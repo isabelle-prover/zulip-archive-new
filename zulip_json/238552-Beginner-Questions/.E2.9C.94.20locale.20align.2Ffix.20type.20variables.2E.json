@@ -1,0 +1,86 @@
+[
+    {
+        "content": "<p>I want to define a locale <code>fin</code> but I am struggling to force <code>'a</code> to refer to the same type:</p>\n<div class=\"codehilite\"><pre><span></span><code>locale fin =\n  fixes fn :: &quot;&#39;a ⇒ &#39;a&quot; and N :: nat\n  assumes card: &quot;card (UNIV :: &#39;a set) = N&quot; &quot;0 &lt; N&quot;\nbegin\n\nlemma f: &quot;finite (f ` UNIV)&quot;\n  apply (rule finite_imageI)\n  using card_ge_0_finite[OF card(2)[folded card(1)]]\n  (*\n    using this:\n      finite UNIV\n    goal (1 subgoal):\n     1. finite UNIV\n  *)\n  sorry\n\nend\n\ninterpretation Fin_bool: fin Not 2\n  by standard simp_all\n\ndeclare [[show_types]]\nlemmas yikes = Fin_bool.f (* finite (range (?f::?&#39;c ⇒ ?&#39;b)) *)\n</code></pre></div>\n<p>Types for <code>yikes</code> are not what I expected, it should be <code>finite (range (?f::bool ⇒ bool)</code>. How do I model this with locales?</p>",
+        "id": 275044077,
+        "sender_full_name": "cai",
+        "timestamp": 1647038230
+    },
+    {
+        "content": "<p>Not sure if I understand you correctly... How about replacing</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">lemma</span> <span class=\"n\">f</span><span class=\"o\">:</span> <span class=\"s\">\"finite (f ` UNIV)\"</span>\n</code></pre></div>\n<p>with</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">lemma</span> <span class=\"n\">f</span><span class=\"o\">:</span> <span class=\"s\">\"finite ((f::_⇒'a) ` (UNIV::'a set))\"</span>\n</code></pre></div>\n<p>which adds more type constraints.</p>",
+        "id": 275089136,
+        "sender_full_name": "Wenda Li",
+        "timestamp": 1647080276
+    },
+    {
+        "content": "<p>Isn't the issue that fin specifies <code>fn</code> as function name, while the lemma uses <code>f</code>? Maybe this is a typo. Or this intended as such and Wenda is right.</p>",
+        "id": 275092438,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1647085436
+    },
+    {
+        "content": "<p>Aye, nvm this is something lost in translation when converting to a minimal example. Thanks for the help! the problem resolved itself as the implementation progressed (and more assumptions rolledin, restricting the types to what I wanted)</p>",
+        "id": 275446137,
+        "sender_full_name": "cai",
+        "timestamp": 1647384582
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"476996\">cai</span> has marked this topic as resolved.</p>",
+        "id": 275446149,
+        "sender_full_name": "Notification Bot",
+        "timestamp": 1647384592
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"476996\">cai</span> has marked this topic as unresolved.</p>",
+        "id": 275447912,
+        "sender_full_name": "Notification Bot",
+        "timestamp": 1647385614
+    },
+    {
+        "content": "<p>Actually not resolved, the issue is still available. For example here:</p>\n<div class=\"codehilite\"><pre><span></span><code>locale f =\n  fixes g :: &quot;&#39;a list ⇒ &#39;a list&quot; and κ :: nat\n  assumes\n    &quot;card (UNIV :: &#39;a set) = κ&quot;\nbegin (* ... *)  end\n\ndeclare [[show_types]]\n\ninterpretation f &quot;λx. take 1 x&quot; 2\n  apply (standard)\n  using card_UNIV_bool\n  (* it is not possible to prove this *)\n</code></pre></div>\n<p>And how can I enabled the type annotations for <code>UNIV</code>? It only shows <code>card UNIV = (2::nat)</code> but I want <code>card (UNIV :: bool set) = (2::nat)</code> or (what there is now (??) <code>card (UNIV :: ?'a) = (2::nat)</code>)..</p>",
+        "id": 275448502,
+        "sender_full_name": "cai",
+        "timestamp": 1647386045
+    },
+    {
+        "content": "<p>When I changed the function to <code>'a =&gt; 'a list</code> or <code>'a =&gt; 'a</code> it works but I cannot express the real <code>g</code> in terms of those generically :'(</p>",
+        "id": 275448603,
+        "sender_full_name": "cai",
+        "timestamp": 1647386127
+    },
+    {
+        "content": "<p>Is there something like <code>-XScopedTypeVariables</code> for Isabelle/HOL ?</p>",
+        "id": 275448707,
+        "sender_full_name": "cai",
+        "timestamp": 1647386212
+    },
+    {
+        "content": "<p>have you tried to to specify the type of <code>λx. take 1 x</code>?</p>",
+        "id": 275476419,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1647417284
+    },
+    {
+        "content": "<div class=\"codehilite\"><pre><span></span><code>interpretation f &quot;λx. take 1 (x::bool list)&quot; 2\n  apply (standard)\n  apply (rule card_UNIV_bool)\n  done\n</code></pre></div>",
+        "id": 275476527,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1647417370
+    },
+    {
+        "content": "<p>Or</p>\n<div class=\"codehilite\"><pre><span></span><code>interpretation f &quot;take 1 :: bool list ⇒ _&quot; 2\n</code></pre></div>",
+        "id": 275476577,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1647417434
+    },
+    {
+        "content": "<p>I see, that does solve the issue indeed. Now I feel stupid. It does not show they type of <code>UNIV</code> but now that is not necessary.</p>",
+        "id": 275560720,
+        "sender_full_name": "cai",
+        "timestamp": 1647456620
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"476996\">cai</span> has marked this topic as resolved.</p>",
+        "id": 275560726,
+        "sender_full_name": "Notification Bot",
+        "timestamp": 1647456624
+    }
+]

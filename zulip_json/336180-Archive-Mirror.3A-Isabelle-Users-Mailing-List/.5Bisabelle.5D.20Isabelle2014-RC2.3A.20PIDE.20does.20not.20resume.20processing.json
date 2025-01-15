@@ -1,0 +1,230 @@
+[
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nApart from a protocol crash, there might be non-termination in the <br>\nprotocol handler, e.g. because of problems to cancel old command <br>\ntransactions.  Normally the protocol loop is detached from actual <br>\nexecution, though.</p>\n<p>A \"PIDE greyout\" means that the important assign_update message is not <br>\nreceived, e.g. due to heavy overloading, long GC, or actual breakdown of <br>\nthe ML side.</p>\n<p>I am including a changeset for testing, which produces syslog messages <br>\nabout the critical protocol phases.  This works via the \"Syslog\" panel, <br>\nwhich is buffered and also restricted in size.</p>\n<p>Makarius<br>\n<a href=\"/user_uploads/14278/tX7cZfDGc4Tu9xLvozv_o96q/ch\">ch</a></p>",
+        "id": 294287867,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660922453
+    },
+    {
+        "content": "<p>From: Andreas Lochbihler &lt;<a href=\"mailto:andreas.lochbihler@inf.ethz.ch\">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>\nHi Makarius,</p>\n<p>The greyout happened again (with Isabelle2014-RC3). This time, I had typed</p>\n<p>thm $</p>\n<p>and placed the cursor at $, then opened Query/Find theorems and searched for simp_implies.</p>\n<p>I've attached the activity log and the output of the syslog. The Prover.echo command still <br>\nworks. There are no exceptions in the shell from which I have started PIDE.</p>\n<p>Hope this helps<br>\nAndreas<br>\n<a href=\"/user_uploads/14278/zIUaCaDVmrHJy6rDzNS2rnIz/greyout.zip\">greyout.zip</a></p>",
+        "id": 294288336,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660922601
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nThanks for continued testing.</p>\n<p>Looking at the results, I would say there is a deadlock in the main <br>\nDocument.update operation -- as you have pointed out earlier that the CPU <br>\nuse of the poly process is 0.</p>\n<p>We somehow need to get to the bottom if it.  Such problems are sometimes <br>\nhardware specific, but if we are lucky it is just a soft mistake in my own <br>\nmachine room of Isabelle/ML.</p>\n<p>Can you just continue testing with threads_trace = \"5\" in <br>\n$ISABELLE_HOME_USER/etc/preferences?  You need to edit that file offline, <br>\nwhile Isabelle/jEdit is not running.  That option will produce massive <br>\namounts of tracing information for syslog, but while the panel is <em>not</em> <br>\nopen the performance hit should be bearable.  Once the greyout happens <br>\nagain, you open an instance of the panel and look at the tail end of the <br>\nlast 100 messages.</p>\n<p>Makarius</p>",
+        "id": 294288597,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660922680
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nThat conclusion is actually too quick, because it is in conflict with the <br>\nfollowing observation:</p>\n<blockquote>\n<p>The Prover.echo command still works.</p>\n</blockquote>\n<p>On the other hand ...</p>\n<blockquote>\n<p>There are no exceptions in the shell from which I have started PIDE.</p>\n</blockquote>\n<p>but the latter refers to JVM exceptions.</p>\n<p>If Prover.echo still works after the greyout, the protocol thread is alive <br>\nand not dead-locked.  The abrupt end of the syslog after Document.update <br>\ncould also mean that it just crashed, but then we need to see ML <br>\nexceptions on Raw Output.  The latter is unbuffered, though.  Did you have <br>\nRaw Output open <em>before</em> the incident?</p>\n<p>Makarius</p>",
+        "id": 294288610,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660922686
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nJust to make sure here is an example for protocol commands that crash:</p>\n<p>ML ‹<br>\n   Isabelle_Process.protocol_command \"error\" (fn _ =&gt; error \"Error\");<br>\n   Isabelle_Process.protocol_command \"interrupt\" (fn _ =&gt; Exn.interrupt ());<br>\n›</p>\n<p>Now the Scala console within Isabelle/jEdit can invoke them like this:</p>\n<p>PIDE.session.protocol_command(\"error\")<br>\n   PIDE.session.protocol_command(\"interrupt\")</p>\n<p>The (unbuffered) result in Raw Output will be like this:</p>\n<p>Isabelle protocol command failure: \"interrupt\"<br>\n   Interrupt<br>\n   Isabelle protocol command failure: \"error\"<br>\n   Error</p>\n<p>So if the Raw Output panel is active in this mysterious PIDE greyout, and <br>\nthe ML protocol command loop failing, it should be visible there.</p>\n<p>One reason for Document.update crashing could be a resource problem, which <br>\nleads to implicit interrupt in Poly/ML.  Above we see that this is printed <br>\nexplicitly, unlike in the normal user space error output, since this is <br>\nthe PIDE machine room.</p>\n<p>Makarius</p>",
+        "id": 294288721,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660922723
+    },
+    {
+        "content": "<p>From: Andreas Lochbihler &lt;<a href=\"mailto:andreas.lochbihler@inf.ethz.ch\">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>\nHi Makarius,</p>\n<p>I opened Raw Output after the greyout. I'll keep Raw Output open the whole time when I <br>\ncontinue testing.</p>\n<p>Andreas</p>",
+        "id": 294288767,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660922745
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nOK, thanks.</p>\n<p>Some more details about jEdit dockables: the instance gets created the <br>\nfirst time you open it in the dock and it remains active while visually <br>\nclosed; it is detroyed only via explicit undocking.  In contrast, a <br>\nfloating instance exists exactly during the livetime of the visible <br>\nwindow.</p>\n<p>Makarius</p>",
+        "id": 294288790,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660922753
+    },
+    {
+        "content": "<p>From: Andreas Lochbihler &lt;<a href=\"mailto:andreas.lochbihler@inf.ethz.ch\">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>\nThanks for the hint. That also explains why sledgehammer aborts a running search when I <br>\nchange the position of the docked sledgehammer panel (say, from dock at bottom to dock at <br>\nright).</p>\n<p>Andreas</p>",
+        "id": 294288807,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660922759
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nSome days ago, I've run myself into a situation of permanent \"PIDE <br>\ngreyout\" while editing some ML files within Isabelle/HOL, which <br>\nautomatically means it is under heavy load, because of the immense size of <br>\nthat session. This was presumably due to a Document.update protocol crash, <br>\nbut I did not have the Raw Output panel open to confirm it. The <br>\nProver.echo protocol command still worked afterwards.</p>\n<p>For the next release candidate, which will be published later today, I <br>\nhave made an end to this game: PIDE protocol exceptions will be part of <br>\nthe buffered syslog channel.  Thus they can be retrieved later, in the <br>\nrare situations when such a breakdown happens.</p>\n<p>Moreover, I have made two rounds through the sources, to see where such a <br>\ncrash can happen theoretically.  I found nothing particular about query <br>\ncommands, but the protocol for PIDE document \"garbage collection\" had a <br>\nweakness stemming from its first implementation 3 years ago: depending on <br>\ntiming, it was possible to have the ML process refer to undefined items <br>\nand thus crash.</p>\n<p>My own crash of ML blob editing fits exactly into this pattern, although I <br>\ncould not reproduce it systematically.  The query crash might be the same <br>\nor something different.  If something like that ever happens again (after <br>\nIsabelle2014-RC4), it is important to preserve the content of the Syslog <br>\npanel afterwards and show that to me.</p>\n<p>Makarius</p>",
+        "id": 294289011,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660922821
+    },
+    {
+        "content": "<p>From: Andreas Lochbihler &lt;<a href=\"mailto:andreas.lochbihler@inf.ethz.ch\">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>\nDear Makarius,</p>\n<p>When I use the Query and Sledgehammer panels heavily, PIDE regularly gets into a state <br>\nwhere the theory text has a grey background, but I cannot get it to resume working any <br>\nmore (There is also no process running, the CPU is idle). The GUI itself is reactive, but <br>\nI cannot get any feedback from Isabelle any more. The Syslog only shows the welcome <br>\nmessage and Raw Output is empty. I then have to shut down jEdit and restart PIDE. I am <br>\nafraid that I don't know how to come up with a better description.</p>\n<p>My system parameters:</p>\n<p>Intel® Core™ i7-3630QM CPU @ 2.40GHz, 16GB memory<br>\nUbuntu 12.04 LTS</p>\n<p>ML_PLATFORM=\"x86-linux\"<br>\nML_HOME=\"/home/andreloc/isabelle/Isabelle2014-RC2/contrib/polyml-5.5.2-1/x86-linux\"<br>\nML_SYSTEM=\"polyml-5.5.2\"<br>\nML_OPTIONS=\"-H 500 --gcthreads 4\"<br>\nISABELLE_JAVA_SYSTEM_OPTIONS=-Dfile.encoding=UTF-8 -server<br>\nJEDIT_JAVA_OPTIONS=-Xms128m -Xmx3072m -Xss2m</p>\n<p>Andreas</p>",
+        "id": 294294369,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660924129
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nThere must have been a protocol crash somewhere at the bottom.  The next <br>\ntime when this happens, there are a few things that can be checked to pin <br>\nit down more precisely:</p>\n<p>* jEdit menu Utilities / Troubleshooting / Activity Log for JVM<br>\n     exception traces -- if you run \"isabelle jedit\" on the command line<br>\n     there should be information on the terminal as well.</p>\n<p>* The following simple test of the ML/Scala protocol handler:</p>\n<p>- open Raw Output panel, to make it active before trying anything</p>\n<p>- open Console/Scala and emit this command:</p>\n<p>PIDE.session.protocol_command(\"Prover.echo\", \"test\")</p>\n<p>The result \"test\" should appear on raw output.  This is the command<br>\n       loop of the prover process in PIDE wrapping.</p>\n<p>Makarius</p>",
+        "id": 294294440,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660924153
+    },
+    {
+        "content": "<p>From: Andreas Lochbihler &lt;<a href=\"mailto:andreas.lochbihler@inf.ethz.ch\">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>\nHi Makarius,</p>\n<p>Today, I experienced a PIDE greyout again, this time in Isabelle2014 while running <br>\nquickcheck. I've attached the Syslog content and the output of error messages in the <br>\nterminal from which I had started Isabelle/jEdit.</p>\n<p>Hope this helps in narrowing down the problem,<br>\nAndreas<br>\n<a href=\"/user_uploads/14278/yj9Z3e2-HW0yjX2F9EeUePA8/greyout.zip\">greyout.zip</a></p>",
+        "id": 294294742,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660924251
+    },
+    {
+        "content": "<p>From: Andreas Lochbihler &lt;<a href=\"mailto:andreas.lochbihler@inf.ethz.ch\">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>\nHi Makarius,</p>\n<p>Here is another datapoint in the greyout story with Isabelle2014. The attached syslog ends <br>\nwith a DUP exception. This time there were no exceptions on the command line. The greyout <br>\nhappened again while I was using the query panel to find theorems.</p>\n<p>My setings are:</p>\n<p>JEDIT_JAVA_OPTIONS=\"-Xms1024m -Xmx4096m -Xss4m\"<br>\nML_OPTIONS=\"-H 500 --gcthreads 4\"q</p>\n<p>Hope this helps,<br>\nAndreas<br>\n<a href=\"/user_uploads/14278/FhmAp_CAivTOC6sE7G-hgVbq/syslog.zip\">syslog.zip</a></p>",
+        "id": 294316292,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660925580
+    },
+    {
+        "content": "<p>From: Harry Butterworth &lt;<a href=\"mailto:heb1001@gmail.com\">heb1001@gmail.com</a>&gt;<br>\nI have also been having to occasionally quit and restart Isabelle 2014<br>\njedit when it stops working.</p>\n<p>Here is the syslog from the latest problem:</p>\n<p>Welcome to Isabelle/HOL (Isabelle2014: August 2014)<br>\npoly: gc_mark_phase.cpp:439: virtual void<br>\nMTGCProcessMarkPointers::ScanAddressesInObject(PolyObject*, POLYUNSIGNED):<br>\nAssertion `baseAddr &gt; (PolyWord<em>)obj &amp;&amp; baseAddr &lt; ((PolyWord</em>)obj)+length'<br>\nfailed.</p>\n<p>message_output terminated<br>\n/usr/local/Isabelle2014/lib/scripts/run-polyml-5.5.2: line 84:  1645<br>\nAborted                 (core dumped) \"$POLY\" -q -i $ML_OPTIONS --eval<br>\n\"$(perl \"$ISABELLE_HOME/lib/scripts/recode.pl\" \"$MLTEXT\")\" --error-exit &lt;<br>\n/dev/null</p>\n<p>rmdir: failed to remove `/tmp/isabelle-harry1631': Directory not empty</p>\n<p>standard_error terminated<br>\nstandard_output terminated<br>\nprocess terminated<br>\ncommand_input terminated<br>\nprocess_manager terminated<br>\nReturn code: 134</p>",
+        "id": 294316481,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660925625
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\n(This thread is already quite old, but not forgotten.  After several weeks <br>\nI am back to normal network connectivity, to make a clean sweep ...)</p>\n<p>Do you remember anything specific about the situation?  E.g. a very big <br>\nmessage being output, say a large subgoal?</p>\n<p>The bash output looks like a stack-overflow in <br>\nisabelle.Protocol.clean_message, although the trace is truncated and the <br>\nexception header is missing.</p>\n<p>The JVM is very unflexible in thread stack management: the value given on <br>\nstartup is taken for all newly created threads, and cannot be changed at <br>\nruntime.  This makes it hard to guess right once and for all, and for <br>\neveryone.</p>\n<p>The Isabelle/jEdit settings have these defaults for heap and stack:</p>\n<p>JEDIT_JAVA_OPTIONS=\"-Xms128m -Xmx1024m -Xss2m\"</p>\n<p>I am using myself this one on a modest 8GB 64bit machine:</p>\n<p>JEDIT_JAVA_OPTIONS=\"-Xms1024m -Xmx4096m -Xss4m\"</p>\n<p>Bigger machines should easily afford -Xss8m or more.</p>\n<p>Oracle basically ships a Harley-Davidson -- it requires a lot of polishing <br>\nand handywork from the power-user.</p>\n<p>David Matthews provides more flexibility in Poly/ML: the stack can grow <br>\ndynamically to some GBs, but even then it is possible to drive the system <br>\nto the limits ...</p>\n<p>Makarius</p>",
+        "id": 294317146,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660925796
+    },
+    {
+        "content": "<p>From: Andreas Lochbihler &lt;<a href=\"mailto:andreas.lochbihler@inf.ethz.ch\">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>\nHi Makarius,</p>\n<p>On 08/10/14 22:51, Makarius wrote:</p>\n<blockquote>\n<blockquote>\n<p>Today, I experienced a PIDE greyout again, this time in Isabelle2014 while running<br>\nquickcheck. I've attached the Syslog content and the output of error messages in the<br>\nterminal from which I had started Isabelle/jEdit.</p>\n</blockquote>\n<p>Do you remember anything specific about the situation?  E.g. a very big message being<br>\noutput, say a large subgoal?</p>\n<p>No, everything was quite small, actually. At that time, I was preparing exercises for the <br>\nIsabelle course at ETH, so I just had a single theory file based on HOL/Main, and <br>\nquickcheck normally outputs only small counterexamples.</p>\n</blockquote>\n<blockquote>\n<p>The Isabelle/jEdit settings have these defaults for heap and stack:</p>\n<p>JEDIT_JAVA_OPTIONS=\"-Xms128m -Xmx1024m -Xss2m\"</p>\n<p>I am using myself this one on a modest 8GB 64bit machine:</p>\n<p>JEDIT_JAVA_OPTIONS=\"-Xms1024m -Xmx4096m -Xss4m\"</p>\n<p>I had the -Xmx4096m option set before, but I will now also adapt your settings for -Xss <br>\nand -Xms. Let's see what happens.</p>\n</blockquote>\n<p>Andreas</p>",
+        "id": 294317205,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660925815
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nI will keep an eye on the JVM stack, and experiment with bigger values for <br>\na future release.</p>\n<p>The memory problem is mainly due to the 32bit limitation of our JVM <br>\nbundle, especially for Windows.  Of course there is a proper 64bit Java <br>\nfor that platform, but we don't use it yet.</p>\n<p>Makarius</p>\n<hr>\n<p><a href=\"http://stop-ttip.org\">http://stop-ttip.org</a></p>\n<hr>",
+        "id": 294317380,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660925876
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nThis is a hard crash of the Poly/ML runtime-system.  It has been reported <br>\nsporadically since about 1 year, e.g. see <br>\n<a href=\"https://lists.cam.ac.uk/mailman/htdig/cl-isabelle-users/2013-December/msg00090.html\">https://lists.cam.ac.uk/mailman/htdig/cl-isabelle-users/2013-December/msg00090.html</a></p>\n<p>My impression is that it occurs more often with big application or tight <br>\nmemory size, e.g. on Windows/Cygwin.</p>\n<p>What is the approximative size of your application?  What is your OS <br>\nplatform?</p>\n<p>Makarius</p>\n<hr>\n<p><a href=\"http://stop-ttip.org\">http://stop-ttip.org</a>  777,282 people so far</p>\n<hr>",
+        "id": 294318718,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660926263
+    },
+    {
+        "content": "<p>From: Peter Lammich &lt;<a href=\"mailto:lammich@in.tum.de\">lammich@in.tum.de</a>&gt;<br>\nWith Isabelle-2014 + jedit, I get grayouts every day. Some of them<br>\nresolve themselves after a few seconds (up to a minute), one or two<br>\ntimes a day I have to restart the IDE. It's annoying, but you get used<br>\nto it :(</p>\n<p>When I got such a grayout during an Isabelle tutorial recently, I asked<br>\nthe students who of them had already experienced such a grayout, and had<br>\nto restart. Almost all arms raised immediately!</p>",
+        "id": 294318827,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660926293
+    },
+    {
+        "content": "<p>From: Joachim Breitner &lt;<a href=\"mailto:breitner@kit.edu\">breitner@kit.edu</a>&gt;<br>\nHi,</p>\n<p>thanks for the definition; I’ll pay closer attention to it from now, but<br>\nI believe I have experienced this or similar effects when there is a<br>\nlooping procedure. My usual reaction is to go to the beginning of the<br>\nfile and change something in the theory header, hoping to reset the<br>\nprocessing. It often works, but that does not mean that I’m not just<br>\ncargo-culting :-)</p>\n<p>Greetings,<br>\nJoachim<br>\n<a href=\"/user_uploads/14278/6UKmaXOkfGVFpSVU3DeLRl-o/signature.asc\">signature.asc</a></p>",
+        "id": 294318860,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660926300
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nOn Thu, 20 Nov 2014, Peter Lammich wrote:</p>\n<blockquote>\n<p>With Isabelle-2014 + jedit, I get grayouts every day. Some of them <br>\nresolve themselves after a few seconds (up to a minute), one or two <br>\ntimes a day I have to restart the IDE. It's annoying, but you get used <br>\nto it :(</p>\n</blockquote>\n<p>Getting used to problems means they are likely to remain indefinitely. <br>\nIt is important that users invest a minimum of time to figure out what is <br>\nactually the situation and provide useful feedback on that.</p>\n<p>I can only repeat that I am not aware of any such open problems in <br>\nIsabelle2014.  I need tangible reports to do anything to increase the <br>\ngeneral system quality again one step further.</p>\n<blockquote>\n<p>Informal definition of \"grayout\": The text in the proof buffer becomes <br>\ngray, and the prover is not responding any more. You can still edit the <br>\ntext.</p>\n</blockquote>\n<p>This is correct, and just a normal consequence how PIDE works: the editor <br>\nis always ready to accept edits, and sends them continously to the prover. <br>\nThe prover reports eventually on the results.</p>\n<p>The aspect \"not responding any more\" is a delicate one.  For example, <br>\ngarbage collection on the ML side or overloading with many long-running <br>\ntasks could lead to seconds of delay, sometimes half a minute.  This is <br>\nnormal and not an immediate problem.  The situation can be improved by <br>\nusing an adequate machine (e.g. 4 cores and 8 GB is very little by today's <br>\nstandards).</p>\n<p>Actual breakdown of the prover process is something else.  The Syslog <br>\npanel should show ML exeptions if anything like that has happened.  By <br>\nshowing me that, I can figure out more.  By keeping the information <br>\nsecret, chances for improvement are much diminished.</p>\n<p>Makarius</p>\n<hr>\n<p><a href=\"http://stop-ttip.org\">http://stop-ttip.org</a>  925,412 people so far</p>\n<hr>",
+        "id": 294319212,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660926373
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nThe syslog ultimately says this:</p>\n<p>Isabelle protocol command failure: \"Document.update\"<br>\n   exception DUP ~5951 raised (line 261 of \"General/table.ML\")</p>\n<p>which refers to Table.update_new.</p>\n<p>Looking at the source, I did not find a plausible way how this exception <br>\ncould have happened -- there are normally handlers to say something more <br>\nspecific like ERROR \"Duplicate command: ~5951\".</p>\n<p>If you see anything like this again, please tell me about it.</p>\n<p>In Isabelle/f4e9bd04e1d5 I have reduced the chances of such low-level DUP <br>\nexceptions, although that might not be directly relevant. We should <br>\ncontinue this on isabelle-dev next time.</p>\n<p>Makarius</p>\n<hr>\n<p><a href=\"http://stop-ttip.org\">http://stop-ttip.org</a></p>\n<hr>",
+        "id": 294322310,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660927321
+    },
+    {
+        "content": "<p>From: Andreas Lochbihler &lt;<a href=\"mailto:andreas.lochbihler@inf.ethz.ch\">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>\nDear Makarius,</p>\n<p>These DUP exceptions (with varying values) occur several times a day with Isabelle2014. <br>\nThey happen when I heavily use find_theorems (with session image HOL-Probability). Most <br>\nlikely, when I start the search while there is no valid context (e.g., because the current <br>\ntheory file is part of HOL-Probability or because there is a syntax error), or when I <br>\nrestart the search while another search is still going on. A week ago, I switched to the <br>\nrepository version (currently 059ba950a657). Since then I have not experienced any of <br>\nthese greyouts. I'll let you know on isabelle-dev when they reappear.</p>\n<p>Andreas</p>",
+        "id": 294322374,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660927330
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nOn Wed, 19 Nov 2014, Andreas Lochbihler wrote:</p>\n<blockquote>\n<p>These DUP exceptions (with varying values) occur several times a day with <br>\nIsabelle2014.</p>\n</blockquote>\n<p>I was not aware of any such problem in the official release.  As usual, <br>\nproblems that are kept secret will remain so over indefinite time.</p>\n<blockquote>\n<blockquote>\n<p>In Isabelle/f4e9bd04e1d5 I have reduced the chances of such low-level<br>\n DUP exceptions, although that might not be directly relevant.</p>\n</blockquote>\n</blockquote>\n<p>It could be worth trying this tiny change <br>\n<a href=\"http://isabelle.in.tum.de/repos/isabelle/rev/f4e9bd04e1d5\">http://isabelle.in.tum.de/repos/isabelle/rev/f4e9bd04e1d5</a> on official <br>\nIsabelle2014, just by editing $ISABELLE_HOME/src/Pure/General/table.ML <br>\naccordingly and rebooting the system.</p>\n<p>Makarius</p>\n<hr>\n<p><a href=\"http://stop-ttip.org\">http://stop-ttip.org</a>  911,984 people so far</p>\n<hr>",
+        "id": 294322390,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660927336
+    },
+    {
+        "content": "<p>From: Andreas Lochbihler &lt;<a href=\"mailto:andreas.lochbihler@inf.ethz.ch\">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>\nHi Makarius,</p>\n<p>On 19/11/14 11:01, Makarius wrote:</p>\n<blockquote>\n<blockquote>\n<p>These DUP exceptions (with varying values) occur several times a day with Isabelle2014.</p>\n</blockquote>\n<p>I was not aware of any such problem in the official release.  As usual, problems that are<br>\nkept secret will remain so over indefinite time.<br>\nI did not get these exceptions during the test phase of release candidates, but I was not <br>\nworking as intensively with Isabelle at that time, either. You cannot complain that I have <br>\nnot reported this problem with DUP. I just did not want to send you an e-mail every time <br>\nthe same failure occurs.</p>\n</blockquote>\n<blockquote>\n<blockquote>\n<blockquote>\n<p>In Isabelle/f4e9bd04e1d5 I have reduced the chances of such low-level<br>\n DUP exceptions, although that might not be directly relevant.</p>\n</blockquote>\n</blockquote>\n<p>It could be worth trying this tiny change<br>\n<a href=\"http://isabelle.in.tum.de/repos/isabelle/rev/f4e9bd04e1d5\">http://isabelle.in.tum.de/repos/isabelle/rev/f4e9bd04e1d5</a> on official Isabelle2014, just<br>\nby editing $ISABELLE_HOME/src/Pure/General/table.ML accordingly and rebooting the system.<br>\nI'll do that, but I cannot promise that I will have time to thoroughly test it during <br>\nwork. My work now has moved to the repository version and no longer runs with <br>\nIsabelle2014, but I have a bunch of other theories that I might get back to some time.</p>\n</blockquote>\n<p>Andreas</p>",
+        "id": 294322422,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660927348
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nI did not complain.  My impression is that the testing of the Isabelle2014 <br>\nrelease candidates resulted in a fairly good release.</p>\n<p>It is just a reminder to everyone who sees practical relevant problems to <br>\nreport them.  Something that fails at intervals of weeks or months is <br>\nmerely a fine point (still to be considered eventually).  Something that <br>\nfails daily is getting in the way of practical work.</p>\n<p>But frequent and reliable failure also means it is relatively easy to pin <br>\ndown and eliminate.</p>\n<p>Makarius</p>\n<hr>\n<p><a href=\"http://stop-ttip.org\">http://stop-ttip.org</a></p>\n<hr>",
+        "id": 294322438,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660927355
+    },
+    {
+        "content": "<p>From: Peter Lammich &lt;<a href=\"mailto:lammich@in.tum.de\">lammich@in.tum.de</a>&gt;</p>\n<blockquote>\n<p>OK, I recommend to apply the tiny change from <br>\n<a href=\"http://isabelle.in.tum.de/repos/isabelle/rev/f4e9bd04e1d5\">http://isabelle.in.tum.de/repos/isabelle/rev/f4e9bd04e1d5</a> by editing <br>\nIsabelle2014/src/Pure/General/table.ML accordingly, and rebooting (which <br>\nwill cause an automatic rebuild of logic images).</p>\n<p>If anything like that happens again, just keep me informed.<br>\n</p>\n</blockquote>\n<p>Again, a permanent grayout, which did not recover itself. This time,<br>\nsyslog sais:</p>\n<p>Welcome to Isabelle/CAVA_Base (Isabelle2014: August 2014)<br>\nIsabelle protocol command failure: \"Document.update\"<br>\nexception Thread \"Thread creation failed\" raised (line 48 of<br>\n\"ML-Systems/polyml.ML\")<br>\nIsabelle protocol command failure: \"Document.update\"<br>\nUndefined document version: -60998<br>\nIsabelle protocol command failure: \"Document.remove_versions\"<br>\nAttempt to remove execution version -60993</p>",
+        "id": 294322609,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660927432
+    },
+    {
+        "content": "<p>From: Peter Lammich &lt;<a href=\"mailto:lammich@in.tum.de\">lammich@in.tum.de</a>&gt;<br>\nThis is what syslog printed on my last grayout, which did not recover<br>\nitself:</p>\n<p>Welcome to Isabelle/CAVA_Base (Isabelle2014: August 2014)<br>\nIsabelle protocol command failure: \"Document.update\"<br>\nexception DUP ~111048 raised (line 261 of \"General/table.ML\")</p>",
+        "id": 294322730,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660927465
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nOK, I recommend to apply the tiny change from <br>\n<a href=\"http://isabelle.in.tum.de/repos/isabelle/rev/f4e9bd04e1d5\">http://isabelle.in.tum.de/repos/isabelle/rev/f4e9bd04e1d5</a> by editing <br>\nIsabelle2014/src/Pure/General/table.ML accordingly, and rebooting (which <br>\nwill cause an automatic rebuild of logic images).</p>\n<p>If anything like that happens again, just keep me informed.</p>\n<p>Makarius</p>\n<hr>\n<p><a href=\"http://stop-ttip.org\">http://stop-ttip.org</a>  1,015,195 people so far</p>\n<hr>",
+        "id": 294322769,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660927477
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nA java process with 100% (and a few GB memory) could mean that the <br>\nspecified heap is full and GC failing to continue properly.  This is a <br>\nwell-known \"feature\" of the JVM.  You need to give more room in advance, <br>\ne.g. like this in $ISABELLE_HOME_USER/etc/settings:</p>\n<p>JEDIT_JAVA_OPTIONS=\"-Xms1024m -Xmx4096m -Xss4m\"</p>\n<p>There are a few more examples in <br>\n$ISABELLE_HOME/src/Tools/jEdit/etc/settings -- you need to restart the <br>\napplication afterwards.</p>\n<p>This only refers the \"isabelle jedit\" command-line tool, or the Linux <br>\ntoplevel \"app\" script.  For Mac OS X, the Info.plist provides similar JVM <br>\nproperties.  Likewise for Windows in the Isabelle2014.ini file.</p>\n<p>Note that the defaults are for a 2-4 GB machine in 32bit mode, where JVM <br>\nmemory is tight.  On Linux or Mac OS X the JVM is usually in 64bit mode, <br>\nand bigger heap as above can be easily afforded.  On Windows the bundled <br>\nJVM is always for 32bit, though, but a 64bit one could be installed <br>\nmanually, e.g. by replacing the Isabelle2014/contrib/jdk directory.</p>\n<p>Makarius</p>\n<hr>\n<p><a href=\"http://stop-ttip.org\">http://stop-ttip.org</a>  1,023,025 people so far</p>\n<hr>",
+        "id": 294322894,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660927527
+    },
+    {
+        "content": "<p>From: Gottfried Barrow &lt;<a href=\"mailto:igbi@gmx.com\">igbi@gmx.com</a>&gt;<br>\nMakarius wrote:</p>\n<blockquote>\n<p>A java process with 100% (and a few GB memory) could mean that the <br>\nspecified heap is full and GC failing to continue properly. This is a <br>\nwell-known \"feature\" of the JVM. You need to give more room in <br>\nadvance, e.g. like this in $ISABELLE_HOME_USER/etc/settings:<br>\nJEDIT_JAVA_OPTIONS=\"-Xms1024m -Xmx4096m -Xss4m\"</p>\n</blockquote>\n<p>I'm not having any big problems, but when I try that with 32-bit Java, <br>\non a PC with 16G of RAM, the PIDE tries to start, but quickly terminates.</p>\n<blockquote>\n<p>...the defaults are for a 2-4 GB machine in 32bit mode, where JVM <br>\nmemory is tight. ... On Windows the bundled JVM is always for 32bit, <br>\nthough, but a 64bit one could be installed manually, e.g. by replacing <br>\nthe Isabelle2014/contrib/jdk directory.</p>\n</blockquote>\n<p>So, I did this:</p>\n<p>*) Install the 64-bit JDK: <br>\n<a href=\"http://www.oracle.com/technetwork/java/javase/downloads/jdk7-downloads-1880260.html\">http://www.oracle.com/technetwork/java/javase/downloads/jdk7-downloads-1880260.html</a></p>\n<p>*) Copy 'C:\\Program Files\\java\\jdk1.7.0_71' to <br>\n'Isabelle2014\\contrib\\jdk\\jdk1.7.0_71'</p>\n<p>*) Rename 'Isabelle2014\\contrib\\jdk\\x86-cygwin' to 'jdk\\x86-cygwin__OLD'</p>\n<p>*) Rename 'Isabelle2014\\contrib\\jdk\\jdk1.7.0_71' to 'jdk\\x86-cygwin'</p>\n<p>I'm using these settings on a PC with 16G of RAM and cheap 8-core AMD <br>\nFX-8320:</p>\n<p>JEDIT_JAVA_OPTIONS=\"-Xms4G -Xmx8G -Xss4m\"</p>\n<p>It's working so far. Thanks for the info.</p>\n<p>Regards,<br>\nGB</p>",
+        "id": 294323073,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660927588
+    },
+    {
+        "content": "<p>From: Gottfried Barrow &lt;<a href=\"mailto:igbi@gmx.com\">igbi@gmx.com</a>&gt;<br>\nWith 64-bit Java it worked out and is working out because I set the <br>\nenvironment with a batch file, and then I start 'isabelle' with a <br>\ncombination of a batch file and bash file like this:</p>\n<p>BATCH:</p>\n<p>start /MIN mintty.exe -i /Cygwin-Terminal.ico \"%~dp0%~n0.bash\"</p>\n<p>BASH:</p>\n<p>isabelle jedit -l HOL</p>\n<p>If I try to use 'Isabelle2014.exe' directly, or us it in a batch file, I <br>\nget a window that says, \"Error starting Java VM\".</p>\n<p>It doesn't matter to me, but someone else may need the info to use <br>\n64-bit Java.</p>\n<p>Regards,<br>\nGB</p>",
+        "id": 294323100,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660927600
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nIndeed.  This is actually the main reason why Isabelle on Windows does not <br>\nhave the 64 bit option yet: the .exe already determines the platform <br>\npersonality, and it is not possible to switch that later.</p>\n<p>Java 8 has a slightly different .exe for applications, but it is also <br>\nquite new.  Maybe that can be used in the next release.</p>\n<p>Makarius</p>\n<hr>\n<p><a href=\"http://stop-ttip.org\">http://stop-ttip.org</a>  1,061,642 people so far</p>\n<hr>",
+        "id": 294323119,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660927605
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nThis might be of concern to David Matthews, the man behind Poly/ML.</p>\n<p>I just want to point out, that Isabelle/ML can quite easily cope with a <br>\nsituation, where Thread.fork may sporadically fail due to resource <br>\nproblems, in a way where exceptions won't crash the system infrastructure. <br>\nIt will be done like that in the next Isabelle release.</p>\n<p>Until then the same procedure as everytime: tangible problem reports lead <br>\nto eventual resolution; non-tangible or secret problems will remain <br>\nindefinitely.</p>\n<p>Makarius</p>",
+        "id": 294324471,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660928060
+    },
+    {
+        "content": "<p>From: Peter Lammich &lt;<a href=\"mailto:lammich@in.tum.de\">lammich@in.tum.de</a>&gt;<br>\nAgain the assertion error from the garbage-collector, again from jedit<br>\nunder heavy load.</p>\n<p>This (probably Poly/ML) problem starts to get annyoing ...</p>\n<p>Peter</p>\n<hr>\n<p>Welcome to Isabelle/HOL (Isabelle2014: August 2014)<br>\npoly: gc_mark_phase.cpp:439: virtual void<br>\nMTGCProcessMarkPointers::ScanAddressesInObject(PolyObject*,<br>\nPOLYUNSIGNED): Assertion `baseAddr &gt; (PolyWord*)obj &amp;&amp; baseAddr &lt;<br>\n((PolyWord*)obj)+length' failed.</p>\n<p>message_output terminated</p>",
+        "id": 294324498,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660928072
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nOn Tue, 30 Dec 2014, Peter Lammich wrote:</p>\n<blockquote>\n<blockquote>\n<p>OK, I recommend to apply the tiny change from<br>\n<a href=\"http://isabelle.in.tum.de/repos/isabelle/rev/f4e9bd04e1d5\">http://isabelle.in.tum.de/repos/isabelle/rev/f4e9bd04e1d5</a> by editing<br>\nIsabelle2014/src/Pure/General/table.ML accordingly, and rebooting (which<br>\nwill cause an automatic rebuild of logic images).</p>\n<p>If anything like that happens again, just keep me informed.<br>\n</p>\n</blockquote>\n<p>Again, a permanent grayout, which did not recover itself.</p>\n</blockquote>\n<p>Thanks for reporting that.  As always, it is important for me get an <br>\nimpression about two things:</p>\n<p>(1) What kind of crashes can happen.</p>\n<p>(2) The approximate frequency they happen.</p>\n<p>In that sense, just keep me informed if you see something like this again.</p>\n<p>Anyone else who sees the same or similar breakdowns is welcome to say so, <br>\ntoo.</p>\n<blockquote>\n<p>This time, syslog sais:</p>\n<p>Welcome to Isabelle/CAVA_Base (Isabelle2014: August 2014)<br>\nIsabelle protocol command failure: \"Document.update\"<br>\nexception Thread \"Thread creation failed\" raised (line 48 of \"ML-Systems/polyml.ML\")</p>\n</blockquote>\n<blockquote>\n<p>Isabelle protocol command failure: \"Document.update\"<br>\nUndefined document version: -60998<br>\nIsabelle protocol command failure: \"Document.remove_versions\"<br>\nAttempt to remove execution version -60993</p>\n</blockquote>\n<p>Here I was first distracted by the latter part, which would have been an <br>\nintegrity problem within the PIDE protocol state, i.e. in my own <br>\ndepartment.</p>\n<p>The relevant bit is \"Thread creation failed\", though, which is produced by <br>\nthe Poly/ML runtime system, when the system function pthread_create fails <br>\n(according to libpolyml/processes.cpp).  The man page for that function <br>\nsays about error situations:</p>\n<p>EAGAIN Insufficient resources to create another thread,  or  a  system-<br>\n               imposed  limit  on  the  number of threads was encountered.  The<br>\n               latter case  may  occur  in  two  ways:  the  RLIMIT_NPROC  soft<br>\n               resource  limit  (set via setrlimit(2)), which limits the number<br>\n               of process for a real user ID, was reached; or the kernel's sys‐<br>\n               tem-wide   limit   on  the  number  of  threads,  /proc/sys/ker‐<br>\n               nel/threads-max, was reached.</p>\n<p>We can probably ignore the explicit /proc/sys/kernel/threads-max -- it is <br>\na very high value on my Ubuntu system.</p>\n<p>In other words, we are back to the usual guess of insufficient resources <br>\n-- unless your application was unexpectedly tiny.</p>\n<p>It should be explicitly noted that stack space was already sucessfully <br>\nallocated -- there is a different exception for that: \"Unable to allocate <br>\nthread stack\".</p>\n<p>Maybe we are slowly moving out of the 32-bit era, but there might be a <br>\ncompletely different reason.</p>\n<p>Makarius</p>",
+        "id": 294325638,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660928452
+    },
+    {
+        "content": "<p>From: Peter Lammich &lt;<a href=\"mailto:lammich@in.tum.de\">lammich@in.tum.de</a>&gt;<br>\nHere is the next one. Putting Isabelle under heavy load seems not to be<br>\na good idea nowadays :( </p>\n<p>A few years ago, Isabelle used to be very stable, even on big stuff ...</p>\n<p>Welcome to Isabelle/HOL (Isabelle2014: August 2014)<br>\npoly: gc_mark_phase.cpp:439: virtual void<br>\nMTGCProcessMarkPointers::ScanAddressesInObject(PolyObject*,<br>\nPOLYUNSIGNED): Assertion `baseAddr &gt; (PolyWord*)obj &amp;&amp; baseAddr &lt;<br>\n((PolyWord*)obj)+length' failed.</p>\n<p>Malformed message:<br>\nbad chunk (unexpected EOF after 3012 of 4431 bytes)<br>\nmessage_output terminated<br>\n/home/lammich/opt/Isabelle2014/lib/scripts/run-polyml-5.5.2: line 84:<br>\n7861 Aborted                 (core dumped) \"$POLY\" -q -i $ML_OPTIONS<br>\n--eval \"$(perl \"$ISABELLE_HOME/lib/scripts/recode.pl\" \"$MLTEXT\")\"<br>\n--error-exit &lt; /dev/null</p>\n<p>standard_error terminated<br>\nstandard_output terminated<br>\nprocess terminated<br>\ncommand_input terminated<br>\nprocess_manager terminated<br>\nReturn code: 134</p>",
+        "id": 294325829,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660928520
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nOn Fri, 9 Jan 2015, Peter Lammich wrote:</p>\n<blockquote>\n<p>Here is the next one. Putting Isabelle under heavy load seems not to be<br>\na good idea nowadays :(</p>\n<p>A few years ago, Isabelle used to be very stable, even on big stuff ...</p>\n</blockquote>\n<p>This impression is not based on facts: the applications today are much <br>\nlarger than in the past, and we are actually doing quite well.</p>\n<p>There was always a hidden concrete wall, and some applications / users <br>\nhave driven very fast towards it without being aware of normal resource <br>\nlimitations on concrete computing infrastructure.  That concrete wall has <br>\nbeen moved many times over many years, such that today we can do insanely <br>\nlarge applications in a quite stable environment.</p>\n<p>Now that TTY and Proof General support has been finally deleted from the <br>\ncode-base, I can revisit some old problems in a better way, to make the <br>\nsystem even more stable.</p>\n<blockquote>\n<p>Welcome to Isabelle/HOL (Isabelle2014: August 2014)<br>\npoly: gc_mark_phase.cpp:439: virtual void<br>\nMTGCProcessMarkPointers::ScanAddressesInObject(PolyObject*,<br>\nPOLYUNSIGNED): Assertion `baseAddr &gt; (PolyWord*)obj &amp;&amp; baseAddr &lt;<br>\n((PolyWord*)obj)+length' failed.</p>\n</blockquote>\n<p>See also this thread \"Report of Crash of Isabelle 2014\" <br>\n<a href=\"https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2014-December/msg00097.html\">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2014-December/msg00097.html</a></p>\n<p>Makarius</p>",
+        "id": 294326105,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660928581
+    }
+]

@@ -1,0 +1,38 @@
+[
+    {
+        "content": "<p>From: Manuel Eberl &lt;<a href=\"mailto:manuel@pruvisto.org\">manuel@pruvisto.org</a>&gt;<br>\nHello,</p>\n<p>I have a typedef of the form</p>\n<p>typedef good_nat = \"{n::nat. good n}\"</p>\n<p>and I have an executable function that produces a \"nat list\" where I <br>\nhave proven that all entries are good.</p>\n<p>How can I lift that to an <em>executable</em> function that produces a <br>\n\"good_nat list\" instead?</p>\n<p>The way I see it, the usual approach of doing a \"code abstype\" and <br>\nspecifying the code equation in terms of some projection out of the <br>\n\"type with invariant\" to \"type without invariant\" doesn't work here <br>\nbecause I have lists of these things.</p>\n<p>I do have a workaround involving a second typedef for intermediate <br>\nresults, but it is very boilerplatey and I'd be happy to know if there <br>\nis something easier.</p>\n<p>See attachment for all the details.</p>\n<p>Thanks,</p>\n<p>Manuel<br>\n<a href=\"/user_uploads/14278/eu2f9LT_aB14YO46QjH_B3UH/Test.thy\">Test.thy</a></p>",
+        "id": 257669928,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1634290197
+    },
+    {
+        "content": "<p>From: Manuel Eberl &lt;<a href=\"mailto:manuel@pruvisto.org\">manuel@pruvisto.org</a>&gt;<br>\nSmall addition: another application of this is to make a \"safe\" <br>\nconstructor for types with invariants that returns \"None\" if the given <br>\nvalue does not fulfil the invariant, e.g.:</p>\n<p>mk_pos_nat :: nat ⇒ good_nat option<br>\nmk_pos_nat n = (if good_nat n then Some (Abs_good_nat n) else None)</p>\n<p>One can do this with an auxiliary function that returns a default value <br>\ninstead of None, but then you have to check the condition twice.</p>\n<p>The best possible solution I see here is if \"code abstype\" could handle <br>\nnot only equations of the form \"projection (fun_with_invariant x y z) = <br>\n…\" but relations involving \"canonical\" relators on types. In the above <br>\ncase, one would then not have a code equation but a code relation:</p>\n<p>rel_fun (=) (rel_option pcr_good_nat)<br>\n      (λn. if good n then Some n else None) mk_good_nat</p>\n<p>Similarly, the function in my last email have the following relations:</p>\n<p>rel_fun (=) (list_all2 pcr_good_nat)<br>\n      my_complicated_computation my_complicated_computation'</p>\n<p>The actual generated code should of course be:</p>\n<p>mk_pos_nat n = (if good_nat n then Some (Abs_good_nat n) else None</p>\n<p>my_complicated_computation' xs = map Abs_good_nat <br>\n(my_complicated_computation xs)</p>\n<p>Which is exactly the m_complicated_computation' that comes out of the <br>\nlift_definition anyway (and I imagine there's a one-to-one <br>\ncorrespondence between the map operations in the def lemma and the <br>\nrelators in the transfer lemma).</p>\n<p>So, not sure – is there some fundamental problem with implementation <br>\nsomething like this in the code generator?</p>\n<p>Manuel</p>",
+        "id": 257710368,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1634309555
+    },
+    {
+        "content": "<p>From: Dmitriy Traytel &lt;<a href=\"mailto:traytel@di.ku.dk\">traytel@di.ku.dk</a>&gt;<br>\nHi Manuel,</p>\n<p>lift_definition already implements your workaround. Try:</p>\n<p>context notes[[typedef_overloaded]] begin<br>\nlift_definition (code_dt) my_complicated_computation' :: \"nat ⇒ good_nat list\" is my_complicated_computation<br>\n  using my_complicated_computation_good by (auto simp: list.pred_set)<br>\nend</p>\n<p>(The context is only needed because your typedef is overloaded. If you have a concrete non-overloaded definition for good you can drop it.)</p>\n<p>This is documented in Ondra's PhD thesis (<a href=\"https://www21.in.tum.de/~kuncar/documents/kuncar-phdthesis.pdf\">https://www21.in.tum.de/~kuncar/documents/kuncar-phdthesis.pdf</a>, Section 6.4) and in isar-ref (page 282 for the Isabelle2021 edition).</p>\n<p>IIRC, Ondra had also considered extending the code generator but decided against as it would significantly increase the trusted code base (which now would need to take map functions into account).</p>\n<p>Dmitriy</p>",
+        "id": 257723416,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1634314339
+    },
+    {
+        "content": "<p>From: Manuel Eberl &lt;<a href=\"mailto:manuel@pruvisto.org\">manuel@pruvisto.org</a>&gt;<br>\nInteresting, thanks!</p>\n<p>Unfortunately, there seems to be a problem with the implementation. <br>\nConsider e.g. this example:</p>\n<p>typedef mynat = \"{n::nat. n &gt; 0 ∧ even n}\"<br>\n   by (rule exI[of _ 2]) auto</p>\n<p>typedef foo = \"{(a :: nat,bs :: (nat × nat) list). ∀b∈set bs. fst b &gt; 0 <br>\n∧ even (fst b)}\"<br>\n   by (rule exI[of _ \"(0, [])\"]) auto</p>\n<p>setup_lifting type_definition_foo<br>\nsetup_lifting type_definition_mynat</p>\n<p>lift_definition (code_dt) bar :: \"foo ⇒ (mynat × nat) list\" is snd<br>\n   by (force simp: list.pred_set)</p>\n<p>This gives me a \"tactic failed\".</p>\n<p>Manuel</p>",
+        "id": 257726864,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1634315707
+    },
+    {
+        "content": "<p>From: Manuel Eberl &lt;<a href=\"mailto:manuel@pruvisto.org\">manuel@pruvisto.org</a>&gt;<br>\nNB: if I wrap the conjunction in the typedef of mynat into another <br>\ndefinition, everything works fine. So there seems to be some problem <br>\nwith the conjunction.</p>\n<p>Manuel</p>",
+        "id": 257727780,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1634316088
+    },
+    {
+        "content": "<p>From: Florian Haftmann &lt;<a href=\"mailto:florian.haftmann@informatik.tu-muenchen.de\">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>\nHi all,</p>\n<p>I can confirm this since I backed this decision.  Sorry for the late reply.</p>\n<p>Florian<br>\n<a href=\"/user_uploads/14278/8C4qZvo5GU-iM1wOzQULEB8c/OpenPGP_signature\">OpenPGP_signature</a></p>",
+        "id": 261293464,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1636742178
+    }
+]

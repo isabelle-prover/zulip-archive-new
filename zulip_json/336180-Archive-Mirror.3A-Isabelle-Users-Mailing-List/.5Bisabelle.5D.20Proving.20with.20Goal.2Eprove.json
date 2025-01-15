@@ -1,0 +1,56 @@
+[
+    {
+        "content": "<p>From: John Munroe &lt;<a href=\"mailto:munddr@gmail.com\">munddr@gmail.com</a>&gt;<br>\nHello again,</p>\n<p>I'm trying another example with Goal.prove, but it can't seem to<br>\ndischarge the proof goal. I must have done something wrong:</p>\n<p>ML {*</p>\n<p>fun foo ctxt st =<br>\n  let<br>\n    val {prop,...} = Thm.rep_thm st<br>\n    val tac = auto_tac (clasimpset_of ctxt)<br>\n    val t = Goal.prove ctxt [] [] prop<br>\n      (fn _ =&gt; tac)<br>\n  in<br>\n    tac st<br>\n  end;</p>\n<p>*}</p>\n<p>lemma lem1: \"EX x y. x = y\"<br>\napply (tactic {* foo @{context} *})</p>\n<p>Does the value prop not contain the goal of lem1? If not, how can the<br>\ngoal for the current goal state be retrieved?</p>\n<p>Thanks again!</p>\n<p>John</p>",
+        "id": 294116178,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660838386
+    },
+    {
+        "content": "<p>From: John Munroe &lt;<a href=\"mailto:munddr@gmail.com\">munddr@gmail.com</a>&gt;<br>\nI want to add that I know foo could just be auto_tac (clasimpset_of<br>\nctxt) and proves lem1, but I'm experimenting with Goal.prove.<br>\nSpecifically, I want to see why Goal.prove fails.</p>\n<p>Thanks</p>\n<p>John</p>",
+        "id": 294116313,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660838410
+    },
+    {
+        "content": "<p>From: Michael Chan &lt;<a href=\"mailto:mchan@inf.ed.ac.uk\">mchan@inf.ed.ac.uk</a>&gt;</p>\n<blockquote>\n<p>Does the value prop not contain the goal of lem1? If not, how can the<br>\ngoal for the current goal state be retrieved?<br>\n</p>\n</blockquote>\n<p>John,</p>\n<p>I'm not sure myself, but it seems like the prop here is:</p>\n<p>EX (x::'a) y::'a. y &lt; x ==&gt; (EX (x::'a) y::'a. y &lt; x)</p>\n<p>so that doesn't look like the goal in lem1. Hopefully someone more <br>\nfamiliar with the ML level can answer your question.</p>\n<p>Michael</p>\n<blockquote>\n<p>Thanks again!</p>\n<p>John</p>\n</blockquote>",
+        "id": 294116354,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660838427
+    },
+    {
+        "content": "<p>From: Cezary Kaliszyk &lt;<a href=\"mailto:cezarykaliszyk@gmail.com\">cezarykaliszyk@gmail.com</a>&gt;<br>\nHi,</p>\n<p>Additionally there is a (hidden) prop marker that separates all the<br>\nremaining subgoals from<br>\nthe original goal. Since 'auto' cannot deal with the prop-marker it<br>\nfails. So to make your code<br>\nwork you may want to strip the assumptions and remove the prop marker.</p>\n<p>The following does work:</p>\n<p>val {prop,...} = Thm.rep_thm st<br>\n  val t = Goal.prove ctxt [] [] (Logic.unprotect<br>\n(Logic.strip_assums_concl prop)) (fn _ =&gt; tac)</p>\n<p>But the above is somehow very low-level, if you want to look at<br>\nsubparts of the goal in a tactic<br>\nin a convenient way you may want to have a look at the Subgoal.FOCUS<br>\nfamily of combinators.</p>\n<p>Cezary.</p>",
+        "id": 294118408,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660839003
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nThere are some explanations in the Isabelle/Isar implementation manual, <br>\nsection 3.1 and 3.2.  The invisible prop marker is written as # in 3.1. <br>\nAdministrative operations like Goal.conclude should be only used on your <br>\nown Goal.init states, not arbitrary goal states seen by tactics.  Regular <br>\ntactics cannot count on any particular format of the main conclusion -- <br>\nthere might be 0 or more main goal markers.</p>\n<p>All regular tactical reasoning takes place on the left side, operating on <br>\nthe list of subgoals.  The main conclusion is a no-go area for tactics.</p>\n<p>Makarius</p>",
+        "id": 294118572,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660839068
+    },
+    {
+        "content": "<p>From: John Munroe &lt;<a href=\"mailto:munddr@gmail.com\">munddr@gmail.com</a>&gt;<br>\nIf I understand correctly, does Logic.unprotect remove the prop marker<br>\nfrom the main conclusion (conclusion of prop)? Is the concl of a focus<br>\nsupposed to be the main conclusion, but with the prop marker removed?</p>\n<p>Thanks.</p>\n<p>John</p>",
+        "id": 294118770,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660839134
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nFirst of all, the function foo above looks formally like a tactic, so it <br>\nhas to be called foo_tac, and probably parameterized over i: int (subgoal <br>\nnumber).</p>\n<p>Inspecting the full prop of a goal \"st\" hardly ever makes sense.</p>\n<p>The most basic way to get hold of a certain subgoal is via the SUBGOAL <br>\ncombinator.</p>\n<p>SUBPROOF or FOCUS and variants are far more advanced technologies that are <br>\nconvenient in many cases, but definitely overkill to peek at a specified <br>\nsubgoal.</p>\n<p>Forget everything you have heard about Goal.init, Goal.conclude unprotect <br>\netc. on this thread.  That's a completely different story about <br>\nimplementing a structured goal concept, not just using it.</p>\n<p>Makarius</p>",
+        "id": 294119034,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660839203
+    },
+    {
+        "content": "<p>From: Michael Chan &lt;<a href=\"mailto:mchan@inf.ed.ac.uk\">mchan@inf.ed.ac.uk</a>&gt;<br>\nSince we're on Goal.prove, I'd like to ask a quick question: can it be <br>\nused to prove schematic goals? It seems that if the goal is, say, \"EX <br>\n(f::?'a=&gt;?'b)...\", the type of f in concl of the focus becomes \"'a=&gt;'b\". <br>\nSo if Goal.prove takes only concl of the focus, it'd be non-schematic. <br>\nSo it seems like Goal.prove handles schematic goals as non-schematic <br>\nones. Am I missing something here?</p>\n<p>Thanks<br>\nMichael</p>",
+        "id": 294119426,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660839340
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nGoal.prove itself does not interfere with the schematic status of the <br>\ninput, it merely checks that the final result is an instance of the <br>\ninitial claim.</p>\n<p>Since you speak about \"focus\" above, I reckon that you are also using the <br>\nvery convenient Subgoal.FOCUS suite of combinators.  This relatively <br>\nrecent technology is able to address almost all issues and surprises about <br>\ngoal states that have accumulated over the years, but it limits the part <br>\nof the subgoal you are focusing to a fixed view of variables.  So indeed, <br>\nit temporarily imports ?'a=&gt;?'b and presents it as 'a=&gt;'b in the auxiliary <br>\ncontext.</p>\n<p>Apart from that, goals with schematic <em>type</em> variables are always prone to <br>\ncause problems elsewhere: various proof tools choke on that.  It is <br>\ntechnically relatively hard to \"synthesize\" Pure/HOL types in Isabelle, <br>\nharder than synthesizing term instances.</p>\n<p>Makarius</p>",
+        "id": 294119659,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660839410
+    }
+]

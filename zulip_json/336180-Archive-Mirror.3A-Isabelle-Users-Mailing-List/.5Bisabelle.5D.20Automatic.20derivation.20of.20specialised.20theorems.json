@@ -1,0 +1,68 @@
+[
+    {
+        "content": "<p>From: Manuel Eberl &lt;<a href=\"mailto:eberlm@in.tum.de\">eberlm@in.tum.de</a>&gt;<br>\nHallo,</p>\n<p>I currently have the following situation: I have a number of theorems in<br>\nsome typeclass that contain terms such as “x div foo x” (where foo is a<br>\nfunction constant and x is a free variable)</p>\n<p>For particular instantiations of this typeclass, “x div foo x” often has<br>\na much easier form. Say, for instance, I have a theorem “(?x::nat) div<br>\nfoo ?x = ?x” I would therefore like to do the following for any theorem<br>\nthat contains “?x div foo ?x” as a subterm:</p>\n<ol>\n<li>\n<p>replace every occurrence of “x div foo x” in the theorem with “?x”<br>\n(i.e. just replace lhs of equation with rhs everywhere)</p>\n</li>\n<li>\n<p>perform some simplification, possibly with a restricted simpset</p>\n</li>\n<li>register the new theorem under the name of the old one, plus the<br>\nsuffix “_nat”</li>\n</ol>\n<p>Are there any existing mechanisms for something like this? If not, how<br>\nshould I proceed? For instance, how do I get a list of all theorems<br>\ncontaining such a pattern? (All of this will be done only in the theory<br>\nwhere the type class instance was first derived, so this is a very<br>\n“local” operation, the number of theorems affected is not very large)</p>\n<p>Cheers,<br>\nManuel</p>",
+        "id": 294267714,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660916146
+    },
+    {
+        "content": "<p>From: Peter Lammich &lt;<a href=\"mailto:lammich@in.tum.de\">lammich@in.tum.de</a>&gt;</p>\n<blockquote>\n<ol>\n<li>replace every occurrence of “x div foo x” in the theorem with “?x”<br>\n(i.e. just replace lhs of equation with rhs everywhere)</li>\n<li>perform some simplification, possibly with a restricted simpset</li>\n<li>register the new theorem under the name of the old one, plus the<br>\nsuffix “_nat”</li>\n</ol>\n</blockquote>\n<p>1 + 2 sounds like the \"unfolded\" and \"simplified\" attributes.</p>\n<p>For 3, I do not know any \"clean\" solution ;)</p>\n<p>-- Peter</p>\n<blockquote>\n<p>Are there any existing mechanisms for something like this? If not, how<br>\nshould I proceed? For instance, how do I get a list of all theorems<br>\ncontaining such a pattern? (All of this will be done only in the theory<br>\nwhere the type class instance was first derived, so this is a very<br>\n“local” operation, the number of theorems affected is not very large)</p>\n<p>Cheers,<br>\nManuel</p>\n</blockquote>",
+        "id": 294267725,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660916152
+    },
+    {
+        "content": "<p>From: Andreas Lochbihler &lt;<a href=\"mailto:andreas.lochbihler@inf.ethz.ch\">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>\nHi Manuel,</p>\n<p>From your name \"_nat\", I guess that you just need this transformation for natural <br>\nnumbers, so you can exploit the rewriting morphism of interpretation. If you state more <br>\nequations there, you get more simplification. This also allows you to register the facts <br>\nunder the same name with a prefix such as \"nat.\". Suffixes are not supported. Here's a <br>\nsilly example.</p>\n<p>class foo = div + fixes foo :: \"'a =&gt; 'a\" begin<br>\nlemma foo: \"x div foo x = y\" sorry<br>\nend</p>\n<p>interpretation nat!: foo \"op *\" \"op div\" \"op mod\" \"id :: nat =&gt; nat\"<br>\n   where \"!!x :: nat. x div id x == x\" sorry</p>\n<p>thm <a href=\"http://nat.foo\">nat.foo</a></p>\n<p>Best,<br>\nAndreas</p>",
+        "id": 294267743,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660916158
+    },
+    {
+        "content": "<p>From: Manuel Eberl &lt;<a href=\"mailto:eberlm@in.tum.de\">eberlm@in.tum.de</a>&gt;<br>\nNot quite. I also need it for int. I thought about using locales, but<br>\nthat would require me to also put the original theorems into a locale of<br>\ntheir own; I'm not sure whether I want that.</p>\n<p>Also, in regard to what Peter said: I'm not really looking for a<br>\nsolution within the high level stuff of Isabelle, I was thinking of a<br>\nsolution in Isabelle/ML. My main problem is finding all the theorems<br>\nthat contain an occurrence of some pattern; if I knew how to do that, I<br>\ncould probably manage the rest myself with what little knowledge I have<br>\nof Isabelle/ML.</p>\n<p>Cheers,<br>\nManuel</p>",
+        "id": 294267804,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660916170
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nI've found this approach by Andreas quite nice. What is wrong about <br>\nputting your original theorems into a locale?</p>\n<p>Without any further context of the actual application, it is hard to tell <br>\nwhat you actually need, in contrast to what you think you want.</p>\n<p>Makarius</p>",
+        "id": 294268830,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660916522
+    },
+    {
+        "content": "<p>From: Manuel Eberl &lt;<a href=\"mailto:eberlm@in.tum.de\">eberlm@in.tum.de</a>&gt;<br>\nPoint taken.</p>\n<p>The context is the following, modified GCD theory, in particular the<br>\nlemmas in euclidean_semiring_gcd: <a href=\"http://shodan.linuxd.org/paste/Fl46bj4E\">http://shodan.linuxd.org/paste/Fl46bj4E</a></p>\n<p>The problem is that the general theorems in euclidean_semiring_gcd<br>\ncontain statements such as \"is_unit x\", \"associated x y\",<br>\n\"normalisation_factor x\", \"euclidean_size x\". However:</p>\n<ul>\n<li>for nat, these simplify to \"x = 1\", \"x = y\", \"1\", and \"x\", respectively</li>\n<li>\n<p>For int, they simplify to \"abs x = 1\", \"abs x = abs y\", \"sgn x\", and<br>\n\"abs x\", respectively</p>\n</li>\n<li>\n<p>for 'a poly, they simplify to \"x ? 0 ? degree x = 0\", \"associated x<br>\ny\", \"coeff (degree x) x\", and \"degree x\", respectively</p>\n</li>\n</ul>\n<p>Also, expressions such as \"x div normalisation_factor x\" simplify<br>\naccordingly to \"x\" for nat and \"abs x\" for int.</p>\n<p>Of course, one would like to have a general theorem stating that \"gcd<br>\n(x::'a::euclidean_semiring) 0 = x div normalisation_factor x\", but also<br>\nspecialised ones saying \"gcd (x::nat) 0 = x\" and \"gcd (x::int) 0 = abs x\".</p>\n<p>I think locales can do most of those (although I'm not quite sure how to<br>\nset it up exactly), but some things, but some things, such as<br>\nautomatically discarding trivial assumptions like \"normalisation_factor<br>\nx = 1\" for x :: nat are, to my knowledge, not possible with locales.</p>\n<p>Cheers,<br>\nManuel</p>",
+        "id": 294268882,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660916527
+    },
+    {
+        "content": "<p>From: Andreas Lochbihler &lt;<a href=\"mailto:andreas.lochbihler@inf.ethz.ch\">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>\nHi Manuel,</p>\n<p>Since you did not specify which theorems you need to transfer, I had a go at gcd_0_left, <br>\nlcmI, and lcm_unique and inserted the following after the instantiation nat :: <br>\neuclidean_semiring_gcd.</p>\n<p>interpretation nat!: euclidean_semiring_gcd<br>\n     gcd lcm Gcd Lcm \"op *\" \"op div\" \"op mod\" \"op +\" \"0 :: nat\" 1 id \"normalisation_factor\"<br>\nwhere \"!!x :: nat. x div normalisation_factor x == x\"<br>\n   and \"!!x :: nat. normalisation_factor x = (if x = 0 then 0 else 1) == True\"<br>\n   and \"(PROP Q ==&gt; True ==&gt; PROP P) == (PROP Q ==&gt; PROP P)\"<br>\n        -- \"get rid of assumption True in lcmI\"<br>\n   and \"True ∧ x == x\" -- \"get rid of True in conjunction in lcm_unique\"<br>\nsorry</p>\n<p>thm nat.gcd_0_left nat.lcmI nat.lcm_unique</p>\n<p>The set of rules seem sufficient for the three theorems, but you probably need more for <br>\nother theorems.</p>\n<p>Hope this helps,<br>\nAndreas</p>",
+        "id": 294271807,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660917464
+    },
+    {
+        "content": "<p>From: Manuel Eberl &lt;<a href=\"mailto:eberlm@in.tum.de\">eberlm@in.tum.de</a>&gt;<br>\nHallo,</p>\n<p>thank you, as far as I can tell, that is more or less what I wanted.<br>\nHowever, I'm struggling to prove the obligations that this command gives<br>\nme, in particular:</p>\n<p>⋀a. a ≠ 0 ⟹ semiring_div.is_unit op * 1 (normalisation_factor a)</p>\n<p>This should be reasonably simple to prove if I could unfold the<br>\ndefinition of is_unit, but I cannot, because for that I would require<br>\n“class.semiring_div (op *) (op div) (op mod) (op +) 0 (Suc 0)” and I<br>\ndon't know where to get it from. Besides, working with classes/locales<br>\nin such an indirect way seems a bit pedestrian to me – is there a better<br>\nway?</p>\n<p>In other words: what is the least ugly way to get rid of those proof<br>\nobligations?</p>\n<p>Cheers,<br>\nManuel</p>",
+        "id": 294272694,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660917716
+    },
+    {
+        "content": "<p>From: Manuel Eberl &lt;<a href=\"mailto:eberlm@in.tum.de\">eberlm@in.tum.de</a>&gt;<br>\nApologies for writing another mail, but I just noticed another problem:<br>\nyour solution generates the following theorem for lcmI:</p>\n<p>dvd.dvd op * (?x∷nat) (?k∷nat) ⟹ dvd.dvd op * (?y∷nat) ?k ⟹ (⋀l∷nat.<br>\ndvd.dvd op * ?x l ⟹<br>\n      dvd.dvd op * ?y l ⟹ dvd.dvd op * ?k l) ⟹ ?k = lcm ?x ?y</p>\n<p>I would, of course, very much like to have “dvd.dvd op * (?x::nat)<br>\n(?k::nat)” as “(?x::nat) dvd (?k::nat)\"</p>\n<p>What do I have to change to achieve that?</p>\n<p>Cheers,<br>\nManuel</p>",
+        "id": 294272757,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660917722
+    },
+    {
+        "content": "<p>From: Andreas Lochbihler &lt;<a href=\"mailto:andreas.lochbihler@inf.ethz.ch\">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>\nHi Manuel,</p>\n<p>You have already shown in the instantiation of euclidean_semiring_gcd with nat that all <br>\nthe proof obligations hold for naturals. The proof obligation that you mention is <br>\ngenerated by trying to prove manually once more that the operations on nat satisfy <br>\neuclidean_semiring_gcd. Normally, unfold_locales should solve this completely, but in the <br>\nexample below, I have replaced euclidean_size with id. Therefore, the easiest way to prove <br>\nthe class predicate is to make sure that the parameters exactly fit an existing <br>\ninterpretation and then call unfold_locales. You can inspect the existing interpretations <br>\nwith print_interps &lt;locale name&gt;.</p>\n<p>The reason for using id instead of euclidean_size is that interpretation generates the <br>\ntheorems only if the set of parameters are not already subsumed by a previous <br>\ninterpretation. If I had used euclidean_size instead of id, interpretation would not do <br>\nanything at all.</p>\n<p>The following works for me:</p>\n<p>interpretation nat!: euclidean_semiring_gcd gcd lcm Gcd Lcm \"op *\" \"op div\" \"op mod\"<br>\n                        \"op +\" \"0 :: nat\" 1 id normalisation_factor<br>\n   where \"!!x :: nat. x div normalisation_factor x == x\"<br>\n   and \"!!x :: nat. normalisation_factor x = (if x = 0 then 0 else 1) == True\"<br>\n   and \"(PROP Q ==&gt; True ==&gt; PROP P) == (PROP Q ==&gt; PROP P)\"<br>\n   and \"True ∧ x == x\"<br>\napply(subst euclidean_size_nat_def[symmetric])  -- \"replace id with euclidean_size\"<br>\napply unfold_locales                            -- \"get rid of the class predicate\"<br>\napply(simp_all add: atomize_eq split: split_if) -- \"solve all the rewrite equations\"<br>\ndone</p>\n<p>Best,<br>\nAndreas</p>",
+        "id": 294272779,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660917729
+    },
+    {
+        "content": "<p>From: Andreas Lochbihler &lt;<a href=\"mailto:andreas.lochbihler@inf.ethz.ch\">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>\nHi Manuel,</p>\n<p>You just have to add another rewrite rule to the where clauses of the interpretation:</p>\n<p>\"dvd.dvd op * == (op dvd :: nat =&gt; _)\"</p>\n<p>You can show this by expanding the definitions as follows.</p>\n<p>by(simp add: fun_eq_iff dvd.dvd_def dvd_def)</p>\n<p>Best,<br>\nAndreas</p>",
+        "id": 294272797,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660917735
+    }
+]

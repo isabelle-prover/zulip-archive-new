@@ -1,0 +1,200 @@
+[
+    {
+        "content": "<p>I have the following code, which is not the original but just a mwe to recreate the problem I have:</p>\n<div class=\"codehilite\"><pre><span></span><code>theory Scratch\n  imports Main\n\nbegin\n\nlocale weird_topological_space = fixes S :: &quot;&#39;a set&quot; and is_open :: &quot;&#39;a set ⇒ bool&quot;\n  assumes open_space [simp, intro]: &quot;is_open S&quot; and open_empty [simp, intro]: &quot;is_open {}&quot;\n    and open_imp_subset: &quot;is_open U ⟹ U ⊆ S&quot;\n    and open_inter [intro]: &quot;⟦is_open U; is_open V⟧ ⟹ is_open (U ∩ V)&quot;\n    and open_union [intro]: &quot;⋀F::(&#39;a set) set. (⋀x. x ∈ F ⟹ is_open x) ⟹ is_open (⋃x∈F. x)&quot;\n\nbegin\n\ndefinition nbhds :: &quot;&#39;a ⇒ &#39;a filter&quot;\n  where &quot;nbhds a = (INF S∈{S. is_open S ∧ a ∈ S}. principal S)&quot;\n\nend\n\ndefinition pippo :: &quot;&#39;a ⇒ &#39;a filter&quot;\n  where &quot;pippo a = (INF S∈{S. a ∈ S}. principal S)&quot;\n\nlocale test_1 =\nfixes f :: &quot;&#39;a ⇒ &#39;b&quot; and x :: &#39;a and y :: &#39;b\nassumes has_derivative_hd: &quot;filterlim f (nbhds y) (nbhds x)&quot;\n\n(* Type unification failed\n\nType error in application: incompatible operand type\n\nOperator:  nbhds :: &#39;b ⇒ &#39;b filter\nOperand:   x :: &#39;a *)\n\nlocale test_2 =\nfixes f :: &quot;&#39;a ⇒ &#39;b&quot; and x :: &#39;a and y :: &#39;b\nassumes has_derivative_hd: &quot;filterlim f (pippo y) (nbhds x)&quot;\n\nlocale test_3 =\nfixes f :: &quot;&#39;a ⇒ &#39;b&quot; and x :: &#39;a and y :: &#39;b\nassumes has_derivative_hd: &quot;filterlim f (pippo y) (pippox)&quot;\n\nend\n</code></pre></div>\n<p>and for some reason test 2 and 3 work, whereas test 1 does not. It is as if for some reason the function <code>is_open</code> does not allow the function <code>nbhds</code> to change type in different instances.</p>\n<p>Does anybody know why?</p>",
+        "id": 237637885,
+        "sender_full_name": "Nicolò Cavalleri",
+        "timestamp": 1620297711
+    },
+    {
+        "content": "<p>as you can see by the identifier being blue, the <code>nbhds</code> in <code>test_1</code> is a free variable, it does not refer to the definition in <code>weird_topological_space</code></p>",
+        "id": 237638301,
+        "sender_full_name": "Jakub Kądziołka",
+        "timestamp": 1620298024
+    },
+    {
+        "content": "<p>when you're defining <code>test_1</code>, you're outside of the <code>weird_topological_space</code></p>",
+        "id": 237638390,
+        "sender_full_name": "Jakub Kądziołka",
+        "timestamp": 1620298079
+    },
+    {
+        "content": "<p>Take a look at how <code>group_hom</code> is defined <a href=\"https://isabelle.in.tum.de/library/HOL/HOL-Algebra/Group.html\">here</a></p>",
+        "id": 237638494,
+        "sender_full_name": "Jakub Kądziołka",
+        "timestamp": 1620298137
+    },
+    {
+        "content": "<p>Ok ops that was a stupid mistake, sorry I am not used to Isabelle colors! How can I use it outside?</p>",
+        "id": 237638507,
+        "sender_full_name": "Nicolò Cavalleri",
+        "timestamp": 1620298148
+    },
+    {
+        "content": "<p>you need to provide the implicit parameters of the locale somehow</p>",
+        "id": 237638535,
+        "sender_full_name": "Jakub Kądziołka",
+        "timestamp": 1620298176
+    },
+    {
+        "content": "<p>I assume that you want to have two topological spaces involved</p>",
+        "id": 237638550,
+        "sender_full_name": "Jakub Kądziołka",
+        "timestamp": 1620298186
+    },
+    {
+        "content": "<p>if you only needed one, you could do <code>locale test_1 = weird_topological_space  +</code> and <code>nbhds</code> would be in scope</p>",
+        "id": 237638636,
+        "sender_full_name": "Jakub Kądziołka",
+        "timestamp": 1620298222
+    },
+    {
+        "content": "<p>if you do need two, you'll need to give explicit names to the topological spaces and then use <code>nbhds⊗⇘T⇙</code> and <code>nbhds⊗⇘U⇙</code> (again, see the <code>group_hom</code> example</p>",
+        "id": 237638719,
+        "sender_full_name": "Jakub Kądziołka",
+        "timestamp": 1620298277
+    },
+    {
+        "content": "<p>Thank you very much for your help! I am trying to imitate the example you linked. Now it recognizes <code>nbhds</code> but it still have a type overloading problem: if I replace <code>test_1</code> above with</p>\n<div class=\"codehilite\"><pre><span></span><code>locale test_1 =\nX?: weird_topological_space X + Y?: weird_topological_space Y\nfor X and Y +\nfixes f :: &quot;&#39;a ⇒ &#39;b&quot; and x :: &#39;a and y :: &#39;b\nassumes at_mem_x : &quot;x ∈ X&quot;\nand at_mem_y : &quot;y ∈ Y&quot;\nand lim: &quot;filterlim f (nbhds x) (nbhds y)&quot;\n\n(* Type unification failed\n\nType error in application: incompatible operand type\n\nOperator:  (∈) y :: &#39;b set ⇒ bool\nOperand:   Y :: &#39;a set *)\n</code></pre></div>\n<p>I get the above error. What am I doing wrong this time? Again it is as if it forces both topological spaces to be built on the same type</p>",
+        "id": 237641061,
+        "sender_full_name": "Nicolò Cavalleri",
+        "timestamp": 1620299648
+    },
+    {
+        "content": "<p>Also I am not sure what the symbols in <code>nbhds⊗⇘T⇙</code> are! Is it something important? I can't find anything about this notation in the online tutorial on locales!</p>",
+        "id": 237642067,
+        "sender_full_name": "Nicolò Cavalleri",
+        "timestamp": 1620300254
+    },
+    {
+        "content": "<p>This is like <code>\\&lt;sub&gt;</code> but you are allowed to use multiple characters (<code>\\&lt;bsub&gt;</code> ...<code>\\&lt;esub&gt;</code>). Additionally, you are allowed to use parameters inside this notation, which is not allowed for <code>\\&lt;sub&gt;</code>. The notation is not displayed correctly but there are patches for jEdit flying around <span class=\"user-mention\" data-user-id=\"233212\">@Mohammad Abdulaziz</span>?</p>",
+        "id": 237642323,
+        "sender_full_name": "Lukas Stevens",
+        "timestamp": 1620300392
+    },
+    {
+        "content": "<p>ah, ignore the ⊗, copy-paste mishap</p>",
+        "id": 237643419,
+        "sender_full_name": "Jakub Kądziołka",
+        "timestamp": 1620300979
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"370356\">Nicolò Cavalleri</span> <a href=\"#narrow/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working/near/237641061\">said</a>:</p>\n<blockquote>\n<p>I get the above error. What am I doing wrong this time? Again it is as if it forces both topological spaces to be built on the same type</p>\n</blockquote>\n<p><span class=\"user-mention\" data-user-id=\"380931\">@Jakub Kądziołka</span> do you by chance know anything about this?</p>",
+        "id": 237645045,
+        "sender_full_name": "Nicolò Cavalleri",
+        "timestamp": 1620301942
+    },
+    {
+        "content": "<p>say <code>for X (structure) and Y (structure)</code> and add subscripts to invokations of <code>nbhds</code></p>",
+        "id": 237645146,
+        "sender_full_name": "Jakub Kądziołka",
+        "timestamp": 1620302008
+    },
+    {
+        "content": "<p>I added <code>(structure)</code>, but as for subscripts, the error comes out even if I remove the line about nbhds: it comes out for the line</p>\n<div class=\"codehilite\"><pre><span></span><code>and at_mem_y : &quot;y ∈ Y&quot;\n</code></pre></div>",
+        "id": 237645910,
+        "sender_full_name": "Nicolò Cavalleri",
+        "timestamp": 1620302429
+    },
+    {
+        "content": "<p>Also I tried to add subscripts your way, with \\&lt;bsub&gt; and \\&lt;esub&gt; but Isabelle does not seem to recognize them, it says <code>Inner syntax error⌂\nFailed to parse prop</code>. I don't really know how subscripts work in isabelle and they don't appear to be in any tutorial: neither <code>prog-prove</code> nor \"A proof Assistant for Higher-Order Logic\"</p>",
+        "id": 237646342,
+        "sender_full_name": "Nicolò Cavalleri",
+        "timestamp": 1620302605
+    },
+    {
+        "content": "<p>hmm, I do not understand why this is happening</p>",
+        "id": 237647028,
+        "sender_full_name": "Jakub Kądziołka",
+        "timestamp": 1620302994
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"370356\">Nicolò Cavalleri</span> <a href=\"#narrow/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working/near/237645910\">said</a>:</p>\n<blockquote>\n<p>I added <code>(structure)</code>, but as for subscripts, the error comes out even if I remove the line about nbhds: it comes out for the line</p>\n<p><div class=\"codehilite\"><pre><span></span><code>and at_mem_y : &quot;y ∈ Y&quot;\n</code></pre></div><br>\n</p>\n</blockquote>\n<p>You mean this right?</p>",
+        "id": 237647095,
+        "sender_full_name": "Nicolò Cavalleri",
+        "timestamp": 1620303015
+    },
+    {
+        "content": "<p>Looks like locales with multiple parameters aren't behaving like they should. I'd suggest posting on the mailing list. Meanwhile you can package up your topological space into a record like HOL-Algebra does:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">theory</span> <span class=\"n\">Scratch</span>\n  <span class=\"kp\">imports</span> <span class=\"n\">Main</span> <span class=\"s\">\"HOL-Algebra.Congruence\"</span>\n<span class=\"k\">begin</span>\n\n<span class=\"k\">record</span> <span class=\"n n-Type\">'a</span> <span class=\"n\">weird_topological_space</span> <span class=\"o\">=</span>  <span class=\"s\">\"'a partial_object\"</span> <span class=\"o\">+</span>\n  <span class=\"n\">is_open</span>    <span class=\"o\">::</span> <span class=\"s\">\"'a set ⇒ bool\"</span> <span class=\"o\">(</span><span class=\"s\">\"is'_openı _\"</span><span class=\"o\">)</span>\n\n<span class=\"k\">locale</span> <span class=\"n\">weird_topological_space</span> <span class=\"o\">=</span> <span class=\"kp\">fixes</span> <span class=\"n\">S</span> <span class=\"o\">(</span><span class=\"kp\">structure</span><span class=\"o\">)</span>\n  <span class=\"kp\">assumes</span> <span class=\"n\">open_space</span> <span class=\"o\">[</span><span class=\"n\">simp</span><span class=\"o\">,</span> <span class=\"n\">intro</span><span class=\"o\">]:</span> <span class=\"s\">\"is_open (carrier S)\"</span>\n\n<span class=\"k\">begin</span>\n\n<span class=\"k\">end</span>\n\n<span class=\"k\">locale</span> <span class=\"n\">test_1</span> <span class=\"o\">=</span>\n<span class=\"n\">X</span><span class=\"o\">?:</span> <span class=\"n\">weird_topological_space</span> <span class=\"n\">X</span> <span class=\"o\">+</span> <span class=\"n\">Y</span><span class=\"o\">?:</span> <span class=\"n\">weird_topological_space</span> <span class=\"n\">Y</span>\n<span class=\"kp\">for</span> <span class=\"n\">X</span> <span class=\"o\">(</span><span class=\"kp\">structure</span><span class=\"o\">)</span> <span class=\"kp\">and</span> <span class=\"n\">Y</span> <span class=\"o\">(</span><span class=\"kp\">structure</span><span class=\"o\">)</span> <span class=\"o\">+</span>\n<span class=\"kp\">fixes</span> <span class=\"n\">f</span> <span class=\"o\">::</span> <span class=\"s\">\"'a ⇒ 'b\"</span> <span class=\"kp\">and</span> <span class=\"n\">x</span> <span class=\"n\">y</span>\n<span class=\"kp\">assumes</span> <span class=\"n\">at_mem_x</span> <span class=\"o\">:</span> <span class=\"s\">\"x ∈ carrier X\"</span>\n<span class=\"kp\">and</span> <span class=\"n\">at_mem_y</span> <span class=\"o\">:</span> <span class=\"s\">\"y ∈ carrier Y\"</span>\n</code></pre></div>",
+        "id": 237648047,
+        "sender_full_name": "Jakub Kądziołka",
+        "timestamp": 1620303505
+    },
+    {
+        "content": "<p>What is happening in the parenthesis <code>(\"is'_openı _\")</code>? I mean what is that and what is its role?</p>",
+        "id": 237659203,
+        "sender_full_name": "Nicolò Cavalleri",
+        "timestamp": 1620308405
+    },
+    {
+        "content": "<p>Also do you know about somewhere where I can read more about how are locales related to records? I don't really understand what is going on and I can't manage to get rid of the carriers, I mean I'd just like to write <code>S :: 'a set</code> instead of <code>\"'a partial_object\"</code></p>",
+        "id": 237660047,
+        "sender_full_name": "Nicolò Cavalleri",
+        "timestamp": 1620308739
+    },
+    {
+        "content": "<p>ctrl+click on <code>partial_object</code> -- it is just a record field <code>carrier :: \"'a set\"</code></p>",
+        "id": 237670457,
+        "sender_full_name": "Jakub Kądziołka",
+        "timestamp": 1620312566
+    },
+    {
+        "content": "<p>using this common definition lets you use HOL-Algebra and your definitions without having to disambugate the meaning of <code>carrier</code></p>",
+        "id": 237670530,
+        "sender_full_name": "Jakub Kądziołka",
+        "timestamp": 1620312594
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"370356\">Nicolò Cavalleri</span> <a href=\"#narrow/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working/near/237659203\">said</a>:</p>\n<blockquote>\n<p>What is happening in the parenthesis <code>(\"is'_openı _\")</code>? I mean what is that and what is its role?</p>\n</blockquote>\n<p>Right. The motivation is that <code>is_open</code> needs an argument which is the record (topological space) itself. This is the role of the <code>structure</code> mechanism:</p>\n<ul>\n<li>If a variable has been defined with <code>fixes X (structure)</code> or <code>for X (structure)</code> (with optional type signature before the parenthesis), it can be used as a subscript in a place corresponding to a <code>ı</code> in notation</li>\n<li>if only one structure is in scope, the structure parameter will be inferred</li>\n</ul>",
+        "id": 237671196,
+        "sender_full_name": "Jakub Kądziołka",
+        "timestamp": 1620312815
+    },
+    {
+        "content": "<p>The carrier is your set <code>S</code></p>",
+        "id": 237671330,
+        "sender_full_name": "Jakub Kądziołka",
+        "timestamp": 1620312849
+    },
+    {
+        "content": "<p>What is the ' after \"is\" in <code>is'_open</code>?</p>",
+        "id": 237671522,
+        "sender_full_name": "Nicolò Cavalleri",
+        "timestamp": 1620312923
+    },
+    {
+        "content": "<p>the <code>'</code> is an escape character — unescaped, an underscore indicates an argument. Think <code>if _ then _ else _</code></p>",
+        "id": 237671719,
+        "sender_full_name": "Jakub Kądziołka",
+        "timestamp": 1620312989
+    },
+    {
+        "content": "<p>BTW, I realized why your earlier example wasn't working. This works:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">locale</span> <span class=\"n\">test_1</span> <span class=\"o\">=</span>\n  <span class=\"n\">X</span><span class=\"o\">?:</span> <span class=\"n\">weird_topological_space</span> <span class=\"n\">X</span> <span class=\"n\">open_in_X</span> <span class=\"o\">+</span> <span class=\"n\">Y</span><span class=\"o\">?:</span> <span class=\"n\">weird_topological_space</span> <span class=\"n\">Y</span> <span class=\"n\">open_in_Y</span>\n  <span class=\"kp\">for</span> <span class=\"n\">X</span> <span class=\"n\">open_in_X</span>  <span class=\"n\">Y</span> <span class=\"kp\">and</span> <span class=\"n\">open_in_Y</span> <span class=\"o\">+</span>\n  <span class=\"kp\">fixes</span> <span class=\"n\">f</span> <span class=\"o\">::</span> <span class=\"s\">\"'a ⇒ 'b\"</span> <span class=\"kp\">and</span> <span class=\"n\">x</span> <span class=\"o\">::</span> <span class=\"n n-Type\">'a</span> <span class=\"kp\">and</span> <span class=\"n\">y</span> <span class=\"o\">::</span> <span class=\"n n-Type\">'b</span>\n  <span class=\"kp\">assumes</span> <span class=\"n\">at_mem_x</span> <span class=\"o\">:</span> <span class=\"s\">\"x ∈ X\"</span>\n    <span class=\"kp\">and</span> <span class=\"n\">at_mem_y</span> <span class=\"o\">:</span> <span class=\"s\">\"y ∈ Y\"</span>\n    <span class=\"kp\">and</span> <span class=\"n\">lim</span><span class=\"o\">:</span> <span class=\"s\">\"filterlim f (Y.nbhds y) (X.nbhds x)\"</span>\n</code></pre></div>",
+        "id": 237671781,
+        "sender_full_name": "Jakub Kądziołka",
+        "timestamp": 1620313014
+    },
+    {
+        "content": "<p>note that you need to do <code>for &lt;set&gt; and &lt;open predicate for that set&gt;</code>, and provide both to <code>weird_topological_space</code>, as only both values at once can define a topological space</p>",
+        "id": 237671991,
+        "sender_full_name": "Jakub Kądziołka",
+        "timestamp": 1620313085
+    },
+    {
+        "content": "<p>This is why records are so common — a record is essentially a tuple where its elements have been named</p>",
+        "id": 237672114,
+        "sender_full_name": "Jakub Kądziołka",
+        "timestamp": 1620313141
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"370356\">Nicolò Cavalleri</span> <a href=\"#narrow/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working/near/237660047\">said</a>:</p>\n<blockquote>\n<p>Also do you know about somewhere where I can read more about how are locales related to records? I don't really understand what is going on and I can't manage to get rid of the carriers, I mean I'd just like to write <code>S :: 'a set</code> instead of <code>\"'a partial_object\"</code></p>\n</blockquote>\n<p>I guess I wrote some notes on how and why abstract structures like these are defined by Isabelle as they are: <a href=\"https://github.com/NieDzejkob/isabelle-math-contests/blob/master/NOTES.md#abstract-algebra\">https://github.com/NieDzejkob/isabelle-math-contests/blob/master/NOTES.md#abstract-algebra</a></p>",
+        "id": 237672452,
+        "sender_full_name": "Jakub Kądziołka",
+        "timestamp": 1620313230
+    },
+    {
+        "content": "<p>Thank you very much!!</p>",
+        "id": 237748655,
+        "sender_full_name": "Nicolò Cavalleri",
+        "timestamp": 1620345775
+    }
+]

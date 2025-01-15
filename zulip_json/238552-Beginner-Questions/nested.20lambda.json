@@ -1,0 +1,128 @@
+[
+    {
+        "content": "<p>I'm probably missing something simple here, but I can't figure it out on my own. I usually have statements of the form <code>P (do_thing a s)</code>, but at some point I need to prove <code>P (λp. do_thing a (f p) p)</code> instead (note how s has been replaced with <code>f p</code>). I have a helper lemma, which would give me the proof easily, but it requires <code>bounded s</code>, or in this case <code>bounded (f p)</code>, which I can provide. So, in short, I need something like this:</p>\n<div class=\"codehilite\"><pre><span></span><code>  assumes &quot;⋀p. bounded (f p)&quot;\n      and &quot;⋀s. bounded s ⟹ P (λp. do_thing a s p)&quot;\n    shows &quot;P (λp. do_thing a (f p) p)&quot;\n</code></pre></div>\n<p>And I don't know how to approach this.</p>",
+        "id": 237081343,
+        "sender_full_name": "Max Nowak",
+        "timestamp": 1619988375
+    },
+    {
+        "content": "<p>your assumption, <code>⋀s. bounded s ⟹ P (λp. do_thing a s p)</code>, is too weak. as written, <code>s</code> is not allowed to depend on <code>p</code></p>",
+        "id": 237081522,
+        "sender_full_name": "Jakub Kądziołka",
+        "timestamp": 1619988538
+    },
+    {
+        "content": "<p>I still can't figure it out. I managed to show <code>⋀f x. bounded (f x) ==&gt; P (λp. do_thing a (f x) p)</code>, but replacing <code>do_thing a (f x)</code> with <code>do_thing a (f p)</code> and it fails to prove.</p>",
+        "id": 237085143,
+        "sender_full_name": "Max Nowak",
+        "timestamp": 1619990142
+    },
+    {
+        "content": "<p>Here is how to get the Isabelle version of <span class=\"user-mention\" data-user-id=\"380931\">@Jakub Kądziołka</span> 's error:</p>\n<div class=\"codehilite\"><pre><span></span><code>lemma\n  assumes &quot;⋀p. bounded (f p)&quot;\n      and &quot;⋀s. bounded s ⟹ P (λp. do_thing a s p)&quot;\n    shows &quot;P (λp. do_thing a (f p) p)&quot;\n  supply [[unify_trace_failure]]\n  apply (rule assms(2))\n(*\nCannot unify variable ?s (depending on bound variables )\nwith term f p\nTerm contains additional bound variable(s) p\n*)\n</code></pre></div>",
+        "id": 237112592,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1620017710
+    },
+    {
+        "content": "<p>In this version <code>⋀f x. bounded (f x) ==&gt; P (λp. do_thing a (f x) p)</code> there is still no dependency between <code>f x</code> and <code>p</code>: whatever <code>p</code> is, <code>f x</code> does not change. If you get <code>f p</code> instead, the proof will work.</p>",
+        "id": 237113006,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1620018096
+    },
+    {
+        "content": "<div class=\"codehilite\"><pre><span></span><code>  assumes &quot;⋀p. bounded (f p)&quot;\n      and &quot;⋀(f :: &#39;a ⇒ &#39;b) (x :: &#39;a). bounded (f x) ==&gt; P (λp. do_thing a (f p) p)&quot;\n    shows &quot;P (λp :: &#39;a. do_thing a (f p) p)&quot;\n  apply (rule assms(2))\n  apply (rule assms(1))\n  done\n</code></pre></div>",
+        "id": 237113021,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1620018120
+    },
+    {
+        "content": "<p>That's the issue though. I need to prove <code>⋀(f :: 'a ⇒ 'b) (x :: 'a). bounded (f x) ==&gt; P (λp. do_thing a (f p) p)</code>, since I am not given that fact.</p>",
+        "id": 237207321,
+        "sender_full_name": "Max Nowak",
+        "timestamp": 1620066730
+    },
+    {
+        "content": "<div class=\"codehilite\"><pre><span></span><code>⋀(f :: &#39;a ⇒ &#39;b) (x :: &#39;a). bounded (f x) ==&gt; P (λp. do_thing a (f p) p)\n</code></pre></div>\n<p>this statement is too strong. You're saying that if, for a specific <code>x</code>, <code>f x</code> is bounded, then <code>P (%p. do_thing a (f p) p)</code> holds, which depends on the boundedness of <code>f p</code> for many different <code>p</code>, I'd assume</p>",
+        "id": 237209062,
+        "sender_full_name": "Jakub Kądziołka",
+        "timestamp": 1620067371
+    },
+    {
+        "content": "<p>and we are telling you: without more assumption it does not work</p>",
+        "id": 237209063,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1620067372
+    },
+    {
+        "content": "<p>You'd want</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"err\">⋀</span><span class=\"o\">(</span><span class=\"n\">f</span> <span class=\"o\">::</span> <span class=\"n n-Type\">'a</span> <span class=\"err\">⇒</span> <span class=\"n n-Type\">'b</span><span class=\"o\">)</span> <span class=\"o\">(</span><span class=\"err\">⋀</span><span class=\"o\">(</span><span class=\"n\">x</span> <span class=\"o\">::</span> <span class=\"n n-Type\">'a</span><span class=\"o\">)</span><span class=\"ow\">.</span> <span class=\"n\">bounded</span> <span class=\"o\">(</span><span class=\"n\">f</span> <span class=\"n\">x</span><span class=\"o\">))</span> <span class=\"o\">==</span><span class=\"err\">&gt;</span> <span class=\"n\">P</span> <span class=\"o\">(</span><span class=\"n\">λp.</span> <span class=\"n\">do_thing</span> <span class=\"n\">a</span> <span class=\"o\">(</span><span class=\"n\">f</span> <span class=\"n\">p</span><span class=\"o\">)</span> <span class=\"n\">p</span><span class=\"o\">)</span>\n</code></pre></div>",
+        "id": 237209107,
+        "sender_full_name": "Jakub Kądziołka",
+        "timestamp": 1620067396
+    },
+    {
+        "content": "<p>how is <code>bounded</code> and <code>do_thing</code> defined?</p>",
+        "id": 237209130,
+        "sender_full_name": "Jakub Kądziołka",
+        "timestamp": 1620067409
+    },
+    {
+        "content": "<div class=\"codehilite\"><pre><span></span><code>  assumes &quot;⋀p. bounded (f p)&quot;\n      and &quot;⋀s. bounded s ⟹ P (λp. do_thing a s p)&quot;\n    shows &quot;P (λp. do_thing a (f p) p)&quot;\n</code></pre></div>\n<p>this inference can never work. Consider <code>bounded x = True</code>, <code>do_thing a s p = s</code>, <code>P f = (EX c. f = %x. c)</code>, <code>f x = x</code></p>",
+        "id": 237209394,
+        "sender_full_name": "Jakub Kądziołka",
+        "timestamp": 1620067508
+    },
+    {
+        "content": "<p>bounded is an abbreviation: <code>bounded r == (0 &lt;= r /\\ r &lt;= 1)</code>, and roughly the <code>fun</code> <code>do_thing a s p = (modify p and return a similar p, same type)</code></p>",
+        "id": 237209878,
+        "sender_full_name": "Max Nowak",
+        "timestamp": 1620067699
+    },
+    {
+        "content": "<p>The classes I took never covered ZF axioms, so I have to be honest and say that this goes over my head. I suppose I simply have to change the structure of my proof so that I don't run into this issue.</p>",
+        "id": 237210447,
+        "sender_full_name": "Max Nowak",
+        "timestamp": 1620067972
+    },
+    {
+        "content": "<p>Thanks for the help though!</p>",
+        "id": 237210467,
+        "sender_full_name": "Max Nowak",
+        "timestamp": 1620067986
+    },
+    {
+        "content": "<p>this is independent of ZF axioms, it's just logic</p>",
+        "id": 237210818,
+        "sender_full_name": "Jakub Kądziołka",
+        "timestamp": 1620068151
+    },
+    {
+        "content": "<p>maybe the example <code>has_a_maximum (λp. f p)</code> with <code>f p x = x</code> and <code>f p _ = p</code> is easier to understand</p>",
+        "id": 237211002,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1620068215
+    },
+    {
+        "content": "<p>What's the % syntax?</p>",
+        "id": 237211049,
+        "sender_full_name": "Max Nowak",
+        "timestamp": 1620068233
+    },
+    {
+        "content": "<p>a λ I was too lazy to seach for... but that does not type for your definition of bound</p>",
+        "id": 237211307,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1620068333
+    },
+    {
+        "content": "<p>Ah, gotcha</p>",
+        "id": 237211341,
+        "sender_full_name": "Max Nowak",
+        "timestamp": 1620068347
+    },
+    {
+        "content": "<p>that is what I had in mind:</p>\n<p><span class=\"user-mention silent\" data-user-id=\"233198\">Mathias Fleury</span> <a href=\"#narrow/stream/238552-Beginner-Questions/topic/nested.20lambda/near/237211002\">said</a>:</p>\n<blockquote>\n<p>maybe the example <code>has_a_maximum (λp. f p)</code> with <code>f p x = x</code> and <code>f p _ = p</code> is easier to understand</p>\n</blockquote>",
+        "id": 237211526,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1620068407
+    }
+]

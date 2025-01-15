@@ -1,0 +1,44 @@
+[
+    {
+        "content": "<p>From: Manuel Eberl &lt;<a href=\"mailto:eberlm@in.tum.de\">eberlm@in.tum.de</a>&gt;<br>\nI just stumbled across this while talking to Katharina Kreuzer.</p>\n<p>Currently, we have two notions of making a list from an interval of numbers:</p>\n<p>[a..b], which desugars to \"upto a b\" with \"upto :: int =&gt; int =&gt; int\"</p>\n<p>[a..&lt;b], which desugars to \"upt a b\" with \"upt :: nat =&gt; nat =&gt; nat\"</p>\n<p>Clearly, this is confusing and I suspect that it is a historic accident.<br>\nI think we should clean this up.</p>\n<p>What one would like to have, in my opinion, is four notations [a..b],<br>\n[a&lt;..b], [a..&lt;b], [a&lt;..&lt;b] to mirror the same notation on sets.</p>\n<p>The question is: how do we implement this properly? Haskell does it with<br>\nan \"Enum\" type class that has \"succ\"/\"pred\" operations. A \"succ\" would<br>\nbe enough for us, but to implement the above operations one would<br>\nadditionally need to assume that {a..b} is finite for any a, b. And, in<br>\nthe specification of <code>succ</code>, one would have to figure out what to do if<br>\nthere is no successor (e.g. in finite types).</p>\n<p>Any ideas/comments?</p>\n<p>Manuel<br>\n<a href=\"/user_uploads/14278/E07Tu9bvU4eun5sfMPepkmDx/smime.p7s\">smime.p7s</a></p>",
+        "id": 246199500,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1626425926
+    },
+    {
+        "content": "<p>From: Peter Lammich &lt;<a href=\"mailto:lammich@in.tum.de\">lammich@in.tum.de</a>&gt;<br>\nHi,</p>\n<p>shouldn't linearly ordered and countable be enough to define the succ<br>\noperation, e.g. as succ x = LEAST y. x&lt;y.</p>\n<p>One could leave succ undefined if there is no successor.</p>",
+        "id": 246201571,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1626427406
+    },
+    {
+        "content": "<p>From: Manuel Eberl &lt;<a href=\"mailto:eberlm@in.tum.de\">eberlm@in.tum.de</a>&gt;<br>\nDefine yes, but we'd still need it to be a typeclass argument because we<br>\nalso need implementations of it. \"Least\" is not executable.</p>\n<p>\"countable + linorder\" is not enough though because e.g. \"enat\" does not<br>\nwork. [0..∞] is not a finite list. You could define \"succ\", but not<br>\n\"pred\". (So on the dual of \"enat\" you could not define \"succ\").</p>\n<p>Manuel<br>\n<a href=\"/user_uploads/14278/jsKoYmGjBe1cu4cHgFOgXape/smime.p7s\">smime.p7s</a></p>",
+        "id": 246201956,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1626427652
+    },
+    {
+        "content": "<p>From: Tobias Nipkow &lt;<a href=\"mailto:nipkow@in.tum.de\">nipkow@in.tum.de</a>&gt;<br>\nThis is not a accident but by design. For the types nat in int is exactly what <br>\nyou want. I do not see any advantage in having all 4 notations because on nat <br>\nand int we have +1 and -1. On the contrary, you have to provide multiple <br>\nversions of each lemma. This may not seem too bad for the lemmas in the list <br>\nlibrary, but it gets worse for user provided lemmas where you would have much <br>\nmore of a choice how to formulate them. The analogy with set intervals is <br>\nmisleading because they are often used for real numbers where having 4 different <br>\nintervals does make sense.</p>\n<p>I always like to balance ease of notation and proof automation.</p>\n<p>I would have no objection against generalising [_.._] to some type class.</p>\n<p>If you really want to improve the situation, you could iron out a different <br>\nproblem. This is a defining equation and simp rule:</p>\n<p>\"[i..&lt;(Suc j)] = (if i ≤ j then [i..&lt;j] @ [j] else [])\"</p>\n<p>Unfortunately it leads to lists where elements are appended at the end, but many <br>\nfunctions consume lists from the front. Thus this simp rule is frequently <br>\nremoved. Something like the following one should work better (I hope):</p>\n<p>\"[i..&lt;j] = (if i &lt; j then i # [Suc i..&lt;j] else [])\"</p>\n<p>Tobias<br>\n<a href=\"/user_uploads/14278/CGWVwFQy8gRmx6bdHEwylEEn/smime.p7s\">smime.p7s</a></p>",
+        "id": 246203066,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1626428497
+    },
+    {
+        "content": "<p>From: Florian Haftmann &lt;<a href=\"mailto:florian.haftmann@informatik.tu-muenchen.de\">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>\nHi all,</p>\n<blockquote>\n<p>I always like to balance ease of notation and proof automation.</p>\n<p>I would have no objection against generalising [_.._] to some type class.</p>\n</blockquote>\n<p>5 years ago I posted sth. on the mailing list:<br>\n<a href=\"https://www.mail-archive.com/isabelle-dev@mailbroy.informatik.tu-muenchen.de/msg06715.html\">https://www.mail-archive.com/isabelle-dev@mailbroy.informatik.tu-muenchen.de/msg06715.html</a></p>\n<p>I think it is still a valid starting point for further discussion.</p>\n<blockquote>\n<p>If you really want to improve the situation, you could iron out a<br>\ndifferent problem. This is a defining equation and simp rule:</p>\n<p>\"[i..&lt;(Suc j)] = (if i ≤ j then [i..&lt;j] @ [j] else [])\"</p>\n<p>Unfortunately it leads to lists where elements are appended at the end,<br>\nbut many functions consume lists from the front. Thus this simp rule is<br>\nfrequently removed. Something like the following one should work better<br>\n(I hope):</p>\n<p>\"[i..&lt;j] = (if i &lt; j then i # [Suc i..&lt;j] else [])\"</p>\n</blockquote>\n<p>I agree with the observation that the default simp rule above obstructs<br>\nproofs that would require unfolding from the lower bound rather than the<br>\nupper bound.  But the alternative formulation has no syntactic circuit<br>\nbreaker like Suc and would hence unfold infinitely.  Maybe a conditional<br>\nformulation would help:</p>\n<p>‹i &lt; j ==&gt; [i..&lt;j] = i # [Suc i..&lt;j]›</p>\n<p>But this all would require further thinking.</p>\n<p>Cheers,<br>\n    Florian<br>\n<a href=\"/user_uploads/14278/fsrWOQhjp36Zq6B0yb6ccTom/OpenPGP_signature\">OpenPGP_signature</a></p>",
+        "id": 246314264,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1626512271
+    },
+    {
+        "content": "<p>From: Tobias Nipkow &lt;<a href=\"mailto:nipkow@in.tum.de\">nipkow@in.tum.de</a>&gt;<br>\nYes, \"[i..&lt;j] = (if i &lt; j then i # [Suc i..&lt;j] else [])\" does not terminate <br>\n(hence my \"something like\") and two conditional rules are probably the best <br>\noption. But updating the proofs could be daunting...</p>\n<p>Tobias<br>\n<a href=\"/user_uploads/14278/jxHraRrfX5K80GT_dKG_a648/smime.p7s\">smime.p7s</a></p>",
+        "id": 246330903,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1626537211
+    },
+    {
+        "content": "<p>From: Thomas Sewell &lt;<a href=\"mailto:tals4@cam.ac.uk\">tals4@cam.ac.uk</a>&gt;<br>\nI've worked with upt a bit, and I generally override the default<br>\nsimplification direction for the reasons mentioned already.</p>\n<p>Often it's useful to work with an upt+map variant, for instance:<br>\n\"i &lt; j ⟹ upt i j = i # map Suc (upt i (j - 1))\"</p>\n<p>The above will work with an induction on j, assuming the map is<br>\ncompatible with what you're doing. The library already contains<br>\nmap_upt_Suc for cases where the map was explicitly present.</p>\n<p>Anyway, my points is, while there might be a lot of proofs about upt,<br>\nmany of them might manually set the rewrite/simp pattern, and might<br>\nneed less maintenance.</p>\n<p>I note that a grep for 'del:.*upt.simps' in the l4.verified<br>\nrepository gives me 160+ hits. That might be daunting or not.</p>\n<p>Best regards,<br>\n     Thomas.</p>",
+        "id": 246430145,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1626684466
+    }
+]

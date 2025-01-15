@@ -1,0 +1,26 @@
+[
+    {
+        "content": "<p>From: Julian Brunner &lt;<a href=\"mailto:julianbrunner@gmail.com\">julianbrunner@gmail.com</a>&gt;<br>\nHello everyone,</p>\n<p>I've recently run into a situation where the unfolding command doesn't<br>\nterminate when used with statements containing local definitions.<br>\nConsider the following example:</p>\n<p>locale foo =<br>\n  fixes a :: \"nat option\"<br>\n  assumes not_None: \"a ~= None\"<br>\nbegin</p>\n<p>definition \"b == the a\"</p>\n<p>lemma a_Some: \"a = Some b\"<br>\n    unfolding b_def<br>\n    using not_None<br>\n    by auto</p>\n<p>lemma these_a: \"Option.these {a} = {b}\"<br>\n    unfolding a_Some<br>\n    by simp</p>\n<p>end</p>\n<p>Here, the unfolding command in the proof of 'these_a' doesn't<br>\nterminate. I've figured out that the reason for this is that when<br>\ndefining 'b', what actually happens is that 'foo.b' of type 'nat<br>\noption =&gt; nat' is defined globally, with 'b' being a local<br>\nabbreviation for 'foo.b a'. This, of course, means that 'a_Some'<br>\nactually says 'a = Some (foo.b a)', so unfolding that of course<br>\ndoesn't terminate.</p>\n<p>I've been struggling to find a workaround for this. In my actual<br>\ntheory (this is just a toy example), being able to unfold a statement<br>\nsimilar to 'a_Some' (or, adding it to the simplifier, for that matter)<br>\nwould be hugely beneficial, since it is much easier to work with than<br>\nthe assumption from which it was derived. I've tried using the defines<br>\nelement and additional fixed variables when declaring the locale to<br>\nintroduce an actual constant for 'b'. While this has worked fine<br>\nwithin the context of the locale, it makes global statements about the<br>\nlocale more complex, which is unfortunate, considering the intent of<br>\nsimplifying proofs inside the locale.</p>\n<p>Does anyone know of a good way to deal with a situation like this?</p>\n<p>Thanks in advance,<br>\n Julian</p>",
+        "id": 294270670,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660917110
+    },
+    {
+        "content": "<p>From: Andreas Lochbihler &lt;<a href=\"mailto:andreas.lochbihler@inf.ethz.ch\">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>\nHi Julian,</p>\n<p>You can use congruence rules for the foundational constant to stop the simplifier from <br>\nworking on the locale parameters. It does not work with unfolding, because unfold ignoes <br>\ncongruence rules. Here's your example:</p>\n<blockquote>\n<p>locale foo =<br>\n   fixes a :: \"nat option\"<br>\n   assumes not_None: \"a ~= None\"<br>\nbegin</p>\n<p>definition \"b == the a\"</p>\n<p>lemma a_Some: \"a = Some b\"<br>\n     unfolding b_def<br>\n     using not_None<br>\n     by auto</p>\n<p>end</p>\n</blockquote>\n<p>lemma foo_b_cong [cong]: \"foo.b a == foo.b a\" by(rule reflexive)<br>\n-- \"You have to supply as many parameters to foo.b as there are locale parameters on which <br>\nb depends.\"</p>\n<p>context foo begin</p>\n<p>lemma these_a: \"Option.these {a} = {b}\"<br>\n     by(simp add: a_Some)</p>\n<blockquote>\n<p>end</p>\n</blockquote>\n<p>Hope this helps,<br>\nAndreas</p>",
+        "id": 294271755,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660917451
+    },
+    {
+        "content": "<p>From: Julian Brunner &lt;<a href=\"mailto:julianbrunner@gmail.com\">julianbrunner@gmail.com</a>&gt;<br>\nWhile unfolding would have been nicer, it's a start and it seems like<br>\nunfolding can be emulated using something like 'apply (simp only:<br>\na_Some cong: foo_b_cong)'. Thank you!</p>",
+        "id": 294272433,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660917630
+    },
+    {
+        "content": "<p>From: Gottfried Barrow &lt;<a href=\"mailto:igbi@gmx.com\">igbi@gmx.com</a>&gt;<br>\nNo response is necessary. I put this in only because I wanted to say a <br>\nfew days back that I've learned that there's no guarantee that <code>simp</code> <br>\ncan be controlled with <code>only</code>, which, consequently, destroys its use as <br>\na means to make known that you're making a proof step explicit, such as <br>\nwith your example above.</p>\n<p>To a certain extent, <code>simp</code> behaves like <code>auto</code>. It can call other <br>\nautomatic proof methods on its own. I decided it is what it is, and <br>\nthere must be good reason for it to not shut down calling particular <br>\nproof methods when <code>only</code> is used. This next example shows that you <br>\ncannot completely control <code>simp</code> with <code>only</code>:</p>\n<p>lemma \"2 + 2 = (4::nat)\"<br>\n   using[[simp_trace, simp_trace_depth_limit=100, linarith_trace, <br>\nrule_trace]]<br>\napply(simp only:)<br>\ndone</p>\n<p>It's calling some form of the linear arithmetic proof method. But this <br>\nis explained in the Isar Reference manual, page 188, \"...but also <br>\nnon-trivial tools like linear arithmetic in HOL. The latter may lead to <br>\nsome surprise of the meaning of 'only' in Isabelle/HOL compared to English!\"</p>\n<p>Monolingual English speakers can only speculate whether surprises would <br>\nresult in the context of \"nur, lediglich, erst, einzig, bloß, und allein.\"</p>\n<p>Regards,<br>\nGB</p>",
+        "id": 294272447,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660917636
+    }
+]

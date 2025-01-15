@@ -1,0 +1,170 @@
+[
+    {
+        "content": "<p>It seems that symmetric rule in inductively defined predicates causes difficulty for proving <br>\ncertain arguments make it evaluate to False.<br>\nIf we define an inductive datatype called <code>tfoo</code>:<br>\n<code>datatype tfoo = TZERO | TONE | TSEQ tfoo tfoo\n</code><br>\nThen we can define an inductive predicate that <br>\ndetermines whether two terms of the type <code>tfoo</code><br>\nare \"similar\":</p>\n<div class=\"codehilite\"><pre><span></span><code>inductive tsimilar :: &quot;tfoo ⇒ tfoo ⇒ bool&quot;\n  where\n  &quot;tsimilar TZERO TZERO&quot;\n(*|  &quot;tsimilar t1 t2 ⟹ tsimilar t2 t1&quot;*)\n| &quot;tsimilar TONE TONE&quot;\n| &quot;⟦tsimilar t1 t2; tsimilar t3 t4 ⟧ ⟹ tsimilar (TSEQ t1 t3) (TSEQ t2 t4)&quot;\n</code></pre></div>\n<p>And showing that two concrete instances of type <code>tfoo</code><br>\nare not similar is quite straightforward:</p>\n<div class=\"codehilite\"><pre><span></span><code>lemma notsimilar : assumes &quot;tsimilar TZERO TONE&quot;\n  shows &quot;False&quot;\n  using assms\n  apply(erule_tac tsimilar.cases)\n    apply simp\n    apply simp\n  by fastforce\n</code></pre></div>\n<p>The problem arises once you add (uncomment)<br>\nthe symmetric rule:<br>\n<code> \n\"tsimilar t1 t2 ⟹ tsimilar t2 t1\"\n</code><br>\nThis causes automation to fail.<br>\nThe reason why is probably because sledgehammer/.... <br>\ntries to apply the symmetric rule back and forth, creating<br>\nan infinite loop.<br>\nApparently<code> tsimilar TZERO TONE</code> should <br>\nalways evaluate to false, as the inductive definition<br>\ndefines the minimal set closed under the rules,<br>\nso how can we make this obvious again to Isabelle?</p>",
+        "id": 250112665,
+        "sender_full_name": "Chengsong Tan",
+        "timestamp": 1629463634
+    },
+    {
+        "content": "<p>I think the real problem here is that when you add that new rule, your statement is simply not strong enough to be provable by direct induction.</p>",
+        "id": 250113232,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1629463949
+    },
+    {
+        "content": "<p>You get <code>tsimilar TONE TZERO ⟹ False</code> as one of the cases and that's not provable without another induction.</p>",
+        "id": 250113325,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1629464014
+    },
+    {
+        "content": "<p>The obvious solution is to just prove something stronger, e.g.:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">lemma</span> <span class=\"s\">\"tsimilar x y ⟹ x = y\"</span>\n  <span class=\"k\">by</span> <span class=\"o\">(</span><span class=\"n\">induction</span> <span class=\"n\">rule</span><span class=\"o\">:</span> <span class=\"n\">tsimilar.induct</span><span class=\"o\">)</span> <span class=\"n\">auto</span>\n</code></pre></div>",
+        "id": 250113520,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1629464138
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"232736\">Manuel Eberl</span> <a href=\"#narrow/stream/238552-Beginner-Questions/topic/symmetric.20rule.20in.20inductively.20defined.20predicates/near/250113232\">said</a>:</p>\n<blockquote>\n<p>I think the real problem here is that when you add that new rule, your statement is simply not strong enough to be provable by direct induction.</p>\n</blockquote>\n<p>Thank you!<br>\nHow about when the relation is slightly more complicated that this lemma <br>\ndoesn't hold?</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">lemma</span> <span class=\"s\">\"tsimilar x y ⟹ x = y\"</span>\n</code></pre></div>\n<p>If I change the relation to include those<br>\nthat are slightly different:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">datatype</span> <span class=\"n\">tfoo</span> <span class=\"o\">=</span> <span class=\"n\">TZERO</span> <span class=\"o\">|</span> <span class=\"n\">TONE</span> <span class=\"n\">nat</span> <span class=\"o\">|</span> <span class=\"n\">TSEQ</span> <span class=\"n\">tfoo</span> <span class=\"n\">tfoo</span>\n\n\n<span class=\"k\">inductive</span> <span class=\"n\">tsimilar</span> <span class=\"o\">::</span> <span class=\"s\">\"tfoo ⇒ tfoo ⇒ bool\"</span>\n  <span class=\"kp\">where</span>\n  <span class=\"s\">\"tsimilar TZERO TZERO\"</span>\n<span class=\"o\">|</span>  <span class=\"s\">\"tsimilar t1 t2 ⟹ tsimilar t2 t1\"</span>\n<span class=\"o\">|</span> <span class=\"s\">\"tsimilar (TONE i)  (TONE j)\"</span>\n<span class=\"o\">|</span> <span class=\"s\">\"⟦tsimilar t1 t2; tsimilar t3 t4 ⟧ ⟹ tsimilar (TSEQ t1 t3) (TSEQ t2 t4)\"</span>\n\n<span class=\"kn\">lemma</span> <span class=\"n\">notsimilar</span> <span class=\"o\">:</span> <span class=\"kp\">assumes</span> <span class=\"s\">\"tsimilar TZERO (TONE i)\"</span>\n</code></pre></div>\n<p>Then how can I prove the lemma notsimilar?</p>",
+        "id": 250120568,
+        "sender_full_name": "Chengsong Tan",
+        "timestamp": 1629467808
+    },
+    {
+        "content": "<p>The reason I came up with this question was that<br>\nI defined a predicate where two instances which are<br>\nsemantically equal but syntactically different<br>\nare deemed similar. It would be nice<br>\nto be able to prove certain instances of them<br>\nare not similar because there is no induction rule <br>\nto derive the similarity.</p>",
+        "id": 250120881,
+        "sender_full_name": "Chengsong Tan",
+        "timestamp": 1629467950
+    },
+    {
+        "content": "<p>Well, first of all, your <code>tsimilar</code> would be symmetric even without that additional explicit symmetry rule. So I suggest removing it to make things easier, and then prove it from the remaining ones by induction.</p>",
+        "id": 250121528,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1629468222
+    },
+    {
+        "content": "<p>You could even define this by recursion instead of an <code>inductive</code>, that might also make things easier.</p>",
+        "id": 250121573,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1629468241
+    },
+    {
+        "content": "<p>Otherwise, I guess you will have to strengthen your goal in such a way that it survives the induction, i.e. in particular in a way that makes it symmetric in <code>x</code> and <code>y</code>, e.g.:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">lemma</span> <span class=\"n\">notsimilar</span><span class=\"o\">:</span>\n  <span class=\"kp\">assumes</span> <span class=\"s\">\"tsimilar x y\"</span> <span class=\"s\">\"∃c. x = TZERO ∧ y = TONE c ∨ x = TONE c ∧ y = TZERO\"</span>\n  <span class=\"kp\">shows</span> <span class=\"n\">False</span>\n  <span class=\"k\">using</span> <span class=\"n\">assms</span> <span class=\"k\">by</span> <span class=\"o\">(</span><span class=\"n\">induction</span> <span class=\"n\">rule</span><span class=\"o\">:</span> <span class=\"n\">tsimilar.induct</span><span class=\"o\">)</span> <span class=\"n\">auto</span>\n</code></pre></div>",
+        "id": 250121914,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1629468378
+    },
+    {
+        "content": "<p>But if you can get rid of the symmetry rule in the <code>inductive</code>, I would. It only complicates things.</p>",
+        "id": 250122045,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1629468444
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"232736\">Manuel Eberl</span> <a href=\"#narrow/stream/238552-Beginner-Questions/topic/symmetric.20rule.20in.20inductively.20defined.20predicates/near/250121914\">said</a>:</p>\n<blockquote>\n<p>Otherwise, I guess you will have to strengthen your goal in such a way that it survives the induction, i.e. in particular in a way that makes it symmetric in <code>x</code> and <code>y</code>, e.g.:</p>\n<p><div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">lemma</span> <span class=\"n\">notsimilar</span><span class=\"o\">:</span>\n  <span class=\"kp\">assumes</span> <span class=\"s\">\"tsimilar x y\"</span> <span class=\"s\">\"∃c. x = TZERO ∧ y = TONE c ∨ x = TONE c ∧ y = TZERO\"</span>\n  <span class=\"kp\">shows</span> <span class=\"n\">False</span>\n  <span class=\"k\">using</span> <span class=\"n\">assms</span> <span class=\"k\">by</span> <span class=\"o\">(</span><span class=\"n\">induction</span> <span class=\"n\">rule</span><span class=\"o\">:</span> <span class=\"n\">tsimilar.induct</span><span class=\"o\">)</span> <span class=\"n\">auto</span>\n</code></pre></div><br>\n</p>\n</blockquote>\n<p>Thanks a lot!<br>\nHow do you come up with such strengthening methods (is it<br>\nmore on an ad-hoc basis or is there a general rule of thumb), and<br>\ncan you elaborate a bit more about<br>\nwhat do you mean by \"survive the induction\" (for example a <br>\nformal definition)?</p>\n<p>For me an intuitive and naive reason to think that there should <br>\nbe a method to prove</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">lemma</span> <span class=\"n\">notsimilar</span> <span class=\"o\">:</span> <span class=\"kp\">assumes</span> <span class=\"s\">\"tsimilar TZERO (TONE i)\"</span>\n</code></pre></div>\n<p>is that we know that from rules like these</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code>  <span class=\"s\">\"tsimilar TZERO TZERO\"</span>\n</code></pre></div>\n<p>you can never derive a similarity between instances<br>\nthat breaks the \"hierarchy\", and therefore</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"n\">tsimilar</span> <span class=\"n\">TZERO</span> <span class=\"o\">(</span><span class=\"n\">TONE</span> <span class=\"n\">i</span><span class=\"o\">)</span>\n<span class=\"n\">tsimilar</span> <span class=\"n\">TZERO</span> <span class=\"o\">(</span><span class=\"n\">TSEQ</span> <span class=\"n\">t1</span> <span class=\"n\">t2</span><span class=\"o\">)</span>\n<span class=\"n\">tsimilar</span> <span class=\"o\">(</span><span class=\"n\">TONE</span> <span class=\"n\">i</span><span class=\"o\">)</span> <span class=\"o\">(</span><span class=\"n\">TSEQ</span> <span class=\"n\">t1</span> <span class=\"n\">t2</span><span class=\"o\">)</span>\n</code></pre></div>\n<p>are always false.</p>",
+        "id": 250125142,
+        "sender_full_name": "Chengsong Tan",
+        "timestamp": 1629469870
+    },
+    {
+        "content": "<p>From your example I came up with another strengthening<br>\nlemma that is like the below:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">lemma</span> <span class=\"n\">hierachy_maintained</span><span class=\"o\">:</span>\n  <span class=\"kp\">assumes</span> <span class=\"s\">\"tsimilar x y\"</span> <span class=\"s\">\"∃c t1 t2.</span>\n<span class=\"s\"> x = TZERO ∧ y = TONE c ∨ x = TONE c ∧ y = TZERO</span>\n<span class=\"s\">∨  x = TONE c ∧ y = TSEQ t1 t2 ∨  x = TSEQ t1 t2 ∧ y = TONE c</span>\n<span class=\"s\">∨  x = TZERO ∧ y = TSEQ t1 t2 ∨  x = TSEQ t1 t2 ∧ y = TZERO\"</span>\n  <span class=\"kp\">shows</span> <span class=\"n\">False</span>\n  <span class=\"k\">using</span> <span class=\"n\">assms</span>\n  <span class=\"kp\">apply</span><span class=\"o\">(</span><span class=\"n\">induction</span> <span class=\"n\">rule</span><span class=\"o\">:</span> <span class=\"n\">tsimilar.induct</span><span class=\"o\">)</span>\n  <span class=\"kp\">apply</span> <span class=\"n\">fastforce</span>\n  <span class=\"kp\">apply</span> <span class=\"n\">fastforce</span>\n  <span class=\"kp\">apply</span> <span class=\"n\">fastforce</span>\n  <span class=\"kp\">apply</span> <span class=\"n\">fastforce</span>\n  <span class=\"k\">done</span>\n</code></pre></div>",
+        "id": 250125270,
+        "sender_full_name": "Chengsong Tan",
+        "timestamp": 1629469928
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"241231\">Chengsong Tan</span> <a href=\"#narrow/stream/238552-Beginner-Questions/topic/symmetric.20rule.20in.20inductively.20defined.20predicates/near/250125142\">said</a>:</p>\n<blockquote>\n<p>For me an intuitive and naive reason to think that there should <br>\nbe a method to prove</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">lemma</span> <span class=\"n\">notsimilar</span> <span class=\"o\">:</span> <span class=\"kp\">assumes</span> <span class=\"s\">\"tsimilar TZERO (TONE i)\"</span>\n</code></pre></div>\n<p>is that we know that from rules like these</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code>  <span class=\"s\">\"tsimilar TZERO TZERO\"</span>\n</code></pre></div>\n<p>you can never derive a similarity between instances<br>\nthat breaks the \"hierarchy\", and therefore</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"n\">tsimilar</span> <span class=\"n\">TZERO</span> <span class=\"o\">(</span><span class=\"n\">TONE</span> <span class=\"n\">i</span><span class=\"o\">)</span>\n<span class=\"n\">tsimilar</span> <span class=\"n\">TZERO</span> <span class=\"o\">(</span><span class=\"n\">TSEQ</span> <span class=\"n\">t1</span> <span class=\"n\">t2</span><span class=\"o\">)</span>\n<span class=\"n\">tsimilar</span> <span class=\"o\">(</span><span class=\"n\">TONE</span> <span class=\"n\">i</span><span class=\"o\">)</span> <span class=\"o\">(</span><span class=\"n\">TSEQ</span> <span class=\"n\">t1</span> <span class=\"n\">t2</span><span class=\"o\">)</span>\n</code></pre></div>\n<p>are always false.</p>\n</blockquote>\n<p>Yeah but the problem is that due to your symmetry rule, you could also have <code>tsimilar TZERO (TONE x)</code> from <code>tsimilar (TONE x) TZERO</code>, so if you do try to disprove it, you have to disprove both of them simultaneously.</p>",
+        "id": 250126067,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1629470284
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"241231\">Chengsong Tan</span> <a href=\"#narrow/stream/238552-Beginner-Questions/topic/symmetric.20rule.20in.20inductively.20defined.20predicates/near/250125270\">said</a>:</p>\n<blockquote>\n<p>From your example I came up with another strengthening<br>\nlemma that is like the below:</p>\n<p><div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">lemma</span> <span class=\"n\">hierachy_maintained</span><span class=\"o\">:</span>\n  <span class=\"kp\">assumes</span> <span class=\"s\">\"tsimilar x y\"</span> <span class=\"s\">\"∃c t1 t2.</span>\n<span class=\"s\"> x = TZERO ∧ y = TONE c ∨ x = TONE c ∧ y = TZERO</span>\n<span class=\"s\">∨  x = TONE c ∧ y = TSEQ t1 t2 ∨  x = TSEQ t1 t2 ∧ y = TONE c</span>\n<span class=\"s\">∨  x = TZERO ∧ y = TSEQ t1 t2 ∨  x = TSEQ t1 t2 ∧ y = TZERO\"</span>\n  <span class=\"kp\">shows</span> <span class=\"n\">False</span>\n  <span class=\"k\">using</span> <span class=\"n\">assms</span>\n  <span class=\"kp\">apply</span><span class=\"o\">(</span><span class=\"n\">induction</span> <span class=\"n\">rule</span><span class=\"o\">:</span> <span class=\"n\">tsimilar.induct</span><span class=\"o\">)</span>\n  <span class=\"kp\">apply</span> <span class=\"n\">fastforce</span>\n  <span class=\"kp\">apply</span> <span class=\"n\">fastforce</span>\n  <span class=\"kp\">apply</span> <span class=\"n\">fastforce</span>\n  <span class=\"kp\">apply</span> <span class=\"n\">fastforce</span>\n  <span class=\"k\">done</span>\n</code></pre></div><br>\n</p>\n</blockquote>\n<p>For me the summary of doing a strengthening of a lemma about inductive definitions,<br>\nis to </p>\n<div class=\"codehilite\"><pre><span></span><code>1. add existential quantifiers rather than using free variables\n2. try to prove/disprove together a bunch of things if they are interderivable\n</code></pre></div>",
+        "id": 250126101,
+        "sender_full_name": "Chengsong Tan",
+        "timestamp": 1629470309
+    },
+    {
+        "content": "<p>I don't think there's any general method for finding out how to generalise things sufficiently. It's just intuition and experience.</p>",
+        "id": 250126105,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1629470310
+    },
+    {
+        "content": "<p>By \"survive the induction\" I mean that your statement must be strong enough so that you can actually apply the induction hypothesis in the induction step.</p>",
+        "id": 250126219,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1629470376
+    },
+    {
+        "content": "<p>A classic example is the tail-recursive list reversal function:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">fun</span> <span class=\"n\">itrev</span> <span class=\"o\">::</span> <span class=\"s\">\"'a list ⇒ 'a list ⇒ 'a list\"</span> <span class=\"kp\">where</span>\n  <span class=\"s\">\"itrev acc [] = acc\"</span>\n<span class=\"o\">|</span> <span class=\"s\">\"itrev acc (x # xs) = itrev (x # acc) xs\"</span>\n</code></pre></div>\n<p>If you try to prove <code>itrev [] xs = rev xs</code> by induction directly, you will run into a problem in the induction step because your induction hypothesis will tell you that <code>itrev [] xs = rev xs</code> (i.e. where <code>acc = []</code>), but in the induction step, you will have <code>acc = [x]</code> so you cannot apply the induction hypothesis.</p>",
+        "id": 250126439,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1629470506
+    },
+    {
+        "content": "<p>The trick is then to try to generalise the <code>[]</code> and prove something about <code>itrev acc xs</code> in general, namely <code>itrev acc xs = rev xs @ acc</code>.</p>",
+        "id": 250126531,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1629470546
+    },
+    {
+        "content": "<p>But, let me stress again, in the above case, the real solution is to remove the symmetry rule. You don't need it, and it just makes the proofs harder.</p>",
+        "id": 250126607,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1629470595
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"232736\">Manuel Eberl</span> <a href=\"#narrow/stream/238552-Beginner-Questions/topic/symmetric.20rule.20in.20inductively.20defined.20predicates/near/250126607\">said</a>:</p>\n<blockquote>\n<p>But, let me stress again, in the above case, the real solution is to remove the symmetry rule. You don't need it, and it just makes the proofs harder.</p>\n</blockquote>\n<p>Of course this example is contrived, but I feel like<br>\nin more complicated cases where you can't get<br>\nrid of a rule that tricks Isabelle into loops the technique shown<br>\nhere can be really useful.</p>\n<p>Thanks again for your helpful advice.</p>",
+        "id": 250127366,
+        "sender_full_name": "Chengsong Tan",
+        "timestamp": 1629470921
+    },
+    {
+        "content": "<p>I still don't see where Isabelle \"looped\" here.</p>",
+        "id": 250127968,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1629471150
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"232736\">Manuel Eberl</span> <a href=\"#narrow/stream/238552-Beginner-Questions/topic/symmetric.20rule.20in.20inductively.20defined.20predicates/near/250127968\">said</a>:</p>\n<blockquote>\n<p>I still don't see where Isabelle \"looped\" here.</p>\n</blockquote>\n<p>The automatic prover tries to <br>\nsay that there is no rule leading to the term</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"n\">tsimilar</span> <span class=\"n\">TZERO</span> <span class=\"o\">(</span><span class=\"n\">TONE</span> <span class=\"n\">i</span><span class=\"o\">)</span>\n</code></pre></div>\n<p>(which we abbreviate as <code>t</code>)<br>\nbeing true</p>\n<p>by finding out<br>\nthat </p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"n\">tsimilar</span> <span class=\"n\">TZERO</span> <span class=\"n\">TZERO</span>\n</code></pre></div>\n<p>can't lead to  the <code>t</code>,<br>\nand </p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"n\">tsimilar</span> <span class=\"o\">(</span><span class=\"n\">TONE</span> <span class=\"n\">i</span><span class=\"o\">)</span> <span class=\"o\">(</span><span class=\"n\">TONE</span> <span class=\"n\">j</span><span class=\"o\">)</span>\n</code></pre></div>\n<p>can't lead to <code>t</code>,<br>\nand .......... so forth<br>\nUntil it finds the rule</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"n\">tsimilar</span> <span class=\"n\">t1</span> <span class=\"n\">t2</span> <span class=\"o\">==</span><span class=\"err\">&gt;</span> <span class=\"n\">tsimilar</span> <span class=\"n\">t2</span> <span class=\"n\">t1</span>\n</code></pre></div>\n<p>it says umm, if we unify t1 with<br>\nTONE i and t2 with TZERO,<br>\nthen the fact <code>t'</code></p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"n\">tsimilar</span> <span class=\"n\">t1</span> <span class=\"n\">t2</span>\n</code></pre></div>\n<p>leads to </p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"n\">tsimilar</span> <span class=\"n\">TZERO</span> <span class=\"o\">(</span><span class=\"n\">TONE</span> <span class=\"n\">i</span><span class=\"o\">)</span>\n</code></pre></div>\n<p>How to get <code>t'</code>?<br>\nWell by rule</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"n\">tsimilar</span> <span class=\"n\">t1</span> <span class=\"n\">t2</span> <span class=\"o\">==</span><span class=\"err\">&gt;</span> <span class=\"n\">tsimilar</span> <span class=\"n\">t2</span> <span class=\"n\">t1</span>\n</code></pre></div>\n<p>again, which requires <code>t''</code>,<br>\nwhich requires <code>t'''</code>,<br>\n..............<br>\nthat's where the loop (I think) happens.<br>\nIs there a misunderstanding here?</p>\n<p>Since the inductive definition means the minimal set that<br>\nis closed under the rules, if the prover checked all rules<br>\nand found out that none can lead to the desired relation of instances,<br>\nit proved the fact that <code>P x1.... xn</code> is false. In our example here it got stuck in the last rule,<br>\nnot being able to disprove possibility of deriving the result.</p>",
+        "id": 250129600,
+        "sender_full_name": "Chengsong Tan",
+        "timestamp": 1629471828
+    },
+    {
+        "content": "<p>Pretty sure it has a limited search depth for <code>intro</code> rules though, so I don't think there should be any infinite loop.</p>",
+        "id": 250129844,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1629471934
+    },
+    {
+        "content": "<p>Infinite loops can happen with the simplifier sometimes, but the intro rules of an <code>inductive</code> are not declared as <code>simp</code> rules.</p>",
+        "id": 250129887,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1629471952
+    },
+    {
+        "content": "<p>I don't think I saw any looping behaviour when I tried your example before either.</p>",
+        "id": 250130003,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1629471993
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"232736\">Manuel Eberl</span> <a href=\"#narrow/stream/238552-Beginner-Questions/topic/symmetric.20rule.20in.20inductively.20defined.20predicates/near/250130003\">said</a>:</p>\n<blockquote>\n<p>I don't think I saw any looping behaviour when I tried your example before either.</p>\n</blockquote>\n<p>Ah my bad, shouldn't use the terminology loop, but just stuck and gave up?</p>",
+        "id": 250130283,
+        "sender_full_name": "Chengsong Tan",
+        "timestamp": 1629472109
+    },
+    {
+        "content": "<p>Sure, yes, at some point most methods will just give up.</p>",
+        "id": 250130995,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1629472432
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"241231\">Chengsong Tan</span> has marked this topic as resolved.</p>",
+        "id": 250137188,
+        "sender_full_name": "Notification Bot",
+        "timestamp": 1629475159
+    }
+]

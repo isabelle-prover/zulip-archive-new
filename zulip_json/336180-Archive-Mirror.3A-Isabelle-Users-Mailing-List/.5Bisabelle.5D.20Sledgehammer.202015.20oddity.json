@@ -1,0 +1,38 @@
+[
+    {
+        "content": "<p>From: Thomas Sewell &lt;<a href=\"mailto:thomas.sewell@nicta.com.au\">thomas.sewell@nicta.com.au</a>&gt;<br>\nHello isabelle-users.</p>\n<p>A friend of mine has recently updated to Isabelle 2015 and has come<br>\nacross what looks like a sledgehammer bug.</p>\n<p>Short summary: in Isabelle 2015 all sledgehammer provers recommend \"by<br>\nauto\" to solve a goal that can be solved trivially but not by auto.</p>\n<p>A demo theory is attached.</p>\n<p>Cheers,<br>\n     Thomas.</p>\n<hr>\n<p>The information in this e-mail may be confidential and subject to legal professional privilege and/or copyright. National ICT Australia Limited accepts no liability for any damage caused by this email or its attachments.<br>\n<a href=\"/user_uploads/14278/T_0ekGp9UcfcF2ZpA9AneSOb/Test.thy\">Test.thy</a></p>",
+        "id": 294641357,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661162250
+    },
+    {
+        "content": "<p>From: Jasmin Blanchette &lt;<a href=\"mailto:jasmin.blanchette@inria.fr\">jasmin.blanchette@inria.fr</a>&gt;<br>\nHi Thomas,</p>\n<blockquote>\n<p>Short summary: in Isabelle 2015 all sledgehammer provers recommend \"by<br>\nauto\" to solve a goal that can be solved trivially but not by auto.</p>\n</blockquote>\n<p>Thanks for the example. I am very much dependent on user-provided examples for debugging this feature.</p>\n<p>Here, the problem is that Sledgehammer noticed that “using foo bar by auto” solved the problem, then its minimized kicked in and noticed that “foo” and “bar” were in the simpset and simply took them away. In most cases, this is a useful, time- and CPU-saving strategy, but in your example taking out “foo\" turned out to be deadly. See change 7d278b0617d3 — unfortunately too late for Isabelle2015. The change joins 2c468c062589 and 533f6cfc04c0, done earlier this year.</p>\n<p>Appeal to the list: Please let me know if you run into other examples where either Sledgehammer finds a proof that doesn’t work and it claims it does or vice versa. The issues are normally easy to track down and address if you can provide me with an example that reproduces the problem.</p>\n<p>Jasmin</p>",
+        "id": 294641471,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661162286
+    },
+    {
+        "content": "<p>From: \"Eugene W. Stark\" &lt;<a href=\"mailto:isabelle-users@starkeffect.com\">isabelle-users@starkeffect.com</a>&gt;<br>\nHere is one I just ran into.  It was easy to abstract from the rest of the<br>\ntheory so I am posting it.</p>\n<p>- Gene Stark</p>\n<p>theory Barf<br>\nimports Main<br>\nbegin</p>\n<p>definition graph :: \"'a set ⇒ 'a set ⇒ ('a ⇒ 'a) ⇒ 'a ⇒ 'a ⇒ bool\"<br>\n  (*</p>\n<p>* With the more general type \"'a set ⇒ ' b set ⇒ ('a ⇒ 'b) ⇒ 'a ⇒ 'b ⇒ bool\"<br>\n   * the proof by fastforce succeeds below.<br>\n   *)<br>\n  where \"graph A B f a b = (a ∈ A ∧ b ∈ B ∧ f a = b)\"</p>\n<p>lemma \"a ∈ A ∧ b ∈ B ∧ c ∈ C ∧ f a = b ∧ g b = c ⟹ graph A C (g o f) a c\"<br>\n    using graph_def<br>\n    (* try0 (* Says: 'Try this: by fastforce' *) *)<br>\n    by fastforce  (* Fails to prove lemma -- unification bound exceeded, etc. *)</p>\n<p>end<br>\n<a href=\"/user_uploads/14278/eXqZFQFw86byUh0ENneNb9XV/Barf.thy\">Barf.thy</a></p>",
+        "id": 294642197,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661162575
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nThe above actually works, but fastforce is stalled and waiting for <br>\nconfirmation to spill out more \"potentially useful tracing messages\" at <br>\nthe very bottom.</p>\n<p>This is a light form of denial-of-service attack on the front-end.  A <br>\nheavy form would be a bombing of the IDE process with tons of pointless <br>\nmessages.</p>\n<p>The above example can be made to work as follows:</p>\n<p>using [[unify_trace_bound = 60]]<br>\n     by fastforce</p>\n<p>Sledgehammer is internally very careful to provide a sensible value to <br>\nsuch options, see \"silence_methods\" here: <br>\n<a href=\"http://isabelle.in.tum.de/repos/isabelle/file/Isabelle2015/src/HOL/Tools/try0.ML#l104\">http://isabelle.in.tum.de/repos/isabelle/file/Isabelle2015/src/HOL/Tools/try0.ML#l104</a></p>\n<p>That setup is not active for the generated proof snippet, though.</p>\n<p>Makarius</p>",
+        "id": 294644693,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661163568
+    },
+    {
+        "content": "<p>From: \"Eugene W. Stark\" &lt;<a href=\"mailto:isabelle-users@starkeffect.com\">isabelle-users@starkeffect.com</a>&gt;<br>\nI just ran into a variant of this which I think is a bona fide example of what<br>\nJasmin is looking for.</p>\n<p>- Gene Stark</p>\n<p>theory Barf<br>\nimports Main<br>\nbegin</p>\n<p>definition graph :: \"'a set ⇒ 'b set ⇒ ('a ⇒ 'b) ⇒ ('a × 'b) set\"<br>\n  where \"graph A B f = {(a, b). a ∈ A ∧ b ∈ B ∧ f a = b}\"</p>\n<p>lemma \"graph A B f ⊆ (graph A B f) O (Id_on B)\"<br>\n    (* try<br>\n     Trying \"solve_direct\", \"quickcheck\", \"try0\", \"sledgehammer\", and \"nitpick\"...<br>\n     Ignoring duplicate rewrite rule:<br>\n     ?a1 ∈ Collect ?P1 ≡ ?P1 ?a1<br>\n     Ignoring duplicate rewrite rule:<br>\n     snd (?x1.1, ?y) ≡ ?y<br>\n     SMT: Solver z3: Counterexample found (possibly spurious)<br>\n     \"cvc4\": Try this: by (smt Collect_splitD Id_onI graph_def relcomp.simps snd_conv subrelI) (754 ms).</p>\n<p>The above one-liner succeeds. However, see below...<br>\n     *)<br>\n    using graph_def<br>\n    (* try<br>\n         \"cvc4\": Try this: by auto (37 ms).<br>\n         \"z3\": Try this: by auto (53 ms).<br>\n     *)<br>\n    by auto<br>\n    (* Failed to finish proof⌂:<br>\n       goal (1 subgoal):</p>\n<p>1. ⋀a b. (⋀A B f. graph A B f = {(a, b). a ∈ A ∧ b ∈ B ∧ f a = b}) ⟹<br>\n                  (a, b) ∈ graph A B f ⟹ (a, b) ∈ graph A B f O Id_on B<br>\n     *)</p>\n<p>end<br>\n<a href=\"/user_uploads/14278/FnBiKcBUwZfmNyCAzMHCda9B/Barf.thy\">Barf.thy</a></p>",
+        "id": 294651270,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661166188
+    },
+    {
+        "content": "<p>From: Jasmin Blanchette &lt;<a href=\"mailto:jasmin.blanchette@inria.fr\">jasmin.blanchette@inria.fr</a>&gt;<br>\nDear Eugene,</p>\n<p>Thank you for your report. It appears to work fine with a recent repository version (e.g. 48600872b12c). After the 2015 release, I sorted out a number of issues related to preplaying.</p>\n<p>Regards,</p>\n<p>Jasmin</p>",
+        "id": 294657142,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661168511
+    }
+]

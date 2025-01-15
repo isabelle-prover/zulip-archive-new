@@ -1,0 +1,105 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Issue with pattern_aliases and let · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Issue.20with.20pattern_aliases.20and.20let.html">[isabelle] Issue with pattern_aliases and let</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="207064616"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Issue%20with%20pattern_aliases%20and%20let/near/207064616" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Issue.20with.20pattern_aliases.20and.20let.html#207064616">(Aug 16 2020 at 10:09)</a>:</h4>
+<p>From: Niels Mündler &lt;<a href="mailto:n.muendler@tum.de">n.muendler@tum.de</a>&gt;<br>
+Hello everyone,</p>
+<p>Working with the latest Isabelle distribution, I have encountered an <br>
+internal exception when using <code>pattern_aliases</code> in combination with <br>
+<code>let</code> statements. As a minimal breaking example, the function <br>
+"weird_swin" can be found  in the code appended. Thanks to Manuel Eberl, <br>
+a non-breaking version could be formulated which can also be found, <br>
+named "not_so_weird_swin".</p>
+<p>I am just curious whether this issue is known and suggest that the issue <br>
+should be fixed, myself having no clue what caused it.</p>
+<p>Best regards,<br>
+Niels Mündler<br>
+<a href="/user_uploads/14278/KpIZZkOqXgaQbF-MemqQWbjY/Breaking.thy">Breaking.thy</a></p>
+
+
+
+<a name="207139464"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Issue%20with%20pattern_aliases%20and%20let/near/207139464" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Issue.20with.20pattern_aliases.20and.20let.html#207139464">(Aug 17 2020 at 12:56)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:eberlm@in.tum.de">eberlm@in.tum.de</a>&gt;<br>
+I tried to track it down but failed so far. Even with ML exception trace<br>
+and ML exception debugger enabled (and Pure + HOL rebuilt), I see no<br>
+trace for the exception. Rebuilding HOL with the full ML debugger is not<br>
+feasible (doesn't terminate).</p>
+<p>I did find out, however, that it is /not/ a problem with the function<br>
+package but rather a problem with pattern aliases. The function<br>
+definition does not use pattern aliases at all, and if you just disable<br>
+pattern aliases, the exception goes away.</p>
+<p>Manuel</p>
+
+
+
+<a name="207141613"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Issue%20with%20pattern_aliases%20and%20let/near/207141613" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Issue.20with.20pattern_aliases.20and.20let.html#207141613">(Aug 17 2020 at 13:11)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:eberlm@in.tum.de">eberlm@in.tum.de</a>&gt;<br>
+Okay, I managed to get somewhere. First of all, the problem doesn't seem<br>
+to be pattern aliases as such but a fundef_cong rule it declares:</p>
+<p>lemma let_cong_unfolding [fundef_cong]:<br>
+  "M = N ⟹ f N = g N ⟹ Let M f = Let N g"<br>
+  by simp</p>
+<p>The problem is probably due to the combination of "Let" and "case", but<br>
+I cannot see what exactly the problem is.</p>
+<p>Minimal breaking example and exception trace below.</p>
+<p>Manuel</p>
+<p>theory Foo<br>
+imports "~~/src/HOL/Fun_Def"<br>
+begin</p>
+<p>lemma let_cong_unfolding [fundef_cong]:<br>
+  "M = N ⟹ f N = g N ⟹ Let M f = Let N g"<br>
+  by simp</p>
+<p>fun foo :: "nat ⇒ unit × unit" where<br>
+ "foo 0 = undefined" |<br>
+ "foo (Suc n) = (let (a', l') = foo n in undefined)"</p>
+<p>end</p>
+<p>Exception trace - exception THM 1 raised (line 700 of "drule.ML"): COMP<br>
+  Function_Context_Tree.rewrite_by_tree(5)rewrite_help (line 244 of<br>
+"~~/src/HOL/Tools/Function/function_context_tree.ML")<br>
+  Function_Context_Tree.rewrite_by_tree (line 242 of<br>
+"~~/src/HOL/Tools/Function/function_context_tree.ML")<br>
+  Function_Core.mk_replacement_lemma (line 256 of<br>
+"~~/src/HOL/Tools/Function/function_core.ML")<br>
+  Function_Core.prove_stuff (line 390 of<br>
+"~~/src/HOL/Tools/Function/function_core.ML")<br>
+  Function_Core.prepare_function (line 825 of<br>
+"~~/src/HOL/Tools/Function/function_core.ML")<br>
+  Function_Mutual.prepare_function_mutual (line 303 of<br>
+"~~/src/HOL/Tools/Function/mutual.ML")<br>
+  Function.prepare_function (line 72 of<br>
+"~~/src/HOL/Tools/Function/function.ML")<br>
+  Function.gen_add_function (line 139 of<br>
+"~~/src/HOL/Tools/Function/function.ML")<br>
+  Function_Fun.gen_add_fun (line 155 of "~~/src/HOL/Tools/Function/fun.ML")</p>
+<p>exception THM 1 raised (line 700 of "drule.ML"):<br>
+  COMP<br>
+  (case h_fd n of (a', l') ⇒ undefined) = (case foo_sumC n of (a', l') ⇒<br>
+undefined)<br>
+    [⋀z. foo_rel z x_fd ⟹ ∃!y. foo_graph z y, x_fd = Suc n, foo_graph n<br>
+(h_fd n),<br>
+      foo_rel ≡ ??.Foo.foo_rel, foo_sumC ≡ ??.Foo.foo_sumC, foo_graph ≡<br>
+??.Foo.foo_graph]<br>
+  (case foo_sumC n of (a', l') ⇒ undefined) = (case foo_sumC n of (a',<br>
+l') ⇒ undefined) ⟹<br>
+  let (a', l') = h_fd n in undefined ≡ let (a', l') = foo_sumC n in<br>
+undefined<br>
+    [⋀z. foo_rel z x_fd ⟹ ∃!y. foo_graph z y, x_fd = Suc n, foo_graph n<br>
+(h_fd n),<br>
+      foo_rel ≡ ??.Foo.foo_rel, foo_sumC ≡ ??.Foo.foo_sumC, foo_graph ≡<br>
+??.Foo.foo_graph]</p>
+
+
+
+<hr><p>Last updated: Jul 15 2022 at 23:21 UTC</p>
+</html>

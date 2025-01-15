@@ -1,0 +1,56 @@
+[
+    {
+        "content": "<p>Hey guys, I'm having a lot of trouble proving anything about an object that's gone through my recursive function.</p>\n<p>The function works through a termination condition via if else and I've already been able to prove that it terminates.</p>\n<p>The easiest example would be something like </p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">fun</span><span class=\"w\"> </span><span class=\"n\">test</span><span class=\"o\">::</span><span class=\"w\"> </span><span class=\"s\">\"nat ⇒ nat\"</span><span class=\"w\"> </span><span class=\"kp\">where</span>\n<span class=\"s\">\"test x = (if x &lt; 5 then x else test ( x- 2))\"</span>\n</code></pre></div>\n<p>When trying to prove that <code>test x &lt;= x</code>I can obviously show that x-2 &lt; x and x&lt;= x, but I'm unable to show how this means that the end result is &lt;= x, despite those being the only two possible cases.</p>\n<p>Same goes for properties that don't get changed in either case, like the evenness of x in this case.</p>\n<p>Is there some inductive rule for cases like these?</p>",
+        "id": 329241141,
+        "sender_full_name": "Umon",
+        "timestamp": 1676998625
+    },
+    {
+        "content": "<p>Are you using the induction rule <code>test.induct</code>?</p>",
+        "id": 329241892,
+        "sender_full_name": "Lukas Stevens",
+        "timestamp": 1676998816
+    },
+    {
+        "content": "<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">lemma</span><span class=\"w\"> </span><span class=\"s\">\"test x ≤ x\"</span>\n<span class=\"w\">  </span><span class=\"kp\">apply</span><span class=\"o\">(</span><span class=\"n\">induction</span><span class=\"w\"> </span><span class=\"n\">rule</span><span class=\"o\">:</span><span class=\"w\"> </span><span class=\"n\">test.induct</span><span class=\"o\">)</span>\n<span class=\"w\">  </span><span class=\"k\">by</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">metis</span><span class=\"w\"> </span><span class=\"n\">diff_le_self</span><span class=\"w\"> </span><span class=\"n\">le_eq_less_or_eq</span><span class=\"w\"> </span><span class=\"n\">le_trans</span><span class=\"w\"> </span><span class=\"n\">test.elims</span><span class=\"o\">)</span>\n</code></pre></div>",
+        "id": 329242380,
+        "sender_full_name": "Lukas Stevens",
+        "timestamp": 1676998940
+    },
+    {
+        "content": "<p>or</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">proof</span><span class=\"o\">(</span><span class=\"n\">induction</span><span class=\"w\"> </span><span class=\"n\">rule</span><span class=\"o\">:</span><span class=\"w\"> </span><span class=\"n\">test.induct</span><span class=\"o\">)</span>\n<span class=\"w\">  </span><span class=\"k\">case</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">1</span><span class=\"w\"> </span><span class=\"n\">x</span><span class=\"o\">)</span>\n<span class=\"w\">  </span><span class=\"k\">then</span><span class=\"w\"> </span><span class=\"k\">show</span><span class=\"w\"> </span><span class=\"o\">?</span><span class=\"k\">case</span>\n<span class=\"w\">    </span><span class=\"k\">unfolding</span><span class=\"w\"> </span><span class=\"n\">test.simps</span><span class=\"o\">[</span><span class=\"n\">of</span><span class=\"w\"> </span><span class=\"n\">x</span><span class=\"o\">]</span>\n<span class=\"w\">    </span><span class=\"k\">by</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">auto</span><span class=\"w\"> </span><span class=\"n\">simp</span><span class=\"w\"> </span><span class=\"n\">del</span><span class=\"o\">:</span><span class=\"w\"> </span><span class=\"n\">test.simps</span><span class=\"o\">)</span>\n<span class=\"k\">qed</span>\n</code></pre></div>",
+        "id": 329243001,
+        "sender_full_name": "Lukas Stevens",
+        "timestamp": 1676999106
+    },
+    {
+        "content": "<p>Well, that works, but as far as I can tell test.induct merely shows <code>(¬ x &lt; 5 ⟹ test (x - 2) ≤ x - 2)</code> or more generally, that as long as the termination condition remains unfulfilled, the lemma is true.</p>\n<p>Is that really enough to say something about the result after the recursion? <code>\"even x ≡ even (test x)\"</code> for example can't be proven that way, or at least sledgehammer doesn't find anything. I personally think it only works on the previous lemma because x getting smaller is basically the measure for the termination.</p>\n<p>How do I make the jump from \"it remains true while looping\" to \"it remains true for the end result\"?</p>",
+        "id": 329700321,
+        "sender_full_name": "Umon",
+        "timestamp": 1677153886
+    },
+    {
+        "content": "<p>No, you are misunderstanding the induction rule. The above shows <code>test x ≤ x</code> for all <code>x</code>.</p>",
+        "id": 329701158,
+        "sender_full_name": "Lukas Stevens",
+        "timestamp": 1677154167
+    },
+    {
+        "content": "<p>It is just the case that you only have an induction hypothesis for the case that <code>x</code> is greater than or equal to <code>5</code>. If <code>x &lt; 5</code> you just have to show <code>test x ≤ x</code> without any I.H. available.</p>",
+        "id": 329701376,
+        "sender_full_name": "Lukas Stevens",
+        "timestamp": 1677154224
+    },
+    {
+        "content": "<p>Yeah, you're completely right. I was able to prove my lemmas using cases and .induct.</p>\n<p>A lot of my confusion came from how sometimes cases would target other variables than the induction and I ended up with a bunch of orange and blue variables refusing to cooperate.</p>\n<p>It turned out that the 'direction' of the \"=\" mattered. As in, <code>(property) (test x) = (property) x</code> was a lot easier to prove than <code>(property) x= (property) (test x) </code>?</p>\n<p>Thank you very much for your help!</p>",
+        "id": 329714808,
+        "sender_full_name": "Umon",
+        "timestamp": 1677157961
+    },
+    {
+        "content": "<p>Generally it's a good idea to always tell <code>induct</code> and <code>cases</code> what variables (or, more generally, terms) you want to induct/case distinguish on. The only time when it's safe to omit that information is when you're chaining in some assumption with <code>using</code> that the induction/cases rule consumes, e.g. induction rules that come out of inductive predicates. Otherwise unpredictable things happen.</p>",
+        "id": 329732843,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1677162500
+    }
+]

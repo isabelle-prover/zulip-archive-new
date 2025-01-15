@@ -1,0 +1,134 @@
+[
+    {
+        "content": "<p>Hi! I'm trying to understand when/how clickable references to formal entities are created. Here's a minimal example:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"n\">Scratch</span>\n<span class=\"w\">  </span><span class=\"kp\">imports</span><span class=\"w\"> </span><span class=\"n\">Main</span>\n<span class=\"w\">  </span><span class=\"kp\">keywords</span><span class=\"w\"> </span><span class=\"s\">\"dummy0\"</span><span class=\"w\"> </span><span class=\"s\">\"dummy1\"</span><span class=\"w\"> </span><span class=\"o\">::</span><span class=\"w\"> </span><span class=\"n\">thy_goal</span>\n<span class=\"k\">begin</span>\n<span class=\"k\">ML</span><span class=\"s\">‹</span>\n<span class=\"s\">  fun do_something tyname ctxt =</span>\n<span class=\"s\">    let val _ = Proof_Context.read_type_name {proper = true, strict = false} ctxt tyname in</span>\n<span class=\"s\">       ctxt</span>\n<span class=\"s\">    end</span>\n<span class=\"s\">  fun do_nothing _ ctxt = ctxt</span>\n<span class=\"s\">  val _ = Outer_Syntax.local_theory @{command_keyword \"dummy0\"} \"\" (Parse.const &gt;&gt; do_something)</span>\n<span class=\"s\">  val _ = Outer_Syntax.local_theory @{command_keyword \"dummy1\"} \"\" (Parse.const &gt;&gt; do_nothing)</span>\n<span class=\"s\">›</span>\n<span class=\"n\">dummy0</span><span class=\"w\"> </span><span class=\"n\">nat</span><span class=\"w\"> </span><span class=\"n\">―‹Clickable</span><span class=\"w\"> </span><span class=\"n\">reference›</span>\n<span class=\"n\">dummy1</span><span class=\"w\"> </span><span class=\"n\">nat</span><span class=\"w\"> </span><span class=\"n\">―‹No</span><span class=\"w\"> </span><span class=\"n\">reference›</span>\n<span class=\"k\">end</span>\n</code></pre></div>\n<p>How does Isabelle achieve the clickable reference to <code>nat</code> in case of <code>dummy0 nat</code>? <code>Parse.const</code> is a mere string parser, so where and how is the information about the position of the string retained that would later allow <code>read_type_name</code> to add markup?</p>",
+        "id": 394785136,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1696407736
+    },
+    {
+        "content": "<p>A pide report is generated (see <code>context_position.ML</code>) and sent to Isabelle/Scala. <code>Parse.const</code> will not do that but <code>Proof_Context.read_type_name</code> will.</p>",
+        "id": 394788451,
+        "sender_full_name": "Fabian Huch",
+        "timestamp": 1696408760
+    },
+    {
+        "content": "<p>Thanks Fabian! But <code>read_type_name</code> takes a mere string as an argument, without positioning information? How/where is the position information about the original argument retained after <code>Parse.term</code>?</p>",
+        "id": 394789090,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1696408895
+    },
+    {
+        "content": "<p>I assume that is stored in the context.</p>",
+        "id": 394791059,
+        "sender_full_name": "Fabian Huch",
+        "timestamp": 1696409407
+    },
+    {
+        "content": "<p>I'm sorry, I don't follow yet -- can you elaborate?</p>",
+        "id": 394791163,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1696409454
+    },
+    {
+        "content": "<p>There is the <code>ctxt</code> argument in your <code>do_*</code> function -- this is a context where such arbitrary contextual information can be stored, and judging from the signatures, this is where the position comes from.</p>",
+        "id": 394792244,
+        "sender_full_name": "Fabian Huch",
+        "timestamp": 1696409825
+    },
+    {
+        "content": "<p>If you take a look at the definitions you should be able to follow how exactly.</p>",
+        "id": 394792360,
+        "sender_full_name": "Fabian Huch",
+        "timestamp": 1696409867
+    },
+    {
+        "content": "<p>Yes I saw that <code>Parse.typ</code> stores some information about the input being parsed 'as a type' somewhere. But even so, it only returns a plain string, so even with the context being passed around, I don't understand how <code>read_type_name</code> could know which source code position its input is coming from.</p>",
+        "id": 394792894,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1696410070
+    },
+    {
+        "content": "<p>I'm not sure what you mean with 'only returns a plain string' - No method involved here does that ;)</p>",
+        "id": 394794507,
+        "sender_full_name": "Fabian Huch",
+        "timestamp": 1696410631
+    },
+    {
+        "content": "<p>There is <code>read_type_name</code> which takes a context</p>",
+        "id": 394794546,
+        "sender_full_name": "Fabian Huch",
+        "timestamp": 1696410647
+    },
+    {
+        "content": "<p>and <code>Parse.const</code> which is of type <code>string parser</code>.</p>",
+        "id": 394794609,
+        "sender_full_name": "Fabian Huch",
+        "timestamp": 1696410670
+    },
+    {
+        "content": "<p>Yes. <code>Parse.const</code> is a <code>string parser</code>, so the parser's  output is a string -- ISTM that unless position information is somehow hidden in the string, <code>read_type_name</code> would not be able to add markup for it in the original source.</p>",
+        "id": 394794754,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1696410723
+    },
+    {
+        "content": "<p>Ok... that does indeed seem to be the case. <code>String.explode</code> shows various positioning information in the string that are not displayed when printing it e.g. via <code>tracing</code></p>",
+        "id": 394795639,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1696411031
+    },
+    {
+        "content": "<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">ML</span><span class=\"s\">‹</span>\n<span class=\"s\">  fun do_something tyname ctxt =</span>\n<span class=\"s\">    let</span>\n<span class=\"s\">       val _ = tyname |&gt; String.explode |&gt; List.map Char.toString |&gt; String.concatWith \"\" |&gt; tracing</span>\n<span class=\"s\">       val _ = Proof_Context.read_type_name {proper = true, strict = false} ctxt tyname in</span>\n<span class=\"s\">       ctxt</span>\n<span class=\"s\">    end</span>\n<span class=\"s\">  val _ = Outer_Syntax.local_theory @{command_keyword \"dummy0\"} \"\" (Parse.typ &gt;&gt; do_something)</span>\n<span class=\"s\">›</span>\n\n<span class=\"n\">dummy0</span><span class=\"w\"> </span><span class=\"n\">nat</span><span class=\"w\"> </span><span class=\"n\">―‹Clickable</span><span class=\"w\"> </span><span class=\"n\">reference›</span>\n<span class=\"n\">―‹\\^E\\^Finput\\^Fdelimited</span><span class=\"o\">=</span><span class=\"n\">false\\^Foffset</span><span class=\"o\">=</span><span class=\"n\">8\\^Fend_offset</span><span class=\"o\">=</span><span class=\"n\">11\\^Fid</span><span class=\"o\">=-</span><span class=\"n\">15172\\^Enat\\^E\\^F\\^E›</span>\n</code></pre></div>",
+        "id": 394796023,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1696411167
+    },
+    {
+        "content": "<p>Also the <code>string parser</code> is not a function to string - it is <code>T list -&gt; 'a * T list</code>, and the whole parser for the command is of type <code>(local_theory -&gt; local_theory) parser</code>.</p>",
+        "id": 394796297,
+        "sender_full_name": "Fabian Huch",
+        "timestamp": 1696411228
+    },
+    {
+        "content": "<p>Yes, that's understood</p>",
+        "id": 394796318,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1696411238
+    },
+    {
+        "content": "<p>But, ultimately, the position information is not passed through context here, but through the string itself -- which is difficult to notice because it's elided upon normal printing.</p>",
+        "id": 394796385,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1696411262
+    },
+    {
+        "content": "<p>Yup. That is not obvious from the signature but when you read through the code it becomes clear:</p>\n<div class=\"codehilite\" data-code-language=\"Standard ML\"><pre><span></span><code><span class=\"kr\">fun</span> <span class=\"nf\">read_type_name</span> <span class=\"n\">flags</span> <span class=\"n\">ctxt</span> <span class=\"n\">text</span> <span class=\"p\">=</span>\n  <span class=\"kr\">let</span>\n    <span class=\"kr\">val</span> <span class=\"nv\">source</span> <span class=\"p\">=</span> <span class=\"nn\">Syntax</span><span class=\"p\">.</span><span class=\"n\">read_input</span> <span class=\"n\">text</span><span class=\"p\">;</span>\n    <span class=\"kr\">val</span> <span class=\"p\">(</span><span class=\"n\">T</span><span class=\"p\">,</span> <span class=\"n\">reports</span><span class=\"p\">)</span> <span class=\"nv\">=</span> <span class=\"n\">check_type_name</span> <span class=\"n\">flags</span> <span class=\"n\">ctxt</span> <span class=\"p\">(</span><span class=\"nn\">Input</span><span class=\"p\">.</span><span class=\"n\">source_content</span> <span class=\"n\">source</span><span class=\"p\">);</span>\n    <span class=\"kr\">val</span> <span class=\"p\">_</span> <span class=\"p\">=</span> <span class=\"nn\">Context_Position</span><span class=\"p\">.</span><span class=\"n\">reports</span> <span class=\"n\">ctxt</span> <span class=\"n\">reports</span><span class=\"p\">;</span>\n</code></pre></div>",
+        "id": 394797989,
+        "sender_full_name": "Fabian Huch",
+        "timestamp": 1696411835
+    },
+    {
+        "content": "<p>Do you happen to know if there are helper functions for removing such position annotations to get \"plain string\"?</p>",
+        "id": 394798094,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1696411869
+    },
+    {
+        "content": "<p>Not by memory but there must be, look at the module where the type of <code>source</code> here is defined.</p>",
+        "id": 394798568,
+        "sender_full_name": "Fabian Huch",
+        "timestamp": 1696412042
+    },
+    {
+        "content": "<p><code>Syntax.read_input #&gt; Input.string_of</code> seems to work</p>",
+        "id": 394798980,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1696412167
+    },
+    {
+        "content": "<p>Great, I think I can make progress now. Thanks for the help! <span aria-label=\"pray\" class=\"emoji emoji-1f64f\" role=\"img\" title=\"pray\">:pray:</span></p>",
+        "id": 394799065,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1696412205
+    }
+]

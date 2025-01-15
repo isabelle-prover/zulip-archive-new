@@ -1,0 +1,38 @@
+[
+    {
+        "content": "<p>From: Dominique Unruh &lt;<a href=\"mailto:unruh@ut.ee\">unruh@ut.ee</a>&gt;<br>\nHello,</p>\n<p>I have a case where the combination of Rewrite and Adhoc_Overloading breaks<br>\nthe subst tactic. It is probably simplest to just show the minimal example:</p>\n<p>theory Test3<br>\n  imports \"HOL-Library.Rewrite\" Main<br>\nbegin</p>\n<p>end</p>\n<p>theory Test<br>\n  imports \"HOL-Library.Adhoc_Overloading\" Main Test3<br>\nbegin</p>\n<p>lemma a: \"x+(x::nat) = 2*x\" by auto<br>\nlemma b: \"(1::nat)+(1::nat) = 2\"<br>\n  apply (subst a)<br>\n  by simp</p>\n<p>end</p>\n<p>(It has two be split into two theory files.)</p>\n<p>If I remove the imports for Rewrite or Adhoc_Overloading, the subst method<br>\nworks as expected. If I move the import for Adhoc_Overloading to Test3, the<br>\nsubst method works as well. But with this specific theory graph, subst does<br>\nnot work.</p>\n<p>What is happening?</p>\n<p>And can this be fixed without adding Adhoc_Overloading as a dependency to<br>\nTest3?</p>\n<p>Best wishes,<br>\nDominique.</p>",
+        "id": 294731374,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661188180
+    },
+    {
+        "content": "<p>From: Lars Hupel &lt;<a href=\"mailto:hupel@in.tum.de\">hupel@in.tum.de</a>&gt;<br>\nDear Dominique,</p>\n<p>the problem is actually independent of \"Test3\". Instead, it is based on <br>\nthe import order.</p>\n<p>Namely, \"Adhoc_Overloading\" is itself based on \"Pure\", not \"Main\". That <br>\nmeans the import order matters.</p>\n<p>This one works:</p>\n<p>theory Test<br>\n   imports Main \"HOL-Library.Adhoc_Overloading\"<br>\nbegin</p>\n<p>That one doesn't:</p>\n<p>theory Test<br>\n   imports \"HOL-Library.Adhoc_Overloading\" Main<br>\nbegin</p>\n<p>As to why exactly the order wrt \"Pure\"/\"Main\" is relevant, I don't know. <br>\nBut I've seen this in the past: <br>\n&lt;<a href=\"https://github.com/larsrh/libisabelle/commit/eaafee24a46dc9a99de75bcf55b7d3c8d27f71ca\">https://github.com/larsrh/libisabelle/commit/eaafee24a46dc9a99de75bcf55b7d3c8d27f71ca</a>&gt;.</p>\n<p>Cheers<br>\nLars</p>",
+        "id": 294731394,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661188188
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nTheory \"HOL-Library.Adhoc_Overloading\" extends Pure, so in a merge where<br>\nit is coming first, non-mergeable data components will have preference<br>\nover those from Main HOL -- notably operations from the Simplifier setup.</p>\n<p>The \"subst\" method uses Simplifier.mksimps here:<br>\n<a href=\"http://isabelle.in.tum.de/repos/isabelle/file/Isabelle2017/src/Tools/eqsubst.ML#l53\">http://isabelle.in.tum.de/repos/isabelle/file/Isabelle2017/src/Tools/eqsubst.ML#l53</a><br>\n-- with the Pure version it cannot work with HOL equalities.<br>\nConsequently, the following variation of the example works:</p>\n<p>theory Test<br>\n  imports \"HOL-Library.Adhoc_Overloading\" Main Test3<br>\nbegin</p>\n<p>lemma a: \"x+(x::nat) ≡ 2*x\" by (rule eq_reflection) auto<br>\nlemma b: \"(1::nat)+(1::nat) = 2\"<br>\n  apply (subst a)<br>\n  by simp</p>\n<p>end</p>\n<p>The session-qualified theory naming in Isabelle2017 causes some<br>\nconfusion here: ~~/src/Tools/Adhoc_Overloading.thy becomes<br>\n\"HOL-Library.Adhoc_Overloading\", so it appears like it should be based<br>\non Main HOL, but it isn't.</p>\n<p>Anything not based on theory Main (or Complex_Main) is subject to the<br>\nrather complex HOL bootstrap process, and should normally not occur in<br>\nuser-space -- it provokes surprises as shown here.</p>\n<p>It is probably better to move Adhoc_Overloading.thy to<br>\n~~/src/HOL/Library and make it import Main. (I am in the process to try<br>\nthis change of Isabelle + AFP.)</p>\n<p>At some later stage, it should all be assimilated into Pure -- this<br>\nwould solve other known problems of the current setup, especially in<br>\nconjunction with abbreviations.</p>\n<p>Makarius</p>",
+        "id": 294732017,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661188420
+    },
+    {
+        "content": "<p>From: Lars Hupel &lt;<a href=\"mailto:hupel@in.tum.de\">hupel@in.tum.de</a>&gt;<br>\nThis change (Isabelle/81d90f830f99) broke HOLCF-Prelude in the AFP (see<br>\nattachment).</p>",
+        "id": 294732208,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661188488
+    },
+    {
+        "content": "<p>From: Christian Sternagel &lt;<a href=\"mailto:c.sternagel@gmail.com\">c.sternagel@gmail.com</a>&gt;<br>\nDear all,</p>\n<p>The easy fix would be to add (but I didn't do anything in the repo,<br>\nbecause I wanted to avoid potential clashes with others).</p>\n<p>hide_const (open) List.nth</p>\n<p>at the top of Definedness.thy. The problem was just that we define our<br>\nown \"nth\" (in Data_List) function but since \"nth\" is also defined in<br>\nMain and Definedness imports Adhoc_Overloading after Data_List. No<br>\nsuddenly \"nth\" referred to List.nth instead of Data_List.nth.</p>\n<p>cheers</p>\n<p>chris</p>",
+        "id": 294732367,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661188554
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nThere are further hide commands that getoverridden by the merge with<br>\nMain from the right. This is another example of merge fragility.</p>\n<p>I have now clarified the imports as in the included changeset.</p>\n<p>Makarius<br>\n<a href=\"/user_uploads/14278/R8k24vywj0lRcGWWRLi_btm9/ch\">ch</a></p>",
+        "id": 294732793,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661188690
+    }
+]
