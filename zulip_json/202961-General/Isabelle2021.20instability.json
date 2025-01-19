@@ -1,0 +1,140 @@
+[
+    {
+        "content": "<p>Ever since upgrading to the new Isabelle2021, occasionally my the \"zulu architecture\" takes about 100% cpu usage, likely triggered by typing some proofs, not even necessarily <code>try</code> or anything. The only option is to close Isabelle, and 2/3 times it works. But occasionally the proof search processes (z3,...) never exit, and I need to restart my whole PC. Has anyone run into similar issues? I'm on Windows x64 on fairly recent hardware.</p>",
+        "id": 228500481,
+        "sender_full_name": "Max Nowak",
+        "timestamp": 1614725044
+    },
+    {
+        "content": "<p><a href=\"/user_uploads/14278/y-FVhsdhIg7pLJIPXwnaDjyN/grafik.png\">This seems to be a common pattern</a> (usage drops to 0 since I quit isabelle)</p>\n<div class=\"message_inline_image\"><a href=\"/user_uploads/14278/y-FVhsdhIg7pLJIPXwnaDjyN/grafik.png\" title=\"This seems to be a common pattern\"><img src=\"/user_uploads/14278/y-FVhsdhIg7pLJIPXwnaDjyN/grafik.png\"></a></div>",
+        "id": 228509685,
+        "sender_full_name": "Max Nowak",
+        "timestamp": 1614729640
+    },
+    {
+        "content": "<p>Any specific reason to assume z3 is responsible?</p>",
+        "id": 228541118,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1614750831
+    },
+    {
+        "content": "<p>Anyway, next time you start Isabelle, can you open the Monitor (bottom right, double click on ML) and look what happens on the ML side when it freezes? I saw this kind of things happen before on large theories and very slow GCing, but that might be something different.</p>",
+        "id": 228541365,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1614751010
+    },
+    {
+        "content": "<p>What kind of formalization are you doing?</p>",
+        "id": 228542080,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1614751581
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"392349\">Max Nowak</span> <a href=\"#narrow/stream/202961-general/topic/Isabelle2021.20instability/near/228509685\">said</a>:</p>\n<blockquote>\n<p><a href=\"/user_uploads/14278/y-FVhsdhIg7pLJIPXwnaDjyN/grafik.png\">This seems to be a common pattern</a> (usage drops to 0 since I quit isabelle)</p>\n</blockquote>\n<p>I am not familiar with the windows task manager. Is that one CPU or all CPUs? Does 100% mean every core is used?</p>",
+        "id": 228542201,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1614751702
+    },
+    {
+        "content": "<p>That is all CPUs. No particular reason why z3, but it tends to happen when I use <code>try</code> or even just normal typing, and... hm, random realization: it tends to happen particularly often when I edit something at the beginning of a long proof, so maybe isabelle/hol tries spawning very heavy proof searches for all the now-broken subsequent proof steps, and hence lags a bunch?</p>",
+        "id": 228686596,
+        "sender_full_name": "Max Nowak",
+        "timestamp": 1614813452
+    },
+    {
+        "content": "<p>I am not sure what to look for in the ML window.</p>",
+        "id": 228686678,
+        "sender_full_name": "Max Nowak",
+        "timestamp": 1614813485
+    },
+    {
+        "content": "<p>In the ML window, look at the heap panel and if see anything suspicious (I don't know what to expect either). For example, you might see that GC is happening every 0.3 seconds, indicating that polyml needs more memory</p>",
+        "id": 228722601,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1614837958
+    },
+    {
+        "content": "<p>When editing long proof and something breaks, I add a <code>oops</code> to make sure Isabelle is not running something (like metis or blast).</p>",
+        "id": 228722779,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1614838105
+    },
+    {
+        "content": "<p>ML isn't the issue I think, it's got to be something else. Looking into the java monitoring console, I spotted a thread which seems to be running a solver all the time, even though there's nothing to do currently in my file, the stack trace is never in any waiting method, and instead always in <code>kodkod.engine.Solver.solve()</code> or deeper. And exactly one of my cores is currently fully loaded, so I assume it's just this thread too? Gut feeling tells me there's some issue killing the solvers once they're no longer needed and/or starting too many. Or maybe it's just an intended background task.</p>",
+        "id": 228750249,
+        "sender_full_name": "Max Nowak",
+        "timestamp": 1614854662
+    },
+    {
+        "content": "<p>I know that some threads have moved from ML to Scala (aka java), like Kodkod. But I have no idea what happens in your case. You could try to deactivate auto_nitpick, but I don't know if this helps</p>",
+        "id": 228750720,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1614854906
+    },
+    {
+        "content": "<p>I have a similar problem in Isabelle2020 when editing a file with two long proofs. After some time Isabelle greys out repeatedly but without Isabelle nor the system going out of memory. It is especially surprising since the file does not depend on other theories and the file itself is not too long (~700 lines).</p>",
+        "id": 228750836,
+        "sender_full_name": "Lukas Stevens",
+        "timestamp": 1614854979
+    },
+    {
+        "content": "<p>Same theories, but isabelle2020 and everything is just fine for me.</p>",
+        "id": 228751187,
+        "sender_full_name": "Max Nowak",
+        "timestamp": 1614855187
+    },
+    {
+        "content": "<p>If it is kodkod-Scala specifically, you could try Isabelle/jEdit &gt; Plugins &gt; Plugins options. Then Plugin Options &gt; Isabelle &gt; General &gt; Miscellaneous Tools &gt; untick kodkod scala</p>",
+        "id": 228758612,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1614858891
+    },
+    {
+        "content": "<p>Hi! I stumbled upon this thread and tried monitoring my long-running theory. The theory takes several minutes at <code>apply (auto simp add: Let_def)</code>, and the heap monitor shows the \"zigzag\" behavior at the time. Is this something that can be mitigated by adjusting the config, rewriting the proof, etc.? <a href=\"/user_uploads/14278/pl9K-KBtwLF6kZ8lWMdspC0E/image.png\">image.png</a></p>\n<div class=\"message_inline_image\"><a href=\"/user_uploads/14278/pl9K-KBtwLF6kZ8lWMdspC0E/image.png\" title=\"image.png\"><img src=\"/user_uploads/14278/pl9K-KBtwLF6kZ8lWMdspC0E/image.png\"></a></div>",
+        "id": 229250459,
+        "sender_full_name": "pandaman",
+        "timestamp": 1615181893
+    },
+    {
+        "content": "<p>Rewrite the proof.</p>",
+        "id": 229251089,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1615182484
+    },
+    {
+        "content": "<p>The heap monitor always shows a zigzag for me, no matter what I do. I assumed that is normal behaviour though?</p>",
+        "id": 229304883,
+        "sender_full_name": "Max Nowak",
+        "timestamp": 1615212924
+    },
+    {
+        "content": "<p>the zigzag is normal. In big applications, memory pressure increases and you expect at some point a full GC where the allocated memory increases (the red curve)</p>",
+        "id": 229348847,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1615227891
+    },
+    {
+        "content": "<p>I think the official recommendation is that if you have to open the memory monitor for any reason, you should buy more RAM. <span aria-label=\"big smile\" class=\"emoji emoji-1f604\" role=\"img\" title=\"big smile\">:big_smile:</span> </p>\n<p>I have 16 GB on my laptop and that's usually enough. My desktop has 32 GB and that's pretty much always enough. Less than 16 GB can be a bit problematic (although I, too, wonder <em>why</em> Isabell needs that much memory…)</p>",
+        "id": 229349453,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1615228125
+    },
+    {
+        "content": "<p>Thank you for the answer. I already have 32GB of RAM and tried to tweak ISABELLE_TOOL_JAVA_OPTIONS and ML_OPTIONS, but it didn't change the behavior (maybe I should have closed the browser).<br>\nIt seems that the expansion of the let expression is behaving exponentially, so I will try to work around this during the proof.</p>",
+        "id": 229421227,
+        "sender_full_name": "pandaman",
+        "timestamp": 1615264878
+    },
+    {
+        "content": "<p>To change the settings for the java process in<code>Isabelle/jEdit</code>, you have to set <code>JEDIT_JAVA_OPTIONS</code> (at least in a repository version).</p>",
+        "id": 229441550,
+        "sender_full_name": "Fabian Huch",
+        "timestamp": 1615279619
+    },
+    {
+        "content": "<p>Indeed, if 32 GB isn't enough, you really should change the proof.</p>",
+        "id": 229447113,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1615282237
+    }
+]

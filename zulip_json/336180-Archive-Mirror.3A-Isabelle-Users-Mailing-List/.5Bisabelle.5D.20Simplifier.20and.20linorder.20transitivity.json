@@ -1,0 +1,38 @@
+[
+    {
+        "content": "<p>From: Ognjen Maric &lt;<a href=\"mailto:ognjen.maric@gmail.com\">ognjen.maric@gmail.com</a>&gt;<br>\nHi,</p>\n<p>given the following example</p>\n<p>typedecl foo<br>\narities foo :: linorder</p>\n<p>lemma<br>\n  \"[| (a :: foo) &lt;= b; b &lt;= c |] ==&gt; P &amp; a &lt;= c &amp; Q\"</p>\n<p>I would like to simplify the conclusion to \"P &amp; Q\". For int and nat,<br>\ncertain arith simprocs produce the desired result, but I can't come up<br>\nwith a simple way to do it for the (non-arithmetic) type foo. Any<br>\nsuggestions are of course welcome.</p>\n<p>Thanks,<br>\nOgnjen</p>",
+        "id": 294237270,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660905340
+    },
+    {
+        "content": "<p>From: Tobias Nipkow &lt;<a href=\"mailto:nipkow@in.tum.de\">nipkow@in.tum.de</a>&gt;<br>\nDear Ognjen,</p>\n<p>There are a number of so called solvers that know about ordering type classes.<br>\nFor example, this works:</p>\n<p>lemma<br>\n  \"[| (a :: foo) &lt;= b; b &lt;= c; c &lt;= d |] ==&gt; ~ d &lt; a\"<br>\napply simp</p>\n<p>However, subformulas that are true are not simplified away, only whole<br>\npropositions are proved.</p>\n<p>Best<br>\nTobias</p>",
+        "id": 294237469,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660905408
+    },
+    {
+        "content": "<p>From: Ognjen Maric &lt;<a href=\"mailto:ognjen.maric@gmail.com\">ognjen.maric@gmail.com</a>&gt;<br>\nDear Tobias,</p>\n<p>thanks for the reply. Unfortunately, in my case splitting the goal would<br>\nyield too many new ones. I was hoping I wasn't the first one to run into<br>\nthis and that somebody would have a ready-made solution.</p>\n<p>Do you know which solvers exactly are capable of dealing with this?<br>\nAlso, is there a general way to get such information from the<br>\nsimplifier? simp_trace didn't seem to be useful here.</p>\n<p>Best,<br>\nOgnjen</p>",
+        "id": 294237602,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660905475
+    },
+    {
+        "content": "<p>From: Ognjen Maric &lt;<a href=\"mailto:ognjen.maric@gmail.com\">ognjen.maric@gmail.com</a>&gt;<br>\nTo reply to myself: order_tac from HOL/Orderings.thy does this. In case<br>\nanyone else runs into this, here's a solution to my problem, in form of<br>\na simproc:</p>\n<p>fun trans_simproc ss (t as (less as Const _) $ _ $ _) = let<br>\n    val ctxt = Simplifier.the_context ss</p>\n<p>val goal = HOLogic.mk_eq (t, @{const \"True\"})<br>\n                             |&gt; HOLogic.mk_Trueprop</p>\n<p>fun is_le_prem thm = (<br>\n        prop_of thm<br>\n                |&gt; HOLogic.dest_Trueprop<br>\n                |&gt; head_of<br>\n                |&gt; equal less<br>\n    ) handle _ =&gt; false</p>\n<p>val le_prems = Simplifier.prems_of ss |&gt; filter is_le_prem</p>\n<p>val solver = mk_solver \"\" (fn ss =&gt;  Orders.order_tac<br>\n                                             (Simplifier.the_context ss)<br>\n(Simplifier.prems_of ss)<br>\n                              )</p>\n<p>val ss' = HOL_ss addSolver solver<br>\n                     |&gt; Simplifier.add_prems le_prems<br>\n                     |&gt; Simplifier.context ctxt<br>\n    val stac = (asm_full_simp_tac ss' 1)</p>\n<p>in<br>\n    Goal.prove ctxt [] [] goal<br>\n               (K (CHANGED stac))<br>\n               |&gt; (fn thm =&gt; thm RS @{thm eq_reflection})<br>\n               |&gt; SOME<br>\n    handle _ =&gt; NONE<br>\nend</p>",
+        "id": 294237945,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660905604
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nJust note that \"handle _ =&gt; ...\" makes the ML program ill-defined, subject <br>\nto the laws of phyisics instead of mathematics.  See also the explanation <br>\nin section 0.5 of the Isabelle/Isar Implementation manual <br>\n<a href=\"http://isabelle.in.tum.de/dist/Isabelle2013/doc/implementation.pdf\">http://isabelle.in.tum.de/dist/Isabelle2013/doc/implementation.pdf</a></p>\n<p>After many years of practice, I am conditioned to watch out for such <br>\nsnags, which is why I've spotted it in your code without looking for <br>\nanything in particular.</p>\n<p>Makarius</p>",
+        "id": 294237957,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660905611
+    },
+    {
+        "content": "<p>From: Ognjen Maric &lt;<a href=\"mailto:ognjen.maric@gmail.com\">ognjen.maric@gmail.com</a>&gt;<br>\nThanks. Looking at it again, it was also horribly convoluted, one can<br>\njust use order_tac directly instead of embedding it as a solver in the<br>\nsimplifier. This is better:</p>\n<p>fun trans_simproc' ss (t as (less as Const _) $ _ $ _) = let<br>\n    val ctxt = Simplifier.the_context ss</p>\n<p>val goal = HOLogic.mk_Trueprop t</p>\n<p>fun is_le_prem thm = (<br>\n        prop_of thm<br>\n                |&gt; HOLogic.dest_Trueprop<br>\n                |&gt; head_of<br>\n                |&gt; equal less<br>\n    ) handle TERM _ =&gt; false</p>\n<p>val le_prems = Simplifier.prems_of ss |&gt; filter is_le_prem</p>\n<p>in<br>\n    Goal.prove ctxt [] [] goal<br>\n               ((fn {context = ctxt', ...} =&gt; Orders.order_tac ctxt'<br>\nle_prems 1))<br>\n               |&gt; (fn thm =&gt; thm RS @{thm Eq_TrueI})<br>\n               |&gt; SOME<br>\n    handle ERROR _ =&gt; NONE<br>\nend</p>",
+        "id": 294238024,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660905647
+    }
+]

@@ -1,0 +1,93 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Code generation for a subtype with free_constr... · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20a.20subtype.20with.20free_constr.2E.2E.2E.html">[isabelle] Code generation for a subtype with free_constr...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="228397098"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20for%20a%20subtype%20with%20free_constr.../near/228397098" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20a.20subtype.20with.20free_constr.2E.2E.2E.html#228397098">(Mar 02 2021 at 11:55)</a>:</h4>
+<p>From: Lukas Stevens &lt;lukas.stevens+isabelle-users@in.tum.de&gt;<br>
+Dear all,</p>
+<p>I define some general term type</p>
+<p>datatype 'a trm = App "'a trm" "'a trm" | Const string | Var 'a</p>
+<p>Now I want to embed a specific type of terms into this general type, <br>
+namely a type of order terms. The inequality between two variables x and <br>
+y would be</p>
+<p>App (App (Const ''LE'') (Var x)) (Var y)</p>
+<p>In order to achieve this, I first define a predicate on 'a trm which is <br>
+true for terms that are order terms. Then I use typedef to introduce a <br>
+subtype that only contains order terms. Since I also want to define <br>
+functions using pattern matching on this subtype, I am using <br>
+free_constructors to introduce constructors for the different types of <br>
+order terms; however, generating code for the following lifted definition</p>
+<p>lift_definition trm_of_order_trm :: "'a order_trm ⇒ 'a trm" is id .</p>
+<p>now doesn't work since it now uses Rep_order_trm. One can prove the code <br>
+equation manually (see below) but is there a way to derive it automatically?</p>
+<p>Cheers,</p>
+<p>Lukas</p>
+<p>Full example:</p>
+<p>theory Scratch imports Main<br>
+begin</p>
+<p>datatype 'a trm = App "'a trm" "'a trm" | Const string | Var 'a</p>
+<p>fun is_order_trm :: "'a trm ⇒ bool" where<br>
+"is_order_trm (App (App (Const c) (Var x)) (Var y)) ⟷ c = ''LE'' ∨ c = ''LT'' ∨ c = ''EQ''" |<br>
+"is_order_trm _ ⟷ False"</p>
+<p>typedef 'a order_trm = "{t::'a trm. is_order_trm t}"<br>
+   by (metis is_order_trm.simps(1) mem_Collect_eq)<br>
+setup_lifting type_definition_order_trm</p>
+<p>abbreviation (input) "App2ConstVars c x y ≡ (App (App ((Const c)) (Var x)) (Var y))"<br>
+abbreviation (input) "CtorOrder c x y ≡ Abs_order_trm (App2ConstVars c x y)"<br>
+definition "CtorLE ≡ CtorOrder ''LE''"<br>
+definition "CtorLT ≡ CtorOrder ''LT''"<br>
+definition "CtorEQ ≡ CtorOrder ''EQ''"</p>
+<p>lemmas order_ctor_defs = CtorLE_def CtorLT_def CtorEQ_def</p>
+<p>lemma order_trm_cases:<br>
+   fixes t :: "'a order_trm"<br>
+   obtains<br>
+     (LE) x y where "t = CtorLE x y"<br>
+   | (LT) x y where "t = CtorLT x y"<br>
+   | (EQ) x y where "t = CtorEQ x y"<br>
+proof(cases t)<br>
+   case (Abs_order_trm t')<br>
+   then have "is_order_trm t'"<br>
+     by simp<br>
+   then show ?thesis using that Abs_order_trm<br>
+     apply(induction t' rule: is_order_trm.induct)<br>
+     by (auto simp: order_ctor_defs)<br>
+qed</p>
+<p>lift_definition trm_of_order_trm :: "'a order_trm ⇒ 'a trm" is id .</p>
+<p>free_constructors case_order_trm for<br>
+   "CtorLE" | "CtorLT" | "CtorEQ"<br>
+   apply(fact order_trm_cases)<br>
+   by (auto simp: order_ctor_defs Abs_order_trm_inject)</p>
+<p>text ‹I want to define functions on @{typ "'a order_trm"} using pattern matching›<br>
+fun sem :: "'a rel ⇒ 'a order_trm ⇒ bool" where<br>
+"sem r (CtorLE x y) ⟷ (x, y) ∈ r" |<br>
+"sem r (CtorLT x y) ⟷ (x, y) ∈ r ∧ x ≠ y" |<br>
+"sem r (CtorEQ x y) ⟷ x = y"</p>
+<p>definition "Sem r A ≡ (∀t ∈ A. sem r t)"</p>
+<p>lemma "¬ Sem r {CtorLT x y, CtorEQ x y}"<br>
+   unfolding Sem_def<br>
+   by simp</p>
+<p>text ‹<br>
+   Exporting code only works if I prove the following code equation manually.<br>
+   Can it be derived automatically?<br>
+›<br>
+lemma [code]:<br>
+   "Rep_order_trm t = (case t of<br>
+                        CtorLE x y ⇒ App2ConstVars ''LE'' x y<br>
+                      | CtorLT x y ⇒ App2ConstVars ''LT'' x y<br>
+                      | CtorEQ x y ⇒ App2ConstVars ''EQ'' x y)"<br>
+   by (auto split: order_trm.splits simp: Abs_order_trm_inverse order_ctor_defs)</p>
+<p>export_code sem trm_of_order_trm in SML</p>
+<p>value "Sem {(1::nat, 2)} {(CtorEQ 1 2), (CtorLT 1 2)}"</p>
+
+
+
+<hr><p>Last updated: Jul 15 2022 at 23:21 UTC</p>
+</html>

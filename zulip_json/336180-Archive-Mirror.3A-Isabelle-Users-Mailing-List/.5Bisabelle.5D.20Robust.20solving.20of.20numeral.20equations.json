@@ -1,0 +1,38 @@
+[
+    {
+        "content": "<p>From: Manuel Eberl &lt;<a href=\"mailto:eberlm@in.tum.de\">eberlm@in.tum.de</a>&gt;<br>\nHallo,</p>\n<p>I have statements like this:<br>\n0 ≤ (7 / 10 * 21 + 6 :: real)</p>\n<p>More formally: equations and inequalities on real numerals with the<br>\noperations uminus, +, -, *, /, inverse.</p>\n<p>I want to write a tactic that solves goals like this. The simplifier<br>\nwith its ‘default’ simpset in HOL-Main can solve these automatically,<br>\nbut how can I do that robustly? What is some minimal simpset that solves<br>\nthese problems? Or should I perhaps use linarith?</p>\n<p>Cheers,</p>\n<p>Manuel</p>",
+        "id": 294331603,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660930458
+    },
+    {
+        "content": "<p>From: \"Thiemann, Rene\" &lt;<a href=\"mailto:Rene.Thiemann@uibk.ac.at\">Rene.Thiemann@uibk.ac.at</a>&gt;<br>\nDear Manual,</p>\n<p>if you are willing to import some AFP-entry then it becomes trivial:</p>\n<p>theory Test<br>\nimports \"$AFP/thys/Real_Impl/Real_Impl\"<br>\nbegin</p>\n<p>lemma \"0 ≤ (7 / 10 * 21 + 6 :: real)\" by eval (* via oracle *)<br>\nlemma \"0 ≤ (7 / 10 * 21 + 6 :: real)\" by code_simp (* without oracle *)<br>\nend</p>\n<p>Cheers,<br>\nRené</p>",
+        "id": 294331616,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660930464
+    },
+    {
+        "content": "<p>From: Wenda Li &lt;<a href=\"mailto:wl302@cam.ac.uk\">wl302@cam.ac.uk</a>&gt;<br>\nDear Rene and Manuel,</p>\n<p>I think we can use eval and code_simp without importing Real_Impl. Also, <br>\nI was wondering if tagging eval with \"via oracle\" is a little bit <br>\nmisleading, as I think \"via oracle\" usually indicate to fully trust the <br>\nresult of an external program while the method eval merely extends our <br>\ntrust base with the current code generation setup.</p>\n<p>Besides, I am a little unclear about the word \"robust\". By robust, do <br>\nyou mean you only want to do rewritings within the kernel and avoid code <br>\ngeneration? If yes, simp should be robust enough as I think it only <br>\ninvolves rewritings through the kernel.</p>\n<p>Cheers,<br>\nWenda</p>",
+        "id": 294331633,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660930470
+    },
+    {
+        "content": "<p>From: Manuel Eberl &lt;<a href=\"mailto:eberlm@in.tum.de\">eberlm@in.tum.de</a>&gt;<br>\nYes, I want to use only the kernel. simp would be my first choice, but I<br>\ndon't know what simpset to use it with.</p>",
+        "id": 294331649,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660930477
+    },
+    {
+        "content": "<p>From: \"Thiemann, Rene\" &lt;<a href=\"mailto:Rene.Thiemann@uibk.ac.at\">Rene.Thiemann@uibk.ac.at</a>&gt;</p>\n<blockquote>\n<p>Yes, I want to use only the kernel. simp would be my first choice, but I<br>\ndon't know what simpset to use it with.</p>\n</blockquote>\n<p>This you can perhaps figure out via code_simp: here is a potential solution,<br>\nthough it might not be the cleanest one:</p>\n<p>theory Test<br>\nimports   <br>\n \"$AFP/thys/Real_Impl/Real_Impl\"<br>\nbegin</p>\n<p>(* a definition which uses all constants for reals that should be supperted: <br>\n  numerals, +, unary -, -, /, *, &lt;, =, ≤ *)</p>\n<p>definition \"use_all (x :: real) = (if (-x) + 3 / x * 5 - 1  ≤ x then x &lt; 3 else x = 2)\"</p>\n<p>ML {*<br>\nval real_tac = Code_Simp.static_tac {consts = [@{const_name use_all}], <br>\n ctxt = @{context}, simpset = NONE}<br>\n*}</p>\n<p>lemma \"0 ≤ (7 / 10 * 21 + 6 :: real)\" <br>\n by (tactic {* real_tac @{context} 1 *})</p>\n<p>(* doing some nasty changes has no effect *)<br>\ndeclare ma_code_eqns[code del]<br>\ndeclare real_standard_impls[code del]<br>\nlemma [code, simp]: \"x + y = x + y\" by simp</p>\n<p>lemma \"0 ≤ (7 / 10 * 21 + 6 :: real)\" <br>\n by (tactic {* real_tac @{context} 1 *})</p>\n<p>end</p>\n<p>Hope this helps,<br>\nRené</p>",
+        "id": 294331660,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660930482
+    },
+    {
+        "content": "<p>From: Wenda Li &lt;<a href=\"mailto:wl302@cam.ac.uk\">wl302@cam.ac.uk</a>&gt;<br>\nHow about this one?</p>\n<p>ML {*<br>\nfun foo1_tac (ctxt : Proof.context) i =<br>\n    let<br>\n      val simpset =<br>\n        fold Simplifier.add_simp @{thms arith_simps times_divide_eq_left <br>\ndivide_simps<br>\n         rel_simps HOL.if_False HOL.if_True } (empty_simpset ctxt<br>\n   |&gt; Simplifier.set_subgoaler asm_full_simp_tac<br>\n   |&gt; Simplifier.set_mksimps (mksimps []))<br>\n    in<br>\n      CHANGED (asm_full_simp_tac simpset i)<br>\n    end<br>\n*}</p>\n<p>lemma \"0  ≤ (7 / 10 * 21 + 6 :: real)\"<br>\n  apply (tactic {* foo1_tac @{context} 1 *})</p>\n<p>We start with an empty simpset and add some basic simplification rules.</p>\n<p>Wenda</p>",
+        "id": 294632102,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661158710
+    }
+]

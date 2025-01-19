@@ -1,0 +1,26 @@
+[
+    {
+        "content": "<p>From: Jose Divasón &lt;<a href=\"mailto:jose.divasonm@unirioja.es\">jose.divasonm@unirioja.es</a>&gt;<br>\nDear all,</p>\n<p>In Isabelle there is the class gcd:</p>\n<p>class gcd = zero + one + dvd +<br>\n  fixes gcd :: \"'a =&gt; 'a =&gt; 'a\"<br>\n    and lcm :: \"'a =&gt; 'a =&gt; 'a\"</p>\n<p>Polynomials (<br>\n<a href=\"http://isabelle.in.tum.de/library/HOL/HOL-Library/Polynomial.html\">http://isabelle.in.tum.de/library/HOL/HOL-Library/Polynomial.html</a>) have<br>\nbeen instantiated to such a class defining a gcd for polynomials, but<br>\nsaying nothing about lcm:</p>\n<p>instantiation poly :: (field) gcdbegin<br>\nfunction gcd_poly :: \"'a::field poly =&gt; 'a poly =&gt; 'a poly\"where<br>\n  \"gcd (x::'a poly) 0 = smult (inverse (coeff x (degree x))) x\"| \"y ≠<br>\n0 ==&gt; gcd (x::'a poly) y = gcd y (x mod y)\"by auto<br>\ntermination \"gcd :: _ poly =&gt; _\"by (relation \"measure (λ(x, y). if y =<br>\n0 then 0 else Suc (degree y))\")<br>\n   (auto dest: degree_mod_less)<br>\ndeclare gcd_poly.simps [simp del]<br>\ninstance ..<br>\nend</p>\n<p>So, I am wondering why there is no definition of lcm for polynomials, but<br>\npolynomials have been made a gcd instance.</p>\n<p>In addition, gcd of polynomials can be computed:</p>\n<p>value \"gcd [:2,3,6,5::real :] [:4,6,12,10:]\" returns \"[:2 / 5, 3 / 5, 6 /<br>\n5, 1:]\"  :: \"real poly\"</p>\n<p>On the contrary, lcm can't be computed (since it has not been defined).</p>\n<p>The problem arose when I was trying to instantiate polynomials to the<br>\neuclidean_ring_gcd class developed by Manuel Eberl (<br>\n<a href=\"http://isabelle.in.tum.de/repos/isabelle/file/5f88c142676d/src/HOL/Number_Theory/Euclidean_Algorithm.thy\">http://isabelle.in.tum.de/repos/isabelle/file/5f88c142676d/src/HOL/Number_Theory/Euclidean_Algorithm.thy</a>).<br>\nThere I have to prove that \"(lcm::'a poly⇒ 'a poly ⇒ 'a poly) = lcm_eucl\",<br>\nbut I can't prove it since I don't know anything about lcm for polynomials.</p>\n<p>If lcm for polynomials is defined in the instance to the gcd class (for<br>\nexample, by means of the below definition), then lcm could be computed and<br>\nthe statement \"(lcm::'a poly⇒ 'a poly ⇒ 'a poly) = lcm_eucl\" can be proved.</p>\n<p>definition lcm_poly :: \"'a::field poly ⇒ 'a poly ⇒ 'a poly\"<br>\nwhere \"lcm_poly x xa = x * xa div (gcd x xa * [:coeff (x * xa) (degree (x *\nxa)):])\"</p>\n<p>Cheers,<br>\nJose</p>",
+        "id": 294309358,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660925339
+    },
+    {
+        "content": "<p>From: Jose Divasón &lt;<a href=\"mailto:jose.divasonm@unirioja.es\">jose.divasonm@unirioja.es</a>&gt;<br>\nThank you both!!</p>\n<p>I was working with my local clone of Polynomial.thy, but it's nice to see<br>\nsuch a trick. I have already seen the new lcm definition in the repository<br>\nversion.</p>\n<p>Cheers,<br>\nJose</p>",
+        "id": 294309381,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660925344
+    },
+    {
+        "content": "<p>From: Manuel Eberl &lt;<a href=\"mailto:eberlm@in.tum.de\">eberlm@in.tum.de</a>&gt;<br>\nI assume lcm does not exist because no one ever needed it. This was<br>\nactually one of the main reasons why I chose to overhaul the whole GCD<br>\nstuff in HOL – many results I needed about the GCD of polynomials were<br>\nmissing.</p>\n<p>For an instantiation of GCD for polynomials, see Polynomial.thy on my<br>\nGithub repo: <a href=\"https://github.com/3of8/isabellehol_gcd\">https://github.com/3of8/isabellehol_gcd</a></p>\n<p>I know that the whole thing with gcd and gcd_eucl is a bit complicated;<br>\nthis was because we wanted to keep the existing gcd/lcm constants purely<br>\nsyntactical, as before.</p>\n<p>Cheers,<br>\nManuel</p>",
+        "id": 294316877,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660925717
+    },
+    {
+        "content": "<p>From: Florian Haftmann &lt;<a href=\"mailto:florian.haftmann@informatik.tu-muenchen.de\">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>\nHi Jose,</p>\n<blockquote>\n<p>So, I am wondering why there is no definition of lcm for polynomials, but<br>\npolynomials have been made a gcd instance.</p>\n</blockquote>\n<p>this is indeed an omission.</p>\n<p>You can add a lcm definition either by making your local clone of<br>\nPolynomial.thy, or by a low-level trick:</p>\n<p>defs<br>\n  lcm_gcd_inst_def: \"gcd_poly_inst.lcm_poly a b == a * b div smult<br>\n(coeff a (degree a) * coeff b (degree b)) (gcd a b)\"</p>\n<p>lemma lcm_gcd_def:<br>\n  \"lcm a b = a * b div smult (coeff a (degree a) * coeff b (degree b))<br>\n(gcd a b)\"<br>\n  apply (tactic ‹ALLGOALS (CONVERSION (Axclass.unoverload_conv @{theory}))›)<br>\n  unfolding lcm_gcd_inst_def<br>\n  apply (tactic ‹ALLGOALS (CONVERSION (Axclass.overload_conv @{theory}))›)<br>\n  ..</p>\n<p>I am currently underway to incorporate a proper lcm definition into<br>\nPolynomial.thy, so in future releases this issue is resolved.</p>\n<p>Hope this helps,<br>\n    Florian<br>\n<a href=\"/user_uploads/14278/VgytFWyUGd7fv3DQR3TT-p2p/signature.asc\">signature.asc</a></p>",
+        "id": 294318001,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660926055
+    }
+]

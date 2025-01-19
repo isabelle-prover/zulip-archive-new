@@ -1,0 +1,38 @@
+[
+    {
+        "content": "<p>From: Bertram Felgenhauer via Cl-isabelle-users &lt;<a href=\"mailto:cl-isabelle-users@lists.cam.ac.uk\">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>\nHi,</p>\n<p>I have a looping 'auto' command in the following theory, for a fairly<br>\nsimple goal (indicated by the fact that the proof can be completed<br>\nusing 'standard; simp'). I don't know why this is happening, can anyone<br>\nfigure out what's going on here?</p>\n<p>This affects Isabelle2016-1 and c5b19f997214.</p>\n<p>Cheers,</p>\n<p>Bertram</p>\n<p>theory Loop<br>\n  imports Main<br>\nbegin</p>\n<p>definition refined :: \"'a list ⇒ 'b list ⇒ bool\" where<br>\n  \"refined ss ts ⟷ length ts = length ss ∧<br>\n    (∀i j. i &lt; length ss ∧ j &lt; length ts ∧ ss ! i = ss ! j ⟶ ts ! i = ts ! j)\"</p>\n<p>definition imbalance :: \"'a list ⇒ nat\" where<br>\n  \"imbalance xs = card { i. i &lt; length xs ∧ (∀j. j &lt; length xs ∧ xs ! i = xs ! j ⟶ i ≤ j) }\"</p>\n<p>lemma refined_imbalance_mono:<br>\n  \"refined ss ts ⟹ imbalance ss ≥ imbalance ts\"<br>\n  (* apply (auto simp: refined_def imbalance_def intro: card_mono) (* desired proof *) *)<br>\n  unfolding refined_def imbalance_def<br>\n  apply (intro card_mono)<br>\n   apply simp<br>\n  apply auto  (* loops? *)<br>\n  (* the proof can be completed by the following two commands: *)<br>\n  apply standard<br>\n  apply simp<br>\n  done</p>\n<p>end</p>",
+        "id": 294710446,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661182002
+    },
+    {
+        "content": "<p>From: Bertram Felgenhauer via Cl-isabelle-users &lt;<a href=\"mailto:cl-isabelle-users@lists.cam.ac.uk\">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>\nReplying to myself:<br>\nI tried to reduce the example, and ended up with the following statement<br>\nthat causes the simplifier to loop for a trivial goal (solvable by .):</p>\n<p>notepad begin<br>\n  fix P :: \"'a ⇒ bool\" and f :: \"'a ⇒ 'b\"<br>\n  assume \"P j ⟹ f i = f j\" for i j<br>\n  then have \"P j ⟹ f i = f j\" for i j<br>\n  apply (simp only: )<br>\nend</p>\n<p>I'm still not sure how to read the resulting simplifier trace, but it's<br>\ndefinitely looping. If I do understand it correctly, the simplifier<br>\nturns the premise into a rewrite rule</p>\n<p>P ?j1 ⟹ f i ≡ f ?j1 </p>\n<p>which it then applies to the given P j to obtain f i ≡ f j, and then<br>\nf j ≡ f j over and over again. The rewrite rule</p>\n<p>P ?j3 ⟹ f ?i3 = f ?j3 ≡ True</p>\n<p>that would solve the goal never gets a chance to fire, apparently,<br>\nperhaps because of the meta level equality?</p>\n<p>Cheers,</p>\n<p>Bertram</p>",
+        "id": 294711571,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661182363
+    },
+    {
+        "content": "<p>From: Tobias Nipkow &lt;<a href=\"mailto:nipkow@in.tum.de\">nipkow@in.tum.de</a>&gt;<br>\nYour analysis is correct. The simplifier gets into a loop because the rules you <br>\nhave given it allow it to. The simpifier follows a certain fixed strategy and <br>\ndoes not try to detect nontermination if it involves more than one rule.</p>\n<p>Tobias<br>\n<a href=\"/user_uploads/14278/ygCZrnW6odncz38IaMYxM4x6/smime.p7s\">smime.p7s</a></p>",
+        "id": 294711587,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661182370
+    },
+    {
+        "content": "<p>From: Bertram Felgenhauer via Cl-isabelle-users &lt;<a href=\"mailto:cl-isabelle-users@lists.cam.ac.uk\">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>\nTobias Nipkow wrote:<br>\nThat's a bit unsatisfying. Since those rewrite rules arise from the<br>\npremises I guess my only option is to hide the problematic equalities<br>\nfrom the simplifier? At least for my original theory, this works:</p>\n<p>definition \"hide_eq ss i j ⟷ ss ! i = ss ! j\"</p>\n<p>lemma refined_imbalance_mono:<br>\n  \"refined ss ts ⟹ imbalance ss ≥ imbalance ts\"<br>\n  by (auto simp: refined_def imbalance_def hide_eq_def[symmetric]<br>\n    intro: card_mono)</p>\n<p>It feels like a dirty trick though.</p>\n<p>Cheers,</p>\n<p>Bertram</p>",
+        "id": 294711612,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661182376
+    },
+    {
+        "content": "<p>From: <a href=\"mailto:Thomas.Sewell@data61.csiro.au\">Thomas.Sewell@data61.csiro.au</a><br>\nHi Bertram.</p>\n<p>I had a look at your problem as well.</p>\n<p>It is a common difficulty that the simplifier will use premises of the <br>\nform \"forall x. P x --&gt; x = ...\" as<br>\nconditional rewrite rules, and they frequently apply far too easily, <br>\nleading to indefinite recursion or<br>\nto looping.</p>\n<p>The version in your notepad happens because the rewrite rule, together <br>\nwith the extra assumption \"P j\",<br>\ncan be used to rewrite \"f x\" into \"f j\" for any x, including x=j. The <br>\nsimplifier doesn't note this is a loop<br>\nbecause it doesn't know until it recurses that the only solution to \"P <br>\n?x\" requires ?x=j.</p>\n<p>Sometimes you can work you way through these via apply (simp(no_asm_use))<br>\nor apply (simp(no_asm_simp)). That requires a long proof, however, <br>\nrather than an easy proof with auto.</p>\n<p>One option is to control the use of quantifiers a bit more by providing <br>\nclassical rules instead.<br>\nHere's a proof which works by providing rules for your \"refined\" predicate:</p>\n<p>lemma refined_length_eq:<br>\n   \"refined ss ts ⟹ length ts = length ss\"<br>\n   by (simp add: refined_def)</p>\n<p>lemma list_eq_refinedD:<br>\n   \"ss ! i = ss ! j ⟹ refined ss ts ⟹ i &lt; length ss ⟹ j &lt; length ss<br>\n     ⟹ ts ! i = ts ! j\"<br>\n   unfolding refined_def<br>\n   by metis</p>\n<p>lemma refined_imbalance_mono:<br>\n   \"refined ss ts ⟹ imbalance ss ≥ imbalance ts\"<br>\n   (* apply (auto simp: refined_def imbalance_def intro: card_mono) (* <br>\ndesired proof *) *)<br>\n   unfolding imbalance_def<br>\n   apply (auto intro!: card_mono simp: refined_length_eq dest: <br>\nlist_eq_refinedD)</p>\n<p>It took me a couple of rounds to get it to work with standard auto. You <br>\ncan also try fastforce,<br>\nwhich is a bit more aggressive, or turn up auto's search depth<br>\n   e.g. (auto 4 4 intro: card_mono simp: refined_length_eq dest: <br>\nrefined_eq_imp)</p>\n<p>Perhaps that helps?</p>\n<p>Cheers,<br>\n     Thomas.</p>",
+        "id": 294711700,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661182407
+    },
+    {
+        "content": "<p>From: Bertram Felgenhauer via Cl-isabelle-users &lt;<a href=\"mailto:cl-isabelle-users@lists.cam.ac.uk\">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>\nHi Thomas,</p>\n<blockquote>\n<p>I had a look at your problem as well.</p>\n</blockquote>\n<p>Thanks a lot! The idea of using derived properties instead of the<br>\nfull definition looks like a natural and fairly general way of<br>\navoiding exposing the simplifier to harmful simplification rules.</p>\n<p>Cheers,</p>\n<p>Bertram</p>",
+        "id": 294711747,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661182423
+    }
+]

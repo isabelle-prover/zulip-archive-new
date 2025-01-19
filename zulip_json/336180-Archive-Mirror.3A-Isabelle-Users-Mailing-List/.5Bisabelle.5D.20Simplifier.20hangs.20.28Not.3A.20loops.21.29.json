@@ -1,0 +1,26 @@
+[
+    {
+        "content": "<p>From: Dennis Walter &lt;<a href=\"mailto:dennis.walter@gmail.com\">dennis.walter@gmail.com</a>&gt;<br>\nDear all,</p>\n<p>I encountered a goal which makes the simplifier hang, where by<br>\n\"hanging\" I mean that it does not give any response in the trace, even<br>\nthough trace_simp_depth_limit is set to 10 (trace_simp enabled, ofc)<br>\nand the last message in the trace is on level 2. I could boil the goal<br>\ndown to what you can see below, where the simplifier displays the same<br>\nbehaviour: a partial trace, and no failure or success after one minute<br>\n(yes, I'm somewhat impatient :) ) The problem seems to be introduced<br>\nin theory Int, since simp'ing with the simpsets of Equiv_Relations,<br>\nNat, or Wellfounded terminates.</p>\n<p>Can somebody comment on this?</p>\n<p>Thanks,<br>\n  Dennis</p>\n<p>=====</p>\n<p>theory Hangs imports Main<br>\nbegin</p>\n<p>definition f :: \"int =&gt; int\"<br>\nwhere \"f x = x\"</p>\n<p>lemma<br>\n\"f a = M { nat j |j. 0 &lt;= j &amp; j &lt; f b} ==&gt; P\"<br>\n  apply simp<br>\n(* even apply (tactic {* asm_full_simp_tac (simpset_of @{theory Int})<br>\n1 *}) does not work *)<br>\n=====</p>\n<p>PS: Isabelle 2009, polyml 5.2.1, Linux</p>",
+        "id": 294081410,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660830807
+    },
+    {
+        "content": "<p>From: Brian Huffman &lt;<a href=\"mailto:brianh@cs.pdx.edu\">brianh@cs.pdx.edu</a>&gt;<br>\nOn Tue, Aug 4, 2009 at 8:36 AM, Dennis Walter&lt;<a href=\"mailto:dennis.walter@gmail.com\">dennis.walter@gmail.com</a>&gt; wrote:</p>\n<blockquote>\n<p>Dear all,</p>\n<p>I encountered a goal which makes the simplifier hang,</p>\n</blockquote>\n<p>I managed to simplify the example a bit more; the definition of<br>\nconstant \"f\" has nothing to do with the problem, although the types<br>\nare important.</p>\n<p>lemma \"(a::int) = M {x::nat. EX j. x = nat j}\"<br>\napply simp (* hangs *)</p>\n<p>lemma \"(a::int) = M {z. P (nat z)}\"<br>\napply simp (* also hangs *)</p>\n<blockquote>\n<p>The problem seems to be introduced<br>\nin theory Int, since simp'ing with the simpsets of Equiv_Relations,<br>\nNat, or Wellfounded terminates.</p>\n</blockquote>\n<p>The constant \"nat\" seems to be important here; the simplifier doesn't<br>\nhang if I replace it with another constant of the same type.</p>\n<p>Interestingly, the same behavior is produced if I replace \"a::int\"<br>\nwith \"a::nat\", \"a::rat\" or \"a::real\"; but the simplifier doesn't hang<br>\nfor \"a::complex\", or other types like \"a::int list\". Only ordered<br>\nnumeric types seem to cause a problem. (I also found that the<br>\nsimplifier still hangs if you replace the top-level \"=\" with \"&lt;\" or<br>\n\"&lt;=\".)</p>\n<p>My best guess is that one of the default simprocs is causing the<br>\nsimplifier to hang. Looking at \"Show me ... simplifier rules\" in Proof<br>\nGeneral, I don't see any simprocs that mention constant \"nat\"<br>\nexplicitly. I suppose it must be a simproc like fast_int_arith that<br>\nmatches the equality at type int. Internally, the simproc must be<br>\ndoing some processing of each side that causes it to loop.</p>\n<p>Unfortunately, it seems that the simprocs don't produce any trace<br>\noutput unless they succeed, which isn't much help here. Maybe someone<br>\nelse can figure out the rest of what's going on here.</p>\n<ul>\n<li>Brian</li>\n</ul>",
+        "id": 294081456,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660830824
+    },
+    {
+        "content": "<p>From: Tjark Weber &lt;<a href=\"mailto:webertj@in.tum.de\">webertj@in.tum.de</a>&gt;<br>\nDennis,</p>\n<p>the problem was caused by a bug in the solver for linear arithmetic,<br>\nwhich deals with certain expressions (e.g., \"nat j\") by case splitting.<br>\nIf those expressions contained bound variables, the solver would (in<br>\nsome cases) erroneously loop.</p>\n<p>I have committed a fix to the Isabelle repository.  Please let me know<br>\nif the problem persists.</p>\n<p>Regards,<br>\nTjark</p>",
+        "id": 294081811,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660830940
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nTjark's change is available here <br>\n<a href=\"http://isabelle.in.tum.de/repos/isabelle/rev/04af689ce721\">http://isabelle.in.tum.de/repos/isabelle/rev/04af689ce721</a></p>\n<p>It looks like you could apply this easily to the official Isabelle2009 <br>\nsources, so you need not experiment with \"unofficial undefined\" repository <br>\nsnapshots in your production work.</p>\n<p>Makarius</p>",
+        "id": 294081877,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660830958
+    }
+]

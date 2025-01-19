@@ -1,0 +1,32 @@
+[
+    {
+        "content": "<p>From: Peter Lammich &lt;<a href=\"mailto:lammich@in.tum.de\">lammich@in.tum.de</a>&gt;<br>\nHi List,</p>\n<p>I'm writing a tool that converts a term into an equivalent term. <br>\nIt works by first generating the new term, and then using the<br>\nsimplifier to prove equality. However, when generating the new term, I<br>\ncan save a lot of book-keeping work if I insert \"dummyT\" types in the<br>\nterm, and then run type inference later to resolve them.</p>\n<p>Here my question: Syntax.check_term seems to do a lot more than type<br>\ninference. Can I expect that it will leave the rest of my term intact,<br>\nand only replace the dummyT types by something sensible?<br>\nIf not, can I run type-inference in isolation?</p>\n<p>Thanks for any help,<br>\n  Peter</p>",
+        "id": 294822490,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661242817
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nSyntax.check_term is a bit like \"by simp\" for abstract syntax: it can<br>\npotentially do many more things than you would normally expect, depending on<br>\ninstrumentation in the application context. (Just accidentally, the default<br>\nsetup does mostly simple type inference.)</p>\n<p>Here is a more robust way to invoke just the core type-inference:</p>\n<p>ML ‹<br>\n  fun infer_types_simple ctxt =<br>\n    singleton (Type_Infer_Context.infer_types ctxt) #&gt;<br>\n    singleton (Type_Infer.fixate ctxt false);<br>\n›</p>\n<p>ML ‹infer_types_simple \\&lt;^context&gt; (Free (\"f\", dummyT) $ Free (\"x\", dummyT))›</p>\n<p>That is not an \"official\" API, but it is reasonably well-defined to be re-used<br>\nby other tools.</p>\n<p>Makarius</p>",
+        "id": 294822496,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661242823
+    },
+    {
+        "content": "<p>From: Manuel Eberl &lt;<a href=\"mailto:eberlm@in.tum.de\">eberlm@in.tum.de</a>&gt;<br>\nThis is not really an answer to your question and I don't know what your<br>\nexact use case is, but I just as a reminder: type inference might not<br>\nalways be enough to determine the type. One example are things like \"if<br>\n(2::nat) = 0 then A else B\". If you copy that term without types and run<br>\ntype inference on it, you will get a new type variable in there and it<br>\nwon't be pretty.</p>\n<p>Manuel</p>",
+        "id": 294822521,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661242835
+    },
+    {
+        "content": "<p>From: Peter Lammich &lt;<a href=\"mailto:lammich@in.tum.de\">lammich@in.tum.de</a>&gt;<br>\nHi Makarius</p>\n<blockquote>\n<p>Here is a more robust way to invoke just the core type-inference:</p>\n<p>ML ‹<br>\n  fun infer_types_simple ctxt =<br>\n    singleton (Type_Infer_Context.infer_types ctxt) #&gt;<br>\n    singleton (Type_Infer.fixate ctxt false);<br>\n›</p>\n<p>ML ‹infer_types_simple \\&lt;^context&gt; (Free (\"f\", dummyT) $ Free (\"x\",<br>\ndummyT))›<br>\n</p>\n</blockquote>\n<p>This code worked fine until I had a schematic type variable in the<br>\nterm, which raises an \"Illegal schematic type variable\" error.<br>\nAs this code is called from inside a conversion, importing and<br>\nexporting the term does not work, as this will rename schematic type<br>\nvariables, causing the conversion to fail.</p>\n<p>I now do \"Proof_Context.set_mode mode_schematic\", which makes the error<br>\ngo away. However, the fact that I got this error makes me curious how<br>\nmuch more than \"core type inference\" this does, and what other<br>\nsurprises to expect, e.g. on terms with internal variable names, etc.</p>\n<p>Best,<br>\n  Peter</p>\n<blockquote>\n<p>That is not an \"official\" API, but it is reasonably well-defined to<br>\nbe re-used<br>\nby other tools.</p>\n<p>Makarius<br>\n</p>\n</blockquote>",
+        "id": 294826809,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661244834
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nOn 12/04/2020 21:53, Peter Lammich wrote:</p>\n<blockquote>\n<blockquote>\n<p>Here is a more robust way to invoke just the core type-inference:</p>\n<p>ML ‹<br>\n  fun infer_types_simple ctxt =<br>\n    singleton (Type_Infer_Context.infer_types ctxt) #&gt;<br>\n    singleton (Type_Infer.fixate ctxt false);<br>\n›</p>\n<p>ML ‹infer_types_simple \\&lt;^context&gt; (Free (\"f\", dummyT) $ Free (\"x\",<br>\ndummyT))›<br>\n</p>\n</blockquote>\n<p>This code worked fine until I had a schematic type variable in the<br>\nterm, which raises an \"Illegal schematic type variable\" error.<br>\nAs this code is called from inside a conversion, importing and<br>\nexporting the term does not work, as this will rename schematic type<br>\nvariables, causing the conversion to fail.</p>\n<p>I now do \"Proof_Context.set_mode mode_schematic\", which makes the error<br>\ngo away.</p>\n</blockquote>\n<p>Proof_Context.set_mode mode_schematic should be OK, it was introduced many<br>\nyears ago for exactly such situations.</p>\n<blockquote>\n<p>However, the fact that I got this error makes me curious how<br>\nmuch more than \"core type inference\" this does, and what other<br>\nsurprises to expect, e.g. on terms with internal variable names, etc.</p>\n</blockquote>\n<p>Type_Infer_Context.infer_types is already the core of type inference, but it<br>\nuses a full Syntax.check_typs here<br>\n<a href=\"https://isabelle.sketis.net/repos/isabelle/file/Isabelle2020-RC5/src/Pure/type_infer_context.ML#l293\">https://isabelle.sketis.net/repos/isabelle/file/Isabelle2020-RC5/src/Pure/type_infer_context.ML#l293</a><br>\nin order to prepare the types occurring within the given terms.</p>\n<p>This is in principle subject to plugins of the context, but de-facto it is<br>\nalways Proof_Context.standard_typ_check provided by Isabelle/Pure.</p>\n<p>Makarius</p>",
+        "id": 294826819,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661244841
+    }
+]

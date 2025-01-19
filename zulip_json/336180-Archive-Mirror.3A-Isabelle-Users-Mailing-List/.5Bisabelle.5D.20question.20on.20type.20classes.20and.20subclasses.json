@@ -1,0 +1,20 @@
+[
+    {
+        "content": "<p>From: Esseger &lt;<a href=\"mailto:esseger@free.fr\">esseger@free.fr</a>&gt;<br>\nDear all,</p>\n<p>When trying to prove that a class C is a subclass of a class B, say, I <br>\nam having trouble using lemmas that I have proved in C. The following <br>\nstupid example illustrates it well:</p>\n<p>class A = fixes f g::\"'a ⇒ 'a\" assumes HA: \"f x = g x\"</p>\n<p>class B = A + assumes HB: \"f x = x\"</p>\n<p>class C = A + assumes HC: \"g x = x\"<br>\nlemma lemmaC: \"g x = (x::'a::C)\" using HC by auto</p>\n<p>subclass (in C) B<br>\nproof<br>\n   (<em>fix x::'a show \"f x = x\" using HA[of x] HC[of x] by auto</em>)<br>\n   fix x::'a show \"f x = x\" using HA[of x] lemmaC[of x] by auto<br>\nqed</p>\n<p>The proof fails, complaining that lemmaC[of x] makes no sense as the <br>\ntype 'a of x is not of class C (while it is...). On the other hand, the <br>\ncommented line succeeds. I do not understand what is going on here, as <br>\nto me HC and lemmaC are the same statement.</p>\n<p>In my real use case, I want to use serious lemmas that I have proved in <br>\nC, should I use another syntax for this?</p>\n<p>Esseger</p>",
+        "id": 294706492,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661180793
+    },
+    {
+        "content": "<p>From: Manuel Eberl &lt;<a href=\"mailto:eberlm@in.tum.de\">eberlm@in.tum.de</a>&gt;<br>\nThe problem is that lemmaC is /not/ proved in the class C; it is proved <br>\nwithout any surrounding context, but with a sort constraint C on the <br>\ntype 'a. This is, unfortunately, something different insofar as you <br>\ncannot use such facts from within the context of the class.</p>\n<p>It is therefore advisable to prove facts like this within the class <br>\ncontext whenever possible, e.g.:</p>\n<p>class C = A + assumes HC: \"g x = x\"<br>\nbegin</p>\n<p>lemma lemmaC: \"g x = x\"<br>\n…</p>\n<p>end</p>\n<p>or</p>\n<p>context C<br>\nbegin</p>\n<p>lemma lemmaC: \"g x = x\"<br>\n…</p>\n<p>end</p>\n<p>or</p>\n<p>lemma (in C) lemmaC: \"g x = x\"<br>\n…</p>\n<p>Cheers,</p>\n<p>Manuel</p>",
+        "id": 294706703,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661180861
+    },
+    {
+        "content": "<p>From: Andreas Lochbihler &lt;<a href=\"mailto:andreas.lochbihler@inf.ethz.ch\">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>\nDear Esseger and Manuel,</p>\n<p>In real-world cases, proving theorems within the class context may be require more work <br>\nthan outside. For example, all theorems about the Isabelle constant mono live in the <br>\nglobal context, because mono's type is too polymorphic (two type variables) for a class <br>\ncontext. This means that you cannot use any theorem about mono in a subclass proof, even <br>\nif the concrete instance just contains one type variable. :-(</p>\n<p>Fortunately, Types_To_Sets from Isabelle2016-1 can help in such cases. Import <br>\n\"~~/src/HOL/Types_To_Sets/Types_To_Sets\" and put the following lines outside of any <br>\ncontext. Then, you get a version lemmaC'' in the class context.</p>\n<p>setup ‹Sign.add_const_constraint (@{const_name \"g\"}, SOME @{typ \"'a ⇒ 'a\"})›<br>\nsetup ‹Sign.add_const_constraint (@{const_name \"f\"}, SOME @{typ \"'a ⇒ 'a\"})›<br>\nlemmas lemmaC' = lemmaC[internalize_sort \"'a :: C\",<br>\n   unoverload \"g :: 'a ⇒ 'a\", unoverload \"f :: 'a ⇒ 'a\"]<br>\nlemma (in C) lemmaC'': \"g x = x\" by(rule lemmaC') unfold_locales</p>\n<p>All this is still very experimental, but it works if you absolutely need it.</p>\n<p>Best,<br>\nAndreas</p>",
+        "id": 294706990,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661180928
+    }
+]

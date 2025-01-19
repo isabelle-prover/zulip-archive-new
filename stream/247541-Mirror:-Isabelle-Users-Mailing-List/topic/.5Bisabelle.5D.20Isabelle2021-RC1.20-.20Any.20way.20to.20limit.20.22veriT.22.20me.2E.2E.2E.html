@@ -1,0 +1,502 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Isabelle2021-RC1 - Any way to limit &quot;veriT&quot; me... · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2021-RC1.20-.20Any.20way.20to.20limit.20.22veriT.22.20me.2E.2E.2E.html">[isabelle] Isabelle2021-RC1 - Any way to limit &quot;veriT&quot; me...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="221715994"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2021-RC1%20-%20Any%20way%20to%20limit%20%22veriT%22%20me.../near/221715994" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2021-RC1.20-.20Any.20way.20to.20limit.20.22veriT.22.20me.2E.2E.2E.html#221715994">(Jan 05 2021 at 23:29)</a>:</h4>
+<p>From: "Eugene W. Stark" &lt;<a href="mailto:isabelle-users@starkeffect.com">isabelle-users@starkeffect.com</a>&gt;<br>
+I am running Isabelle2021-RC1 under Ubuntu 20.04.  Is there any way to limit the memory use<br>
+of the "veriT" prover?  It seems not to be a very good citizen in this respect: when it is<br>
+run from the "try" command it seems willing to grow its address space even to significantly<br>
+exceed the total amount of system RAM.  For example, I just observed a virtual address space<br>
+of 37.8GB on a system with 32GB total RAM and of course Java, poly, and various other things<br>
+were also running, so this is unsupportable.  When this occurs, the system is sent into a<br>
+thrashing mode, from which it is difficult even to get back control of the desktop so that<br>
+the offending process can be identified and killed.  So some ability to impose a limit is<br>
+needed here.</p>
+
+
+
+<a name="221743907"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2021-RC1%20-%20Any%20way%20to%20limit%20%22veriT%22%20me.../near/221743907" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2021-RC1.20-.20Any.20way.20to.20limit.20.22veriT.22.20me.2E.2E.2E.html#221743907">(Jan 06 2021 at 08:30)</a>:</h4>
+<p>From: Mathias Fleury &lt;<a href="mailto:mathias.fleury12@gmail.com">mathias.fleury12@gmail.com</a>&gt;<br>
+Hi Eugene,</p>
+<p>I never use "try", so I need some more information:</p>
+<ul>
+<li>
+<p>Are you talking about one veriT thread  that used so much memory or <br>
+more than one veriT thread?</p>
+</li>
+<li>
+<p>on what theory was this? I would like to reproduce that.</p>
+</li>
+<li>
+<p>What was the real memory usage? Virtual memory is pretty meaningless: <br>
+I have a program that has a virtual memory usage of 256G but uses only 9M...</p>
+</li>
+</ul>
+<p>If the trashing is not too hard to reproduce:</p>
+<ul>
+<li>Does it still happen if you deactivate veriT in sledgehammer by adding:<p>ML ‹<br>
+  fun verit_rm_stgy f stgy thy =<br>
+     let<br>
+       val ctxt' = f (Proof_Context.init_global thy);<br>
+       val thy' = Proof_Context.theory_of ctxt';<br>
+     in Context.theory_map (Verit_Proof.verit_rm_stgy stgy) thy' end;<br>
+  ›</p>
+<p>setup ‹fold (verit_rm_stgy (fn x=&gt; x)) ["del_insts", "ccfv_SIG",<br>
+  "ccfv_threshold", "default", "best"]›</p>
+<p>ML ‹Verit_Proof.all_veriT_stgies (Context.Proof @{context})›<br>
+  (<em>should print: val it = []: string list</em>)</p>
+</li>
+</ul>
+<p>at the top of the file?</p>
+<ul>
+<li>If the previous point works, does it still happen if you deactivate <br>
+all but one veriT strategy in sledgehammer, by adding:<p>ML ‹<br>
+  fun verit_rm_stgy f stgy thy =<br>
+     let<br>
+       val ctxt' = f (Proof_Context.init_global thy);<br>
+       val thy' = Proof_Context.theory_of ctxt';<br>
+     in Context.theory_map (Verit_Proof.verit_rm_stgy stgy) thy' end;<br>
+  ›</p>
+<p>setup ‹fold (verit_rm_stgy (fn x=&gt; x)) ["del_insts", "ccfv_SIG",<br>
+  "ccfv_threshold", "default"]›</p>
+<p>ML ‹Verit_Proof.all_veriT_stgies (Context.Proof @{context})›<br>
+  (<em>should print: val it = ["best"]: string list</em>)</p>
+</li>
+</ul>
+<p>at the top of the file?</p>
+<p>Thanks,</p>
+<p>Mathias</p>
+
+
+
+<a name="221755081"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2021-RC1%20-%20Any%20way%20to%20limit%20%22veriT%22%20me.../near/221755081" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2021-RC1.20-.20Any.20way.20to.20limit.20.22veriT.22.20me.2E.2E.2E.html#221755081">(Jan 06 2021 at 11:03)</a>:</h4>
+<p>From: "Eugene W. Stark" &lt;<a href="mailto:isabelle-users@starkeffect.com">isabelle-users@starkeffect.com</a>&gt;<br>
+On 1/6/21 3:29 AM, Mathias Fleury wrote:</p>
+<blockquote>
+<p>Hi Eugene,</p>
+<p>I never use "try", so I need some more information:</p>
+<ul>
+<li>Are you talking about one veriT thread  that used so much memory or more than one veriT thread?</li>
+</ul>
+</blockquote>
+<p>I am not sure that I understand this question.  Threads share a single address space, so the amount of memory used<br>
+is not a property of a single thread, but of a process.  If you are asking about processes, then it was one veriT<br>
+process.  I did not check how many threads were part of that process.</p>
+<blockquote>
+<ul>
+<li>on what theory was this? I would like to reproduce that.</li>
+</ul>
+</blockquote>
+<p>It is not easy for me to supply any kind of simple theory with straightforward instructions for reproducing,<br>
+but the next time it happens I will see if I can reproduce by using the same "try" in the same context.</p>
+<blockquote>
+<ul>
+<li>What was the real memory usage? Virtual memory is pretty meaningless: I have a program that has a virtual memory usage<br>
+of 256G but uses only 9M...<br>
+</li>
+</ul>
+</blockquote>
+<p>Again, I don't know what you mean by "real memory usage".  Unless a program uses some tricks such as sparse<br>
+address spaces (which can be useful in some kind of in-memory database situations), the virtual memory will be the<br>
+sum of the code, data, heap and stack sizes.  Code and read-only data can be shared between processes, but this is<br>
+not an issue here because there is only one veriT process, and I don't think any shared libraries used would be<br>
+contributing to the issue.  The usage in question is almost certainly dynamic memory usage; i.e. heap.</p>
+<p>Linux utilities such as "top" and "ps" do report "virtual size" and "resident-set size".  The resident-set size<br>
+would be the amount of actual RAM currently in use by the process.  This number is obviously limited by the<br>
+amount of installed RAM and once it reaches a certain level there can essentially not be any further increases,<br>
+though the size of the virtual address space can continue to increase if there is available swap.<br>
+In the case of the example I cited, the RSS reached about 26GB, which took up enough of the system RAM so that<br>
+there was severe thrashing.</p>
+<blockquote>
+<p>If the trashing is not too hard to reproduce:</p>
+<ul>
+<li>Does it still happen if you deactivate veriT in sledgehammer by adding:<p>ML ‹<br>
+  fun verit_rm_stgy f stgy thy =<br>
+    let<br>
+      val ctxt' = f (Proof_Context.init_global thy);<br>
+      val thy' = Proof_Context.theory_of ctxt';<br>
+    in Context.theory_map (Verit_Proof.verit_rm_stgy stgy) thy' end;<br>
+  ›</p>
+<p>setup ‹fold (verit_rm_stgy (fn x=&gt; x)) ["del_insts", "ccfv_SIG", "ccfv_threshold", "default", "best"]›</p>
+<p>ML ‹Verit_Proof.all_veriT_stgies (Context.Proof @{context})›<br>
+  (<em>should print: val it = []: string list</em>)</p>
+</li>
+</ul>
+<p>at the top of the file?</p>
+<ul>
+<li>If the previous point works, does it still happen if you deactivate all but one veriT strategy in sledgehammer, by adding:<p>ML ‹<br>
+  fun verit_rm_stgy f stgy thy =<br>
+    let<br>
+      val ctxt' = f (Proof_Context.init_global thy);<br>
+      val thy' = Proof_Context.theory_of ctxt';<br>
+    in Context.theory_map (Verit_Proof.verit_rm_stgy stgy) thy' end;<br>
+  ›</p>
+<p>setup ‹fold (verit_rm_stgy (fn x=&gt; x)) ["del_insts", "ccfv_SIG", "ccfv_threshold", "default"]›</p>
+<p>ML ‹Verit_Proof.all_veriT_stgies (Context.Proof @{context})›<br>
+  (<em>should print: val it = ["best"]: string list</em>)</p>
+</li>
+</ul>
+<p>at the top of the file?</p>
+</blockquote>
+<p>I can try this, but do not know if/when I will be able to report on results, since the situation is not<br>
+deterministically reproducible at this time.</p>
+<blockquote>
+<p>Thanks,</p>
+<p>Mathias</p>
+<p>On 06/01/2021 00:28, Eugene W. Stark wrote:</p>
+<blockquote>
+<p>I am running Isabelle2021-RC1 under Ubuntu 20.04.  Is there any way to limit the memory use<br>
+of the "veriT" prover?  It seems not to be a very good citizen in this respect: when it is<br>
+run from the "try" command it seems willing to grow its address space even to significantly<br>
+exceed the total amount of system RAM.  For example, I just observed a virtual address space<br>
+of 37.8GB on a system with 32GB total RAM and of course Java, poly, and various other things<br>
+were also running, so this is unsupportable.  When this occurs, the system is sent into a<br>
+thrashing mode, from which it is difficult even to get back control of the desktop so that<br>
+the offending process can be identified and killed.  So some ability to impose a limit is<br>
+needed here.</p>
+</blockquote>
+</blockquote>
+
+
+
+<a name="222241667"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2021-RC1%20-%20Any%20way%20to%20limit%20%22veriT%22%20me.../near/222241667" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2021-RC1.20-.20Any.20way.20to.20limit.20.22veriT.22.20me.2E.2E.2E.html#222241667">(Jan 10 2021 at 20:56)</a>:</h4>
+<p>From: "Eugene W. Stark" &lt;<a href="mailto:isabelle-users@starkeffect.com">isabelle-users@starkeffect.com</a>&gt;<br>
+One additional data point:  The excessive memory consumption issue is not limited to sledgehammer --<br>
+it can occur even when there is simply a use in an Isar proof of smt that specifies "verit".<br>
+The problem does not occur with proofs that already succeed in a short period of time; it happens when<br>
+you invalidate some portion of the proof by editing, so that the particular smt proof doesn't work<br>
+any more.  This means that you can spam your whole session (if not your whole computer) if you happen<br>
+to make some changes that trigger uncontrolled memory use by veriT in subsequent proofs that<br>
+used to work before you made the changes.</p>
+<p>This is very much making me want a way to limit the memory use, otherwise I have to figure out how to<br>
+disable veriT completely.</p>
+
+
+
+<a name="222266264"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2021-RC1%20-%20Any%20way%20to%20limit%20%22veriT%22%20me.../near/222266264" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2021-RC1.20-.20Any.20way.20to.20limit.20.22veriT.22.20me.2E.2E.2E.html#222266264">(Jan 11 2021 at 07:28)</a>:</h4>
+<p>From: Mathias Fleury &lt;<a href="mailto:mathias.fleury12@gmail.com">mathias.fleury12@gmail.com</a>&gt;<br>
+Hi Eugene,</p>
+<p>I believe that there are two different problems here:</p>
+<ol>
+<li>
+<p>tactics running forever and using a lot of memory. This already<br>
+    happens with metis or blast. However, this behavior might be new for<br>
+    smt, because the smt_timeout was disabled<br>
+    (<a href="http://isabelle.in.tum.de/repos/isabelle/rev/478b7599a1a0">http://isabelle.in.tum.de/repos/isabelle/rev/478b7599a1a0</a>) and smt<br>
+    solver are a lot more powerful than metis/blast. This is not<br>
+    specific to veriT and can happen with Z3 too.</p>
+<p>*   Solution: Set the smt_timeout to some reasonable value.</p>
+</li>
+<li>
+<p>the Sledgehammer problem that I cannot reproduce. It is hard to know<br>
+    what is really happening here, because I would not be surprised that<br>
+    the problem is actually the opposite: Isabelle uses tons of memory<br>
+    and is not able to kill veriT within the timeout and, therefore,<br>
+    veriT has a lot more time to use memory.</p>
+</li>
+</ol>
+<p>The motivation for 1 is avoiding timeouts that are hardware dependent <br>
+(e.g., if you run things on a raspberry pi).</p>
+<p>For 2, can you give me the ouput of the sledgehammer_params command?</p>
+<p>Mathias</p>
+
+
+
+<a name="222298968"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2021-RC1%20-%20Any%20way%20to%20limit%20%22veriT%22%20me.../near/222298968" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2021-RC1.20-.20Any.20way.20to.20limit.20.22veriT.22.20me.2E.2E.2E.html#222298968">(Jan 11 2021 at 13:53)</a>:</h4>
+<p>From: "Eugene W. Stark" &lt;<a href="mailto:isabelle-users@starkeffect.com">isabelle-users@starkeffect.com</a>&gt;<br>
+Metis and blast run in ML, so are limited by the size of the ML heap.  Poly accepts a parameter that allows<br>
+you to limit the size of the ML heap.  Similarly, Java accepts a parameter that allows you to limit the size<br>
+of its heap.  The problem here is that now there are additional processes getting fired off that can consume<br>
+memory voraciously, and there is no way to limit it.  There is only a certain amount of RAM on the system,<br>
+and if each process uses as much as it wants with no limitation, then the RAM will become overcommitted and<br>
+the system unstable.  It would be best if there were a single limit to the total amount of memory used by<br>
+all Isabelle-related processes, but that is a more complex thing to implement and a fallback is to make it<br>
+possible to place limits on the less-essential tools (e.g. smt solvers) that can cause trouble.</p>
+
+
+
+<a name="222683556"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2021-RC1%20-%20Any%20way%20to%20limit%20%22veriT%22%20me.../near/222683556" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2021-RC1.20-.20Any.20way.20to.20limit.20.22veriT.22.20me.2E.2E.2E.html#222683556">(Jan 14 2021 at 06:24)</a>:</h4>
+<p>From: Mathias Fleury &lt;<a href="mailto:mathias.fleury12@gmail.com">mathias.fleury12@gmail.com</a>&gt;<br>
+Hi Eugene,</p>
+<p>On 11/01/2021 14:52, Eugene W. Stark wrote:</p>
+<blockquote>
+<blockquote>
+<p>Default parameters for Sledgehammer:<br>
+...<br>
+provers = cvc4 vampire z3 e</p>
+</blockquote>
+</blockquote>
+<p>This indicates that veriT is not called by Sledgehammer as a prover <br>
+backend. So problem 2 does not exist for you.</p>
+<blockquote>
+<p>Metis and blast run in ML, so are limited by the size of the ML heap.  Poly accepts a parameter that allows<br>
+you to limit the size of the ML heap.  Similarly, Java accepts a parameter that allows you to limit the size<br>
+of its heap.  The problem here is that now there are additional processes getting fired off that can consume<br>
+memory voraciously, and there is no way to limit it.  There is only a certain amount of RAM on the system,<br>
+and if each process uses as much as it wants with no limitation, then the RAM will become overcommitted and<br>
+the system unstable.  It would be best if there were a single limit to the total amount of memory used by<br>
+all Isabelle-related processes, but that is a more complex thing to implement and a fallback is to make it<br>
+possible to place limits on the less-essential tools (e.g. smt solvers) that can cause trouble.</p>
+</blockquote>
+<p>You never have to use smt in your development (that might cripple <br>
+Sledgehammer however).</p>
+<p>Anyway, unless you find a way to replicate the issue, I believe that <br>
+setting the smt_timeout solves the problem and that no change is <br>
+required in Isabelle.</p>
+<p>Thanks for the report,</p>
+<p>Mathias</p>
+<blockquote>
+<p>On 1/11/21 2:28 AM, Mathias Fleury wrote:</p>
+<blockquote>
+<p>Hi Eugene,</p>
+<p>I believe that there are two different problems here:</p>
+<p>1. tactics running forever and using a lot of memory. This already happens with metis or blast. However, this behavior<br>
+     might be new for smt, because the smt_timeout was disabled<br>
+     (<a href="http://isabelle.in.tum.de/repos/isabelle/rev/478b7599a1a0">http://isabelle.in.tum.de/repos/isabelle/rev/478b7599a1a0</a>) and smt solver are a lot more powerful than metis/blast.<br>
+     This is not specific to veriT and can happen with Z3 too.<br>
+       *  Solution: Set the smt_timeout to some reasonable value.</p>
+<p>2. the Sledgehammer problem that I cannot reproduce. It is hard to know what is really happening here, because I would<br>
+     not be surprised that the problem is actually the opposite: Isabelle uses tons of memory and is not able to kill<br>
+     veriT within the timeout and, therefore, veriT has a lot more time to use memory.</p>
+<p>The motivation for 1 is avoiding timeouts that are hardware dependent (e.g., if you run things on a raspberry pi).</p>
+<p>For 2, can you give me the ouput of the sledgehammer_params command?</p>
+<p>Mathias</p>
+</blockquote>
+<p>On 10/01/2021 21:56, Eugene W. Stark wrote:</p>
+<blockquote>
+<blockquote>
+<p>One additional data point:  The excessive memory consumption issue is not limited to sledgehammer --<br>
+it can occur even when there is simply a use in an Isar proof of smt that specifies "verit".<br>
+The problem does not occur with proofs that already succeed in a short period of time; it happens when<br>
+you invalidate some portion of the proof by editing, so that the particular smt proof doesn't work<br>
+any more.  This means that you can spam your whole session (if not your whole computer) if you happen<br>
+to make some changes that trigger uncontrolled memory use by veriT in subsequent proofs that<br>
+used to work before you made the changes.</p>
+<p>This is very much making me want a way to limit the memory use, otherwise I have to figure out how to<br>
+disable veriT completely.</p>
+</blockquote>
+<p>On 1/6/21 6:03 AM, Eugene W. Stark wrote:</p>
+<blockquote>
+<blockquote>
+<p>On 1/6/21 3:29 AM, Mathias Fleury wrote:</p>
+<blockquote>
+<p>Hi Eugene,</p>
+<p>I never use "try", so I need some more information:</p>
+<ul>
+<li>Are you talking about one veriT thread  that used so much memory or more than one veriT thread?<br>
+I am not sure that I understand this question.  Threads share a single address space, so the amount of memory used<br>
+is not a property of a single thread, but of a process.  If you are asking about processes, then it was one veriT<br>
+process.  I did not check how many threads were part of that process.</li>
+</ul>
+</blockquote>
+<blockquote>
+<ul>
+<li>on what theory was this? I would like to reproduce that.<br>
+It is not easy for me to supply any kind of simple theory with straightforward instructions for reproducing,<br>
+but the next time it happens I will see if I can reproduce by using the same "try" in the same context.</li>
+</ul>
+</blockquote>
+<blockquote>
+<ul>
+<li>What was the real memory usage? Virtual memory is pretty meaningless: I have a program that has a virtual memory usage<br>
+of 256G but uses only 9M...</li>
+</ul>
+<p>Again, I don't know what you mean by "real memory usage".  Unless a program uses some tricks such as sparse<br>
+address spaces (which can be useful in some kind of in-memory database situations), the virtual memory will be the<br>
+sum of the code, data, heap and stack sizes.  Code and read-only data can be shared between processes, but this is<br>
+not an issue here because there is only one veriT process, and I don't think any shared libraries used would be<br>
+contributing to the issue.  The usage in question is almost certainly dynamic memory usage; i.e. heap.</p>
+</blockquote>
+<p>Linux utilities such as "top" and "ps" do report "virtual size" and "resident-set size".  The resident-set size<br>
+would be the amount of actual RAM currently in use by the process.  This number is obviously limited by the<br>
+amount of installed RAM and once it reaches a certain level there can essentially not be any further increases,<br>
+though the size of the virtual address space can continue to increase if there is available swap.<br>
+In the case of the example I cited, the RSS reached about 26GB, which took up enough of the system RAM so that<br>
+there was severe thrashing.</p>
+<blockquote>
+<p>If the trashing is not too hard to reproduce:</p>
+<ul>
+<li>Does it still happen if you deactivate veriT in sledgehammer by adding:<p>ML ‹<br>
+   fun verit_rm_stgy f stgy thy =<br>
+     let<br>
+       val ctxt' = f (Proof_Context.init_global thy);<br>
+       val thy' = Proof_Context.theory_of ctxt';<br>
+     in Context.theory_map (Verit_Proof.verit_rm_stgy stgy) thy' end;<br>
+   ›</p>
+<p>setup ‹fold (verit_rm_stgy (fn x=&gt; x)) ["del_insts", "ccfv_SIG", "ccfv_threshold", "default", "best"]›</p>
+<p>ML ‹Verit_Proof.all_veriT_stgies (Context.Proof @{context})›<br>
+   (<em>should print: val it = []: string list</em>)</p>
+</li>
+</ul>
+<p>at the top of the file?</p>
+<ul>
+<li>If the previous point works, does it still happen if you deactivate all but one veriT strategy in sledgehammer, by adding:<p>ML ‹<br>
+   fun verit_rm_stgy f stgy thy =<br>
+     let<br>
+       val ctxt' = f (Proof_Context.init_global thy);<br>
+       val thy' = Proof_Context.theory_of ctxt';<br>
+     in Context.theory_map (Verit_Proof.verit_rm_stgy stgy) thy' end;<br>
+   ›</p>
+<p>setup ‹fold (verit_rm_stgy (fn x=&gt; x)) ["del_insts", "ccfv_SIG", "ccfv_threshold", "default"]›</p>
+<p>ML ‹Verit_Proof.all_veriT_stgies (Context.Proof @{context})›<br>
+   (<em>should print: val it = ["best"]: string list</em>)</p>
+</li>
+</ul>
+<p>at the top of the file?<br>
+I can try this, but do not know if/when I will be able to report on results, since the situation is not<br>
+deterministically reproducible at this time.</p>
+</blockquote>
+<blockquote>
+<p>Thanks,</p>
+<p>Mathias</p>
+</blockquote>
+<p>On 06/01/2021 00:28, Eugene W. Stark wrote:</p>
+<blockquote>
+<blockquote>
+<p>I am running Isabelle2021-RC1 under Ubuntu 20.04.  Is there any way to limit the memory use<br>
+of the "veriT" prover?  It seems not to be a very good citizen in this respect: when it is<br>
+run from the "try" command it seems willing to grow its address space even to significantly<br>
+exceed the total amount of system RAM.  For example, I just observed a virtual address space<br>
+of 37.8GB on a system with 32GB total RAM and of course Java, poly, and various other things<br>
+were also running, so this is unsupportable.  When this occurs, the system is sent into a<br>
+thrashing mode, from which it is difficult even to get back control of the desktop so that<br>
+the offending process can be identified and killed.  So some ability to impose a limit is<br>
+needed here.</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+
+
+
+<a name="222742288"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2021-RC1%20-%20Any%20way%20to%20limit%20%22veriT%22%20me.../near/222742288" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2021-RC1.20-.20Any.20way.20to.20limit.20.22veriT.22.20me.2E.2E.2E.html#222742288">(Jan 14 2021 at 16:28)</a>:</h4>
+<p>From: Thomas Sewell &lt;<a href="mailto:tals4@cam.ac.uk">tals4@cam.ac.uk</a>&gt;<br>
+I think it might be worth mentioning that there are good ways to set<br>
+resource limits on processes in any given OS. I've got consistent <br>
+results<br>
+from ulimit on linux in the past (in a non-Isabelle project that run<br>
+thousands of SMT queries). It might be possible to add such limits to<br>
+the veriT tasks as they're created, if necessary by wrapping the veriT<br>
+binary in a script.</p>
+<p>Best regards,<br>
+     Thomas.</p>
+
+
+
+<a name="224245883"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2021-RC1%20-%20Any%20way%20to%20limit%20%22veriT%22%20me.../near/224245883" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2021-RC1.20-.20Any.20way.20to.20limit.20.22veriT.22.20me.2E.2E.2E.html#224245883">(Jan 27 2021 at 20:55)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+This does not sound very portable: Would this work on Windows (with or without<br>
+Cygwin)?</p>
+<p>Makarius</p>
+
+
+
+<a name="224246304"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2021-RC1%20-%20Any%20way%20to%20limit%20%22veriT%22%20me.../near/224246304" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2021-RC1.20-.20Any.20way.20to.20limit.20.22veriT.22.20me.2E.2E.2E.html#224246304">(Jan 27 2021 at 20:59)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On 11/01/2021 08:28, Mathias Fleury wrote:</p>
+<blockquote>
+<p>I believe that there are two different problems here:</p>
+<ol>
+<li>tactics running forever and using a lot of memory. This already happens<br>
+    with metis or blast. However, this behavior might be new for smt, because<br>
+    the smt_timeout was disabled<br>
+    (<a href="http://isabelle.in.tum.de/repos/isabelle/rev/478b7599a1a0">http://isabelle.in.tum.de/repos/isabelle/rev/478b7599a1a0</a>) and smt solver<br>
+    are a lot more powerful than metis/blast. This is not specific to veriT<br>
+    and can happen with Z3 too.<br>
+      *  Solution: Set the smt_timeout to some reasonable value.</li>
+</ol>
+</blockquote>
+<p>The quoted changeset says:</p>
+<p>changeset:   72347:478b7599a1a0<br>
+parent:      72342:4195e75a92ef<br>
+user:        desharna</p>
+
+
+
+<a name="224249650"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2021-RC1%20-%20Any%20way%20to%20limit%20%22veriT%22%20me.../near/224249650" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2021-RC1.20-.20Any.20way.20to.20limit.20.22veriT.22.20me.2E.2E.2E.html#224249650">(Jan 27 2021 at 21:24)</a>:</h4>
+<p>From: "Eugene W. Stark" &lt;<a href="mailto:isabelle-users@starkeffect.com">isabelle-users@starkeffect.com</a>&gt;<br>
+I don't have anything further to add.  I reported what I observed and what my opinion was about it.</p>
+
+
+
+<a name="224319017"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2021-RC1%20-%20Any%20way%20to%20limit%20%22veriT%22%20me.../near/224319017" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2021-RC1.20-.20Any.20way.20to.20limit.20.22veriT.22.20me.2E.2E.2E.html#224319017">(Jan 28 2021 at 12:31)</a>:</h4>
+<p>From: Thomas Sewell &lt;<a href="mailto:tals4@cam.ac.uk">tals4@cam.ac.uk</a>&gt;<br>
+It's likely there's a Windows feature similar to ulimit, but I<br>
+have no idea what it might be. I quickly checked whether python's<br>
+setrlimit was considered "portable", and it doesn't appear to be<br>
+the case.</p>
+<p>Even if a portable version exists, I can't think of a sensible<br>
+default value. A sufficiently advanced user could already apply<br>
+this on a compatible platform by fiddling with the contents of<br>
+Isabelle's contrib directory, I think, so maybe there's no need<br>
+for any action.</p>
+<p>Cheers,<br>
+     Thomas.</p>
+
+
+
+<a name="225129529"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2021-RC1%20-%20Any%20way%20to%20limit%20%22veriT%22%20me.../near/225129529" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2021-RC1.20-.20Any.20way.20to.20limit.20.22veriT.22.20me.2E.2E.2E.html#225129529">(Feb 04 2021 at 08:09)</a>:</h4>
+<p>From: Jasmin Blanchette via Cl-isabelle-users &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+The idea came from me. Having a tactic operate with a timeout seems quite fragile. This adds a layer of randomness to Isabelle. In each AFP entry's ROOT file, there's a timeout for the entire session, which is a good practical compromise, but if we start having timeouts in every individual tactic, we might get all sorts of random failures. Other tactics like "auto" or "metis" don't have timeout.</p>
+<p>If this is the only or best way to reduce veriT's memory usage, we could consider reverting 478b7599a1a0, but this seems dubious to me.</p>
+<p>Jasmin</p>
+
+
+
+<a name="225281883"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2021-RC1%20-%20Any%20way%20to%20limit%20%22veriT%22%20me.../near/225281883" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2021-RC1.20-.20Any.20way.20to.20limit.20.22veriT.22.20me.2E.2E.2E.html#225281883">(Feb 05 2021 at 10:27)</a>:</h4>
+<p>From: Dominique Unruh &lt;<a href="mailto:unruh@ut.ee">unruh@ut.ee</a>&gt;<br>
+Hi,</p>
+<blockquote>
+<p>If this is the only or best way to reduce veriT's memory usage, we could consider reverting 478b7599a1a0, but this seems dubious to me.</p>
+</blockquote>
+<p>Perhaps a compromise would be to activate timeouts only for the <br>
+interactive session? I find that the most annoying thing about timeouts <br>
+is that they can make a build of large heaps fail because the computer <br>
+goes into swapping. While in the interactive session, timeouts could be <br>
+nice so that the computer does not go into expensive infinite loops when <br>
+something changes during editing. And since the interactive session is <br>
+usually edited by the same person who inserts the timeout, it's then up <br>
+to each person whether they want to use a timeout or not. (And <br>
+unpredictability is less of a problem during the interactive editing.)</p>
+<p>Best wishes,<br>
+Dominique.</p>
+
+
+
+<a name="225298747"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2021-RC1%20-%20Any%20way%20to%20limit%20%22veriT%22%20me.../near/225298747" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2021-RC1.20-.20Any.20way.20to.20limit.20.22veriT.22.20me.2E.2E.2E.html#225298747">(Feb 05 2021 at 13:36)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+For my part, it is formally OK to do nothing for the release.</p>
+<p>It is up to the SMT + veriT experts to say if there is something severely<br>
+wrong that needs to be changed for the Isabelle2021 release. RC5 is planned<br>
+for 08-Feb-2021. The final release approx. 1 week later.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Jul 15 2022 at 23:21 UTC</p>
+</html>

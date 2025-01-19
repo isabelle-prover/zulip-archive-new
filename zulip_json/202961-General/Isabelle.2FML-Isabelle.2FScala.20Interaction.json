@@ -1,0 +1,86 @@
+[
+    {
+        "content": "<p>Hi, I want to find the Isabelle/ML and Isabelle/Scala functions in charge of communicating both worlds. The way I currently understand Isabelle's inner workings is that there is a \"thread\" managing the messages from both systems. I am interested in the functions (from both sides) that send and receive the messages to/from this \"thread\". If this is not the correct model, an explanation with pointers to the code would be desirable. Written in another way, I am interested in the functions corresponding to the \"internal protocol\" part in slide 5 of <a href=\"https://isabelle.in.tum.de/nominal/activities/tphols09/IDW/MW-slides4.pdf\">these slides</a>. Thanks!</p>",
+        "id": 440310561,
+        "sender_full_name": "Jonathan Julian Huerta y Munive",
+        "timestamp": 1716466818
+    },
+    {
+        "content": "<p>What are you trying to achieve, exactly? There are many moving parts here, and your question is too broad to answer well.</p>",
+        "id": 440350994,
+        "sender_full_name": "Fabian Huch",
+        "timestamp": 1716479279
+    },
+    {
+        "content": "<p>Certainly there is no 'single thread that manages all  communication and lives outside the system' if that is what you mean</p>",
+        "id": 440352787,
+        "sender_full_name": "Fabian Huch",
+        "timestamp": 1716479826
+    },
+    {
+        "content": "<p>On a technical level, there are System channels and Databases for IPC.</p>",
+        "id": 440353102,
+        "sender_full_name": "Fabian Huch",
+        "timestamp": 1716479922
+    },
+    {
+        "content": "<p>I am trying to understand Isabelle better to decide the best approach to interface the proving process with Python. Suppose I want to use <a href=\"https://github.com/py4j/py4j\">this Python library</a>. I would like to build a heap, postulate a theorem from Python from that point, receive a filtered list of possible methods and proven theorems from this heap, choose the proof method and its arguments from Python, ask Isabelle/ML to send back the new Proof.state after using that method, and repeat. After looking at Isabelle's scala files, it seems to me that doing it via Isabelle/scala would alleviate the need of building my own YXML parsers, document model, thread management, and all the engineering already there.</p>",
+        "id": 440359832,
+        "sender_full_name": "Jonathan Julian Huerta y Munive",
+        "timestamp": 1716482155
+    },
+    {
+        "content": "<p>Yes, I would highly recommend simply using Isabelle/Scala instead of trying to interact with the raw Poly/ML process.</p>",
+        "id": 440373999,
+        "sender_full_name": "Fabian Huch",
+        "timestamp": 1716487826
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"348400\">Fabian Huch</span> <a href=\"#narrow/stream/202961-General/topic/Isabelle.2FML-Isabelle.2FScala.20Interaction/near/440353102\">said</a>:</p>\n<blockquote>\n<p>On a technical level, there are System channels and Databases for IPC.</p>\n</blockquote>\n<p>Based on this, I guess I would like to pinpoint how the proof state is updated from the Isabelle/scala part. Reading the libraries takes a lot of time. Is the process described precisely somewhere with pointers to the code?</p>",
+        "id": 440498981,
+        "sender_full_name": "Jonathan Julian Huerta y Munive",
+        "timestamp": 1716553582
+    },
+    {
+        "content": "<p>No, the precise document is the code itself. Maybe you are better off using the Isabelle server to send theory snippets/receive results? Of course it doesn't scale as well, but it's easy to use from the outside, and there are even python bindings for the API.</p>",
+        "id": 440529430,
+        "sender_full_name": "Fabian Huch",
+        "timestamp": 1716563799
+    },
+    {
+        "content": "<p>Anyway, the state is updated via <code>Document.Edit</code>s (see Pure/PIDE/document.scala), which are progressed from within the ML process.</p>",
+        "id": 440529785,
+        "sender_full_name": "Fabian Huch",
+        "timestamp": 1716563975
+    },
+    {
+        "content": "<p>Thanks <span class=\"user-mention\" data-user-id=\"348400\">@Fabian Huch</span>. I'll take my time to understand Isabelle/Scala. I think I am making good progress on that front.</p>",
+        "id": 440550995,
+        "sender_full_name": "Jonathan Julian Huerta y Munive",
+        "timestamp": 1716572269
+    },
+    {
+        "content": "<p>For future reference to whoever is interested: the most useful file to answer my question was <code>session.scala</code>. The file has its own model of the <code>prover</code> and it declares various <code>Consumer_Thread</code>s to interact with it and the PIDE. Interesting threads in that file are <code>manager</code>, <code>dispatcher</code> and <code>change_parser</code>. Among the messages that they handle are <code>Prover.Output</code>s and <code>Prover.Input</code>s. Accordingly, the file <code>prover.scala</code> provides the <code>Prover</code> class extending the referred <code>Protocol</code> in the slides linked above. The protocol is implemented in both the scala side (<code>protocol.scala</code>) and the ML side (<code>protocol.ML</code>). Then, as Fabian stated, <code>Document.Edits</code> are sent to the ML side which contain the code snippets that Isabelle/ML processes.</p>",
+        "id": 445295934,
+        "sender_full_name": "Jonathan Julian Huerta y Munive",
+        "timestamp": 1718697609
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"441006\">Jonathan Julian Huerta y Munive</span> <a href=\"#narrow/stream/202961-General/topic/Isabelle.2FML-Isabelle.2FScala.20Interaction/near/445295934\">said</a>:</p>\n<blockquote>\n<p>For future reference to whoever is interested: the most useful file to answer my question was <code>session.scala</code>. The file has its own model of the <code>prover</code> and it declares various <code>Consumer_Thread</code>s to interact with it and the PIDE. Interesting threads in that file are <code>manager</code>, <code>dispatcher</code> and <code>change_parser</code>. Among the messages that they handle are <code>Prover.Output</code>s and <code>Prover.Input</code>s. Accordingly, the file <code>prover.scala</code> provides the <code>Prover</code> class extending the referred <code>Protocol</code> in the slides linked above. The protocol is implemented in both the scala side (<code>protocol.scala</code>) and the ML side (<code>protocol.ML</code>). Then, as Fabian stated, <code>Document.Edits</code> are sent to the ML side which contain the code snippets that Isabelle/ML processes.</p>\n</blockquote>\n<p>Hi Julian,</p>\n<p>Thanks very much for this very useful information! I am now also trying to come up with some automated tools utilizing Isabelle/Scala.<br>\nI was wondering if you have any \"hello world\" snippets you can share? For instance what code in Isabelle/Scala did you write to cause an edit to happen without actually editing in jedit? Or how do you intercept the messages returned by the prover IDE and print them to stdout instead?</p>\n<p>Thanks a lot for any help in advance!</p>\n<p>Best wishes,<br>\nChengsong</p>",
+        "id": 472248573,
+        "sender_full_name": "Chengsong Tan",
+        "timestamp": 1727101761
+    },
+    {
+        "content": "<p><span class=\"user-mention\" data-user-id=\"241231\">@Chengsong Tan</span> I am sorry to write that I do not have anything quick to follow/share with you. Basically, I used the <a href=\"https://isabelle-dev.sketis.net/source/isabelle/\">develop version of Isabelle with its Mercurial version control</a> and modified the code in a personal \"branch\" in <code>session.scala</code> so that the <code>manager</code> and the <code>dispatcher</code> printed to the standard output some messages that they send and receive. However, after reading them and the <code>protocol.scala</code> I felt that the messages that they send are very specific for the PIDE. Right now I am using <a href=\"https://dominique-unruh.github.io/scala-isabelle/\">Dominique Unruh's scala-isabelle</a> which seems to work for my purposes. If you wish, we can discuss more privately about each other's objectives and maybe we can align them.</p>",
+        "id": 472654500,
+        "sender_full_name": "Jonathan Julian Huerta y Munive",
+        "timestamp": 1727257445
+    },
+    {
+        "content": "<p>If you want to go the \"official\" way, code that might be useful to read appears in <code>PIDE/headless.scala</code> (e.g. <code>resources.start_session</code>) and its interaction with <code>Tools/server_commands.scala</code></p>",
+        "id": 472658458,
+        "sender_full_name": "Jonathan Julian Huerta y Munive",
+        "timestamp": 1727258765
+    }
+]

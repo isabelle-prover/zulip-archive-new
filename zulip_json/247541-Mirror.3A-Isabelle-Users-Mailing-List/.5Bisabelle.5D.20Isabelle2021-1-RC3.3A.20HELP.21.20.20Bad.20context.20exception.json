@@ -1,0 +1,14 @@
+[
+    {
+        "content": "<p>From: Peter Lammich &lt;<a href=\"mailto:lammich@in.tum.de\">lammich@in.tum.de</a>&gt;<br>\nHello,</p>\n<p>I'm getting an exception</p>\n<p>exception Fail raised (line 673 of \"variable.ML\"): Bad context: clash<br>\nof fresh free for bound: :001 vs. xb</p>\n<p>from \"Sepref_Frame.prepare_fi_conv\"<br>\nin afp/thys/Refine_Imperative_HOL/Sepref_Frame.thy</p>\n<p>I assume that this is due to not sticking to some ominous 'context<br>\ndiscipline'. I tried an analogous fix to what has been done in <br>\nRefine_Util.f_tac_conv in<br>\nthys/Automatic_Refinement/Lib/Refine_Util.thy, i.e.,<br>\nVariable.declare_term just before Goal.prove_internal, and using the<br>\nresulting goal_context in the proof tactic, however, the exception<br>\npersists.</p>\n<p>I'm lost! Can someone please explain what might go wrong here, and how<br>\nto debug and track down such errors, or point me to (ideally concise<br>\nand understandable) documentation about what 'context discipline'<br>\nexactly means.</p>",
+        "id": 261388973,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1636850342
+    },
+    {
+        "content": "<p>From: Peter Lammich &lt;<a href=\"mailto:lammich@in.tum.de\">lammich@in.tum.de</a>&gt;<br>\nHi,</p>\n<p>after a few hours of guessing and trying to figure out what happens, I<br>\nhave tracked down the issue to the following dangerous pattern that<br>\nviolates context discipline, but which, unfortunately, I used a lot.<br>\nI'm still trying to figure out a way how to systematically catch them<br>\nall, and how to fix it in some cases without potentially introducing<br>\nperformance regressions.</p>\n<p>Pattern:</p>\n<p>fun some_conv ctxt = let<br>\n  val inner_conv = Simplifier.rewrite (ctxt addsimps ...)<br>\nin<br>\n  Conv.params_conv ~1 (K [...] inner_conv) ctxt<br>\nend</p>\n<p>I probably thought it was a good idea, b/c it keeps the (maybe<br>\nexpensive?) operations on the context, like adding a lot of simp-<br>\nlemmas, out of the conversion (in particular, if [...] applies the<br>\nconversion multiple times).</p>\n<p>The obvious 'fix' would be to modify the simpset before invoking the<br>\nconversion, which, however, easily leads to modularity problems, as in:</p>\n<p>fun complicated_inner_conv_reused_from_multiple_places ctxt = let<br>\n  val ctxt = ctxt addsimps ...<br>\n  [...]<br>\nin<br>\n  Simplifier.rewrite ctxt<br>\nend</p>\n<p>I cannot come up with a robust solution here, in particular if more<br>\nthan one inner_conv is involved.</p>",
+        "id": 261414100,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1636891690
+    }
+]

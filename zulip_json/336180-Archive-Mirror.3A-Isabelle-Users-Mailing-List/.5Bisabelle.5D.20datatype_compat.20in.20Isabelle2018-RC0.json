@@ -1,0 +1,44 @@
+[
+    {
+        "content": "<p>From: Jasmin Blanchette &lt;<a href=\"mailto:jasmin.blanchette@inria.fr\">jasmin.blanchette@inria.fr</a>&gt;<br>\nHi Gerwin,</p>\n<blockquote>\n<p>The datatype_compat command used to generate the old-style definition of the “size” constant in Isabelle2017 (potentially only when  size did not yet exist). This no longer seems to be the case.</p>\n<p>Is this intentional? I couldn’t find anything relevant in NEWS.</p>\n</blockquote>\n<p>The reason why the old-style definitions were supported for so long at all was for the benefit of the \"old_datatype\" command. The thread \"Any users of 'Old_Datatype.thy' or 'Old_SMT.thy'?\" (started in December 2017) didn't reveal any users, so when I removed the legacy \"old_datatype\", I also removed the old-style size infrastructure (which itself is an important step towards removing the last left-overs from the old datatype package from Isabelle, to keep the Isabelle code in a not too messy state).</p>\n<blockquote>\n<p>I’m using this a few times — not very often, but it’s annoying enough to recreate manually (see email thread on that around Isabelle2017..) that it’s worth checking at least.</p>\n</blockquote>\n<p>I would like to know more about your use case. It seems like you found a corner case of the datatype package -- namely, you're presumably disabling \"size\" first, then invoking \"datatype_compat\" to produce an old-style \"size\". Is your main motivation for the use of old-style \"size\" definitions compatibility (i.e. no need to port old scripts), or do you find the old definitions intrinsically better?</p>\n<p>The reason I'm asking is that there are advantages and disadvantages to both schemes, and it may be worthwhile to just support both, e.g. via an option.</p>\n<p>Cheers,</p>\n<p>Jasmin</p>",
+        "id": 294733805,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661189046
+    },
+    {
+        "content": "<p>From: <a href=\"mailto:Gerwin.Klein@data61.csiro.au\">Gerwin.Klein@data61.csiro.au</a></p>\n<blockquote>\n<p>On 21 Jun 2018, at 18:22, Jasmin Blanchette &lt;<a href=\"mailto:jasmin.blanchette@inria.fr\">jasmin.blanchette@inria.fr</a>&gt; wrote:<br>\n[..]<br>\nThe reason why the old-style definitions were supported for so long at all was for the benefit of the \"old_datatype\" command. The thread \"Any users of 'Old_Datatype.thy' or 'Old_SMT.thy'?\" (started in December 2017) didn't reveal any users, so when I removed the legacy \"old_datatype\", I also removed the old-style size infrastructure (which itself is an important step towards removing the last left-overs from the old datatype package from Isabelle, to keep the Isabelle code in a not too messy state).</p>\n</blockquote>\n<p>Ha, I did see that query, but did not realise its implication :-)</p>\n<blockquote>\n<blockquote>\n<p>I’m using this a few times — not very often, but it’s annoying enough to recreate manually (see email thread on that around Isabelle2017..) that it’s worth checking at least.</p>\n</blockquote>\n<p>I would like to know more about your use case. It seems like you found a corner case of the datatype package -- namely, you're presumably disabling \"size\" first, then invoking \"datatype_compat\" to produce an old-style \"size\". Is your main motivation for the use of old-style \"size\" definitions compatibility (i.e. no need to port old scripts), or do you find the old definitions intrinsically better?</p>\n<p>The reason I'm asking is that there are advantages and disadvantages to both schemes, and it may be worthwhile to just support both, e.g. via an option.</p>\n</blockquote>\n<p>This case is so far the only one I have encountered that showed a real difference between the two.</p>\n<p>It is precisely as you guessed:</p>\n<p>datatype (plugins del: size)<br>\n         'a typ_desc   = TypDesc \"'a typ_struct\" typ_name<br>\n    and  'a typ_struct = TypScalar nat nat \"'a\" |<br>\n                         TypAggregate \"('a typ_desc,field_name) dt_pair list\"</p>\n<p>datatype_compat dt_pair<br>\ndatatype_compat typ_desc typ_struct</p>\n<p>then a bunch of rules recreating exactly the old induct rules, so I don’t have to dig into old and messy proofs, and then at some point:</p>\n<p>fun<br>\n  fold_td' :: \"(typ_name =&gt; ('a * field_name) list =&gt; 'a) * 'a typ_desc =&gt; 'a\"<br>\nwhere<br>\nfot0: \"fold_td' (f,TypDesc st nm) = (case st of<br>\n           TypScalar n algn d =&gt; d |<br>\n           TypAggregate ts =&gt; f nm (map (\\&lt;lambda&gt;x. case x of DTPair t n =&gt; (fold_td' (f,t),n)) ts))”</p>\n<p>With the old size definition, fun find as lexicographic termination order, with the new size definitions it fails (and I couldn’t figure out one within 20min, which might have more to do with the state of my mind than anything).</p>\n<p>Originals (for 2017) at<br>\n<a href=\"https://github.com/seL4/l4v/blob/a837d380126ae06765353bcd6af90e5546e8e946/tools/c-parser/umm_heap/CTypesDefs.thy#L34\">https://github.com/seL4/l4v/blob/a837d380126ae06765353bcd6af90e5546e8e946/tools/c-parser/umm_heap/CTypesDefs.thy#L34</a><br>\n<a href=\"https://github.com/seL4/l4v/blob/a837d380126ae06765353bcd6af90e5546e8e946/tools/c-parser/umm_heap/CTypesDefs.thy#L756\">https://github.com/seL4/l4v/blob/a837d380126ae06765353bcd6af90e5546e8e946/tools/c-parser/umm_heap/CTypesDefs.thy#L756</a></p>\n<p>This is not the nicest way to define things, but again, lots of later ugly proofs depend on the structure of these functions, so I am loathe to touch them if not necessary.</p>\n<p>Cheers,<br>\nGerwin</p>",
+        "id": 294733829,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661189062
+    },
+    {
+        "content": "<p>From: Traytel  Dmitriy &lt;<a href=\"mailto:traytel@inf.ethz.ch\">traytel@inf.ethz.ch</a>&gt;<br>\nHi Gerwin,</p>\n<p>The following works for me out of the box. Note that I also have removed \"(plugins del: size)\" from dt_pair.</p>\n<p>Cheers,<br>\nDmitriy</p>\n<p>type_synonym field_name = string<br>\ntype_synonym typ_name = string</p>\n<p>datatype ('a,'b) dt_pair = DTPair 'a 'b</p>\n<p>datatype 'a typ_desc   = TypDesc \"'a typ_struct\" typ_name<br>\n   and   'a typ_struct = TypScalar nat nat \"'a\" |<br>\n                         TypAggregate \"('a typ_desc,field_name) dt_pair list\"</p>\n<p>datatype_compat dt_pair<br>\ndatatype_compat typ_desc typ_struct</p>\n<p>fun<br>\n fold_td' :: \"(typ_name =&gt; ('a * field_name) list =&gt; 'a) * 'a typ_desc =&gt; 'a\"<br>\nwhere<br>\nfot0: \"fold_td' (f,TypDesc st nm) = (case st of<br>\n          TypScalar n algn d =&gt; d |<br>\n          TypAggregate ts =&gt; f nm (map (λx. case x of DTPair t n =&gt; (fold_td' (f,t),n)) ts))\"</p>",
+        "id": 294733841,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661189064
+    },
+    {
+        "content": "<p>From: <a href=\"mailto:Gerwin.Klein@data61.csiro.au\">Gerwin.Klein@data61.csiro.au</a><br>\nHm, I had tried that before and it failed. Let me get back to you.</p>\n<p>Cheers,<br>\nGerwin</p>",
+        "id": 294733862,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661189071
+    },
+    {
+        "content": "<p>From: Jasmin Blanchette &lt;<a href=\"mailto:jasmin.blanchette@inria.fr\">jasmin.blanchette@inria.fr</a>&gt;<br>\nHi Gerwin,</p>\n<blockquote>\n<p>Hm, I had tried that before and it failed. Let me get back to you.</p>\n</blockquote>\n<p>Your type has very few constructors. Another option, which is always available, is to define the \"size\" instance yourself. The \"size\" plugin (old or new) is doing very little.</p>\n<p>Cheers,</p>\n<p>Jasmin</p>",
+        "id": 294733883,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661189082
+    },
+    {
+        "content": "<p>From: <a href=\"mailto:Gerwin.Klein@data61.csiro.au\">Gerwin.Klein@data61.csiro.au</a><br>\nThat would have been my fall-back solution, yes.</p>\n<p>Cheers,<br>\nGerwin</p>",
+        "id": 294733899,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661189089
+    },
+    {
+        "content": "<p>From: <a href=\"mailto:Gerwin.Klein@data61.csiro.au\">Gerwin.Klein@data61.csiro.au</a><br>\nThe datatype_compat command used to generate the old-style definition of the “size” constant in Isabelle2017 (potentially only when  size did not yet exist). This no longer seems to be the case.</p>\n<p>Is this intentional? I couldn’t find anything relevant in NEWS.</p>\n<p>I’m using this a few times — not very often, but it’s annoying enough to recreate manually (see email thread on that around Isabelle2017..) that it’s worth checking at least.</p>\n<p>Cheers,<br>\nGerwin</p>",
+        "id": 294736620,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661190020
+    }
+]

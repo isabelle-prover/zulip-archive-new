@@ -1,0 +1,32 @@
+[
+    {
+        "content": "<p>From: Clemens Ballarin &lt;<a href=\"mailto:ballarin@in.tum.de\">ballarin@in.tum.de</a>&gt;<br>\nHi Norbert,</p>\n<p>There have been many refactorings since I've implemented this, so I <br>\ncannot tell you for sure. However, it seems to me that you should be <br>\nusing 'isar_interpretation' rather than 'interpretation'.</p>\n<p>Clemens</p>",
+        "id": 254094556,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1632161991
+    },
+    {
+        "content": "<p>From: Norbert Schirmer via Cl-isabelle-users &lt;<a href=\"mailto:cl-isabelle-users@lists.cam.ac.uk\">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>\nHi Clemens,</p>\n<p>Unfortunately this also does not show any effect.</p>\n<p>Regards,<br>\nNorbert</p>",
+        "id": 254118738,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1632172206
+    },
+    {
+        "content": "<p>From: Florian Haftmann &lt;<a href=\"mailto:florian.haftmann@informatik.tu-muenchen.de\">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>\nHi Norbert,</p>\n<p>the issue is a little bit delicate.</p>\n<p>First, to clarify the ML interfaces:</p>\n<ul>\n<li>\n<p>Interpretation.interpretation is for bounded interpretation within<br>\ncontext begin/end blocks.</p>\n</li>\n<li>\n<p>Interpretation.isar_interpretation mimics the Isar keyword<br>\n»interpretation« which has a different meaning at the theory level.</p>\n</li>\n</ul>\n<p>Following »explicit is better than implict«,<br>\nInterpretation.interpretation seems the right thing for your application.</p>\n<p>Now, the problem itself:</p>\n<blockquote>\n<p>context foo<br>\nbegin<br>\nML_val ‹<br>\nval lthy = <br>\n @{context} <br>\n |&gt; Interpretation.interpretation expr_one             <br>\n |&gt; Proof.global_terminal_proof ((Method.Basic (fn ctxt =&gt;  SIMPLE_METHOD (<br>\n      (Locale.intro_locales_tac {strict = false, eager = true} ctxt [] THEN <br>\n       asm_full_simp_tac ctxt 1))), <a href=\"http://Position.no\">Position.no</a><br>\n&lt;http://Position.no&gt;_range), NONE)</p>\n<p>val thms = Named_Theorems.get lthy @{named_theorems my_rules} ―‹[]›</p>\n</blockquote>\n<p>A second glimpse:</p>\n<blockquote>\n<p>val thms = Named_Theorems.get (Local_Theory.target_of lthy)<br>\n@{named_theorems my_rules} ―‹[]›</p>\n</blockquote>\n<p>What happens here?  Declarations stemming from bounded interpretations<br>\nare »as it is by now« only applied in a <em>target</em> context, but never in<br>\nthe »eigen context«.  So far this has never raised any attention since<br>\nafter each Isar interpretation, the target context is restored, any<br>\nobviously there haven’t been any programmatic applications of<br>\ninterpretation in bounded contexts so far.</p>\n<p>I deem the position in the code which is responsible for that glitch is<br>\nin generic_target.ML:</p>\n<p>val local_interpretation = standard_registration (fn (n, level) =&gt; level<br>\n= n - 1);</p>\n<p>The check is too strict: it should not only cover level = n - 1 (the<br>\nuppermost nested local theory) but level = n also (the eigen context).</p>\n<p>I will have a look at this and see whether this suffices.</p>\n<p>Cheers,<br>\n    Florian<br>\n<a href=\"/user_uploads/14278/E8VBRj7ZCriDUB4tly8709Yk/OpenPGP_signature\">OpenPGP_signature</a></p>",
+        "id": 254537574,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1632404797
+    },
+    {
+        "content": "<p>From: Florian Haftmann &lt;<a href=\"mailto:florian.haftmann@informatik.tu-muenchen.de\">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>\nHi Norbert,</p>\n<p>see now <a href=\"https://isabelle.in.tum.de/repos/isabelle/rev/690928dd6f8f\">https://isabelle.in.tum.de/repos/isabelle/rev/690928dd6f8f</a></p>\n<p>It would also be possible to apply declarations it <em>all</em> levels of the<br>\nnested target, but at the moment I am reluctant to undertake such a<br>\nchange in user-observable behaviour.</p>\n<p>Florian<br>\n<a href=\"/user_uploads/14278/keHuDgS2VNg6UXDpzqO10Ywq/OpenPGP_signature\">OpenPGP_signature</a></p>",
+        "id": 255371986,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1632909597
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nI have tried to track the emergence of the level \"n - 1\" / formerly map_top<br>\nand found this old changeset:</p>\n<p>changeset:   52119:90ba620333d0<br>\nuser:        haftmann<br>\ndate:        Wed May 22 22:56:17 2013 +0200<br>\nfiles:       src/Pure/Isar/expression.ML src/Pure/Isar/local_theory.ML<br>\ndescription:<br>\ninterpretation must always operate on the last element in a local theory<br>\nstack, not on all elements: interpretated facts must disappear after pop from<br>\nlocal theory stack, and transfer from last target is not enough</p>\n<p>The \"must always\" is not explained in the text; maybe you still remember the<br>\nreasons.</p>\n<p>Makarius</p>",
+        "id": 255375003,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1632911106
+    }
+]

@@ -1,0 +1,96 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Slow top-down contraction of abbreviations · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Slow.20top-down.20contraction.20of.20abbreviations.html">[isabelle] Slow top-down contraction of abbreviations</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="434138731"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Slow%20top-down%20contraction%20of%20abbreviations/near/434138731" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Slow.20top-down.20contraction.20of.20abbreviations.html#434138731">(Apr 18 2024 at 15:51)</a>:</h4>
+<p>From: Fabian Immler &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Hello everyone,</p>
+<p>We observed that pretty printing is slow when you have an abbreviation that is deeply nested in a term.<br>
+Consider e.g. the abbreviation <code>int == of_nat</code> in <code>iterate_bind</code>, where</p>
+<p>iterate_bind n = do {<br>
+      x ← Some x;<br>
+      ...;<br>
+      x ← Some x;<br>
+      Some (int x)<br>
+    }</p>
+<p>For <code>n = 1500</code> (a term size not uncommon in program verification), pretty printing takes about 60s.<br>
+This is due to the fact that abbreviations are contracted top-down<br>
+(Proof_Context.standard_term_uncheck-&gt;contract_abbrevs-&gt;Pattern.rewrite_term_top).<br>
+Bottom-up rewriting (Pattern.rewrite_term) takes less than a second (and obviously produces the same result in this case).</p>
+<p>Interestingly, <code>contract_abbrevs</code> used to do bottom-up rewriting prior to 5d2fe4e09354.<br>
+And while I am sure there must have been a reason for this change, the changeset unfortunately does not give a justification.</p>
+<p>Concrete explorations are below, with <code>contract_abbrevs'</code> as a parameterized variant of<br>
+<code>contract_abbrevs</code>.</p>
+<p>This is certainly a very delicate business, but does anyone have insights if or how this situation<br>
+could be improved?</p>
+<p>Best wishes,<br>
+Fabian</p>
+<p>—<br>
+Fabian Immler<br>
+<a href="mailto:fimmler@apple.com">fimmler@apple.com</a> &lt;mailto:<a href="mailto:fimmler@apple.com">fimmler@apple.com</a>&gt;<br>
+ SEG Formal Verification</p>
+<p>Scratch.thy:<br>
+=========</p>
+<p>theory Scratch<br>
+  imports<br>
+    Main<br>
+(* "HOL-Library.Monad_Syntax" *)<br>
+begin</p>
+<p>ML ‹<br>
+fun iterate_bind 0 = Abs ("x", @{typ "nat"}, @{const Some("int")} $ (@{term int} $ Bound 0))<br>
+  | iterate_bind i =<br>
+    Abs ("x", @{typ nat},<br>
+      @{const Option.bind(nat, int)} $ (@{const Some(nat)} $ Bound 0) $<br>
+      iterate_bind (i - 1))</p>
+<p>(* when including "HOL-Library.Monad_Syntax"<br>
+iterate_bind 3 =  @{term "λx. do {<br>
+    x ← Some x;<br>
+    x ← Some x;<br>
+    x ← Some x;<br>
+    Some (int x)<br>
+  }"}<br>
+*)<br>
+›</p>
+<p>ML ‹<br>
+(* Pretty printing such a term with "show_abbrevs" is slow: *)<br>
+local<br>
+val ctxt = @{context}<br>
+val t = iterate_bind 1500<br>
+val ct = Thm.cterm_of ctxt t<br>
+val _ = timeap_msg "show_abbrevs=true"  (Syntax.string_of_term ctxt) t<br>
+val ctxt' = Config.put Proof_Context.show_abbrevs false ctxt<br>
+val _ = timeap_msg "show_abbrevs=false" (Syntax.string_of_term ctxt') t<br>
+in<br>
+  val t = t<br>
+end<br>
+›</p>
+<p>ML ‹<br>
+fun contract_abbrevs' ctxt rewrite_term t =<br>
+  let<br>
+    val thy = Proof_Context.theory_of ctxt;<br>
+    val consts = Proof_Context.consts_of ctxt;<br>
+    val abbrev = false;<br>
+    val retrieve = Consts.retrieve_abbrevs consts (print_mode_value () @ [""]);<br>
+    fun match_abbrev u = <a href="http://Option.map">Option.map</a> #1 (get_first (Pattern.match_rew thy u) (retrieve u));<br>
+  in<br>
+    if abbrev orelse not (Config.get ctxt show_abbrevs) orelse not (can Term.type_of t) then t<br>
+    else rewrite_term thy [] [match_abbrev] t<br>
+  end;<br>
+›<br>
+ML ‹val t1 = timeap_msg "top-down" (contract_abbrevs' @{context} Pattern.rewrite_term_top) t›<br>
+ML ‹val t2 = timeap_msg "bot-up"   (contract_abbrevs' @{context} Pattern.rewrite_term    ) t›<br>
+ML ‹t1 = t2›</p>
+<p>end</p>
+
+
+
+<hr><p>Last updated: Jan 19 2025 at 20:17 UTC</p>
+</html>

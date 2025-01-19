@@ -1,0 +1,122 @@
+[
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nWith Isabelle/37e57ac55559 we now have proven support for Linux ARM64, meaning <br>\nthat there is a nightly \"isabelle build -a\" on a virtual server (from Netcup).</p>\n<p>The Admin/build_release now works on Linux ARM64, and can produce logic images <br>\nfor Linux ARM64. Thus regular repository snapshots (and release candidates) <br>\nsupport that platform by default, e.g. see <br>\n<a href=\"https://isatest.sketis.net/devel/release_snapshot\">https://isatest.sketis.net/devel/release_snapshot</a></p>\n<p>Still missing (to be investigated further) are the following external tools:</p>\n<p>* z3: stuck at the rather old version 4.4.0, which lacks arm64-linux <br>\nbinaries; the 4.4.1 arm64 package from ancient Debian is somewhat unstable on <br>\ncurrent Ubuntu 20.04, see also failure of HOL-SMT_Examples recorded on <br>\n<a href=\"https://isatest.sketis.net/devel/build_status/index.html\">https://isatest.sketis.net/devel/build_status/index.html</a></p>\n<p>* cvc4 (or rather cvc5)</p>\n<p>* nunchaku</p>\n<p>* smbc</p>\n<p>* ocaml / opam</p>\n<p>Makarius</p>\n<hr>\n<p>isabelle-dev mailing list<br>\n<a href=\"mailto:isabelle-dev@in.tum.de\">isabelle-dev@in.tum.de</a><br>\n<a href=\"https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev\">https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev</a></p>",
+        "id": 420132924,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1707252468
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nI've spent a lot of time experimenting with z3 4.4.0pre (0482e7fe727c), but <br>\ndid not succeed so far (as of Isabelle/6e5f40cfa877): The session <br>\nHOL-SMT_Examples fails with timeout, due to non-terminating invocations of z3 <br>\non arm64-linux.</p>\n<p>For verit there was a similar problem, but rebuilding it from source (with <br>\n\"docker run -it ubuntu:18.04 bash\") made it work; see also see <br>\nIsabelle/b14c4cb37d99.</p>\n<p>For z3 the build instructions are as follows, using the attached z3.patch, <br>\nwhich is based on the Debian package and changes found in the z3 repository:</p>\n<p>\"\"\"<br>\ndocker run -it ubuntu:16.04 bash<br>\napt-get update &amp;&amp; apt-get upgrade -y &amp;&amp; apt autoremove -y<br>\napt install -y curl less libfontconfig1 libgomp1 openssh-client perl pwgen <br>\nrlwrap make g++ python</p>\n<p>mkdir z3-4.4.0pre<br>\ncd z3-4.4.0pre<br>\ncurl --location <a href=\"https://github.com/Z3Prover/z3/archive/0482e7fe727c.tar.gz\">https://github.com/Z3Prover/z3/archive/0482e7fe727c.tar.gz</a> | <br>\ntar --strip-components=1 -xz -f -</p>\n<p>#inline z3.patch below<br>\npatch -p1 &lt;&lt;EOF<br>\n...<br>\nEOF</p>\n<p>python scripts/mk_make.py<br>\ncd build &amp;&amp; make<br>\n\"\"\"</p>\n<p>That is minor progress, because the build works at all, by using ubuntu:16.04 <br>\ninstead of our official ubuntu:18.04 baseline.</p>\n<p>For the planned release of Isabelle2024 (May 2024), I tend to disable z3 on <br>\narm64-linux by default (via etc/settings of the component), and no longer <br>\npretend that we have something working, see also <br>\n<a href=\"https://isabelle-dev.sketis.net/rISABELLE796ae338eb9d\">https://isabelle-dev.sketis.net/rISABELLE796ae338eb9d</a></p>\n<p>Makarius</p>\n<p><a href=\"/user_uploads/14278/jowy6rOovmCjQIarNVmKQPkC/z3.patch\">z3.patch</a></p>",
+        "id": 421225811,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1707824230
+    },
+    {
+        "content": "<p>From: Jasmin Blanchette &lt;<a href=\"mailto:jasmin.blanchette@ifi.lmu.de\">jasmin.blanchette@ifi.lmu.de</a>&gt;<br>\nHi Makarius,</p>\n<p>Thanks for investigating this. The binary components are always a special source of worry.</p>\n<p>From what I understand, HOL-SMT_Examples will continue working thanks to the certificate caching mechanism that is used there. The mechanism isn't used in the AFP, though, which means arm64-linux users won't be able to load many AFP entries due to \"smt\" calls to Z3 in there. If this is too much of an issue, we could consider either of two solutions:</p>\n<ol>\n<li>\n<p>Replace the \"smt\" calls. Most of them could use the \"(verit)\" option instead, and for the others, we'd have to come up with alternative proofs. This possibly entails a lot of work, but it could be done by a \"task force\".</p>\n</li>\n<li>\n<p>Use certificates for the AFP (and require their use in the future). Certificates take the form of low-level (SMT input, SMT output) pairs, so that when \"smt\" generates a given SMT input in the cache, the SMT output is used directly instead of running the SMT solver.</p>\n</li>\n</ol>\n<p>Best,<br>\nJasmin</p>\n<p><a href=\"/user_uploads/14278/Bwz3WG2ZK1liPxk0ssp08b1M/smime.p7s\">smime.p7s</a></p>",
+        "id": 421387268,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1707896859
+    },
+    {
+        "content": "<p>From: Jasmin Blanchette &lt;<a href=\"mailto:jasmin.blanchette@ifi.lmu.de\">jasmin.blanchette@ifi.lmu.de</a>&gt;<br>\nHi Makarius,</p>\n<blockquote>\n<p>Still missing (to be investigated further) are the following external tools:</p>\n<ul>\n<li>z3: stuck at the rather old version 4.4.0, which lacks arm64-linux binaries; the 4.4.1 arm64 package from ancient Debian is somewhat unstable on current Ubuntu 20.04, see also failure of HOL-SMT_Examples recorded on <a href=\"https://isatest.sketis.net/devel/build_status/index.html\">https://isatest.sketis.net/devel/build_status/index.html</a></li>\n</ul>\n</blockquote>\n<p>See my previous email.</p>\n<blockquote>\n<ul>\n<li>cvc4 (or rather cvc5)</li>\n</ul>\n</blockquote>\n<p>CVC4 would be nice to have, but it's not critical in the same way as Z3.</p>\n<p>cvc5 used to crash on Mac, but I'm told by Clark Barrett that with version 1.1.0 they've solved many Mac-specific bugs. I can experiment with it on my Mac and if it seems to work well, we could upgrade to that.</p>\n<blockquote>\n<ul>\n<li>\n<p>nunchaku</p>\n</li>\n<li>\n<p>smbc</p>\n</li>\n</ul>\n</blockquote>\n<p>Nunchaku (and its backend SMBC) never left the experimental stage. Maybe we could move them out of \"HOL\" and mark them more clearly as experimental? I haven't given up all hopes of developing Nunchaku further and indeed just this week I was talking with a candidate about doing this, but it shouldn't block Isabelle releases.</p>\n<blockquote>\n<ul>\n<li>ocaml / opam</li>\n</ul>\n</blockquote>\n<p>Thankfully somebody else's concern. :)</p>\n<p>Jasmin</p>\n<p><a href=\"/user_uploads/14278/FVbsvXWpDETALwdpQutRCfen/smime.p7s\">smime.p7s</a></p>",
+        "id": 421390740,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1707898150
+    },
+    {
+        "content": "<p>From: Lawrence Paulson &lt;<a href=\"mailto:lp15@cam.ac.uk\">lp15@cam.ac.uk</a>&gt;<br>\nSomewhat to my surprise, there seem to be 1004 occurrences of “smt(z3\" in the libraries and repository (I've never allowed it personally). It is outnumbered by verit more than 3 to 1, again a surprisingly low ratio. </p>\n<p>Getting rid of them all would be a tedious business. One day we might consider automated tools to crawl over old the proofs and get rid of ugly things. </p>\n<p>Larry</p>\n<hr>\n<p>isabelle-dev mailing list<br>\n<a href=\"mailto:isabelle-dev@in.tum.de\">isabelle-dev@in.tum.de</a><br>\n<a href=\"https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev\">https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev</a></p>",
+        "id": 421417730,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1707907384
+    },
+    {
+        "content": "<p>From: Jasmin Blanchette &lt;<a href=\"mailto:jasmin.blanchette@ifi.lmu.de\">jasmin.blanchette@ifi.lmu.de</a>&gt;<br>\nHi Larry,</p>\n<p>\"smt(z3\" occurs seldom because z3 is the default for \"smt\", so often it's omitted. (I believe it used to be omitted and now it's explicit.)</p>\n<p>Jasmin</p>\n<p><a href=\"/user_uploads/14278/UKHSECJJ08UMqhisFUUpjr6r/smime.p7s\">smime.p7s</a></p>",
+        "id": 421431502,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1707912612
+    },
+    {
+        "content": "<p>From: Lawrence Paulson &lt;<a href=\"mailto:lp15@cam.ac.uk\">lp15@cam.ac.uk</a>&gt;<br>\nThat picks up a further 428 occurrences <br>\nLarry</p>\n<hr>\n<p>isabelle-dev mailing list<br>\n<a href=\"mailto:isabelle-dev@in.tum.de\">isabelle-dev@in.tum.de</a><br>\n<a href=\"https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev\">https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev</a></p>",
+        "id": 421433445,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1707913410
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nI would say we just leave the status-quo for the Isabelle2024 release, i.e. <br>\nthese tools are implicitly \"experimental\" and there is no arm64-linux support.</p>\n<p>Makarius</p>\n<hr>\n<p>isabelle-dev mailing list<br>\n<a href=\"mailto:isabelle-dev@in.tum.de\">isabelle-dev@in.tum.de</a><br>\n<a href=\"https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev\">https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev</a></p>",
+        "id": 421608626,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1707987863
+    },
+    {
+        "content": "<p>From: Jasmin Blanchette &lt;<a href=\"mailto:jasmin.blanchette@ifi.lmu.de\">jasmin.blanchette@ifi.lmu.de</a>&gt;<br>\nHi Makarius,</p>\n<p>Concerning cvc5: I tried downloading and running cvc5 1.1.1 for arm64 from</p>\n<p><a href=\"https://github.com/cvc5/cvc5/releases/\">https://github.com/cvc5/cvc5/releases/</a></p>\n<p>and I still get errors in Isabelle. For example, adding the line</p>\n<p>sledgehammer[cvc5, mepo, slices=4]</p>\n<p>before line 318 of the file \"$AFP/thys/Given_Clause_Loops/DISCOUNT_Loop.thy\" produces this output (nondeterministically):</p>\n<p>Sledgehammering... <br>\ncvc5 found a proof... <br>\ncvc5 found a proof... <br>\ncvc5 found a proof... <br>\ncvc5 found a proof... <br>\n/tmp/isabelle-jasminblanchette/bash_script1894380443147744112: line 1: 30873 Abort trap: 6           /Users/jasminblanchette/.isabelle/contrib/cvc5-1.1.1/arm64-darwin/cvc5 --decision\\=internal --simplification\\=none --full-saturate-quant --proof-format-mode\\=alethe --proof-granularity\\=dsl-rewrite --no-stats --sat-random-seed\\=1 --lang\\=smt2 --tlimit 219 /tmp/isabelle-jasminblanchette/process10570530194278022654/cache-io-9904226 &gt; /tmp/isabelle-jasminblanchette/process10570530194278022654/cache-io-9904228 2&gt;&amp;1 <br>\n/tmp/isabelle-jasminblanchette/bash_script936180679870508119: line 1: 30876 Abort trap: 6           /Users/jasminblanchette/.isabelle/contrib/cvc5-1.1.1/arm64-darwin/cvc5 --trigger-sel\\=max --full-saturate-quant --proof-format-mode\\=alethe --proof-granularity\\=dsl-rewrite --no-stats --sat-random-seed\\=1 --lang\\=smt2 --tlimit 222 /tmp/isabelle-jasminblanchette/process10570530194278022654/cache-io-9904284 &gt; /tmp/isabelle-jasminblanchette/process10570530194278022654/cache-io-9904286 2&gt;&amp;1 <br>\n/tmp/isabelle-jasminblanchette/bash_script2386389454125518978: line 1: 30882 Abort trap: 6           /Users/jasminblanchette/.isabelle/contrib/cvc5-1.1.1/arm64-darwin/cvc5 --full-saturate-quant --inst-when\\=full-last-call --inst-no-entail --term-db-mode\\=relevant --multi-trigger-linear --proof-format-mode\\=alethe --proof-granularity\\=dsl-rewrite --no-stats --sat-random-seed\\=1 --lang\\=smt2 --tlimit 221 /tmp/isabelle-jasminblanchette/process10570530194278022654/cache-io-9904420 &gt; /tmp/isabelle-jasminblanchette/process10570530194278022654/cache-io-9904422 2&gt;&amp;1 <br>\ncvc5: Try this: by (metis P0A_add_y_formula PYA_add_active_formula state.simps) (130 ms) <br>\ncvc5: Duplicate proof <br>\ncvc5: Duplicate proof <br>\ncvc5: Duplicate proof <br>\nDone</p>\n<p>I don't know what the \"Abort trap\" warnings mean, because the prover seems to succeed nevertheless. I need to investigate. But I don't get these errors with CVC4.</p>\n<p>Jasmin</p>\n<p><a href=\"/user_uploads/14278/fQSSUPAOBWDa8JDJbknraix1/smime.p7s\">smime.p7s</a></p>",
+        "id": 421657498,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1708005089
+    },
+    {
+        "content": "<p>From: Jasmin Blanchette &lt;<a href=\"mailto:jasmin.blanchette@ifi.lmu.de\">jasmin.blanchette@ifi.lmu.de</a>&gt;<br>\nHi all,</p>\n<p>I've investigated further. The issue is hard to debug. It seems to arise only when minimizing proofs (where we call the solver repeatedly on often unprovable problems) and only when at least two solvers are run in parallel (i.e., when invoking Sledgehammer with \"slices=2\" or above).</p>\n<p>I thought I might make some progress by replacing the \"cvc5\" binary with this script:</p>\n<p>#!/bin/bash<br>\n    cp ${!#} \"$(mktemp /tmp/foo.XXXXXXXXX).smt\"<br>\n    /Users/jasminblanchette/.isabelle/contrib/cvc5-1.1.1/arm64-darwin/cvc5.bin $@</p>\n<p>where \"cvc5.bin\" is the ARM64 Darwin cvc5 binary. But then the issue doesn't arise anymore!</p>\n<p>As far as I can tell, the issue only arises with unprovable (sat) problems anyway, and it happens in such a way that it doesn't affect the workings of Sledgehammer. What's annoying is the yellow warning message in Isabelle/jEdit.</p>\n<p>It looks like we can suppress the yellow message by writing a small wrapper script like the above (but using the proper idiom for retrieving the path of \"cvc5.bin\"). Is that what we should do? It would be great to leave CVC4 behind and to move to cvc5.</p>\n<p>Jasmin</p>\n<p><a href=\"/user_uploads/14278/bnCX9qnaQ9qJu_r7mxMIPQq_/smime.p7s\">smime.p7s</a></p>",
+        "id": 421865509,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1708092630
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nThat could be some odd effect from switching between Intel and ARM on macOS, <br>\nmaybe caused by our bash_process wrapper (which is for Intel in <br>\nIsabelle/0f01c575ff3e).</p>\n<p>Apart from that, are you satisfied with cvc5-1.1.1? Does everything work with <br>\nthe current Intel setup?</p>\n<p>If so, I will see how to change our process wrappers such that everything <br>\nworks again on all platforms.</p>\n<p>Makarius</p>\n<hr>\n<p>isabelle-dev mailing list<br>\n<a href=\"mailto:isabelle-dev@in.tum.de\">isabelle-dev@in.tum.de</a><br>\n<a href=\"https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev\">https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev</a></p>",
+        "id": 421869929,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1708094055
+    },
+    {
+        "content": "<p>From: Florian Haftmann &lt;<a href=\"mailto:florian.haftmann@informatik.tu-muenchen.de\">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>\nHi all,</p>\n<p>just my 5 cent: the certificates are helpful, but strictly relying on <br>\nthem in distribution or AFP rules out people having no access to certain <br>\nprovers to do work requiring potentially pervasive maintenance of proofs.</p>\n<p>Cheers,<br>\n    Florian</p>\n<p><a href=\"/user_uploads/14278/GYnJT3mWlJH4N1la5bDpYINT/OpenPGP_0xA707172232CFA4E9.asc\">OpenPGP_0xA707172232CFA4E9.asc</a><br>\n<a href=\"/user_uploads/14278/b-yMafNzeU5Jkjk5dHTdqp8L/OpenPGP_signature.asc\">OpenPGP_signature.asc</a></p>",
+        "id": 421994023,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1708159662
+    },
+    {
+        "content": "<p>From: Jasmin Blanchette &lt;<a href=\"mailto:jasmin.blanchette@ifi.lmu.de\">jasmin.blanchette@ifi.lmu.de</a>&gt;<br>\nHi Makarius,</p>\n<p>I'm very satisfied with cvc5. I ran an evaluation on hundreds of goals from the AFP and the success rate went up from 52% for CVC4 to 64% for cvc5.</p>\n<p>Jasmin</p>\n<p><a href=\"/user_uploads/14278/XxK5j8f4WaRUmC-U-lhdFuT6/smime.p7s\">smime.p7s</a></p>",
+        "id": 422216982,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1708343470
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nOK, so here is the cvc5-1.1.1 component for further testing: <br>\n<a href=\"https://isabelle-dev.sketis.net/rISABELLEf8fb4384180e\">https://isabelle-dev.sketis.net/rISABELLEf8fb4384180e</a></p>\n<p>I only made some basic tests with sledgehammer in <br>\nsrc/HOL/Metis_Examples/Big_O.thy --- it looks fine so far on all platforms.</p>\n<p>Note that arm64-linux is still missing from <br>\n<a href=\"https://github.com/cvc5/cvc5/releases/tag/cvc5-1.1.1\">https://github.com/cvc5/cvc5/releases/tag/cvc5-1.1.1</a></p>\n<p>They claim that ARM64 is supported via cross compilation here: <br>\n<a href=\"https://github.com/cvc5/cvc5/blob/main/INSTALL.rst\">https://github.com/cvc5/cvc5/blob/main/INSTALL.rst</a> --- but they don't provide <br>\nbinaries for download.</p>\n<p>Maybe you can motivate the cvc5 guys to complete their set of downloads --- to <br>\navoid \"debianization\" of this otherwise great tool --- meaning bad builds that <br>\nappear to work superficially.</p>\n<p>Makarius</p>\n<hr>\n<p>isabelle-dev mailing list<br>\n<a href=\"mailto:isabelle-dev@in.tum.de\">isabelle-dev@in.tum.de</a><br>\n<a href=\"https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev\">https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev</a></p>",
+        "id": 424118081,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1709244727
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nNow I've found the problem report, that I was looking for, but too late: The <br>\ncvc5 distribution of Isabelle/f8fb4384180e has the same problem (it uses the <br>\n\"static\" versions).</p>\n<p>I've also updated all bash_process executables already in a861b0df74b4, now <br>\nwith native arm64-darwin. This does not help here.</p>\n<p>Makarius</p>\n<hr>\n<p>isabelle-dev mailing list<br>\n<a href=\"mailto:isabelle-dev@in.tum.de\">isabelle-dev@in.tum.de</a><br>\n<a href=\"https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev\">https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev</a></p>",
+        "id": 424119744,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1709245433
+    },
+    {
+        "content": "<p>From: Haniel Barbosa &lt;<a href=\"mailto:hbarbosa@dcc.ufmg.br\">hbarbosa@dcc.ufmg.br</a>&gt;<br>\nHello,</p>\n<p>FYI inspired by this thread we started to look into adding arm64 into<br>\nour CI pipeline so we can provide this binary for users. Unclear when<br>\nthat'll materialize though.</p>\n<p>Best,</p>\n<p>Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt; writes:</p>",
+        "id": 424293405,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1709313724
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nHaniel,</p>\n<p>can you point to the place in the cvc5 repository (or elsewhere) where the <br>\nbuild happens? For now I could imitate that manually, e.g. on my own ARM64 <br>\nLinux node together with docker.</p>\n<p>Makarius</p>\n<hr>\n<p>isabelle-dev mailing list<br>\n<a href=\"mailto:isabelle-dev@in.tum.de\">isabelle-dev@in.tum.de</a><br>\n<a href=\"https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev\">https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev</a></p>",
+        "id": 424300967,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1709316545
+    },
+    {
+        "content": "<p>From: Haniel Barbosa &lt;<a href=\"mailto:hbarbosa@dcc.ufmg.br\">hbarbosa@dcc.ufmg.br</a>&gt;<br>\nMakarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt; writes:</p>\n<blockquote>\n<p>On 01/03/2024 18:21, Haniel Barbosa wrote:</p>\n<blockquote>\n<p>FYI inspired by this thread we started to look into adding arm64<br>\ninto<br>\nour CI pipeline so we can provide this binary for users. Unclear when<br>\nthat'll materialize though.</p>\n</blockquote>\n<p>Haniel,</p>\n<p>can you point to the place in the cvc5 repository (or elsewhere) where<br>\nthe build happens? For now I could imitate that manually, e.g. on my<br>\nown ARM64 Linux node together with docker.</p>\n</blockquote>\n<p>I'm not sure if I understand the question. The build system is based<br>\non cmake and the code for it is here:</p>\n<p><a href=\"https://github.com/cvc5/cvc5/tree/main/cmake\">https://github.com/cvc5/cvc5/tree/main/cmake</a></p>\n<p>There are a number of builds that happen during CI at GitHub that are<br>\nhandled via the code here:</p>\n<p><a href=\"https://github.com/cvc5/cvc5/tree/main/.github/actions\">https://github.com/cvc5/cvc5/tree/main/.github/actions</a></p>\n<p>There are also a number of builds that we run nightly but that is via<br>\na private server (the binaries to download are generated from those,<br>\nand it's to that we will try to add arm64 builds).</p>\n<p>If you have specific questions about it, the best is to use<br>\n<a href=\"https://github.com/cvc5/cvc5/discussions\">https://github.com/cvc5/cvc5/discussions</a>, where everybody in the team<br>\nwill see it (I myself am no expert on the cvc5 build system hehe).</p>\n<p>Best,</p>\n<blockquote>\n<p>Makarius</p>\n</blockquote>",
+        "id": 424327949,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1709328249
+    },
+    {
+        "content": "<p>From: Haniel Barbosa &lt;<a href=\"mailto:hbarbosa@dcc.ufmg.br\">hbarbosa@dcc.ufmg.br</a>&gt;<br>\nHello,</p>\n<p>I'm happy to report that we got this working now (thanks to Daniel<br>\nLarraz):</p>\n<p><a href=\"https://github.com/cvc5/cvc5/releases/tag/latest\">https://github.com/cvc5/cvc5/releases/tag/latest</a></p>\n<p>Best,</p>\n<p>Haniel Barbosa &lt;<a href=\"mailto:hbarbosa@dcc.ufmg.br\">hbarbosa@dcc.ufmg.br</a>&gt; writes:</p>",
+        "id": 427817899,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1710885218
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nMany thanks.</p>\n<p>I have tried it out briefly on all Isabelle platforms, see also <br>\n<a href=\"https://isabelle-dev.sketis.net/rISABELLE67d28b35c5d8\">https://isabelle-dev.sketis.net/rISABELLE67d28b35c5d8</a> --- cvc5-latest versions <br>\nchange quickly, so that precise version has disappeared already.</p>\n<p>The arm64-linux version basically works on my 2 test machines: virtual Ubuntu <br>\n22.04 and physical Raspberry PI with an old version of Debian.</p>\n<p>I did see a few crashes, though, when several cvc5 processes are running <br>\nconcurrently. Maybe that is the same crash that Jasmin has observed on <br>\narm64-darwin: I am including a test example as changeset for AFP. That can be <br>\nreproduced with the Isabelle component \"cvc5-1.1.1\" (e.g. edited into <br>\nAdmin/components/main followed by \"Admin/init\").</p>\n<p>Makarius</p>\n<p><a href=\"/user_uploads/14278/c9jV6ssXv8EEfzCUwbARB6xK/ch-cvc5-Abort_trap_6\">ch-cvc5-Abort_trap_6</a></p>",
+        "id": 428089749,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1711014451
+    }
+]

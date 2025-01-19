@@ -1,0 +1,38 @@
+[
+    {
+        "content": "<p>Is it possible to use the 'value' command on Imperative-HOL constructs? I have:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"n\">ImpPlay</span>\n<span class=\"w\">  </span><span class=\"kp\">imports</span><span class=\"w\"> </span><span class=\"s\">\"HOL-Imperative_HOL.Imperative_HOL_ex\"</span>\n<span class=\"k\">begin</span>\n\n<span class=\"kt\">value</span><span class=\"w\"> </span><span class=\"s\">\"execute example Heap.empty\"</span>\n\n<span class=\"k\">end</span>\n</code></pre></div>\n<p>but the value line gives:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"n\">exception</span><span class=\"w\"> </span><span class=\"n\">Fail</span><span class=\"w\"> </span><span class=\"n\">raised</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">line</span><span class=\"w\"> </span><span class=\"n\">211</span><span class=\"w\"> </span><span class=\"n\">of</span><span class=\"w\"> </span><span class=\"s\">\"generated code\"</span><span class=\"o\">):</span><span class=\"w\"> </span><span class=\"n\">Heap_Monad.execute</span>\n</code></pre></div>",
+        "id": 431459330,
+        "sender_full_name": "Mark Wassell",
+        "timestamp": 1712300774
+    },
+    {
+        "content": "<p>I think that execution only makes sense when exporting the code and executing it outside. The alternative is to do it with simp:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">lemma</span><span class=\"w\"> </span><span class=\"s\">\"execute example Heap.empty = A\"</span>\n<span class=\"w\">  </span><span class=\"kp\">apply</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">simp</span><span class=\"w\"> </span><span class=\"n\">add</span><span class=\"o\">:</span><span class=\"w\"> </span><span class=\"n\">example_def</span><span class=\"w\"> </span><span class=\"n\">Array.make_def</span><span class=\"w\"> </span><span class=\"n\">execute_bind_case</span><span class=\"w\"> </span><span class=\"n\">execute_heap</span><span class=\"w\"> </span><span class=\"n\">Array.alloc_def</span><span class=\"w\"> </span><span class=\"n\">Let_def</span>\n<span class=\"w\">      </span><span class=\"n\">Imperative_Reverse.rev.simps</span><span class=\"w\"> </span><span class=\"n\">execute_upd</span><span class=\"w\"> </span><span class=\"n\">Imperative_Reverse.swap.simps</span><span class=\"w\"> </span><span class=\"n\">execute_nth</span><span class=\"w\"> </span><span class=\"n\">Array.length_def</span>\n<span class=\"w\">      </span><span class=\"n\">split</span><span class=\"o\">:</span><span class=\"w\"> </span><span class=\"n\">option.splits</span><span class=\"o\">)</span>\n</code></pre></div>\n<p>(Yes this is annoying, but the entire point of Imperative_HOL is the imperative execution that you cannot do directly)</p>",
+        "id": 431492604,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1712311988
+    },
+    {
+        "content": "<p>The following does work for <code>example</code> being some expression of type <code>'a heap</code>:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kt\">ML_val</span><span class=\"w\"> </span><span class=\"s\">‹@{code example} ()›</span>\n</code></pre></div>\n<p>Of course, that gives the result as an ML value and not a HOL term, but that might be enough. For non-\"heapy\" result types one could probably wrap the result in a <code>Code_Evaluation.term_of</code> and then interpret the resulting ML value as a HOL value, similar to what the <code>value</code> command normally does. But I'm not sure how that would work for e.g. functions that return an array or a pointer. It probably doesn't.</p>",
+        "id": 431515811,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1712320908
+    },
+    {
+        "content": "<p>Well I guess you can just convert that array to a list to print it… The following kind of works:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">definition</span><span class=\"w\"> </span><span class=\"s\">\"example2 = do {</span>\n<span class=\"s\">    a ← Array.of_list ([42, 2, 3, 5, 0, 1705, 8, 3, 15] :: nat list);</span>\n<span class=\"s\">    xs ← Array.freeze a;</span>\n<span class=\"s\">    return (Code_Evaluation.term_of xs)</span>\n<span class=\"s\">  }\"</span>\n\n\n<span class=\"k\">ML</span><span class=\"w\"> </span><span class=\"s\">‹</span>\n<span class=\"s\">  val _ = @{code example2} () |&gt; Syntax.pretty_term @{context} |&gt; Pretty.writeln</span>\n<span class=\"s\">›</span>\n</code></pre></div>\n<p>Output:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"o\">[</span><span class=\"n\">nat_of_integer</span><span class=\"w\"> </span><span class=\"n\">42</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"n\">nat_of_integer</span><span class=\"w\"> </span><span class=\"n\">2</span><span class=\"o\">,</span>\n<span class=\"w\"> </span><span class=\"n\">nat_of_integer</span><span class=\"w\"> </span><span class=\"n\">3</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"n\">nat_of_integer</span><span class=\"w\"> </span><span class=\"n\">5</span><span class=\"o\">,</span>\n<span class=\"w\"> </span><span class=\"n\">nat_of_integer</span><span class=\"w\"> </span><span class=\"n\">0</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"n\">nat_of_integer</span><span class=\"w\"> </span><span class=\"n\">1705</span><span class=\"o\">,</span>\n<span class=\"w\"> </span><span class=\"n\">nat_of_integer</span><span class=\"w\"> </span><span class=\"n\">8</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"n\">nat_of_integer</span><span class=\"w\"> </span><span class=\"n\">3</span><span class=\"o\">,</span>\n<span class=\"w\"> </span><span class=\"n\">nat_of_integer</span><span class=\"w\"> </span><span class=\"n\">15</span><span class=\"o\">]</span>\n</code></pre></div>",
+        "id": 431517623,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1712321503
+    },
+    {
+        "content": "<p>Not quite as nice at what <code>value</code> would give you because the <code>code_proc</code> rules are not applied. One could probably fix up something that does this a bit more automatically and wrap it in a <code>value_imp</code> command or something. Or perhaps even an alternative evaluator for the normal <code>value</code> command.</p>",
+        "id": 431517764,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1712321552
+    },
+    {
+        "content": "<p>Quite possibly one could even tweak the normal <code>value</code> command to do something like this.</p>",
+        "id": 431517965,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1712321619
+    }
+]

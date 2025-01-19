@@ -1,0 +1,43 @@
+<html>
+<head><meta charset="utf-8"><title>Illegal fixed variable error · Isabelle/ML · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle/ML/index.html">Isabelle/ML</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle/ML/topic/Illegal.20fixed.20variable.20error.html">Illegal fixed variable error</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="235864259"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Illegal%20fixed%20variable%20error/near/235864259" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Ricardo Correia <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle/ML/topic/Illegal.20fixed.20variable.20error.html#235864259">(Apr 23 2021 at 15:49)</a>:</h4>
+<p>I'm using Isabelle 2019 and I'm trying to debug an error in Why3's Isabelle/ML code but I'm having some difficulties understanding what's happening.</p>
+<p>As far as I understand, the code is trying to add an axiom with multiple facts to the theory, something equivalent to this:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">typedef</span> <span class="n">foo</span>
+
+<span class="k">axiomatization</span> <span class="n">baz_1</span><span class="o">:</span> <span class="s">"(x::foo) = (y::foo)"</span> <span class="kp">and</span> <span class="n">baz_2</span><span class="o">:</span> <span class="s">"(y::foo) = (x::foo)"</span>
+<span class="k">lemmas</span> <span class="n">baz</span> <span class="o">=</span> <span class="n">baz_1</span> <span class="n">baz_2</span>
+</code></pre></div>
+<p>This is the code that is adding the facts to the theory:</p>
+<div class="codehilite" data-code-language="Standard ML"><pre><span></span><code><span class="kr">fun</span> <span class="nf">add_axioms</span> <span class="n">s</span> <span class="p">[</span><span class="n">t</span><span class="p">]</span> <span class="p">=</span>
+      <span class="nn">Specification</span><span class="p">.</span><span class="n">axiom</span> <span class="p">((</span><span class="n">fact_binding</span> <span class="n">s</span><span class="p">,</span> <span class="p">[]),</span> <span class="n">t</span><span class="p">)</span> <span class="n">#&gt;</span> <span class="n">snd</span>
+  <span class="p">|</span> <span class="nf">add_axioms</span> <span class="n">s</span> <span class="n">ts</span> <span class="p">=</span>
+      <span class="n">fold_map</span> <span class="nn">Specification</span><span class="p">.</span><span class="n">axiom</span>
+        <span class="p">(</span><span class="n">map_index</span> <span class="p">(</span><span class="kr">fn</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">t</span><span class="p">)</span> <span class="p">=&gt;</span>
+           <span class="p">((</span><span class="n">fact_binding</span> <span class="p">(</span><span class="n">s</span> <span class="n">^</span> <span class="s2">"_"</span> <span class="n">^</span> <span class="n">string_of_int</span> <span class="p">(</span><span class="n">i</span> <span class="n">+</span> <span class="mi">1</span><span class="p">)),</span> <span class="p">[]),</span> <span class="n">t</span><span class="p">))</span> <span class="n">ts</span><span class="p">)</span> <span class="n">#&gt;</span>
+      <span class="n">apfst</span> <span class="p">(</span><span class="n">pair</span> <span class="p">(</span><span class="n">fact_binding</span> <span class="n">s</span><span class="p">)</span> <span class="n">#&gt;</span> <span class="n">rpair</span> <span class="p">[]</span> <span class="n">#&gt;</span> <span class="n">single</span><span class="p">)</span> <span class="n">#&gt;</span>
+      <span class="n">uncurry</span> <span class="nn">Global_Theory</span><span class="p">.</span><span class="n">add_thmss</span> <span class="n">#&gt;</span> <span class="n">snd</span><span class="p">;</span>
+</code></pre></div>
+<p>This seems to work fine in this situation, but if I replace <code>foo</code> with <code>'a foo</code>, then <code>Global_Theory.add_thmss</code> fails with <code>Illegal fixed variable: "'a"</code>. Unfortunately, I'm just a beginner Isabelle user so I don't know what this means.</p>
+<p>I've traced the code to print the first argument to <code>add_thmss</code> and this is the result (with <code>declare [[show_types]]</code>):</p>
+<div class="codehilite" data-code-language="Standard ML"><pre><span></span><code><span class="p">[((</span><span class="s2">"facts.baz"</span><span class="p">,</span> <span class="p">[</span><span class="s2">"(?y::'a ??.Why3_Setup.g.foo) = (?x::'a ??.Why3_Setup.g.foo)"</span><span class="p">,</span> <span class="s2">"(?x::'a ??.Why3_Setup.g.foo) = (?y::'a ??.Why3_Setup.g.foo)"</span><span class="p">]),</span> <span class="p">[])]</span>
+</code></pre></div>
+<p>Which is almost exactly what is passed as the first argument to <code>add_thmss</code> when foo doesn't have a type variable, except for the added <code>'a</code>. So I'm really lost as to why <code>add_thmss</code> is failing when the axiom has a type variable.</p>
+<p>Just to see what would happen, I've tried to call <code>Global_Theory.note_thms</code> instead of <code>add_thmss</code> but I run into the same error.</p>
+<p>I think the error in <code>add_thmss</code> is coming from <code>Logic.unvarify_global</code> (which calls <code>Logic.bad_fixed</code>) but unfortunately I don't understand what the code is doing or even exactly what a fixed variable is in this context, or why it would be illegal.</p>
+<p>Does anyone know how this can be fixed?</p>
+
+
+
+<hr><p>Last updated: Jul 15 2022 at 23:21 UTC</p>
+</html>

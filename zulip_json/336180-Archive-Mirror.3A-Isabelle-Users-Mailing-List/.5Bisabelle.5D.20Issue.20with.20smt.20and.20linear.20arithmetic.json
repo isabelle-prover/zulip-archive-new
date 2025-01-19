@@ -1,0 +1,32 @@
+[
+    {
+        "content": "<p>From: Lukas Bulwahn &lt;<a href=\"mailto:lukas.bulwahn@gmail.com\">lukas.bulwahn@gmail.com</a>&gt;<br>\nDear Isabelle developers,</p>\n<p>in my latest Isabelle formalization, I stumbled upon an<br>\nissue with the linear arithmetic method that the smt method<br>\ninternally uses.</p>\n<p>I am especially reporting this as this tool asks me to do<br>\nso with this warning:<br>\nLinear arithmetic should have refuted the assumptions.<br>\nPlease inform Tobias Nipkow.</p>\n<p>As it is unclear to me as an user, which tool is to <code>blame</code>,<br>\nI must leave it to you, Jasmin, Sascha and Tobias, to find the<br>\ndetails of tool interaction below.</p>\n<p>The following theory fragment shows the issue I encountered<br>\nin Isabelle2016 (on Windows 10), but I could not test it<br>\non a recent Isabelle developer version yet:</p>\n<p>›</p>\n<p>theory Issue imports Transcendental<br>\nbegin</p>\n<p>text ‹<br>\nFirst, here is the original formulation of the lemma as I encountered the issue.<br>\nSledgehammer found the smt proof, but smt then fails.<br>\n›<br>\nlemma sin_diff_minus:<br>\n  assumes \"0 ≤ x\" \"x ≤ y\" \"y ≤ 2 * pi\"<br>\n  shows \"sin ((x - y) / 2) = - sin ((y - x) / 2)\"<br>\n  apply (smt minus_divide_left sin_minus)<br>\n  oops</p>\n<p>text ‹<br>\nIn fact, the assumptions are not required for the proof<br>\nand the issue can be reproduced in a slightly smaller<br>\nlemma without the use of assumptions.<br>\n›</p>\n<p>lemma sin_diff_minus:<br>\n  fixes x y :: real<br>\n  shows \"sin ((x - y) / 2) = - sin ((y - x) / 2)\"<br>\n  apply (smt minus_divide_left sin_minus)<br>\n  oops</p>\n<p>text ‹<br>\nFortunately, an alternative proof is quickly found.<br>\nThe lemma is proved with a few simplification steps.<br>\n›</p>\n<p>lemma sin_diff_minus:<br>\n  fixes x y :: real<br>\n  shows \"sin ((x - y) / 2) = - sin ((y - x) / 2)\"<br>\nby (simp only: sin_minus[symmetric] minus_divide_left minus_diff_eq)</p>\n<p>end</p>",
+        "id": 294681043,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661176738
+    },
+    {
+        "content": "<p>From: Tobias Nipkow &lt;<a href=\"mailto:nipkow@in.tum.de\">nipkow@in.tum.de</a>&gt;<br>\nThis is a known problem in linear arithmetic but I haven't gotten around to <br>\ntracking it down.</p>\n<p>Tobias<br>\n<a href=\"/user_uploads/14278/N0BoCNBpOxt8AD3_-gIC1G-g/smime.p7s\">smime.p7s</a></p>",
+        "id": 294681066,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661176746
+    },
+    {
+        "content": "<p>From: Sascha Böhme &lt;<a href=\"mailto:boehmes@in.tum.de\">boehmes@in.tum.de</a>&gt;<br>\nHi Lukas,</p>\n<p>linarith works as follows: Based on a decomposition of the original problem into a set of linear inequalities, it tries to find a refutation for them. The trace for the refutation is used to replay the steps, which should yield the Theorem False in the end. Proof replay essentially applies the simplifier with a carefully selected simpset. Whenever the final theorem differs from False, the warning you noticed is shown.</p>\n<p>In your particular case, the obvious simplification for „(2x +2y) / 2“ is not performed, because some rule or simproc is missing in linarith’s simpset. Extending the simpset appropriately would be a solution. I’ll see what I can do, such that your issue is resolved in the next release of Isabelle.</p>\n<p>Cheers,<br>\nSascha</p>\n<p>Von: Lukas Bulwahn</p>",
+        "id": 294681102,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661176757
+    },
+    {
+        "content": "<p>From: Lawrence Paulson &lt;<a href=\"mailto:lp15@cam.ac.uk\">lp15@cam.ac.uk</a>&gt;<br>\nThis precise sort of thing has always annoyed me. I was under the impression that we could perform such simplifications (when there is a gcd; simply distributing the /2 is trivial), but upon looking, it seems that no such simprocs ever existed.</p>\n<p>Larry</p>",
+        "id": 294681120,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661176762
+    },
+    {
+        "content": "<p>From: Tobias Nipkow &lt;<a href=\"mailto:nipkow@in.tum.de\">nipkow@in.tum.de</a>&gt;<br>\nThank you for the analysis, Sascha. Your suggestion for solving the problem <br>\nwould indeed be welcome. The core of the problem is that we don't have a <br>\ncompleteness result about what our arithmetic simplification procedures do. They <br>\ndo what they do.</p>\n<p>In this particular case the problem comes from the fact that although linear <br>\narithmetic dutifully multiplies the inequations by 2 to get rid of the /2, the <br>\neffect is not what is intended: 2*(x+y)/2 is not simplified to x+y, instead the <br>\n2 is pulled inside. This is in contrast to 2*x/2, which is simplified to x.<br>\nThe problem here is that although there is a simproc that simplifies 2*(x+y)/2 <br>\nto x+y, it cannot do its job because distributivity kicks in first. [In case you <br>\nwonder if linear arithmetic needs distributivity, it does: you cannot even build <br>\nHOL if you remove distributivity from the linear arithmetic setup.]</p>\n<p>Tobias<br>\n<a href=\"/user_uploads/14278/0xu9iLdFXh9rl55F3g-yWQUI/smime.p7s\">smime.p7s</a></p>",
+        "id": 294681139,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661176770
+    }
+]
