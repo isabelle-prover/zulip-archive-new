@@ -1,0 +1,38 @@
+[
+    {
+        "content": "<p>Hi again,</p>\n<p>I've been getting great help here, so here's another problem I've ran into.</p>\n<p>I have been working towards proving a behavior that executes an HTTP request, so proving the serialization and deserialization of the data has been a main component of that. What I'm running into now is that a theorem that I've proven for <code>nat</code> is not being used to simplify a record that contains a <code>nat</code> value. Here's what I mean:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">type_synonym</span> <span class=\"n\">http_data</span> <span class=\"o\">=</span> <span class=\"n\">string</span>\n\n<span class=\"k\">record</span> <span class=\"n\">order</span> <span class=\"o\">=</span>\n  <span class=\"n\">amount</span> <span class=\"o\">::</span> <span class=\"n\">nat</span>\n\n<span class=\"k\">fun</span> <span class=\"n\">deserialize</span> <span class=\"o\">::</span> <span class=\"s\">\"http_data ⇒ order\"</span> <span class=\"kp\">where</span>\n<span class=\"s\">\"deserialize d = ⦇ amount = (nat_of_string d) ⦈\"</span>\n\n<span class=\"k\">fun</span> <span class=\"n\">serialize</span> <span class=\"o\">::</span> <span class=\"s\">\"order ⇒ http_data\"</span> <span class=\"kp\">where</span>\n<span class=\"s\">\"serialize ord = string_of_nat (amount ord)\"</span>\n\n<span class=\"c\">(* This theorem has been successfully proven *)</span>\n<span class=\"kn\">theorem</span> <span class=\"n\">ser_deser</span><span class=\"o\">:</span> <span class=\"s\">\"nat_of_string (string_of_nat n) = n\"</span>\n</code></pre></div>\n<p>I would then expect to be able to prove this as follows:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">lemma</span> <span class=\"s\">\"deserialize (serialize order) = order\"</span>\n  <span class=\"kp\">apply</span><span class=\"o\">(</span><span class=\"n\">cases</span> <span class=\"n\">order</span><span class=\"o\">)</span>\n  <span class=\"kp\">apply</span><span class=\"o\">(</span><span class=\"n\">simp</span> <span class=\"n\">add</span><span class=\"o\">:</span> <span class=\"n\">ser_deser</span><span class=\"o\">)</span>\n</code></pre></div>\n<p>This leaves me with the following goal:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code> <span class=\"n\">1</span><span class=\"ow\">.</span> <span class=\"err\">⋀</span><span class=\"n\">amount.</span>\n       <span class=\"n\">order</span> <span class=\"o\">=</span> <span class=\"err\">⦇</span><span class=\"n\">amount</span> <span class=\"o\">=</span> <span class=\"n\">amount</span><span class=\"err\">⦈</span> <span class=\"err\">⟹</span>\n       <span class=\"n\">nat_of_string</span> <span class=\"o\">(</span><span class=\"n\">map</span> <span class=\"n\">char_of</span> <span class=\"o\">(</span><span class=\"n\">digit_list</span> <span class=\"n\">amount</span><span class=\"o\">))</span> <span class=\"o\">=</span> <span class=\"n\">amount</span>\n</code></pre></div>\n<p>The <code>map char_of ...</code> is part of the definition of <code>string_of_nat</code>, but I was hoping that the simplifier would see <code>nat_of_string (string_of_nat amount)</code> and simplify that to <code>amount</code>, especially since I specified <code>ser_deser</code> as a simplification rule.</p>\n<p>Is there something obvious to do here to discharge the goal, or are there some gotchas with using records?</p>",
+        "id": 262710545,
+        "sender_full_name": "Alex Weisberger",
+        "timestamp": 1637849794
+    },
+    {
+        "content": "<p>The problem is that string_of_nat is automatically unfolded to \"map char_of\" by the simplifier before using ser_deser. Not unfolding string_of_nat  with \"simp del: string_of_nat.simps\" should do the trick.</p>",
+        "id": 262710842,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1637849955
+    },
+    {
+        "content": "<p>That is exactly the issue - ok. I'm definitely understanding a bit more what gets automatically applied and what should be added / removed explicitly. Thanks so much!</p>",
+        "id": 262712251,
+        "sender_full_name": "Alex Weisberger",
+        "timestamp": 1637850723
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"459086\">Alex Weisberger</span> has marked this topic as resolved.</p>",
+        "id": 262712520,
+        "sender_full_name": "Notification Bot",
+        "timestamp": 1637850875
+    },
+    {
+        "content": "<p>All the rules in the simp set get used for rewriting by the simplifier (i.e. <code>simp</code>, <code>auto</code>, <code>force</code>, <code>fastforce</code>) automatically. The <code>fun</code> and <code>primrec</code> commands add all the definitional rules that they create to the simpset by default. Other definitional commands (like <code>definition</code>, <code>inductive</code>) do not. This is because that is usually the kind of behaviour that you want: If you do a non-recursive definition, you are introducing that definition as a reason (to hide complexity). If you define a recursive function, you usually want the simplifier to break down things automatically.</p>",
+        "id": 262712738,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1637851022
+    },
+    {
+        "content": "<p>That's a great point about a non-recursive function hiding complexity. I went and changed both <code>string_of_nat</code> and <code>serialize</code> to definitions. Then I was able to prove via:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">theorem</span> <span class=\"s\">\"deserialize (serialize order) = order\"</span>\n  <span class=\"kp\">apply</span><span class=\"o\">(</span><span class=\"n\">cases</span> <span class=\"n\">order</span><span class=\"o\">)</span>\n  <span class=\"kp\">apply</span><span class=\"o\">(</span><span class=\"n\">simp</span> <span class=\"n\">add</span><span class=\"o\">:</span> <span class=\"n\">serialize_def</span><span class=\"o\">)</span>\n  <span class=\"k\">done</span>\n</code></pre></div>",
+        "id": 262716721,
+        "sender_full_name": "Alex Weisberger",
+        "timestamp": 1637852936
+    }
+]

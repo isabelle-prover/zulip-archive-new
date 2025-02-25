@@ -1,0 +1,128 @@
+[
+    {
+        "content": "<p>Hi! Is there a way to focus the simplifier on part of the current subgoal's conclusion? Say my goal  has the shape <code>a0 OP a1</code> with <code>a1</code> being a very complex term which however doesn't matter yet at the stage of the proof. How could I tell the simplifier to only simplify <code>a0</code>, _but_ take into account the subgoals premises as usual? And, as a variant, how could I tell the simplifier to ignore _some_ assumptions? The current <code>simp (no_asm_use)</code> only switches between using all and ignoring all.</p>",
+        "id": 351998609,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1682229035
+    },
+    {
+        "content": "<p>Currently, this is unfortunately not possible. You could use Rewrite in HOL-Library, but that tatctic only applies a single equation.</p>",
+        "id": 352036576,
+        "sender_full_name": "Lukas Stevens",
+        "timestamp": 1682246196
+    },
+    {
+        "content": "<p>It shouldn't be too hard to modify the rewrite tactic to use the simplifier, though.</p>",
+        "id": 352038264,
+        "sender_full_name": "Lukas Stevens",
+        "timestamp": 1682246892
+    },
+    {
+        "content": "<p>Thank you Lukas, I'll have a look.</p>",
+        "id": 352105281,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1682272972
+    },
+    {
+        "content": "<p>Can one perhaps abstract the conclusion to a generic function application with the single argument being the sub-term to be simplified, then simplify this abstracted goal, and finally transform back into the original goal by instantiating the function accordingly?</p>",
+        "id": 352106219,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1682273391
+    },
+    {
+        "content": "<p>The SMT method is doing things like that internally a lot for speed. For example, the following from <code>~~src/HOL/Tools/SMT/z3_replay_methods.ML</code>) ignores everything that is not an arithmetic term:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">fun</span><span class=\"w\"> </span><span class=\"n\">arith_th_lemma</span><span class=\"w\"> </span><span class=\"n\">ctxt</span><span class=\"w\"> </span><span class=\"n\">thms</span><span class=\"w\"> </span><span class=\"n\">t</span><span class=\"w\"> </span><span class=\"o\">=</span>\n<span class=\"w\">  </span><span class=\"n\">SMT_Replay_Methods.prove_abstract</span><span class=\"w\"> </span><span class=\"n\">ctxt</span><span class=\"w\"> </span><span class=\"n\">thms</span><span class=\"w\"> </span><span class=\"n\">t</span><span class=\"w\"> </span><span class=\"n\">arith_th_lemma_tac</span><span class=\"w\"> </span><span class=\"o\">(</span>\n<span class=\"w\">    </span><span class=\"n\">fold_map</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">SMT_Replay_Methods.abstract_arith</span><span class=\"w\"> </span><span class=\"n\">ctxt</span><span class=\"w\"> </span><span class=\"n\">o</span><span class=\"w\"> </span><span class=\"n\">dest_thm</span><span class=\"o\">)</span><span class=\"w\"> </span><span class=\"n\">thms</span><span class=\"w\"> </span><span class=\"n\">##&gt;&gt;</span>\n<span class=\"w\">    </span><span class=\"n\">SMT_Replay_Methods.abstract_arith</span><span class=\"w\"> </span><span class=\"n\">ctxt</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">dest_prop</span><span class=\"w\"> </span><span class=\"n\">t</span><span class=\"o\">))</span>\n</code></pre></div>\n<p>but I don't know how useful this would be for you.</p>",
+        "id": 352161670,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1682312426
+    },
+    {
+        "content": "<p>Interesting, thanks Mathias! I will have a look and see if/how it could be adapted</p>",
+        "id": 352163238,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1682313037
+    },
+    {
+        "content": "<p>What about ignoring some assumptions? In some situations close to finishing a goal, I can just filter out irrelevant premises, but generally, I'd like to tell the simplifier to ignore some assumptions, but not remove them</p>",
+        "id": 352163519,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1682313142
+    },
+    {
+        "content": "<p>you could abstract them away too</p>",
+        "id": 352164106,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1682313390
+    },
+    {
+        "content": "<p>or <code>Subgoal.FOCUS</code> after abstracting</p>",
+        "id": 352164295,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1682313515
+    },
+    {
+        "content": "<p>Do you mind explaining a bit more how <code>prove_abstract</code> is to be used (and how it works)? I see you're one of the authors of <code>z3_replay_methods.ML</code></p>",
+        "id": 352169280,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1682315427
+    },
+    {
+        "content": "<p>Here is a small example where I embedded it into a tactic:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"c\">(*declare [[simp_trace]]*)</span>\n<span class=\"kn\">lemma</span><span class=\"w\"> </span><span class=\"s\">\"(if xy then a else b) + 2= (if xy then a else b) + 2\"</span>\n<span class=\"w\">  </span><span class=\"kp\">apply</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">raw_tactic</span><span class=\"w\"> </span><span class=\"s\">‹HEADGOAL ((Subgoal.FOCUS (fn  {context, prems, concl, ...} =&gt;</span>\n<span class=\"s\">     let val thm = @{print} (SMT_Replay_Methods.arith_th_lemma_wo_shallow context prems (Thm.term_of concl))</span>\n<span class=\"s\">     val _ = @{print} (\"concl = \", concl)</span>\n<span class=\"s\">     in HEADGOAL (resolve_tac context [thm]) THEN print_tac context \"stuff\" end) @{context}))›</span><span class=\"o\">)</span>\n<span class=\"w\">  </span><span class=\"k\">done</span>\n</code></pre></div>",
+        "id": 352173322,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1682316786
+    },
+    {
+        "content": "<p>prove_abstract takes several arguments, the important ones are the conclusion (as a term), the premises (as premises), and a function to abstract</p>",
+        "id": 352173556,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1682316855
+    },
+    {
+        "content": "<p>The function to abstract iterates over the term and decides to abstract a term or to continue going into the term itself</p>",
+        "id": 352173630,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1682316892
+    },
+    {
+        "content": "<p>For example, abstract_arith_shallow (used in the example above) goes into disjunction, but does not go into if-then-else (put the simp_trace back in to see what the simplifier is handling: it does not see the if-then-else and instead has a term <code>t1</code> that abstracts away)</p>",
+        "id": 352173901,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1682316966
+    },
+    {
+        "content": "<p>For now, prove_abstract supports only a syntactic criterion, but generalization should be easy… (although you need to copy-paste the code)</p>",
+        "id": 352177093,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1682318085
+    },
+    {
+        "content": "<p>Is your goal always of the shape <code>OP x y</code> where <code>OP</code> is a constant? Because then you may simply use an appropriate congruence rule and pass it to the simplifier.</p>",
+        "id": 352183153,
+        "sender_full_name": "Kevin Kappelmann",
+        "timestamp": 1682320261
+    },
+    {
+        "content": "<p><span class=\"user-mention\" data-user-id=\"233154\">@Kevin Kappelmann</span> Not always, but in some meaningful cases, yes. Can you elaborate how I'd instruct the simplifier to ignore <code>y</code> in this case and only simplify <code>x</code>?</p>",
+        "id": 352626985,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1682451893
+    },
+    {
+        "content": "<p><span class=\"user-mention\" data-user-id=\"570503\">@Hanno Becker</span> sorry for the late reply. Here's an example:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">definition</span><span class=\"w\"> </span><span class=\"s\">\"SIMPS_TO s t ≡ s = t\"</span>\n\n<span class=\"kn\">lemma</span><span class=\"w\"> </span><span class=\"n\">SIMPS_TO_iff</span><span class=\"o\">:</span><span class=\"w\"> </span><span class=\"s\">\"SIMPS_TO s t ⟷ s = t\"</span><span class=\"w\"> </span><span class=\"k\">unfolding</span><span class=\"w\"> </span><span class=\"n\">SIMPS_TO_def</span><span class=\"w\"> </span><span class=\"k\">by</span><span class=\"w\"> </span><span class=\"n\">simp</span>\n\n<span class=\"k\">text</span><span class=\"w\"> </span><span class=\"s\">‹Prevent simplification of second argument›</span>\n<span class=\"kn\">lemma</span><span class=\"w\"> </span><span class=\"n\">SIMPS_TO_cong</span><span class=\"w\"> </span><span class=\"o\">[</span><span class=\"n\">cong</span><span class=\"o\">]:</span><span class=\"w\"> </span><span class=\"s\">\"s = s' ⟹ SIMPS_TO s t = SIMPS_TO s' t\"</span><span class=\"w\"> </span><span class=\"k\">by</span><span class=\"w\"> </span><span class=\"n\">simp</span>\n\n<span class=\"kn\">lemma</span><span class=\"w\"> </span><span class=\"n\">SIMPS_TOI</span><span class=\"o\">:</span><span class=\"w\"> </span><span class=\"s\">\"SIMPS_TO s s\"</span><span class=\"w\"> </span><span class=\"k\">unfolding</span><span class=\"w\"> </span><span class=\"n\">SIMPS_TO_iff</span><span class=\"w\"> </span><span class=\"k\">by</span><span class=\"w\"> </span><span class=\"n\">simp</span>\n\n<span class=\"kn\">lemma</span><span class=\"w\"> </span><span class=\"s\">\"SIMPS_TO (0 + 0 :: nat) (0 + 0)\"</span>\n<span class=\"w\">  </span><span class=\"kp\">apply</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">simp</span><span class=\"o\">)</span><span class=\"w\"> </span><span class=\"c\">(*simplifies only the first argument*)</span>\n<span class=\"w\">  </span><span class=\"gr\">oops</span>\n\n<span class=\"c\">(*you can use it to find the normal form of a term in a given context like this:*)</span>\n<span class=\"n\">schematic_goal</span><span class=\"w\"> </span><span class=\"s\">\"x = 0 ⟹ SIMPS_TO (0 + 0 + x :: nat) ?X\"</span>\n<span class=\"w\">  </span><span class=\"kp\">apply</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">simp</span><span class=\"o\">)</span>\n<span class=\"w\">  </span><span class=\"kp\">apply</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">rule</span><span class=\"w\"> </span><span class=\"n\">SIMPS_TOI</span><span class=\"o\">)</span>\n<span class=\"w\">  </span><span class=\"k\">done</span>\n</code></pre></div>",
+        "id": 353891052,
+        "sender_full_name": "Kevin Kappelmann",
+        "timestamp": 1682690967
+    },
+    {
+        "content": "<p>I actually wrote some library functionality for this purpose a couple of days ago. If you are happy to wait another few days, I can share the code with you next week.</p>",
+        "id": 353891621,
+        "sender_full_name": "Kevin Kappelmann",
+        "timestamp": 1682691025
+    },
+    {
+        "content": "<p>Thank you Kevin, that's great and already helps me. I'll likely have further questions on how to best controlled-restrict the simplifier, but I'll read a bit more first.</p>",
+        "id": 354879263,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1682948257
+    }
+]

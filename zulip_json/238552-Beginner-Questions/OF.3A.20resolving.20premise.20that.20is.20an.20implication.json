@@ -1,0 +1,86 @@
+[
+    {
+        "content": "<p>I have the following situation:</p>\n<div class=\"codehilite\"><pre><span></span><code><span class=\"kn\">lemma</span>\n  <span class=\"kp\">assumes</span> <span class=\"s\">&quot;A ⟹ B ⟹ C&quot;</span>\n  <span class=\"kp\">assumes</span> <span class=\"s\">&quot;(A ⟹ B ⟹ C) ⟹ D&quot;</span>\n  <span class=\"kp\">shows</span> <span class=\"n\">D</span>\n<span class=\"k\">proof</span> <span class=\"o\">-</span>\n  <span class=\"kt\">thm</span> <span class=\"n\">assms</span><span class=\"o\">(</span><span class=\"n\">2</span><span class=\"o\">)[</span><span class=\"n\">OF</span> <span class=\"n\">assms</span><span class=\"o\">(</span><span class=\"n\">1</span><span class=\"o\">)]</span>\n<span class=\"gr\">oops</span>\n</code></pre></div>\n\n\n<p>The application of <code>OF</code> gives me the theorem <code>⟦⟦A; B⟧ ⟹ A; ⟦A; B⟧ ⟹ B⟧ ⟹ D</code>. What I want is just <code>D</code>. How can I do that?</p>",
+        "id": 204521688,
+        "sender_full_name": "Lukas Stevens",
+        "timestamp": 1595319181
+    },
+    {
+        "content": "<p>That's the best I can come up with: <code>  have \"D\" by (fact assms(2)[OF assms(1), simplified])</code></p>",
+        "id": 204524529,
+        "sender_full_name": "Kevin Kappelmann",
+        "timestamp": 1595321432
+    },
+    {
+        "content": "<p>But assuming that <code>D</code> is not in some sort of simp normal form already, this will not be what you want.</p>",
+        "id": 204524609,
+        "sender_full_name": "Kevin Kappelmann",
+        "timestamp": 1595321514
+    },
+    {
+        "content": "<div class=\"codehilite\"><pre><span></span><code><span class=\"kn\">lemma</span>\n  <span class=\"kp\">assumes</span> <span class=\"s\">&quot;A ⟹ B ⟹ C&quot;</span>\n  <span class=\"kp\">assumes</span> <span class=\"s\">&quot;(A ⟹ B ⟹ C) ⟹ D ∧ D&quot;</span>\n  <span class=\"kp\">shows</span> <span class=\"n\">D</span>\n<span class=\"k\">proof</span> <span class=\"o\">-</span>\n  <span class=\"k\">have</span> <span class=\"s\">&quot;D ∧ D&quot;</span> <span class=\"k\">by</span> <span class=\"o\">(</span><span class=\"n\">fact</span> <span class=\"n\">assms</span><span class=\"o\">(</span><span class=\"n\">2</span><span class=\"o\">)[</span><span class=\"n\">OF</span> <span class=\"n\">assms</span><span class=\"o\">(</span><span class=\"n\">1</span><span class=\"o\">),</span> <span class=\"n\">simplified</span><span class=\"o\">])</span> <span class=\"err\">―</span> <span class=\"err\">‹</span><span class=\"n\">fails</span><span class=\"err\">›</span>\n  <span class=\"k\">have</span> <span class=\"s\">&quot;D&quot;</span> <span class=\"k\">by</span> <span class=\"o\">(</span><span class=\"n\">fact</span> <span class=\"n\">assms</span><span class=\"o\">(</span><span class=\"n\">2</span><span class=\"o\">)[</span><span class=\"n\">OF</span> <span class=\"n\">assms</span><span class=\"o\">(</span><span class=\"n\">1</span><span class=\"o\">),</span> <span class=\"n\">simplified</span><span class=\"o\">])</span> <span class=\"err\">―</span> <span class=\"err\">‹</span><span class=\"n\">works</span><span class=\"err\">›</span>\n<span class=\"gr\">oops</span>\n</code></pre></div>",
+        "id": 204524761,
+        "sender_full_name": "Kevin Kappelmann",
+        "timestamp": 1595321600
+    },
+    {
+        "content": "<p>I'd like to avoid running a tactic.</p>",
+        "id": 204524783,
+        "sender_full_name": "Lukas Stevens",
+        "timestamp": 1595321621
+    },
+    {
+        "content": "<p>What I am showing here is part of a procedure which constructs a thm. So I would like to avoid tactics.</p>",
+        "id": 204524887,
+        "sender_full_name": "Lukas Stevens",
+        "timestamp": 1595321686
+    },
+    {
+        "content": "<p>How about this?</p>\n<div class=\"codehilite\"><pre><span></span><code><span class=\"kn\">lemma</span>\n  <span class=\"kp\">assumes</span> <span class=\"s\">&quot;A ⟹ B ⟹ C&quot;</span>\n  <span class=\"kp\">assumes</span> <span class=\"s\">&quot;(A ⟹ B ⟹ C) ⟹ D&quot;</span>\n  <span class=\"kp\">shows</span> <span class=\"n\">D</span>\n<span class=\"k\">proof</span> <span class=\"o\">-</span>\n  <span class=\"k\">from</span> <span class=\"n\">assms</span><span class=\"o\">(</span><span class=\"n\">2</span><span class=\"o\">)</span> <span class=\"n\">assms</span><span class=\"o\">(</span><span class=\"n\">1</span><span class=\"o\">)</span> <span class=\"k\">have</span> <span class=\"s\">&quot;D&quot;</span> <span class=\"k\">by</span> <span class=\"o\">(</span><span class=\"n\">fact</span> <span class=\"n\">Pure.cut_rl</span><span class=\"o\">)</span>\n<span class=\"gr\">oops</span>\n</code></pre></div>",
+        "id": 204530488,
+        "sender_full_name": "Kevin Kappelmann",
+        "timestamp": 1595326097
+    },
+    {
+        "content": "<p>This still uses the fact tactic.</p>",
+        "id": 204531512,
+        "sender_full_name": "Lukas Stevens",
+        "timestamp": 1595327035
+    },
+    {
+        "content": "<p>I doubt there's any way of using <code>OF</code> to remove that premise, the really strict way resolution works precludes that. You'll have to resort to doing some ML<del>, or else define some wrapper constant.</del> [I'm not sure this is possible here.]</p>",
+        "id": 204531907,
+        "sender_full_name": "Josh Chen",
+        "timestamp": 1595327344
+    },
+    {
+        "content": "<p>If you plan to work on the ML level, you might have some success with Drule.compose, depending on how your concrete theorems look</p>",
+        "id": 204532222,
+        "sender_full_name": "Simon Roßkopf",
+        "timestamp": 1595327534
+    },
+    {
+        "content": "<p>Yes. Note that there might be issues with lifting for <code>Drule.compose</code> (e.g. <a href=\"https://lists.cam.ac.uk/mailman/htdig/cl-isabelle-users/2019-September/msg00090.html\">https://lists.cam.ac.uk/mailman/htdig/cl-isabelle-users/2019-September/msg00090.html</a> for a previous version of Isabelle, but I think the problem is still there).</p>\n<p>For <em>conclusions</em> this is achievable by <code>Goal.protect</code>, and for terms <code>Logic.protect</code>, <code>Drule.protect</code>.</p>",
+        "id": 204532356,
+        "sender_full_name": "Josh Chen",
+        "timestamp": 1595327654
+    },
+    {
+        "content": "<p>I am working on the ML level, so using ML functions is my goal anyways.</p>",
+        "id": 204532526,
+        "sender_full_name": "Lukas Stevens",
+        "timestamp": 1595327821
+    },
+    {
+        "content": "<p>Judging from Makarius answer, it is probably better to discharge all the trivial goals coming from the final resolution step with <code>assume_tac</code>.</p>",
+        "id": 204532636,
+        "sender_full_name": "Lukas Stevens",
+        "timestamp": 1595327929
+    },
+    {
+        "content": "<p>I think that's the god-given way to do it, yes ;)</p>",
+        "id": 204532660,
+        "sender_full_name": "Josh Chen",
+        "timestamp": 1595327948
+    }
+]

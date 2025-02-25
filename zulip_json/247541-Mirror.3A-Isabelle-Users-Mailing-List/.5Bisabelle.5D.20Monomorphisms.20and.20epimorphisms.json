@@ -1,0 +1,32 @@
+[
+    {
+        "content": "<p>From: Roland Lutz &lt;<a href=\"mailto:rlutz@hedmen.org\">rlutz@hedmen.org</a>&gt;<br>\nHi,</p>\n<p>I ran into a problem when trying to define monomorphisms and epimorphisms:</p>\n<p>definition monomorphism :: \"('a ⇒ 'b) ⇒ bool\" where<br>\n\"monomorphism f ⟷ (∀ g g' :: ('c ⇒ 'a). f ∘ g = f ∘ g' ⟶ g = g')\"</p>\n<p>definition epimorphism :: \"('a ⇒ 'b) ⇒ bool\" where<br>\n\"epimorphism f ⟷ (∀ h h' :: ('b ⇒ 'd). h ∘ f = h' ∘ f ⟶ h = h')\"</p>\n<p>(* Additional type variable(s) in specification of \"monomorphism\": 'c *)<br>\n(* Additional type variable(s) in specification of \"epimorphism\": 'd *)</p>\n<p>A bit of googling led me to [0], which seems to suggest adding a dummy <br>\nparameter.  I don't think this is what I want here, though, since the <br>\nextra type variable is supposed to be part of the all-quantifier as <br>\nopposed to being specified for each use of the definition.</p>\n<p>How would I have to put these definitions to express the notion of a <br>\nmonomorphism and an epimorphism, respectively?</p>\n<p>Roland</p>\n<p>[0] <a href=\"https://mailman46.in.tum.de/pipermail/isabelle-dev/2010-December/009676.html\">https://mailman46.in.tum.de/pipermail/isabelle-dev/2010-December/009676.html</a></p>",
+        "id": 400314972,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1699118361
+    },
+    {
+        "content": "<p>From: Andrei Popescu &lt;<a href=\"mailto:andrei.h.popescu@gmail.com\">andrei.h.popescu@gmail.com</a>&gt;<br>\nDear Roland,</p>\n<p>I am afraid you bumped into a limitation of HOL. The best you can do<br>\nin HOL is express a weaker, \"local\" notion, and prove that it implies<br>\nthe correct notion (which also means it is equivalent to the correct<br>\nnotion). For monomorphisms, one option would be:</p>\n<p>definition monomorphism :: \"('a ⇒ 'b) ⇒ bool\" where<br>\n\"monomorphism f ⟷ (∀ g g' :: ('a ⇒ 'a). f o g = f o g' ⟶ g = g')\"</p>\n<p>lemma monomorphism_correct:<br>\nfixes g g' :: \"'c ⇒ 'a\"<br>\nassumes \"monomorphism f\" and \"f o g = f o g'\"<br>\nshows \"g = g'\"<br>\nproof(rule ext)<br>\n  fix c<br>\n  have \"f o (g o (λ_::'a. c)) = f o (g' o (λ_::'a. c))\"<br>\n  using assms(2) unfolding fun_eq_iff by auto<br>\n  from assms(1)[unfolded monomorphism_def, rule_format, OF this]<br>\n  show \"g c = g' c\" unfolding fun_eq_iff by auto<br>\nqed</p>\n<p>And similarly for epimorphisms. Of course, in this particular case you<br>\ncan alternatively explore the connection between these notions and<br>\ninjectivity / surjectivity, but the above is a more general recipe<br>\nthat works for many other concepts: You start with a more local<br>\nversion of the definition in HOL, and from it you prove the global<br>\nversion which is not directly expressible as a definition.</p>\n<p>An orthogonal caveat: Unlike sets in the usual category of sets, HOL<br>\ntypes are nonempty -- and this affects such category-theoretic<br>\nnotions.</p>\n<p>Best wishes,<br>\nAndrei</p>",
+        "id": 400424996,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1699221372
+    },
+    {
+        "content": "<p>From: Lawrence Paulson &lt;<a href=\"mailto:lp15@cam.ac.uk\">lp15@cam.ac.uk</a>&gt;<br>\nDear Roland, I took a look at these. </p>\n<p>As given, they require explicit quantification over type variables, which we don't have. </p>\n<p>Note that the first one is actually provable using the already existing predicate “inj”.</p>\n<p>lemma \"inj f ⟷ (∀ g g' :: ('c ⇒ 'a). f ∘ g = f ∘ g' ⟶ g = g')\"<br>\n  by (force simp: inj_on_def fun_eq_iff)</p>\n<p>On the other hand, the dual result is not provable because the implicit quantification over type variables is in the wrong place (as it also is for the first example):</p>\n<p>lemma \"surj f ⟷ (∀ h h' :: ('b ⇒ 'd). h ∘ f = h' ∘ f ⟶ h = h')\"</p>\n<p>That is to say, implicitly the type variable ‘d has global scope when you want its scope to be confined to the right hand side. This lemma fails if ‘d denotes a type having a single element. </p>\n<p>In short, this sort of thing cannot work. What you should try instead depends on your overall aims. </p>\n<p>Larry</p>",
+        "id": 400515418,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1699271508
+    },
+    {
+        "content": "<p>From: Roland Lutz &lt;<a href=\"mailto:rlutz@hedmen.org\">rlutz@hedmen.org</a>&gt;<br>\nThank you for your kind answers!</p>\n<p>Do I understand it correctly that “if for any type 'a and term x :: &lt;type <br>\ndepending on 'a&gt;, P x holds, then …” is a concept that can't be expressed <br>\nin HOL, similar to how FOL can't express some concepts HOL can and as <br>\nopposed to a technical limitation in Isabelle?  What would be a good place <br>\nto read up on this kind of thing?</p>\n<p>Roland</p>",
+        "id": 401028577,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1699480070
+    },
+    {
+        "content": "<p>From: Tjark Weber &lt;<a href=\"mailto:tjark.weber@it.uu.se\">tjark.weber@it.uu.se</a>&gt;<br>\nRoland,</p>\n<p>Others may suggest more appropriate references, but probably<br>\n<a href=\"https://en.wikipedia.org/wiki/Parametric_polymorphism#Rank-1_(predicative)_polymorphism\">https://en.wikipedia.org/wiki/Parametric_polymorphism#Rank-1_(predicative)_polymorphism</a><br>\nwould not be a bad place to start.</p>\n<p>Best,<br>\nTjark</p>\n<p>När du har kontakt med oss på Uppsala universitet med e-post så innebär det att vi behandlar dina personuppgifter. För att läsa mer om hur vi gör det kan du läsa här: <a href=\"http://www.uu.se/om-uu/dataskydd-personuppgifter/\">http://www.uu.se/om-uu/dataskydd-personuppgifter/</a></p>\n<p>E-mailing Uppsala University means that we will process your personal data. For more information on how this is performed, please read here: <a href=\"http://www.uu.se/en/about-uu/data-protection-policy\">http://www.uu.se/en/about-uu/data-protection-policy</a></p>",
+        "id": 401099974,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1699517943
+    }
+]

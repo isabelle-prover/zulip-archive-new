@@ -1,0 +1,44 @@
+[
+    {
+        "content": "<p>From: Dimitrios Vytiniotis &lt;<a href=\"mailto:dimitriv@cis.upenn.edu\">dimitriv@cis.upenn.edu</a>&gt;<br>\nHello all, I am puzzled over the first issue and need<br>\nsome advice on the second.</p>\n<p>First issue<br>\n===========================================================<br>\nI have an inductive relation and some of the inference rules<br>\nuse meta-level quantifiers on the premises.<br>\nI found that more convenient because at use sites it is easier<br>\nfor me to instantiate these things than when using object-level<br>\nquantifiers.</p>\n<p>I very often in my development use the style:</p>\n<p>lemma blabla: ...<br>\n  by(induct X, auto elim: MyRelation.elims)</p>\n<p>And although I feel it should work, I get back the error:<br>\n   *** exception TERM raised: dest_Trueprop</p>\n<p>This is a bit annoying, because I did not encounter these problems<br>\nwhen the premises of the rules contained just object level forall's.</p>\n<p>Additionally I have noticed that if I prove an inversion theorem<br>\nusing (inductive_cases) and use that theorem instead of MyRelation.elims<br>\nthings tend to (but not always) work more smoothly.</p>\n<p>Is there more information on this? Should I send over more information?<br>\nI have not been able to figure out when exactly these errors occur but<br>\nany information would be valuable.</p>\n<p>Second issue (advice)<br>\n=======================================================<br>\nI have a datatype which has only one constructor that takes a pair.<br>\nValues of this datatype are paired with naturals and<br>\ncontained in a list. I have very often<br>\nfound out that when I do induction on the list to prove a theorem,<br>\nin the inductive case I often have to do<br>\na \"by(cases \"x\", cases \"snd x\", blast)\"<br>\nwhich I hate but want to do it in a one-line step because it is<br>\na very ``obvious'' fact for the reader of the proof. How do I do<br>\nthis elegantly (e.g with a single tactic like<br>\n(cases_deep_break \"x\", auto) or similar)</p>\n<p>thanks!<br>\n-d</p>",
+        "id": 293911682,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660747591
+    },
+    {
+        "content": "<p>From: Lawrence Paulson &lt;<a href=\"mailto:lp15@cam.ac.uk\">lp15@cam.ac.uk</a>&gt;<br>\nThis looks like a bug. Please send me a theory file, preferably the  <br>\nsmallest possible that causes this behaviour.</p>\n<p>Larry Paulson</p>",
+        "id": 293911686,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660747591
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nOn Fri, 16 Jun 2006, Dimitrios Vytiniotis wrote:</p>\n<blockquote>\n<p>I have a datatype which has only one constructor that takes a pair.<br>\nValues of this datatype are paired with naturals and contained in a<br>\nlist. I have very often found out that when I do induction on the list<br>\nto prove a theorem, in the inductive case I often have to do a \"by(cases<br>\n\"x\", cases \"snd x\", blast)\"</p>\n</blockquote>\n<p>This is how to provide your own cases rule for that specific type scheme:</p>\n<p>datatype ('a, 'b) foo = Foo \"'a * 'b\"</p>\n<p>lemma nat_foo_cases [cases type]:<br>\n    \"(!!(n::nat) a b. x = (n, Foo (a, b)) ==&gt; C) ==&gt; C\"<br>\n  by (cases x, cases \"snd x\") auto</p>\n<p>lemma<br>\n  fixes foos :: \"(nat * ('a, 'b) foo) list\"<br>\n  shows \"P foos\"<br>\nproof (induct foos)<br>\n  case Nil<br>\n  show ?case sorry<br>\nnext<br>\n  case (Cons x xs)<br>\n  show ?case<br>\n    apply (cases x)<br>\n    sorry<br>\nqed</p>\n<blockquote>\n<p>How do I do this elegantly (e.g with a single tactic like<br>\n(cases_deep_break \"x\", auto) or similar)</p>\n</blockquote>\n<p>As a rule of thumb, it is better to derive rules of the Pure framework (as<br>\nabove) rather than do ML hacking with methods/tactics.</p>\n<p>Makarius</p>",
+        "id": 293911694,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660747593
+    },
+    {
+        "content": "<p>From: Jeremy Dawson &lt;<a href=\"mailto:Jeremy.Dawson@rsise.anu.edu.au\">Jeremy.Dawson@rsise.anu.edu.au</a>&gt;<br>\nDimitrios Vytiniotis wrote:<br>\nDimitrios,</p>\n<p>I don't know if the following would help, but of the following,<br>\ncase_tac_frees does case_tac for all free variables<br>\nand case_tac_params does it for all parameters, ie, variables<br>\nin a subgoal quantified by !!</p>\n<p>fun case_tacs (str :: strs) sg state =<br>\n     ((case_tac str THEN_ALL_NEW case_tacs strs) sg state<br>\n     handle _ =&gt; case_tacs strs sg state)<br>\n   | case_tacs [] sg state = all_tac state ;</p>\n<p>fun case_tac_frees sg state =<br>\n   let val tm = nth (prems_of state, sg-1) ;<br>\n     fun freename (Free (name, ty)) = name ;<br>\n   in case_tacs (map freename (term_frees tm)) sg state end ;</p>\n<p>fun case_tac_params sg state =<br>\n   let val tm = nth (prems_of state, sg-1) ;<br>\n     val params = (strip_qnt_vars \"all\" tm) ;<br>\n   in case_tacs (map fst params) sg state end ;</p>\n<p>Alternatively you can just construct your own \"exhaust\" theorem<br>\n(for example, case_tac \"x\" where x is a list seems to be equivalent to<br>\n(res_inst_tac [(\"y\", \"x\")] list.exhaust))</p>\n<p>Regards,</p>\n<p>Jeremy</p>",
+        "id": 293911698,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660747594
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nOn Fri, 16 Jun 2006, Dimitrios Vytiniotis wrote:</p>\n<blockquote>\n<p>I have an inductive relation and some of the inference rules<br>\nuse meta-level quantifiers on the premises.</p>\n</blockquote>\n<blockquote>\n<p>I found that more convenient because at use sites it is easier for me to<br>\ninstantiate these things than when using object-level quantifiers.</p>\n</blockquote>\n<p>Very good.  This is usually the way to do it, because the resulting rules<br>\ncan be used natively, without having to walk through object-logic<br>\nconnectives.</p>\n<blockquote>\n<p>lemma blabla: ...<br>\n  by(induct X, auto elim: MyRelation.elims)</p>\n</blockquote>\n<p>Just note that the initial induct and terminal auto method are normally<br>\nseparated like this:</p>\n<p>by (induct X) (auto ...)</p>\n<p>The difference shows up when there are facts being used for the first<br>\npart.  These are usually irrelevant for the second, so don't pass them to<br>\nauto in the first place.</p>\n<blockquote>\n<p>And although I feel it should work, I get back the error:<br>\n   *** exception TERM raised: dest_Trueprop</p>\n</blockquote>\n<p>Is this caused by induct or auto?  Sometimes a meta-level quantifier gets<br>\na more general type than expected (e.g. 'a::{}).  Then certain tools fail<br>\nto internalize a problem into the object-logic.</p>\n<p>Makarius</p>",
+        "id": 293911700,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660747594
+    },
+    {
+        "content": "<p>From: Dimitrios Vytiniotis &lt;<a href=\"mailto:dimitriv@cis.upenn.edu\">dimitriv@cis.upenn.edu</a>&gt;<br>\nThanks Jeremy, Makarius for the advice. Useful to know.</p>\n<p>For the dest_Trueprop issue, it is the 'auto' step that causes<br>\nthe TERM exception. To be concrete I have put a small theory file at:</p>\n<p><a href=\"http://www.cis.upenn.edu/~dimitriv/poplmark/Simple.thy\">http://www.cis.upenn.edu/~dimitriv/poplmark/Simple.thy</a></p>\n<p>which demonstrates what is happening<br>\nthanks!<br>\n-d</p>\n<p>Makarius wrote:</p>",
+        "id": 293911706,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660747596
+    },
+    {
+        "content": "<p>From: Brian Huffman &lt;<a href=\"mailto:brianh@csee.ogi.edu\">brianh@csee.ogi.edu</a>&gt;<br>\nLooking at the source for auto_tac (in Provers/clasimp.ML), I found that auto <br>\nmakes calls to the simp, safe, and blast tactics. It appears that the problem <br>\nin your example lies in the blast tactic. If you make Typing.elims and <br>\nVal.elims into safe elimination rules (with \"auto elim!:\" instead of \"auto <br>\nelim:\") then auto no longer fails, because the elimination rules are used by <br>\nsafe instead of blast. But if you replace auto with repeated calls to blast, <br>\nthe third subgoal produces the same dest_Trueprop error. I'm not an expert on <br>\nhow blast works, but it seems to me that there could be a bug in the blast <br>\ntactic.</p>\n<ul>\n<li>Brian</li>\n</ul>",
+        "id": 293911708,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660747596
+    }
+]

@@ -1,0 +1,100 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Code generation of a definition obtained throu... · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20of.20a.20definition.20obtained.20throu.2E.2E.2E.html">[isabelle] Code generation of a definition obtained throu...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="206341578"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20of%20a%20definition%20obtained%20throu.../near/206341578" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20of.20a.20definition.20obtained.20throu.2E.2E.2E.html#206341578">(Aug 08 2020 at 10:10)</a>:</h4>
+<p>From: <a href="mailto:isabelle-users@florianmaerkl.de">isabelle-users@florianmaerkl.de</a><br>
+Hello everyone,</p>
+<p>I am currently struggling with the following issue, which I tried to<br>
+condense into a minimal example:<br>
+I have two locales "FinalThing" and "DetailThing" where FinalThing<br>
+defines some useful definition "final_result" and DetailThing is made a<br>
+sublocale of FinalThing:</p>
+<p>locale FinalThing =<br>
+  fixes somefunc :: "nat ⇒ nat"<br>
+  assumes "somefunc 42 = 1337"<br>
+begin<br>
+definition "final_result = somefunc 42"<br>
+end</p>
+<p>locale DetailThing =<br>
+  fixes someval :: "nat"<br>
+  assumes "someval = 1336"</p>
+<p>context DetailThing<br>
+begin<br>
+fun thefunc :: "nat ⇒ nat" where<br>
+  "thefunc _ = someval + 1"<br>
+end<br>
+sublocale DetailThing ⊆ DetailSub: FinalThing<br>
+  where somefunc = thefunc</p>
+<p>(...)</p>
+<p>Now I interpret DetailThing and want to execute final_result from this<br>
+interpretation:</p>
+<p>global_interpretation DetailThing<br>
+  where someval = "1334 + 2"<br>
+  defines final_result_impl = DetailSub.final_result<br>
+  and the_func_impl = thefunc<br>
+  by (standard, simp)</p>
+<p>export_code the_func_impl in SML ― ‹works because of the "defines<br>
+final_result_impl = FinalThing.final_result"›<br>
+export_code final_result_impl in SML ― ‹doesn't work despite the<br>
+"defines the_func_impl = thefunc"›</p>
+<p>Here, I can generate code for thefunc since as it is defined directly in<br>
+DetailThing, but for final_result I get the error "No code equations for<br>
+final_result_impl".<br>
+I found this old thread describing the same problem as far as I<br>
+understood:<br>
+<a href="https://lists.cam.ac.uk/mailman/htdig/cl-isabelle-users/2014-October/msg00034.html">https://lists.cam.ac.uk/mailman/htdig/cl-isabelle-users/2014-October/msg00034.html</a><br>
+However the proposed solution uses permanent_interpretation which<br>
+apparently doesn't exist anymore and I am unsure what the equivalent in<br>
+Isabelle 2020 would be.</p>
+<p>I've attached the full theory.</p>
+<p>Cheers</p>
+<p>Florian<br>
+<a href="/user_uploads/14278/gIq6UOb4tmqLD0fDi7r_Mt05/SublocaleTest.thy">SublocaleTest.thy</a></p>
+
+
+
+<a name="207175161"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20of%20a%20definition%20obtained%20throu.../near/207175161" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20of.20a.20definition.20obtained.20throu.2E.2E.2E.html#207175161">(Aug 17 2020 at 17:50)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Florian,</p>
+<p>I did not study your example in full but from</p>
+<blockquote>
+<p>global_interpretation DetailThing<br>
+  where someval = "1334 + 2"<br>
+  defines the_func_impl = thefunc<br>
+  and final_result_impl = DetailSub.final_result<br>
+  by standard simp</p>
+<p>find_theorems final_result_impl</p>
+</blockquote>
+<p>you see that no suitable code equations is provided for<br>
+final_result_impl, and looking at the theorems</p>
+<blockquote>
+<p>thm final_result_impl_def DetailSub.final_result_def</p>
+</blockquote>
+<p>I guess this is due to your definitions not forming a confluent system,<br>
+maybe due to the construction</p>
+<blockquote>
+<p>fun thefunc :: "nat ⇒ nat" where<br>
+  "thefunc _ = someval + 1"</p>
+</blockquote>
+<p>which drops an argument.  (A rough first guess).</p>
+<p>In this case you have to provide your code equation explicitly.</p>
+<p>Note that global_interpretation is the offical successor of prototypic<br>
+permanent_interpretation.</p>
+<p>Cheers,<br>
+    Florian<br>
+<a href="/user_uploads/14278/nUe3KWQEiWd7mWJ6ZQdtImS_/signature.asc">signature.asc</a></p>
+
+
+
+<hr><p>Last updated: Jul 15 2022 at 23:21 UTC</p>
+</html>

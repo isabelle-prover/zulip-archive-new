@@ -1,0 +1,20 @@
+[
+    {
+        "content": "<p>From: Tjark Weber &lt;<a href=\"mailto:webertj@in.tum.de\">webertj@in.tum.de</a>&gt;<br>\nHi,</p>\n<p>Could someone who understands Isabelle's contexts, classes and sorts<br>\nbetter than I do perhaps enlighten me why the second proof in the<br>\nexample theory below fails?  (I guess it fails because b_def is<br>\nexpecting sort HOL.type, while the actual sort is {Scratch.B,Scratch.C}.<br>\nHowever, I don't quite understand the reason for this.  Is it a bug?  Is<br>\nthere a workaround?)</p>\n<p>Many thanks in advance!</p>\n<p>Kind regards,<br>\nTjark</p>\n<p>========== 8&lt; ==========</p>\n<p>theory Scratch imports Main<br>\nbegin</p>\n<p>class A =<br>\n  fixes a :: 'a</p>\n<p>class B = A<br>\nbegin<br>\n  definition \"b = a\"<br>\nend</p>\n<p>class C = A<br>\nbegin<br>\n  definition \"c = a\"<br>\nend</p>\n<p>lemma bc: \"b = c\" by (simp only: b_def c_def)</p>\n<p>lemma (in B) \"b = c\" by (simp only: b_def c_def)<br>\n  -- {* fails because b_def is expecting sort HOL.type *}</p>\n<p>end</p>",
+        "id": 294125898,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660841294
+    },
+    {
+        "content": "<p>From: Brian Huffman &lt;<a href=\"mailto:brianh@cs.pdx.edu\">brianh@cs.pdx.edu</a>&gt;<br>\nHi Tjark,</p>\n<p>You can get an idea of what is going on by printing a few raw terms<br>\nwithin the context of the proof.</p>\n<p>lemma (in B) \"b = c\"<br>\nML_val {* concl_of @{thm c_def} *}<br>\nML_val {* concl_of @{thm b_def} *}<br>\nML_val {* concl_of @{thm B_class.b_def} *}</p>\n<p>You will notice that in the \"B\" context, theorem c_def states<br>\n\"Scratch.C_class.c = Scratch.A_class.a\", and is polymorphic, having a<br>\nschematic type variable \"?'a::Scratch.C\". This is the same as its<br>\nusual meaning in the top-level context.</p>\n<p>On the other hand, in the \"B\" context, theorem b_def is not the same<br>\npolymorphic theorem that you would get at the top-level. It states<br>\nthat \"Scratch.B.b a = a\", where \"a\" is a free variable of type<br>\n\"'a::HOL.type\". The variable \"a\" and type variable 'a are both fixed<br>\nby the context. In the \"B\" context, the top-level polymorphic version<br>\nof b_def must be referred to by its qualified name \"B_class.b_def\".</p>\n<p>Now let's look at the raw representation of what you are trying to prove:</p>\n<p>ML_val {* @{term \"?thesis\"} *}</p>\n<p>This reveals that you are trying to show \"Scratch.B_class.b =<br>\nScratch.C_class.c\". The theorem referred to by the name \"b_def\" in<br>\nthis context is not helpful here. The proof will succeed if you use<br>\n\"B_class.b_def\", though.</p>\n<blockquote>\n<p>lemma (in B) \"b = c\" by (simp only: B_class.b_def c_def)</p>\n</blockquote>\n<p>I guess the confusion comes from the fact that in context \"B\", the<br>\nterm \"b\" can have two completely different meanings, depending on its<br>\ntype. I wonder if there is a way to configure the pretty-printer so<br>\nthat it would be easier to distinguish the two?</p>\n<ul>\n<li>Brian</li>\n</ul>",
+        "id": 294125915,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660841299
+    },
+    {
+        "content": "<p>From: Tjark Weber &lt;<a href=\"mailto:webertj@in.tum.de\">webertj@in.tum.de</a>&gt;<br>\nBrian,</p>\n<p>Indeed.  Try</p>\n<p>lemma (in B) \"b = c\"<br>\n  apply (cut_tac b_def)</p>\n<p>(with Long Names switched on for greater effect).  No wonder I was<br>\nconfused.</p>\n<p>Thanks for your quick reply!</p>\n<p>Kind regards,<br>\nTjark</p>",
+        "id": 294125927,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660841305
+    }
+]

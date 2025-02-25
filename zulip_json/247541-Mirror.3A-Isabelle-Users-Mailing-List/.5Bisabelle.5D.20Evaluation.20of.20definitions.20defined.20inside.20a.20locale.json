@@ -1,0 +1,32 @@
+[
+    {
+        "content": "<p>From: \"Sanan Baena David Miguel (Dr)\" &lt;<a href=\"mailto:sanan@ntu.edu.sg\">sanan@ntu.edu.sg</a>&gt;<br>\nHi Isabelle users,</p>\n<p>I am trying to evaluate definitions declared inside a locale, but I am getting errors saying that I am using terms that are not constructors. However, if I use abbreviations instead it works slightly better (details below).</p>\n<p>In this very simple example</p>\n<p>theory test<br>\n  imports Main<br>\nbegin<br>\nlocale mytest =<br>\n  fixes s1::\"nat set\"<br>\n  fixes l1::\"nat list\"<br>\nbegin</p>\n<p>definition add::\"nat ⇒ nat set\"<br>\n  where \"add v ≡ insert v s1\"</p>\n<p>definition addl::\"nat ⇒ nat list\"<br>\n  where \"addl v ≡ v#l1\"</p>\n<p>abbreviation abbs::\"nat ⇒ nat set\"<br>\n  where \"abbs v ≡ insert v s1\"</p>\n<p>abbreviation abbl::\"nat =&gt; nat list\"<br>\n  where \"abbl ≡ insert v l1\"</p>\n<p>end</p>\n<p>If I do an interpretation of mytest using numbers (1,2,3..) instead of 0 and Suc.</p>\n<p>interpretation v: mytest \"{0,1}\" \"[0,1]\".</p>\n<p>and I evaluate function add</p>\n<p>value \"v.addl 2\"</p>\n<p>I get<br>\n\"\"Nat.one_nat_inst.one_nat\" is not a constructor, on left hand side of equation, in theorem:<br>\nmytest.addl [zero_nat_inst.zero_nat, one_nat_inst.one_nat] ?v ≡<br>\n[?v, zero_nat_inst.zero_nat, one_nat_inst.one_nat]\"</p>\n<p>if I change the interpretation</p>\n<p>interpretation v: mytest \"{0,1}\" \"[0,Suc 0]\".</p>\n<p>then the evaluation of addl is correct.</p>\n<p>However, it always fails when trying to evaluate \"add\" no matter whether the set is instantiated with numbers or with the natural number constructs.</p>\n<p>interpretation v: mytest \"{0,Suc 0}\" \"[0,Suc 0]\".</p>\n<p>gives the following error</p>\n<p>\"Set.insert\" is not a constructor, on left hand side of equation, in theorem:<br>\nmytest.add<br>\n (insert zero_nat_inst.zero_nat<br>\n   (insert (Suc zero_nat_inst.zero_nat) bot_set_inst.bot_set))<br>\n ?v ≡<br>\ninsert ?v<br>\n (insert zero_nat_inst.zero_nat<br>\n   (insert (Suc zero_nat_inst.zero_nat) bot_set_inst.bot_set))</p>\n<p>I am guessing that the problem here is that a set is an axiomatization and it doesn't have proper constructs.</p>\n<p>If instead of using \"definition\" I use \"abbreviation\" for the declaration, it works then when using sets and instantiating the set by using 0 and Suc. If I use numbers, it doesn't evaluate the definition, it just gives the type. But at least it doesn't throw any error.</p>\n<p>Is there any workaround for this?</p>\n<p>Thank you very much!</p>\n<p>Best regards,<br>\nDavid.</p>\n<hr>\n<p>CONFIDENTIALITY: This email is intended solely for the person(s) named and may be confidential and/or privileged. If you are not the intended recipient, please delete it, notify us and do not copy, use, or disclose its contents.<br>\nTowards a sustainable earth: Print only when necessary. Thank you.</p>",
+        "id": 231768663,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1616664181
+    },
+    {
+        "content": "<p>From: \"Thiemann, René\" &lt;<a href=\"mailto:Rene.Thiemann@uibk.ac.at\">Rene.Thiemann@uibk.ac.at</a>&gt;<br>\nHi David, </p>\n<p>if you want executable of definitions inside a locale, you have to explicitly add code-equations outside the locale.</p>\n<p>e.g., in your case </p>\n<p>locale mytest  = …<br>\nbegin<br>\n…<br>\ndefinition addl = …<br>\nfun some_fun … <br>\n...<br>\nend</p>\n<p>declare mytest.addl_def[code]<br>\ndeclare mytest.some_fun.simps[code]</p>\n<p>interpretation v: mytest \"{0,1}\" \"[0,1]\" . </p>\n<p>Then your execution will succeed.</p>\n<p>value \"v.addl 2”</p>\n<p>Best,<br>\nRené</p>",
+        "id": 232181278,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1616953304
+    },
+    {
+        "content": "<p>From: \"Sanan Baena David Miguel (Dr)\" &lt;<a href=\"mailto:sanan@ntu.edu.sg\">sanan@ntu.edu.sg</a>&gt;<br>\nThank you very much for your answer, René.</p>\n<p>It works well by adding the code-equation outside of the locale.</p>\n<p>But when adding assumptions to the locale like in</p>\n<p>locale mytest =<br>\n   fixes s1::\"nat set\"<br>\n   fixes l1::\"nat list\"<br>\n   assumes not_empty:\"s1≠{}\"<br>\n begin</p>\n<p>definition add::\"nat ⇒ nat set\"<br>\n   where \"add v ≡ insert v s1\"</p>\n<p>definition addl::\"nat ⇒ nat list\"<br>\n   where \"addl v ≡ v#l1\"<br>\nend</p>\n<p>declare mytest.add_def[code]</p>\n<p>the code-equation first warms:<br>\nNot an equation, in theorem:mytest ?s1.0 ⟹ mytest.add ?s1.0 ?v ≡ insert ?v ?s1.0<br>\nWhich makes sense to me.</p>\n<p>But then after doing the interpretation and trying to evaluate the definition I get again the same problem.</p>\n<p>interpretation v:mytest \"{1}\" \"[]\"<br>\n  apply unfold_locales by auto</p>\n<p>value \"v.add {1} 2\"</p>\n<p>Is there anything else that I am missing?</p>\n<p>Thanks again!</p>\n<p>David.</p>",
+        "id": 232536699,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1617166652
+    },
+    {
+        "content": "<p>From: \"YAMADA, Akihisa\" &lt;<a href=\"mailto:ayamada@trs.cm.is.nagoya-u.ac.jp\">ayamada@trs.cm.is.nagoya-u.ac.jp</a>&gt;<br>\nHi David,</p>\n<p>locales with assumptions inserts the assumptions to all facts including <br>\ndefining equations (when they are seen from outside the locale). One <br>\ntrick is to declare a locale without assumptions, and then extend it <br>\nwith assumptions.</p>\n<p>locale pre_mytest =<br>\n    fixes s1::\"nat set\"<br>\n    fixes l1::\"nat list\"<br>\nbegin</p>\n<p>definition add::\"nat ⇒ nat set\"<br>\n    where \"add v ≡ insert v s1\"</p>\n<p>definition addl::\"nat ⇒ nat list\"<br>\n    where \"addl v ≡ v#l1\"<br>\nend</p>\n<p>declare pre_mytest.add_def[code]</p>\n<p>locale mytest = pre_mytest +<br>\n    assumes not_empty:\"s1≠{}\"</p>\n<p>HTH,<br>\nAkihisa</p>",
+        "id": 232538013,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1617167886
+    },
+    {
+        "content": "<p>From: \"Sanan Baena David Miguel (Dr)\" &lt;<a href=\"mailto:sanan@ntu.edu.sg\">sanan@ntu.edu.sg</a>&gt;<br>\nThanks a lot Akihisa,</p>\n<p>This does the trick, of course! (How I didn't think about that...)</p>\n<p>David.</p>",
+        "id": 232540345,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1617170109
+    }
+]

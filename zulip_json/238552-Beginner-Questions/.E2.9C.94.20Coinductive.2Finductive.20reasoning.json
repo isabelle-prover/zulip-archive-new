@@ -1,0 +1,44 @@
+[
+    {
+        "content": "<p>Hello!</p>\n<p>I'm new to coinduction proofs in Isabelle. I'm able to prove simple bisimulation lemmas on streams. However, once I try to mix coinductive definitions with inductive definitions, Isabelle freezes. </p>\n<p>ex)<br>\n<code>try</code> spins forever on <code>lemma \"take 2 (natsFrom 0) = [0,1]\"</code>  or even simpler goals like <code>lemma \"shd (natsFrom 0) = 0\"</code></p>\n<p>Does this have something to do with Isabelle trying to eagerly evaluate an infinite stream?</p>",
+        "id": 249426402,
+        "sender_full_name": "Eric Bond",
+        "timestamp": 1628898215
+    },
+    {
+        "content": "<p>does try0/nitpick/sledgehammer/quickcheck individually also loop?</p>",
+        "id": 249505977,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1629024702
+    },
+    {
+        "content": "<p>Quickcheck is probably the culprit. What it does is to generate Poly/ML code for the statement in question and evaluate it on example data. However, there is no out-of-the-box support for laziness in Isabelle's code generation to Poly/ML, so anything involving infinite structures like this one will simply loop forever or quickly run out of memory.</p>\n<p>So one possible workaround is to just not use QuickCheck here (which means not using <code>try</code> as well). I for one never use <code>try</code> at all, I just use <code>try0</code> (which tries some typical proof methods like <code>blast</code> and <code>auto</code>, but no \"disproof\" methods like QuickCheck and nitpick and not sledgehammer either) or sledgehammer by itself.</p>\n<p>Another one is to import <code>HOL-Library.Code_Lazy</code> and do <code>code_lazy_type stream</code> to register streams as lazy codatatypes for code generation. Then <code>QuickCheck</code> seems to work as expected.</p>",
+        "id": 249506990,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1629026148
+    },
+    {
+        "content": "<p>Note that QuickCheck is a diagnostic tool that is not at the core of Isabelle. Code generation is a cool feature but is also very much seperate from the reasoning core of Isabelle/HOL. Isabelle/HOL itself has absolutely no problems at all with infinite structures such as these.</p>",
+        "id": 249507051,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1629026247
+    },
+    {
+        "content": "<p>Thanks! <br>\nSo I've annotated the <code>stream</code> type with <code>code_lazy_type</code> and I'm able to compute values.<br>\nex <code>value \"take' 3 nats\"</code> yields <code>[0,1,2]</code> this previously spun forever thanks to eager evaluation.</p>\n<p>Sledgehammer/try still have no luck on very simple statements like <code>lemma \"take' 3 nats = [0,1,2]\"</code></p>",
+        "id": 249660969,
+        "sender_full_name": "Eric Bond",
+        "timestamp": 1629156043
+    },
+    {
+        "content": "<p>Sledgehammer is not really made for evaluating terms. Since <code>take'</code> is probably defined by recursion over <code>3</code>, the easiest approach to evaluation (if you really do need that) is to prove lemmas like</p>\n<div class=\"codehilite\" data-code-language=\"Text only\"><pre><span></span><code>take' 0 xs = []\nn &gt; 0 ⟹ take' n xs = shd xs # take' (n - 1) (stl xs)\n</code></pre></div>\n<p>(assuming that's what the projection functions for your stream type are called) and then add those rules to the simplifier.</p>\n<p>In case you're not aware of it, note that we do have stream library in the standard library.</p>",
+        "id": 249680829,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1629179148
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"404050\">Eric Bond</span> has marked this topic as resolved.</p>",
+        "id": 249899210,
+        "sender_full_name": "Notification Bot",
+        "timestamp": 1629314388
+    }
+]

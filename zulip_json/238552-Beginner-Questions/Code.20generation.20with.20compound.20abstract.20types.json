@@ -1,0 +1,68 @@
+[
+    {
+        "content": "<p>Hi all. As documented e.g. in 3.2 of the 2013 article <a href=\"https://isabelle.in.tum.de/~haftmann/pdf/data_refinement_in_isabelle_hol_haftmann_krauss_kuncar_nipkow.pdf\">https://isabelle.in.tum.de/~haftmann/pdf/data_refinement_in_isabelle_hol_haftmann_krauss_kuncar_nipkow.pdf</a>,  code generation does not support  code equations for lifted definitions resulting in compound abstract types. Here's a simple example:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">typedef</span><span class=\"w\"> </span><span class=\"n\">nat_pos</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"s\">‹{ n :: nat . n &gt; 0 }›</span>\n<span class=\"w\">  </span><span class=\"k\">by</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">simp</span><span class=\"w\"> </span><span class=\"n\">add</span><span class=\"o\">:</span><span class=\"w\"> </span><span class=\"n\">gt_ex</span><span class=\"o\">)</span>\n<span class=\"k\">setup_lifting</span><span class=\"w\"> </span><span class=\"n\">nat_pos.type_definition_nat_pos</span>\n\n<span class=\"k\">definition</span><span class=\"w\"> </span><span class=\"n\">nat_minus_one</span><span class=\"w\"> </span><span class=\"o\">::</span><span class=\"w\"> </span><span class=\"s\">‹nat ⇒ nat option›</span>\n<span class=\"w\">  </span><span class=\"kp\">where</span><span class=\"w\"> </span><span class=\"s\">‹nat_minus_one n ≡ if n - 1 &gt; 0 then Some (n - 1) else None›</span>\n\n<span class=\"kn\">lift_definition</span><span class=\"w\"> </span><span class=\"n\">nat_pos_minus_one</span><span class=\"w\"> </span><span class=\"o\">::</span><span class=\"w\"> </span><span class=\"s\">‹nat_pos ⇒ nat_pos option›</span>\n<span class=\"w\">  </span><span class=\"kp\">is</span><span class=\"w\"> </span><span class=\"s\">‹nat_minus_one›</span><span class=\"w\"> </span><span class=\"k\">by</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">auto</span><span class=\"w\"> </span><span class=\"n\">simp</span><span class=\"w\"> </span><span class=\"n\">add</span><span class=\"o\">:</span><span class=\"w\"> </span><span class=\"n\">nat_minus_one_def</span><span class=\"o\">)</span>\n\n<span class=\"k\">export_code</span><span class=\"w\"> </span><span class=\"n\">nat_pos_minus_one</span><span class=\"w\"> </span><span class=\"kp\">in</span><span class=\"w\"> </span><span class=\"n\">OCaml</span><span class=\"w\"> </span><span class=\"c\">(* No code equations for nat_pos_minus_one *)</span>\n</code></pre></div>\n<p>I am aware that one can work around this by realizing <code>nat_pos option</code> as a subtype of <code>nat option</code>, but this quickly becomes impractical in non-toy examples.</p>\n<p>Reading loc.cit. above suggests that the issue is with the code generator having to guarantee that <code>Abs_C</code> is only ever applied to terms satisfying the subtype invariant. However, the <code>lift_definition nat_pos_minus_one ...</code> command above _does_ already generate the correct proof obligation here: <code>⋀nat. 0 &lt; nat ⟹ pred_option ((&lt;) 0) (nat_minus_one nat)</code>.  This being discharged, it confuses me that the resulting theorem <code>nat_pos_minus_one ≡ map_fun Rep_nat_pos (map_option Abs_nat_pos) nat_minus_one</code> is not used as a code equation. It seems that the hard part is already done?</p>\n<p>Has there been any progress on this limitation since 2013? Are there any other workaround than realizing <code>nat_pos option</code> as a subtype of <code>nat option</code>? I'm OK with a bit of ML hacking as well, so long as it can be done atop of the existing ML interfaces.</p>",
+        "id": 412506501,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1705051733
+    },
+    {
+        "content": "<p>The following would work:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">definition</span><span class=\"w\"> </span><span class=\"o\">[</span><span class=\"n\">code</span><span class=\"w\"> </span><span class=\"n\">del</span><span class=\"o\">]:</span><span class=\"w\"> </span><span class=\"s\">‹Abs_nat_pos' ≡ Abs_nat_pos›</span>\n<span class=\"k\">code_printing</span><span class=\"w\"> </span><span class=\"kp\">constant</span><span class=\"w\"> </span><span class=\"n\">Abs_nat_pos'</span><span class=\"w\"> </span><span class=\"n\">⇀</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">OCaml</span><span class=\"o\">)</span><span class=\"w\"> </span><span class=\"s\">\"Abs'_nat'_pos\"</span>\n\n<span class=\"k\">declare</span><span class=\"w\"> </span><span class=\"n\">nat_pos_minus_one_def</span><span class=\"o\">[</span><span class=\"n\">folded</span><span class=\"w\"> </span><span class=\"n\">Abs_nat_pos'_def</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"n\">code</span><span class=\"o\">]</span>\n<span class=\"k\">export_code</span><span class=\"w\"> </span><span class=\"n\">nat_pos_minus_one</span><span class=\"w\"> </span><span class=\"kp\">in</span><span class=\"w\"> </span><span class=\"n\">OCaml</span>\n</code></pre></div>\n<p>Of course, <code>code_printing</code> is generally unsound, but here we are only forcing instances of <code>Abs_C</code> in definitions emitted by <code>lift_definition</code>, and those [so it seems to me] have already been proved to preserve the invariant. So the above seems sound... or am I missing something? If it is indeed sound, it is unclear to me why the code generator doesn't do this automatically.</p>",
+        "id": 412518718,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1705055898
+    },
+    {
+        "content": "<p>I am not sure what the question is, but <a href=\"https://isabelle.in.tum.de/doc/codegen.pdf\">https://isabelle.in.tum.de/doc/codegen.pdf</a>, Section 3.3?</p>",
+        "id": 412522645,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1705057385
+    },
+    {
+        "content": "<p>Or is the point that you do not want to see the new types at all?</p>",
+        "id": 412522779,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1705057446
+    },
+    {
+        "content": "<p>The question is, primarily: Is there a way to extract code for examples like <code>nat_pos_minus_one</code> above, which does not require the definition of intermediate types? And, second, why the code generator does not export code equations already, given that <code>lift_definition</code> does seem to generate the relevant side conditions correctly even when the result type is compound.</p>",
+        "id": 412522790,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1705057449
+    },
+    {
+        "content": "<p>Typedef supports any set, so I do not think a general translation is possible:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">typedef</span><span class=\"w\"> </span><span class=\"n\">nat_pos</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"s\">‹(λn.  (SOME x. x &gt; n))  ` { n :: nat . n &gt; 0 }›</span>\n<span class=\"w\">  </span><span class=\"k\">by</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">simp</span><span class=\"w\"> </span><span class=\"n\">add</span><span class=\"o\">:</span><span class=\"w\"> </span><span class=\"n\">gt_ex</span><span class=\"o\">)</span>\n</code></pre></div>",
+        "id": 412524709,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1705058266
+    },
+    {
+        "content": "<p>I don't follow yet -- can you elaborate this into an example? Note that I am assuming that there is a concrete and extractable 'blueprint'  <code>definition nat_minus_one :: ‹nat ⇒ nat option›</code> for the function <code>nat_pos =&gt; nat_pos option</code> I'm after. <code>lift_definition</code> already generates the right obligations, so why is <code>nat_pos_minus_one ≡ map_fun Rep_nat_pos (map_option Abs_nat_pos) nat_minus_one</code> not accepted as a code equation afterwards?</p>",
+        "id": 412525488,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1705058533
+    },
+    {
+        "content": "<p>You cannot generate code for Abs_nat_pos in general</p>",
+        "id": 412525679,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1705058619
+    },
+    {
+        "content": "<p>It's understood that <code>Abs_C</code> should only be code-extracted when it can be argued that its inputs will satisfy the respective invariant. My point is that this _is_ being  proved as part of <code>lift_definition</code>, regardless of whether the target is a compound type or not. But when it is, somehow no code equation is being generated.</p>",
+        "id": 412526568,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1705058963
+    },
+    {
+        "content": "<p>Maybe I wasn't clear enough: The issue is _wholly_ about <code>lift_definition</code> when the target of the function is a type expression involving the abstract type, but where the abstract type does not appear at the top level. </p>\n<p>The following, for example, works absolutely fine:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">lift_definition</span><span class=\"w\"> </span><span class=\"n\">nat_pos_minus_one'</span><span class=\"w\"> </span><span class=\"o\">::</span><span class=\"w\"> </span><span class=\"s\">‹nat_pos ⇒ nat_pos›</span>\n<span class=\"w\">  </span><span class=\"kp\">is</span><span class=\"w\"> </span><span class=\"s\">‹λn. if n - 1 &gt; 0 then n - 1 else 42›</span><span class=\"w\"> </span><span class=\"k\">by</span><span class=\"w\"> </span><span class=\"n\">auto</span>\n\n<span class=\"k\">export_code</span><span class=\"w\"> </span><span class=\"n\">nat_pos_minus_one'</span>\n</code></pre></div>\n<p>But as soon as you use any compound type, like <code>'a + nat_pos</code>, <code>nat_pos option</code>, <code>nat_pos x 'b</code>, or whatever -- subsequent code generation doesn't work anymore, even though <code>lift_definition</code> itself is still generating the right (a) conditions and (b) equations.</p>",
+        "id": 412527536,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1705059367
+    },
+    {
+        "content": "<p>For the record: <code>lift_definition (code_dt)</code> does the trick.</p>",
+        "id": 412820547,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1705243576
+    }
+]

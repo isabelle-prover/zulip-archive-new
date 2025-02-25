@@ -1,0 +1,44 @@
+[
+    {
+        "content": "<p>From: Lars Noschinski &lt;<a href=\"mailto:noschinl@in.tum.de\">noschinl@in.tum.de</a>&gt;<br>\nHi,</p>\n<p>what transformations are allowed for check phases and which invariants<br>\ncan I expect to be preserved by check phases? I couldn't find anything<br>\nin the implementation manual, but the reference manual at least states<br>\n(section 7.5):</p>\n<p>Pre-terms are further processed by the so-called check and uncheck<br>\n    phases that are intertwined with type-inference (see also [49]). The<br>\n    latter allows to operate on higher-order abstract syntax with proper<br>\n    binding an type information already available</p>\n<p>(although I'm not sure what \"latter\" refers to here).</p>\n<p>The invariant I am interested in is the preservation of binders: Given a<br>\nconstant c (declared by myself, so no check-phase should know about it)<br>\nand an (unchecked) term t containing c exactly once, then the<br>\nAbs(tractions) in t above c are the same as the abstractions above c in<br>\nSyntax.check_term ctxt t (of course \"same\" is a bit fuzzy here --<br>\nobviously types and names might change).</p>\n<p>Is this a reasonable expectation?</p>",
+        "id": 294285571,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660921735
+    },
+    {
+        "content": "<p>From: Lars Noschinski &lt;<a href=\"mailto:noschinl@in.tum.de\">noschinl@in.tum.de</a>&gt;<br>\nTo provide a bit of background: The pat_subst tool we presented at the<br>\nIsabelle workshop allows pattern of the form</p>\n<p>at \"Suc x\" in \"{x. _ + HOLE}\"</p>\n<p>to describe for example the subterm \"Suc y\" in the term \"{y. 1 + (Suc y</p>\n<ul>\n<li>1))}\" where the \"x\" in \"Suc x\" refers to the variable bound in the set<br>\nexpression. Obviously, the bound variable \"x\" in the second term and the<br>\nfree variable \"x\" in the first term should have the same type.</li>\n</ul>\n<p>I achieve that by parsing the terms separatly and calling<br>\nSyntax.check_terms on</p>\n<p>[\"Suc x\", \"x :: '?a\", \"{x :: '?a. _ + HOLE}\"</p>\n<p>(where \":: '?a\" are type constraints added with Type.constraint). Now,<br>\nafter checking the terms, I need to be able to associate the free<br>\nvariables which the right bound variables again. If I can expect the<br>\nbound variables between root and HOLE to be the same before and after<br>\nthe check, this is easy.</p>\n<p>-- Lars</p>",
+        "id": 294285584,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660921741
+    },
+    {
+        "content": "<p>From: Jasmin Christian Blanchette &lt;<a href=\"mailto:jasmin.blanchette@gmail.com\">jasmin.blanchette@gmail.com</a>&gt;<br>\nI don't know if this will help with your application, but \"Term.rename_abs\" might be part of the solution.</p>\n<p>Jasmin</p>",
+        "id": 294285608,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660921747
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nSee chapter 3 of the \"implementation\" manual.  For Isabelle2014 I have <br>\nextended and refined this again (last June).</p>\n<p>If there is anything important missing or unclear, we can discuss that, <br>\nespecially for the coming release.</p>\n<p>Makarius</p>",
+        "id": 294285868,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660921827
+    },
+    {
+        "content": "<p>From: Lars Noschinski &lt;<a href=\"mailto:noschinl@in.tum.de\">noschinl@in.tum.de</a>&gt;<br>\n[Everything here refers to 2014-RC1]</p>\n<p>On the topic of seperation of parse and check, the manual states:</p>\n<p>Note that the formal status of bound variables, versus free<br>\n    variables, versus constants must not be changed between these phases.</p>\n<p>And</p>\n<p>The check phase is meant to subsume a variety of mechanisms in the<br>\n    manner of \"type-inference\" or \"type-reconstruction\" or<br>\n    \"type-improvement\", not just type-checking in the narrow sense.</p>\n<p>By the latter sentence, modifying types and type constraints is<br>\nobviously in the scope of check. I'd interpret the former as \"a check<br>\nmodule transforms bounds to bounds, frees to frees and constants to<br>\nconstants\". However, the abbreviation mechanism is allowed to replace<br>\nsubterms (with a certain constant at the root) by (almost) arbitrary<br>\nother subterms (but without capturing additional variables).</p>\n<p>Similarly (but not mentioned), the \"_\" will be replaced by a Var,<br>\ncapturing all available bounds. So I guess, the first quoted sentence<br>\nneeds to be read as</p>\n<p>Bounds stay bounds, Frees stay Frees, subterms starting with Consts<br>\n    can be transformed almost arbitrarily (although they are probably<br>\n    not allowed to introduce new, previously unfixed, frees).</p>\n<p>The manual doesn't mention abstractions, so I assume that there are<br>\ncases where eta-contraction or even beta-reduction would be deemed as<br>\nallowed steps for a check module.</p>\n<p>BTW, a small nitpick: In the last sentence in the paragraph on<br>\nSyntax.read_terms (bottom of page 93), the reference to §3.3 is missing<br>\nparentheses or a \"see\".</p>",
+        "id": 294291900,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660923729
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nOn Fri, 1 Aug 2014, Lars Noschinski wrote:</p>\n<blockquote>\n<p>And</p>\n<p>The check phase is meant to subsume a variety of mechanisms in the<br>\n   manner of \"type-inference\" or \"type-reconstruction\" or<br>\n   \"type-improvement\", not just type-checking in the narrow sense.</p>\n<p>By the latter sentence, modifying types and type constraints is<br>\nobviously in the scope of check.</p>\n</blockquote>\n<p>Yes, type constraints and certain change of status of type variables is <br>\npossible, and actually the main purpose of certain check phases.  The <br>\nimplementation manual has some general explanations on the implicit <br>\npolymorphism of terms that apply here as well.</p>\n<p>In other situations, term checks perform some kind of higher-order <br>\nrewriting.  This might include alpha-beta-eta conversions, although within <br>\nthe syntax one needs to be more careful than within the logic, to avoid <br>\ntoo much user-confusion.  Tool confusion is a different thing: in full <br>\ngenerality, the mix of check phases might not work out at all.</p>\n<blockquote>\n<p>Similarly (but not mentioned), the \"_\" will be replaced by a Var,<br>\ncapturing all available bounds.</p>\n</blockquote>\n<p>That is some special trickery with \"dummy_pattern\" -- probably not <br>\nsomething to try at home.</p>\n<p>Makarius</p>",
+        "id": 294291980,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660923759
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nReading this description twice, I would say it should work, but there <br>\nmight be fine points to be observed.</p>\n<p>I still need to read your paper from the Isabelle workshop -- it is <br>\nalready printed out and on the top of the stack.</p>\n<p>Makarius</p>",
+        "id": 294292027,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660923773
+    }
+]

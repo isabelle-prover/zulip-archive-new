@@ -1,0 +1,120 @@
+<html>
+<head><meta charset="utf-8"><title>Instantiating a theorem based on matching result · Isabelle/ML · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle/ML/index.html">Isabelle/ML</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle/ML/topic/Instantiating.20a.20theorem.20based.20on.20matching.20result.html">Instantiating a theorem based on matching result</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="253963484"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Instantiating%20a%20theorem%20based%20on%20matching%20result/near/253963484" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mohammad Abdulaziz <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle/ML/topic/Instantiating.20a.20theorem.20based.20on.20matching.20result.html#253963484">(Sep 19 2021 at 18:42)</a>:</h4>
+<p>I am trying to instantiate the schematic variables of a theorem based on the environment found by the matcher. For instance, in the example below, I instantiate the two schematic variables in the theorem <code>exI</code>, and that works.</p>
+<div class="codehilite" data-code-language="fun"><pre><span></span><code>fun prep_ty ctxt (x, (S, ty)) = ((x, S), Thm.ctyp_of ctxt ty)
+fun pretty_typ ctxt ty = Syntax.pretty_typ ctxt ty
+
+
+val P = Free ("P", @{typ "'a ⇒ bool"})
+val x = Free ("x", @{typ 'a})
+val trm = (Thm.term_of (Thm.cterm_of @{context} (P $ x)))
+
+fun inst_exI ctxt trm =
+let
+  val pat = (HOLogic.dest_Trueprop (nth (Logic.strip_imp_prems (Thm.prop_of exI)) 0))
+  val univ = Unify.matchers (Context.Proof ctxt) [(pat, trm)]
+  val env = nth (Seq.list_of univ) 1
+  val tenv = Vartab.dest (Envir.term_env env)
+  val tyenv = Vartab.dest (Envir.type_env env)
+  val instantiation = (Thm.instantiate (map (prep_ty ctxt) tyenv, map (prep_trm ctxt) tenv) exI)
+in
+  instantiation
+end
+
+val _ = inst_exI @{context} trm
+</code></pre></div>
+<p>However, when I try to instantiate only one of the schematic variables, as in the example below, this does not work.</p>
+<div class="codehilite" data-code-language="fun"><pre><span></span><code>fun prep_ty ctxt (x, (S, ty)) = ((x, S), Thm.ctyp_of ctxt ty)
+fun pretty_typ ctxt ty = Syntax.pretty_typ ctxt ty
+
+
+val x = Free ("x", @{typ 'a})
+val trm = (Thm.term_of (Thm.cterm_of @{context} x))
+
+fun inst_exI ctxt trm =
+let
+  val pat = snd (Term.dest_comb (HOLogic.dest_Trueprop (nth (Logic.strip_imp_prems (Thm.prop_of exI)) 0)))
+  val univ = Unify.matchers (Context.Proof ctxt) [(pat, trm)]
+  val env = nth (Seq.list_of univ) 1
+  val tenv = Vartab.dest (Envir.term_env env)
+  val tyenv = Vartab.dest (Envir.type_env env)
+  val instantiation = (Thm.instantiate (map (prep_ty ctxt) tyenv, map (prep_trm ctxt) tenv) exI)
+in
+  instantiation
+end
+
+val _ = inst_exI @{context} trm
+</code></pre></div>
+<p>Does any one know a work around for that?</p>
+
+
+
+<a name="254009660"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Instantiating%20a%20theorem%20based%20on%20matching%20result/near/254009660" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Kevin Kappelmann <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle/ML/topic/Instantiating.20a.20theorem.20based.20on.20matching.20result.html#254009660">(Sep 20 2021 at 07:43)</a>:</h4>
+<p>can you also post the definition of <code>prep_trm</code>?</p>
+
+
+
+<a name="254013954"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Instantiating%20a%20theorem%20based%20on%20matching%20result/near/254013954" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mohammad Abdulaziz <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle/ML/topic/Instantiating.20a.20theorem.20based.20on.20matching.20result.html#254013954">(Sep 20 2021 at 08:26)</a>:</h4>
+<p>I added it</p>
+
+
+
+<a name="254019571"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Instantiating%20a%20theorem%20based%20on%20matching%20result/near/254019571" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Kevin Kappelmann <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle/ML/topic/Instantiating.20a.20theorem.20based.20on.20matching.20result.html#254019571">(Sep 20 2021 at 09:19)</a>:</h4>
+<p><a href="/user_uploads/14278/rM3czGy2KYHiFAp0mJ90BcRf/image.png">image.png</a></p>
+<div class="message_inline_image"><a href="/user_uploads/14278/rM3czGy2KYHiFAp0mJ90BcRf/image.png" title="image.png"><img src="/user_uploads/14278/rM3czGy2KYHiFAp0mJ90BcRf/image.png"></a></div>
+
+
+
+<a name="254019700"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Instantiating%20a%20theorem%20based%20on%20matching%20result/near/254019700" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Kevin Kappelmann <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle/ML/topic/Instantiating.20a.20theorem.20based.20on.20matching.20result.html#254019700">(Sep 20 2021 at 09:20)</a>:</h4>
+<p>the problem is that in the term substitution, <code>?x</code> has type <code>?'a</code> but <code>?'a</code> will be mapped to <code>'a</code>, so you need to normalise the types in your term substitution as well</p>
+
+
+
+<a name="254019742"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Instantiating%20a%20theorem%20based%20on%20matching%20result/near/254019742" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Kevin Kappelmann <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle/ML/topic/Instantiating.20a.20theorem.20based.20on.20matching.20result.html#254019742">(Sep 20 2021 at 09:21)</a>:</h4>
+<p>Here's something I use to normalise a theorem wrt an environment. You can adapt it to your use case:</p>
+<div class="codehilite" data-code-language="OCaml"><pre><span></span><code><span class="k">fun</span> <span class="n">norm_thm</span> <span class="n">ctxt</span> <span class="o">(</span><span class="n">env</span> <span class="k">as</span> <span class="nn">Envir</span><span class="p">.</span><span class="nc">Envir</span> <span class="o">{</span><span class="n">tyenv</span><span class="o">,...})</span> <span class="n">thm</span> <span class="o">=</span>
+  <span class="k">let</span>
+    <span class="k">val</span> <span class="n">prop</span> <span class="o">=</span> <span class="nn">Thm</span><span class="p">.</span><span class="n">prop_of</span> <span class="n">thm</span>
+    <span class="k">val</span> <span class="n">norm_type</span> <span class="o">=</span> <span class="nn">Envir</span><span class="p">.</span><span class="n">norm_type</span> <span class="n">tyenv</span>
+    <span class="k">val</span> <span class="n">norm_term</span> <span class="o">=</span> <span class="nn">Envir</span><span class="p">.</span><span class="n">norm_term</span> <span class="n">env</span>
+    <span class="k">fun</span> <span class="n">prep_type_entry</span> <span class="n">x</span> <span class="o">=</span> <span class="o">(</span><span class="n">x</span><span class="o">,</span> <span class="nn">Thm</span><span class="p">.</span><span class="n">ctyp_of</span> <span class="n">ctxt</span> <span class="o">(</span><span class="n">norm_type</span> <span class="o">(</span><span class="nc">TVar</span> <span class="n">x</span><span class="o">)))</span>
+    <span class="k">val</span> <span class="n">type_inst</span> <span class="o">=</span> <span class="nn">Term</span><span class="p">.</span><span class="n">add_tvars</span> <span class="n">prop</span> <span class="bp">[]</span> <span class="o">|&gt;</span> <span class="n">map</span> <span class="n">prep_type_entry</span>
+    <span class="k">fun</span> <span class="n">prep_term_entry</span> <span class="o">(</span><span class="n">x</span> <span class="k">as</span> <span class="o">(</span><span class="n">n</span><span class="o">,</span> <span class="nc">T</span><span class="o">))</span> <span class="o">=</span> <span class="o">((</span><span class="n">n</span><span class="o">,</span> <span class="n">norm_type</span> <span class="nc">T</span><span class="o">),</span> <span class="nn">Thm</span><span class="p">.</span><span class="n">cterm_of</span> <span class="n">ctxt</span> <span class="o">(</span><span class="n">norm_term</span> <span class="o">(</span><span class="nc">Var</span> <span class="n">x</span><span class="o">)))</span>
+    <span class="k">val</span> <span class="n">term_inst</span> <span class="o">=</span> <span class="nn">Term</span><span class="p">.</span><span class="n">add_vars</span> <span class="n">prop</span> <span class="bp">[]</span> <span class="o">|&gt;</span> <span class="n">map</span> <span class="n">prep_term_entry</span>
+    <span class="k">val</span> <span class="n">inst</span> <span class="o">=</span> <span class="o">(</span><span class="n">type_inst</span><span class="o">,</span> <span class="n">term_inst</span><span class="o">)</span>
+  <span class="k">in</span> <span class="nn">Thm</span><span class="p">.</span><span class="n">instantiate</span> <span class="n">inst</span> <span class="n">thm</span> <span class="k">end</span>
+</code></pre></div>
+
+
+
+<a name="254026504"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Instantiating%20a%20theorem%20based%20on%20matching%20result/near/254026504" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mohammad Abdulaziz <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle/ML/topic/Instantiating.20a.20theorem.20based.20on.20matching.20result.html#254026504">(Sep 20 2021 at 10:15)</a>:</h4>
+<p>Thanks! That works. In general, is it a good idea to always normalise terms and types in thms or instantatiations?</p>
+
+
+
+<a name="254162905"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Instantiating%20a%20theorem%20based%20on%20matching%20result/near/254162905" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Kevin Kappelmann <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle/ML/topic/Instantiating.20a.20theorem.20based.20on.20matching.20result.html#254162905">(Sep 21 2021 at 06:53)</a>:</h4>
+<p>Normalisation wrt arbitrary environments can be quite expensive, so if you can avoid the normalisation step, do so. Sometimes however, I think, you cannot get around it since <code>thm.ML</code> checks for type consistency at certain places (as in your case above).<br>
+Moreover, if you already now that you only want to instantiate certain variables, you can get around the term traversals (the <code>add_(t)vars</code> calls in my function above) by only normalising those variables explicitly.</p>
+
+
+
+<hr><p>Last updated: Jul 15 2022 at 23:21 UTC</p>
+</html>

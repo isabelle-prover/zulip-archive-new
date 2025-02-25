@@ -1,0 +1,236 @@
+[
+    {
+        "content": "<p>I'm trying to generate fresh names (which can be executed). The idea is to keep track of the prev. used names and to pick the <code>smallest</code> element, see.</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">definition</span> <span class=\"n\">fresh</span> <span class=\"o\">::</span> <span class=\"s\">\"'a :: linorder set ⇒ 'a × 'a set\"</span> <span class=\"kp\">where</span>\n<span class=\"s\">\"fresh used = (let f = LEAST x. x ∉ used in (f, insert f used))\"</span>\n</code></pre></div>\n<p>The simple example works as expected</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">lemma</span> <span class=\"s\">\"fresh {1::nat} = x\"</span>\n  <span class=\"kp\">apply</span> <span class=\"o\">(</span><span class=\"n\">simp</span> <span class=\"n\">add</span><span class=\"o\">:</span> <span class=\"n\">fresh_def</span><span class=\"o\">)</span>\n</code></pre></div>\n<p>but when starting at 0</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">lemma</span> <span class=\"s\">\"fresh {0::nat,1} = x\"</span>\n  <span class=\"kp\">apply</span> <span class=\"o\">(</span><span class=\"n\">simp</span> <span class=\"n\">add</span><span class=\"o\">:</span> <span class=\"n\">fresh_def</span><span class=\"o\">)</span>\n</code></pre></div>\n<p>I do get the following goal:</p>\n<div class=\"codehilite\"><pre><span></span><code>proof (prove)\ngoal (1 subgoal):\n 1. (let f = LEAST x. 0 &lt; x ∧ x ≠ Suc 0 in (f, {f, 0, Suc 0})) = x\n</code></pre></div>\n<p>So, why is  the first part of the goal given by <code>0 &lt; x  ∧...</code> and not <code>x  ≠ 0 ∧...</code>?</p>",
+        "id": 246390478,
+        "sender_full_name": "Robert Soeldner",
+        "timestamp": 1626630993
+    },
+    {
+        "content": "<div class=\"codehilite\"><pre><span></span><code>lemma ‹n ≠ (0:: nat)›\n  supply [[simp_trace]]\n  apply simp\n  oops\n</code></pre></div>\n<p>shows that the culprint is <code>thm neq0_conv</code>.</p>",
+        "id": 246390733,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1626631306
+    },
+    {
+        "content": "<p>It is declared is <code>iff</code> rule</p>",
+        "id": 246390741,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1626631318
+    },
+    {
+        "content": "<p>So:</p>\n<div class=\"codehilite\"><pre><span></span><code>(simp add: fresh_def del: neq0_conv)\n</code></pre></div>",
+        "id": 246390798,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1626631364
+    },
+    {
+        "content": "<p>How do you handle infinite sets in <code>fresh</code>?</p>",
+        "id": 246390894,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1626631522
+    },
+    {
+        "content": "<p>like <code>UNIV:: 'a :: linorder set</code></p>",
+        "id": 246390911,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1626631551
+    },
+    {
+        "content": "<p>This makes sense, is <code>supply</code> similar to <code>using [[...]]</code> ?<br>\nIn my specific use-case, the set is always finite.</p>",
+        "id": 246390968,
+        "sender_full_name": "Robert Soeldner",
+        "timestamp": 1626631599
+    },
+    {
+        "content": "<p>Yes for supply</p>",
+        "id": 246390978,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1626631623
+    },
+    {
+        "content": "<p>For the finite case: sure, but won't that make it impossible to make the code executable?</p>",
+        "id": 246390993,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1626631650
+    },
+    {
+        "content": "<p>I'm surprised <code>Least</code> is executable at all. It can't be efficient.</p>",
+        "id": 246391015,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1626631679
+    },
+    {
+        "content": "<p>Well no by default but if the set is finite you can iterate over it to find the first missing value…</p>",
+        "id": 246391058,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1626631731
+    },
+    {
+        "content": "<p>I'd recommend using something like <code>if X = {} then 0 else Suc (Max X)</code> instead.</p>",
+        "id": 246391060,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1626631735
+    },
+    {
+        "content": "<p>… or directly remember the upper bound <code>N</code> on the indices and use <code>{0..N}</code> whenever you need the set</p>",
+        "id": 246391077,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1626631789
+    },
+    {
+        "content": "<p>But: both approaches create holes in the indices (if you also remove some indices)</p>",
+        "id": 246391129,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1626631828
+    },
+    {
+        "content": "<p>Yes, but you're going to have to supply custom code equations for this.</p>",
+        "id": 246391133,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1626631840
+    },
+    {
+        "content": "<p>Frankly, I'd just use the <code>Max</code> approach. Easier to reason about, and you get executability for free.</p>",
+        "id": 246391142,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1626631872
+    },
+    {
+        "content": "<p>this case is limited to nat, I was hoping to use strings as well... Or I could use <code>of_char</code> while parsing and <code>to_char</code> for printing?</p>",
+        "id": 246391144,
+        "sender_full_name": "Robert Soeldner",
+        "timestamp": 1626631893
+    },
+    {
+        "content": "<p>The side of me that proves things agrees with you Manuel… but the side that generates fast code strongly disagrees with you ;-)</p>",
+        "id": 246391185,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1626631937
+    },
+    {
+        "content": "<p>(Little-known fact, <code>Sup</code> also exists for <code>nat</code>s and is executable. It's basically the same as <code>Max</code>, except that <code>Max {}</code> is undefined while <code>Sup ({} :: nat set) = 0</code>).</p>",
+        "id": 246391186,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1626631942
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"233198\">Mathias Fleury</span> <a href=\"#narrow/stream/238552-Beginner-Questions/topic/fresh.20names/near/246391185\">said</a>:</p>\n<blockquote>\n<p>The side of me that proves things agrees with you Manuel… but the side that generates fast code strongly disagrees with you ;-)</p>\n</blockquote>\n<p>Well sure, it's better to just remember the max index in the first place.</p>",
+        "id": 246391194,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1626631967
+    },
+    {
+        "content": "<p>I was simply arguing for <code>Max</code> over <code>Least</code>.</p>",
+        "id": 246391196,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1626631974
+    },
+    {
+        "content": "<p>Fresh name generation is always a pain</p>",
+        "id": 246391200,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1626631991
+    },
+    {
+        "content": "<p>For strings, the obvious approach is to just use some string encoding of numbers as all your variable names.</p>",
+        "id": 246391213,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1626632025
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"232736\">Manuel Eberl</span> <a href=\"#narrow/stream/238552-Beginner-Questions/topic/fresh.20names/near/246391200\">said</a>:</p>\n<blockquote>\n<p>Fresh name generation is always a pain</p>\n</blockquote>\n<p>This is good to know. What would be the keyword to check if I want to encode strings while parsing and later, back, while printing ?</p>",
+        "id": 246391255,
+        "sender_full_name": "Robert Soeldner",
+        "timestamp": 1626632070
+    },
+    {
+        "content": "<p>Otherwise, one can do a \"name variant\" approach, i.e. start with some \"desired\" name and then append stuff to it (e.g. <code>'</code> or <code>a</code>, <code>b</code>, <code>c</code>, etc.) until you find one that isn't taken yet.</p>",
+        "id": 246391263,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1626632092
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"403618\">Robert Soeldner</span> <a href=\"#narrow/stream/238552-Beginner-Questions/topic/fresh.20names/near/246391255\">said</a>:</p>\n<blockquote>\n<p><span class=\"user-mention silent\" data-user-id=\"232736\">Manuel Eberl</span> <a href=\"#narrow/stream/238552-Beginner-Questions/topic/fresh.20names/near/246391200\">said</a>:</p>\n<blockquote>\n<p>Fresh name generation is always a pain</p>\n</blockquote>\n<p>This is good to know. What would be the keyword to check if I want to encode strings while parsing and later, back, while printing ?</p>\n</blockquote>\n<p>I don't understand what you mean.</p>",
+        "id": 246391270,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1626632106
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"232736\">Manuel Eberl</span> <a href=\"#narrow/stream/238552-Beginner-Questions/topic/fresh.20names/near/246391270\">said</a>:</p>\n<blockquote>\n<p><span class=\"user-mention silent\" data-user-id=\"403618\">Robert Soeldner</span> <a href=\"#narrow/stream/238552-Beginner-Questions/topic/fresh.20names/near/246391255\">said</a>:</p>\n<blockquote>\n<p><span class=\"user-mention silent\" data-user-id=\"232736\">Manuel Eberl</span> <a href=\"#narrow/stream/238552-Beginner-Questions/topic/fresh.20names/near/246391200\">said</a>:</p>\n<blockquote>\n<p>Fresh name generation is always a pain</p>\n</blockquote>\n<p>This is good to know. What would be the keyword to check if I want to encode strings while parsing and later, back, while printing ?</p>\n</blockquote>\n<p>I don't understand what you mean.</p>\n</blockquote>\n<p>Isnt there an option to instruct Isabelle to encode strings to nats while parsing? This would allow me to work with nat internally</p>",
+        "id": 246391333,
+        "sender_full_name": "Robert Soeldner",
+        "timestamp": 1626632187
+    },
+    {
+        "content": "<p>I don't really understand what it is you're trying to do here. Are you developing an Isabelle tool?</p>",
+        "id": 246391350,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1626632240
+    },
+    {
+        "content": "<p>why would there be a default option to encode strings as nat?</p>",
+        "id": 246391357,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1626632255
+    },
+    {
+        "content": "<p>(such bijection exists because countable)</p>",
+        "id": 246391362,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1626632280
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"233198\">Mathias Fleury</span> <a href=\"#narrow/stream/238552-Beginner-Questions/topic/fresh.20names/near/246391357\">said</a>:</p>\n<blockquote>\n<p>why would there be a default option to encode strings as nat?</p>\n</blockquote>\n<p>not a default, but user supplied.</p>",
+        "id": 246391404,
+        "sender_full_name": "Robert Soeldner",
+        "timestamp": 1626632295
+    },
+    {
+        "content": "<p>Not that I know of</p>",
+        "id": 246391477,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1626632426
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"232736\">Manuel Eberl</span> <a href=\"#narrow/stream/238552-Beginner-Questions/topic/fresh.20names/near/246391350\">said</a>:</p>\n<blockquote>\n<p>I don't really understand what it is you're trying to do here. Are you developing an Isabelle tool?</p>\n</blockquote>\n<p>I started developing a verification framework for the graph programming language GP2. Especially the logic given in <a href=\"https://arxiv.org/abs/2012.01662v1\">https://arxiv.org/abs/2012.01662v1</a></p>",
+        "id": 246391478,
+        "sender_full_name": "Robert Soeldner",
+        "timestamp": 1626632429
+    },
+    {
+        "content": "<p>When I needed a mapping from string to nat, I used a hashmap and a fresh index …</p>",
+        "id": 246391496,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1626632479
+    },
+    {
+        "content": "<p>I'm still very new to Isabelle, your comments are highly appreciated.</p>",
+        "id": 246391544,
+        "sender_full_name": "Robert Soeldner",
+        "timestamp": 1626632530
+    },
+    {
+        "content": "<p>In short: I used the refinement framework to go from a string version to a nat version with the mapping because some operations required to the original string (sorting on the strings)</p>",
+        "id": 246391616,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1626632672
+    },
+    {
+        "content": "<p>But the Refinement Framework might be overkill for you</p>",
+        "id": 246391618,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1626632688
+    },
+    {
+        "content": "<p>Yea, I will initially take the <code>Max</code> approach and might ask again :-)</p>",
+        "id": 246391643,
+        "sender_full_name": "Robert Soeldner",
+        "timestamp": 1626632737
+    },
+    {
+        "content": "<p>You could presumably replace all the string variables with natural-number variables in a (possibly unverified) pre-processing step.</p>",
+        "id": 246391776,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1626632955
+    }
+]

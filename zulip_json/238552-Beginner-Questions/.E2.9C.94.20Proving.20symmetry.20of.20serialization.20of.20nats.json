@@ -1,0 +1,128 @@
+[
+    {
+        "content": "<p>Hi everyone,</p>\n<p>I'm making progress on this, but I thought it would be a good example to analyze.</p>\n<p>I am trying to show that serializing a number to bytes and then deserializing it results in the original number. Here are the function definitions:</p>\n<div class=\"codehilite\"><pre><span></span><code>fun digit_list :: &quot;nat ⇒ nat list ⇒ nat list&quot; where\n&quot;digit_list 0 s = s&quot; |\n&quot;digit_list n s = digit_list (n div 10) (n mod 10 # s)&quot;\n\nfun string_of_nat :: &quot;nat ⇒ string&quot; where\n&quot;string_of_nat n = map char_of (digit_list n &#39;&#39;&#39;&#39;)&quot;\n\nfun multiply_digit :: &quot;nat ⇒ nat ⇒ nat&quot; where\n&quot;multiply_digit a digit = a * 10 + digit&quot;\n\nfun nat_of_string :: &quot;string ⇒ nat&quot; where\n&quot;nat_of_string s = foldl multiply_digit 0 (map of_char s)&quot;\n</code></pre></div>\n<p><code>string_of_nat</code> produces a string given a <code>nat</code>, i.e. <code>value string_of_nat 123 = ''123''</code>, and <br>\n<code>nat_of_string</code> produces a <code>nat</code> given a <code>string</code>, i.e. <code>value nat_of_string ''123'' = 123</code>.</p>\n<p>I know there's a <code>show</code> implementation for <code>nat</code>, but I couldn't find the inverse, so I just implemented them both. I figure it's good practice.</p>\n<p>The theorem I'm trying to prove is then:</p>\n<p><code>nat_of_string (string_of_nat n) = n</code>,</p>\n<p>And here is my attempted proof:</p>\n<div class=\"codehilite\"><pre><span></span><code>theorem\n  shows &quot;nat_of_string (string_of_nat n) = n&quot;\nproof (induction n)\n  case 0\n  show ?case by auto\nnext\n  case (Suc n)\n  then show ?case\n    apply(auto simp add: foldl_map)\nqed\n</code></pre></div>\n<p>I added the <code>foldl_map</code> simplification rule as an attempt to leverage the fact that there are already simplification rules for <code>of_char (char_of c)</code>, and this did simplify the proof goals. Here's the goal that I'm left with (in the <code>Suc n</code> case):</p>\n<p><code>foldl (λa x. a * 10 + x mod 256) 0 (digit_list (Suc n div 10) [Suc n mod 10]) = Suc n</code></p>\n<p>I imagine that I need an intermediate lemma to aid in further simplification, but I've been unable to think of any that result in a discharged goal. I think one complication is that <code>digit_list</code> is guaranteed to create a list of <code>nats</code> that are each between 0-9, since the idea is to serialize individual digits. I could prove a lemma related to that, but I don't see how that will actually help in simplification.</p>\n<p>I appreciate any thoughts on this.</p>",
+        "id": 262536283,
+        "sender_full_name": "Alex Weisberger",
+        "timestamp": 1637716687
+    },
+    {
+        "content": "<p>Oof, you've made your life pretty difficult there. Basically, the more additional parameters (such as accumulators) you have, the more difficult the induction proofs will be because you have to generalise.</p>",
+        "id": 262686040,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1637834293
+    },
+    {
+        "content": "<p>If you do a straightforward induction on that statement, you will run into trouble, because in the statement you call <code>digit_list n []</code>, but in every recursion step of <code>digit_list</code>, it modifies the accumulator, so you won't be able to apply the induction hypothesis.</p>",
+        "id": 262686118,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1637834345
+    },
+    {
+        "content": "<p>So the first thing you need is a way to get rid of the accumulator, i.e. relate the behaviour of <code>digit_list n acc</code> to the behaviour of <code>digit_list n []</code></p>",
+        "id": 262686144,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1637834373
+    },
+    {
+        "content": "<p>Something like this:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">lemma</span> <span class=\"n\">digit_list_to_Nil</span><span class=\"o\">:</span> <span class=\"s\">\"digit_list n acc = digit_list n [] @ acc\"</span>\n</code></pre></div>",
+        "id": 262686159,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1637834385
+    },
+    {
+        "content": "<p>You will also need to prove <code>map (of_char ∘ char_of) (digit_list n []) = digit_list n []</code>, which only holds because all the numbers in <code>digit_list</code> are less than 10 (in particular less than 256).</p>",
+        "id": 262686285,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1637834426
+    },
+    {
+        "content": "<p>For this, the rule <code>map_idI</code> may be useful, e.g.</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">lemma</span> <span class=\"n\">set_digit_list</span><span class=\"o\">:</span> <span class=\"s\">\"set (digit_list xs acc) ⊆ {0..9} ∪ set acc\"</span>\n  <span class=\"k\">by</span> <span class=\"o\">(</span><span class=\"n\">induction</span> <span class=\"n\">xs</span> <span class=\"n\">acc</span> <span class=\"n\">rule</span><span class=\"o\">:</span> <span class=\"n\">digit_list.induct</span><span class=\"o\">)</span> <span class=\"n\">auto</span>\n<span class=\"o\">[</span><span class=\"ow\">...</span><span class=\"o\">]</span>\n  <span class=\"k\">have</span> <span class=\"s\">\"map (of_char ∘ char_of) (digit_list n []) = digit_list n []\"</span>\n    <span class=\"k\">by</span> <span class=\"o\">(</span><span class=\"n\">intro</span> <span class=\"n\">map_idI</span><span class=\"o\">)</span> <span class=\"o\">(</span><span class=\"n\">use</span> <span class=\"n\">set_digit_list</span><span class=\"o\">[</span><span class=\"n\">of</span> <span class=\"n\">n</span> <span class=\"s\">\"[]\"</span><span class=\"o\">]</span> <span class=\"kp\">in</span> <span class=\"n\">auto</span><span class=\"o\">)</span>\n</code></pre></div>",
+        "id": 262686324,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1637834449
+    },
+    {
+        "content": "<p>With all of that, you should be able to prove <code>foldl multiply_digit 0 (digit_list n []) = n</code> via induction on <code>n</code>. But you're going to have to use an induction rule like <code>less_induct</code> to make it work, or a prove a custom one that allows you to go from <code>n</code> to <code>n div 10</code>.</p>",
+        "id": 262686471,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1637834548
+    },
+    {
+        "content": "<p>Such a rule could e.g. look like this:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">lemma</span> <span class=\"n\">nat_div10_induct</span><span class=\"o\">[</span><span class=\"n\">case_names</span> <span class=\"n\">0</span> <span class=\"n\">div10</span><span class=\"o\">]:</span>\n  <span class=\"kp\">assumes</span> <span class=\"s\">\"P (0 :: nat)\"</span> <span class=\"s\">\"⋀n. n &gt; 0 ⟹ P (n div 10) ⟹ P n\"</span>\n  <span class=\"kp\">shows</span>   <span class=\"s\">\"P n\"</span>\n  <span class=\"k\">using</span> <span class=\"n\">assms</span>\n  <span class=\"kp\">apply</span> <span class=\"n\">induction_schema</span>\n    <span class=\"kp\">apply</span> <span class=\"n\">force</span>\n   <span class=\"kp\">apply</span> <span class=\"o\">(</span><span class=\"n\">rule</span> <span class=\"n\">wf_measure</span><span class=\"o\">[</span><span class=\"n\">of</span> <span class=\"n\">id</span><span class=\"o\">])</span>\n  <span class=\"kp\">apply</span> <span class=\"n\">auto</span>\n  <span class=\"k\">done</span>\n</code></pre></div>",
+        "id": 262686608,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1637834648
+    },
+    {
+        "content": "<p>So this is how to solve your problem. However, I would have started out quite a bit differently: keep your functions as simple as possible. Don't introduce accumulators if you can avoid it.</p>",
+        "id": 262686665,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1637834691
+    },
+    {
+        "content": "<p>You could have defined <code>digit_list</code> so that it returns the reverse list of digits instead:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">fun</span> <span class=\"n\">rev_digit_list</span> <span class=\"o\">::</span> <span class=\"s\">\"nat ⇒ nat list\"</span> <span class=\"kp\">where</span>\n  <span class=\"s\">\"rev_digit_list n = (if n = 0 then [] else n mod 10 # rev_digit_list (n div 10))\"</span>\n</code></pre></div>\n<p>and similarly for the inverse of <code>rev_digit_list</code>:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">fun</span> <span class=\"n\">nat_of_rev_digit_list</span> <span class=\"o\">::</span> <span class=\"s\">\"nat list ⇒ nat\"</span> <span class=\"kp\">where</span>\n  <span class=\"s\">\"nat_of_rev_digit_list [] = 0\"</span>\n<span class=\"o\">|</span> <span class=\"s\">\"nat_of_rev_digit_list (x # xs) = x + 10 * nat_of_rev_digit_list xs\"</span>\n</code></pre></div>\n<p>It should be very easy to show that these two commute, and then you can define your <code>nat_of_string</code> etc. in terms of these just by reversing. And you can still show correspondence to your more complicated (and presumably more efficient, although it probably hardly matters in practice) definitions above afterwards.</p>",
+        "id": 262686877,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1637834824
+    },
+    {
+        "content": "<p>So TLDR: Always keep your definitions as simple as possible. It will make proofs easier. Any additional optimisations can still be introduced afterwards in a modular fashion.</p>",
+        "id": 262687020,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1637834889
+    },
+    {
+        "content": "<p>This was a really in depth answer, exactly the kind of info I was looking for - many thanks. I like that I can now choose to either avoid my problem by simplifying the definitions, but also have some more advanced techniques to try out as well.</p>\n<p>\"Avoiding\" the problem by avoiding an accumulator argument led to a proof for me (and that feels great, because I've spent quite a few days puzzling over this):</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">fun</span> <span class=\"n\">digit_list</span> <span class=\"o\">::</span> <span class=\"s\">\"nat ⇒ nat list\"</span> <span class=\"kp\">where</span>\n<span class=\"s\">\"digit_list 0 = []\"</span> <span class=\"o\">|</span>\n<span class=\"s\">\"digit_list n = n mod 10 # digit_list (n div 10)\"</span>\n\n<span class=\"k\">fun</span> <span class=\"n\">string_of_nat</span> <span class=\"o\">::</span> <span class=\"s\">\"nat ⇒ string\"</span> <span class=\"kp\">where</span>\n<span class=\"s\">\"string_of_nat n = map char_of (digit_list n)\"</span>\n\n<span class=\"k\">fun</span> <span class=\"n\">nat_of_string</span> <span class=\"o\">::</span> <span class=\"s\">\"string ⇒ nat\"</span> <span class=\"kp\">where</span>\n<span class=\"s\">\"nat_of_string [] = 0\"</span> <span class=\"o\">|</span>\n<span class=\"s\">\"nat_of_string (d # ds) = (of_char d) + 10 * (nat_of_string ds)\"</span>\n\n<span class=\"kn\">theorem</span> <span class=\"n\">ser_deser</span><span class=\"o\">:</span> <span class=\"s\">\"nat_of_string (string_of_nat n) = n\"</span>\n  <span class=\"kp\">apply</span><span class=\"o\">(</span><span class=\"n\">induction</span> <span class=\"n\">n</span> <span class=\"n\">rule</span><span class=\"o\">:</span> <span class=\"n\">digit_list.induct</span><span class=\"o\">)</span>\n   <span class=\"kp\">apply</span><span class=\"o\">(</span><span class=\"n\">auto</span><span class=\"o\">)</span>\n  <span class=\"k\">done</span>\n</code></pre></div>\n<p>I'm not exactly clear why I needed to use <code>digit_list.induct</code> as the induction rule,  but plain induction on n didn't work immediately. I'll try and spend some time to understand that more. I saw in the proof goals that the shape of the term was very close to the induction hypothesis, so it was able to be substituted to carry out the proof - that's my main learning from this. </p>\n<p>Thanks again!!</p>",
+        "id": 262707331,
+        "sender_full_name": "Alex Weisberger",
+        "timestamp": 1637848114
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"459086\">Alex Weisberger</span> has marked this topic as resolved.</p>",
+        "id": 262708591,
+        "sender_full_name": "Notification Bot",
+        "timestamp": 1637848734
+    },
+    {
+        "content": "<p>Why you had to use <code>digit_list.induct</code> as an induction rule is easy to explain: if you unfold the definitions of <code>nat_of_string</code> and <code>string_of_nat</code>, you will see that your goal has as its ‘innermost term’ <code>digit_list n</code> (i.e. <code>digit_list</code> is the first function being applied to <code>n</code>). So if you're doing induction over <code>n</code>, in order to actually do something (i.e. unfold the recursive definition of <code>digit_list</code>, you will have to do your induction in a way that fits the recursion of <code>digit_list</code>. The ‘standard’ induction on <code>nat</code> doesn't help you because it goes from <code>Suc n</code> to <code>n</code>, but you need to go from <code>n</code> to <code>n div 10</code>.</p>",
+        "id": 262709547,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1637849255
+    },
+    {
+        "content": "<p>By the way, a few more things:</p>\n<p>First, I usually prefer to use <code>definition</code> for non-recursive functions and unfold the definitions manually (by doing <code>unfolding foo_def</code> or <code>simp add: foo_def</code>). The <code>fun</code> command is really mostly useful for recursive functions.</p>\n<p>Second, I would define <code>digit_to_list</code> not by pattern matching, because that way you get as a second simp rule <code>digit_to_list (Suc n) = Suc n mod 10 # digit_to_list (Suc n div 10)</code> which is kind of ugly.</p>\n<p>You can do this instead:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">fun</span> <span class=\"n\">digit_list</span> <span class=\"o\">::</span> <span class=\"s\">\"nat ⇒ nat list\"</span> <span class=\"kp\">where</span>\n  <span class=\"s\">\"digit_list n = (if n = 0 then [] else n mod 10 # digit_list (n div 10))\"</span>\n\n<span class=\"k\">lemmas</span> <span class=\"o\">[</span><span class=\"n\">simp</span> <span class=\"n\">del</span><span class=\"o\">]</span> <span class=\"o\">=</span> <span class=\"n\">digit_list.simps</span>\n\n<span class=\"kn\">lemma</span> <span class=\"n\">digit_list_0</span> <span class=\"o\">[</span><span class=\"n\">simp</span><span class=\"o\">]:</span> <span class=\"s\">\"digit_list 0 = []\"</span>\n  <span class=\"kp\">and</span> <span class=\"n\">digit_list_rec</span> <span class=\"o\">[</span><span class=\"n\">simp</span><span class=\"o\">]:</span> <span class=\"s\">\"n &gt; 0 ⟹ digit_list n = n mod 10 # digit_list (n div 10)\"</span>\n  <span class=\"k\">by</span> <span class=\"o\">(</span><span class=\"n\">subst</span> <span class=\"n\">digit_list.simps</span><span class=\"err\">;</span> <span class=\"n\">simp</span><span class=\"err\">;</span> <span class=\"n\">fail</span><span class=\"o\">)+</span>\n</code></pre></div>\n<p>It's important to delete <code>digit_list.simps</code> from the simpset, because otherwise the simplifier will keep rewriting with that rule forever. Another way to achieve the same thing is to use a not-so-well-known feature of the function package: conditional equations:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">function</span> <span class=\"n\">digit_list</span> <span class=\"o\">::</span> <span class=\"s\">\"nat ⇒ nat list\"</span> <span class=\"kp\">where</span>\n  <span class=\"s\">\"digit_list 0 = []\"</span>\n<span class=\"o\">|</span> <span class=\"s\">\"n &gt; 0 ⟹ digit_list n = n mod 10 # digit_list (n div 10)\"</span>\n  <span class=\"k\">by</span> <span class=\"n\">auto</span>\n<span class=\"kn\">termination</span> <span class=\"k\">by</span> <span class=\"n\">lexicographic_order</span>\n</code></pre></div>\n<p>The only disadvantage of this is that we lose executability because the code generator cannot handle conditional code equations. But we can restore executability by just proving the original definition as a code equation:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">lemma</span> <span class=\"n\">digit_list_code</span> <span class=\"o\">[</span><span class=\"n\">code</span><span class=\"o\">]:</span>\n  <span class=\"s\">\"digit_list n = (if n = 0 then [] else n mod 10 # digit_list (n div 10))\"</span>\n  <span class=\"k\">by</span> <span class=\"n\">simp</span>\n</code></pre></div>",
+        "id": 262710146,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1637849590
+    },
+    {
+        "content": "<p>I appreciate those tips - definitely going to start applying them.</p>",
+        "id": 262712512,
+        "sender_full_name": "Alex Weisberger",
+        "timestamp": 1637850870
+    },
+    {
+        "content": "<p>Note that your current implementation of <code>string_of_nat</code> gives you the empty string for <code>0</code>. In case that that's not what you intended. <span aria-label=\"smile\" class=\"emoji emoji-1f642\" role=\"img\" title=\"smile\">:smile:</span></p>",
+        "id": 262717028,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1637853093
+    },
+    {
+        "content": "<p>Oh that's interesting - luckily, <code>nat_of_string (string_of_nat 0)</code> still returns 0 (I would hope so, or else the proof would be incorrect!).</p>\n<p>To actually serialize to the digit <code>0</code>, I can't think of an implementation change to <code>digit_list</code>, but <code>string_of_nat</code> could handle the <code>0</code> case explicitly:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">definition</span> <span class=\"n\">string_of_nat</span> <span class=\"o\">::</span> <span class=\"s\">\"nat ⇒ string\"</span> <span class=\"kp\">where</span>\n<span class=\"s\">\"string_of_nat n = (if n = 0 then [CHR 0x00] else map char_of (digit_list n))</span>\n</code></pre></div>\n<p>This breaks some of the exiting proofs, but I'll play around with fixing them.</p>",
+        "id": 262720555,
+        "sender_full_name": "Alex Weisberger",
+        "timestamp": 1637855103
+    },
+    {
+        "content": "<p>Yup, that's what I would have done. You probably don't want <code>CHR 0x00</code> though, that's a 0 byte. The character 0 is <code>CHR ''0''</code>. You can also simply write ''0'' for <code>[CHR ''0'']</code>.</p>",
+        "id": 262722581,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1637856319
+    },
+    {
+        "content": "<p>By the way, the reason I was doing this proof was for a blog post about refinement: <a href=\"https://concerningquality.com/refinement/\">https://concerningquality.com/refinement/</a>. </p>\n<p>I would love to hear any feedback on it. I'm hoping to write more about proving things with Isabelle in the future.</p>",
+        "id": 262896479,
+        "sender_full_name": "Alex Weisberger",
+        "timestamp": 1638052466
+    }
+]

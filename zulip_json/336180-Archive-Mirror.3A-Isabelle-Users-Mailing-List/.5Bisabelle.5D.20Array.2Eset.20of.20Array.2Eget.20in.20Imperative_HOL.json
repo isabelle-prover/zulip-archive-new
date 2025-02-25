@@ -1,0 +1,38 @@
+[
+    {
+        "content": "<p>From: Shuwei Hu &lt;<a href=\"mailto:shuwei.hu@tum.de\">shuwei.hu@tum.de</a>&gt;<br>\nDear Isabelle list,</p>\n<p>I have recently run into an unsolvable subgoal:</p>\n<p>\"Array.set array (Array.get heap array) heap = heap\".</p>\n<p>for which Nitpick found a counterexample in a few seconds.<br>\nI could not understand the counterexample, however. It requires<br>\nan array element type 'a with card = 1, but when I fix the type<br>\nto \"unit\", it is no longer a counterexample.</p>\n<p>Does anyone have an idea why (or how) Imperative_HOL is<br>\ndesigned to let this equation fail?</p>\n<p>Below is the message from nitpick:</p>\n<p>Thanks,<br>\nShuwei</p>",
+        "id": 294730779,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661187953
+    },
+    {
+        "content": "<p>From: Peter Lammich &lt;<a href=\"mailto:lammich@in.tum.de\">lammich@in.tum.de</a>&gt;<br>\nHi Shuwei</p>\n<p>The reason is that we cannot prove <br>\n    to_nat (from_nat n) = n<br>\n(b/c n may be outside the range of the encoding)</p>\n<p>In Imperative/HOL, the heap is modelled by encoding its content to<br>\nnatural numbers using precisely to_nat/from_nat. </p>\n<p>So if you happen to access an array that has not been allocated, its<br>\nencoding might be out of range, and setting it back will replace the<br>\nencoding by something else. </p>\n<p>Btw: For using Imperative/HOL, you should use the high-level interfaces<br>\nto arrays in the heap monad, Array.upd and Array.nth.</p>",
+        "id": 294730789,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661187959
+    },
+    {
+        "content": "<p>From: Shuwei Hu &lt;<a href=\"mailto:shuwei.hu@tum.de\">shuwei.hu@tum.de</a>&gt;<br>\nHi Peter,</p>\n<p>thank you very much for your enlightening respond.</p>\n<p>I was proving some kind of triviality of Array.upd of Array.nth, and indeed,<br>\nit involves an array whose presence on the heap cannot be assured by the<br>\nHeap expression.</p>\n<p>The original goal was the identity property of a monad morphism. Applying on<br>\n<em>\"return v\"</em>, it boils down to *\"x &lt;- Array.nth M i; Array.upd i x M;<br>\nreturn v\"*.</p>\n<p>I understand that there must be some kind of invariant for an array<br>\nimplicitly given<br>\nby its birth, but I'm afraid that the definition of the morphism have to<br>\nstay as it is<br>\nwithout any history of the array, since it might be applied to any monad in<br>\nthe<br>\nmiddle of a program.</p>\n<p>Do you have an idea of what kind of precondition should be given to prove<br>\nthe<br>\nequivalency between the two Heap monads above in bold font?</p>\n<p>Thanks!</p>\n<p>Shuwei</p>",
+        "id": 294730859,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661187980
+    },
+    {
+        "content": "<p>From: Peter Lammich &lt;<a href=\"mailto:lammich@in.tum.de\">lammich@in.tum.de</a>&gt;<br>\nHi,</p>\n<p>the array index must be in range, and the array must have been<br>\nallocated. Otherwise, these two programs are intuitively not equal, as<br>\nthe second would boil down to \"undefined behaviour\".</p>",
+        "id": 294730880,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661187989
+    },
+    {
+        "content": "<p>From: Shuwei Hu &lt;<a href=\"mailto:shuwei.hu@tum.de\">shuwei.hu@tum.de</a>&gt;<br>\nYes indeed, but how can one state them formally?</p>\n<p>The assumptions below doesn't prevent nitpick from finding a counterexample:</p>\n<p>lemma<br>\n  assumes \"i &lt; Array.length h M \"<br>\n  assumes \"Array.present h M\"<br>\n  shows \"execute (do {x ← Array.nth M i; Array.upd i x M; return v}) h =<br>\nexecute (return v) h\"</p>\n<p>And I think that the definition of Array.present suggests that it does not<br>\nhelp<br>\nthe from_nat / to_nat issue.</p>\n<p>Should I invent a new predicate in terms of low level stuffs like from_nat<br>\n&amp; to_nat?</p>\n<p>Thanks!</p>\n<p>Shuwei</p>",
+        "id": 294730896,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661187997
+    },
+    {
+        "content": "<p>From: Peter Lammich &lt;<a href=\"mailto:lammich@in.tum.de\">lammich@in.tum.de</a>&gt;<br>\nYou could strengthen the ARray.present predicate to also ensure that<br>\nthe encoding of the array makes sense, e.g.</p>\n<p>definition enc_invar :: \"Heap.heap ⇒ 'a::heap array ⇒ bool\" where<br>\n    \"enc_invar h a ⟷ (<em>addr_of_array a &lt; lim h ∧</em>) (∃xs::'a list.<br>\n      arrays h TYPEREP('a) (addr_of_array a) = map to_nat xs<br>\n    )\"</p>\n<p>lemma \"enc_invar h a ⟹ Array.set a (Array.get h a) h = h\"<br>\n    unfolding enc_invar_def Array.set_def Array.get_def<br>\n    apply auto<br>\n    by (metis (mono_tags, lifting) comp_def from_nat_to_nat<br>\nfun_upd_triv map_eq_conv surjective update_convs(1))</p>\n<p>Note that the commented out part can be optinal added, to make<br>\nenc_invar stronger than present.</p>",
+        "id": 294730903,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661188002
+    }
+]

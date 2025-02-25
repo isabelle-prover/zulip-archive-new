@@ -1,0 +1,62 @@
+[
+    {
+        "content": "<p>From: \"He, Shuhan\" &lt;<a href=\"mailto:13061136@buaa.edu.cn\">13061136@buaa.edu.cn</a>&gt;<br>\nHello fellow researchers,</p>\n<p>I'm working on a translator from an ML-like language to HOL, and I'm having a<br>\ndifficulty with translation of inductive datatype definitions.</p>\n<p>Datatype definition in Isabelle can be quite slow (at least compared to HOL4)<br>\nwhen the number of constructors goes up (say a few dozen), and time consumption<br>\nseems to be super-linear in the number of constructors.  This has a significant<br>\nimpact on usability since some programs in the source language have very large<br>\ndatatypes, and it's not always feasible to modify the source programs to make<br>\nthem friendlier to Isabelle.  Is the poor performance caused by inherent<br>\nlimitation of the theoretical foundation of the datatype definition package, or<br>\nsuboptimality of implementation of the package?  Also, does the package provide<br>\na \"quick mode\" that skips the slow part of the definition process, while<br>\nretaining the essential theorems about the datatype being defined?</p>\n<p>I once tried to poke into the implementation of the 'datatype' command to find<br>\nout what's slowing the thing down, but finally got lost in its sheer<br>\ncomplexity.  The only potential culprit I found is the simplification theorems,<br>\nthe number of which is quadratic in the number of constructors.</p>\n<p>It would be nice to have a datatype definition package without the<br>\naforementioned drawback, but given the size and complexity of current<br>\nimplementation, improving it seems extremely difficult.</p>\n<p>Your thoughts are greatly appreciated.</p>",
+        "id": 234299782,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1618308768
+    },
+    {
+        "content": "<p>From: Dmitriy Traytel &lt;<a href=\"mailto:traytel@di.ku.dk\">traytel@di.ku.dk</a>&gt;<br>\nHi Shuhan,</p>\n<p>There are a couple of knobs one can turn. For example, a definition like</p>\n<p>datatype t =<br>\n  A00 | A01 | A02 | A03 | A04 | A05 | A06 | A07 | A08 | A09 |<br>\n  A10 | A11 | A12 | A13 | A14 | A15 | A16 | A17 | A18 | A19 |<br>\n  A20 | A21 | A22 | A23 | A24 | A25 | A26 | A27 | A28 | A29 |<br>\n  A30 | A31 | A32 | A33 | A34 | A35 | A36 | A37 | A38 | A39 |<br>\n  A40 | A41 | A42 | A43 | A44 | A45 | A46 | A47 | A48 | A49</p>\n<p>takes something like 30 seconds on my machine. In contrast,</p>\n<p>datatype (plugins only: ) t =<br>\n  A00 | A01 | A02 | A03 | A04 | A05 | A06 | A07 | A08 | A09 |<br>\n  A10 | A11 | A12 | A13 | A14 | A15 | A16 | A17 | A18 | A19 |<br>\n  A20 | A21 | A22 | A23 | A24 | A25 | A26 | A27 | A28 | A29 |<br>\n  A30 | A31 | A32 | A33 | A34 | A35 | A36 | A37 | A38 | A39 |<br>\n  A40 | A41 | A42 | A43 | A44 | A45 | A46 | A47 | A48 | A49</p>\n<p>takes only something like 3 seconds. So the actual datatype constructions (including the simplification theorems which are indeed quadratic in the number<br>\nof constructors) is reasonably fast. The plugins (e.g., size function, code generation setup, transfer theorems, etc.) that were disabled in the second definition provide many useful things too, but have their cost for large datatypes. It depends on the actual application which plugins are actually needed.</p>\n<p>It would help to see your specific example and your requirements (what do you want to do with the type?) to provide further hints.</p>\n<p>Dmitriy</p>",
+        "id": 234339408,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1618325470
+    },
+    {
+        "content": "<p>From: Manuel Eberl &lt;<a href=\"mailto:eberlm@in.tum.de\">eberlm@in.tum.de</a>&gt;<br>\nSomebody once voiced the possibility of making it possible to switch off<br>\nthe simplification lemmas (e.g. for constructor distinctness, of which<br>\nthere are quadratically many) and replace them by a simproc that proves<br>\nthem ad-hoc whenever one of them is needed.</p>\n<p>This would make applying the theorems slightly more expensive, but<br>\neliminate the need to prove all of them beforehand.</p>\n<p>Not sure if this becomes enough of a problem to be worth it or if the<br>\nexisting construction is fast enough for any reasonably-sized datatype.</p>\n<p>Manuel<br>\n<a href=\"/user_uploads/14278/1MnfC7M3WbleAhzmt_e3Wh79/smime.p7s\">smime.p7s</a></p>",
+        "id": 234341882,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1618326094
+    },
+    {
+        "content": "<p>From: Dominique Unruh &lt;<a href=\"mailto:unruh@ut.ee\">unruh@ut.ee</a>&gt;<br>\nMaybe the following approach would be nice:</p>\n<p>Instead of generating pairwise inequalities, a function constructor_num <br>\nis generated with the simp-rules \"constructor_num A00 = 1\" <br>\n\"constructor_num A01 = 2\" \"constructor_num A03 = 3\" etc. (Where <br>\n\"constructor_num\" is an overloaded function like size.)</p>\n<p>Then we additionally add the simp-rule \"constructor_num x != <br>\nconstructor_num y ==&gt; x != y\". (For each datatype one instances because <br>\nthe generic one would loop. Or alternatively, have a no-assumptions type <br>\nclass for which that rule holds is added to the simplifier.)</p>\n<p>Now I believe that this would be enough to decide inequalities the same <br>\nway as simp can do now. (Haven't tested this.)</p>\n<p>To avoid unnecessary simplifications, maybe add a cong-rule that forbids <br>\nsimplifications in the argument of constructor_num.</p>\n<p>(Sorry if this is obvious and anyway what you had in mind for the inner <br>\nworkings of the simproc.)</p>\n<p>Best wishes,<br>\nDominique.</p>",
+        "id": 234354863,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1618330041
+    },
+    {
+        "content": "<p>From: Manuel Eberl &lt;<a href=\"mailto:eberlm@in.tum.de\">eberlm@in.tum.de</a>&gt;</p>\n<blockquote>\n<p>\"constructor_num x != constructor_num y ==&gt; x != y\"</p>\n</blockquote>\n<p>That works in this very simple case where your datatype is just an<br>\n\"enum\"-like type. But in general, it should probably be something like</p>\n<p>\"constructor_num x != constructor_num y ==&gt; x a b c != y d e\"</p>\n<p>because constructors, of course, can take parameters.</p>\n<p>In any case, I don't think that works because you cannot really quantify<br>\nover constructors like this. In general, the constructors may not even<br>\nhave the same type.</p>\n<p>What I had in mind was that the simproc unfolds the internal<br>\nconstruction that the datatype uses and then proves the inequality from<br>\nthat. I am not familiar with the details of that; there is probably a<br>\nlittle bit of overhead involved, but probably not too much.</p>\n<p>Manuel<br>\n<a href=\"/user_uploads/14278/R2lFCU6pGbuJCnNXXRxquhxB/smime.p7s\">smime.p7s</a></p>",
+        "id": 234355661,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1618330327
+    },
+    {
+        "content": "<p>From: Jakub Kądziołka &lt;<a href=\"mailto:kuba@kadziolka.net\">kuba@kadziolka.net</a>&gt;<br>\nNo, Dominique's statement works. For example, for \"option\", it could be<br>\ndefined as</p>\n<p>\"constructor_num None = 0\" |<br>\n\"constructor_num (Some x) = 1\"</p>\n<p>Regards,<br>\nJakub Kądziołka</p>",
+        "id": 234356068,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1618330482
+    },
+    {
+        "content": "<p>From: Manuel Eberl &lt;<a href=\"mailto:eberlm@in.tum.de\">eberlm@in.tum.de</a>&gt;<br>\nAh, okay, I misunderstood. Yes, I suppose that should work. Might indeed<br>\nbe the easiest and fastest way to do it.</p>\n<p>Nice idea!</p>\n<p>Manuel<br>\n<a href=\"/user_uploads/14278/7OgwY2km-Qtuyq1QY8cm5Bqu/smime.p7s\">smime.p7s</a></p>",
+        "id": 234356325,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1618330575
+    },
+    {
+        "content": "<p>From: Dominique Unruh &lt;<a href=\"mailto:unruh@ut.ee\">unruh@ut.ee</a>&gt;<br>\nYes, that's what I had in mind.</p>\n<p>Best wishes,<br>\nDominique.</p>",
+        "id": 234359869,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1618331821
+    },
+    {
+        "content": "<p>From: Dmitriy Traytel &lt;<a href=\"mailto:traytel@di.ku.dk\">traytel@di.ku.dk</a>&gt;<br>\nHi Dominique &amp; Manuel,</p>\n<p>Using a simproc for proving distinctness for datatypes with a large number of constructors was the behavior for the old datatype package, see e.g., [1, p32].<br>\nWhen developing the new package it was a deliberate decision to get rid of this special case. IIRC the reasoning was that distinctness is just one example of a quadratic fact (quadratically many theorems of constant size). There are others, e.g., the case theorems, which are linearly many each of linear size, so also quadratic altogether. So if one decides to seriously battle the quadratic behavior, one has to develop special cases for every such fact (and the cute constructor’s numbering trick will not always work). Also, a simproc has the big downside of being virtually invisible for Sledgehammer (and other tools that are not simp).</p>\n<p>Moreover considering my below measurements: before optimizing the 3 second datatype declaration (which proves all 2450 distinctness theorems), I think we should rather understand the 27 seconds that are spend in the plugins (specifically, code, transfer, and quickcheck seem to be the culprits).</p>\n<p>I would still be interested to see the original problematic example (the number of constructors is only one aspect that affects performance).</p>\n<p>Dmitriy</p>\n<p>[1] <a href=\"https://isabelle.in.tum.de/website-Isabelle2012/dist/Isabelle2012/doc/logics-HOL.pdf\">https://isabelle.in.tum.de/website-Isabelle2012/dist/Isabelle2012/doc/logics-HOL.pdf</a></p>",
+        "id": 234415020,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1618354956
+    },
+    {
+        "content": "<p>From: \"He, Shuhan\" &lt;<a href=\"mailto:13061136@buaa.edu.cn\">13061136@buaa.edu.cn</a>&gt;<br>\nHi Dmitriy,                                                                      </p>\n<p>Thank you for your suggestion.  I can't give a specific example at the moment,   <br>\nbut generally I need to faithfully translate mutually recursive (typically no    <br>\nmore than 4) datatype definitions from a variant of ML into HOL, so I can prove  <br>\nproperties of source programs involving these types using standard proof         <br>\ntechniques like induction.  The ultimate goal is to verify that the source<br>\nprogram conforms to some formal specification expressed in HOL.                                                     </p>\n<p>A quick test showed that without plugins the definition command finished in a    <br>\nfew seconds for some of the larger datatypes in my source program.  Not very     <br>\nfast, but acceptable.</p>",
+        "id": 234785352,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1618540798
+    }
+]

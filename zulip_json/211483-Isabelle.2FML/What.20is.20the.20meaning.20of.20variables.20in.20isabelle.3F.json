@@ -1,0 +1,164 @@
+[
+    {
+        "content": "<p>There are two variable kinds in types: <code>TFree (a, S)</code> and <code>TVar ((a, i), S)</code>, and similarly for terms there are <code>Free (a, T)</code> and <code>Var ((a, i), T)</code>, and additionally there is <code>Bound i</code> as a third kind of variable. What is the role of each of these variable kinds?</p>\n<p>Here's what I've determined so far:</p>\n<ul>\n<li><code>Bound i</code> are de bruijn bound variables, these are normally used to construct lambda terms. A <code>Abs</code> constructor will bind <code>Bound 0</code> in the body of the abstraction.</li>\n<li>Bound variables are not allowed at the top level of a <code>cterm</code>, so most functions in <code>thm.ML</code> never see a bound variable at the top level.</li>\n<li><code>Var</code> and <code>TVar</code> variables are not allowed in hypotheses.</li>\n<li>The <code>instantiate</code> function replaces variables <code>Var ((a, i), _)</code> by terms. So a theorem is effectively implicitly universally quantified over the <code>Var</code> variables in it.</li>\n<li>The <code>varify</code> function turns <code>Free</code> variables into <code>Var</code>, but only if they don't appear in the hypotheses. So <code>Free</code> and <code>Var</code> variables seem somewhat interchangeable at the logical level.</li>\n<li>The <code>lift</code> function manipulates the <code>i</code> in <code>Var ((a, i), _)</code> variables, incrementing them all uniformly by some constant. I don't yet understand the specific meaning of this index but it seems to form part of the \"name\" of the variable. <code>lift</code> also replaces some variables by <code>(Var _) $ (Bound 0) $ ... $ (Bound n)</code> expressions, where the bound variables refer to some forall quantifiers in the outer spine of the expression. I don't understand why this operation is legal since it seems to imply that <code>Var</code> expressions can capture variables in scope even though they aren't represented in the type. I guess these are what <span class=\"user-mention\" data-user-id=\"233154\">@Kevin Kappelmann</span> calls schematic variables?</li>\n<li>Flex-flex pairs are pairs of expressions which we think of as being equated. Is this just the same as an equality hypothesis? Are there constraints on what kind of variables show up here?</li>\n</ul>",
+        "id": 463629201,
+        "sender_full_name": "Mario Carneiro",
+        "timestamp": 1724142170
+    },
+    {
+        "content": "<p><code>Var</code> and <code>TVar</code> are schematic variables. In goals you would write them as <code>?x</code>. Bound variables are represented by <code>Bound</code> and need a corresponding binder, while (fixed) free variables are <code>Free</code> or <code>TFree</code> (in goals that is just <code>x</code>).</p>\n<p>Flex-flex pairs are equalities of higher order schematic variables, you want to avoid those.</p>",
+        "id": 463630953,
+        "sender_full_name": "Jan van Brügge",
+        "timestamp": 1724142850
+    },
+    {
+        "content": "<p>I am trying to write an external processor for isabelle theorems, so I would like to understand what the semantic content of those things are, I can't avoid them as long as isabelle makes use of them</p>",
+        "id": 463631273,
+        "sender_full_name": "Mario Carneiro",
+        "timestamp": 1724142936
+    },
+    {
+        "content": "<p>What you usually do is define the goal using <code>Free</code> and <code>Bound</code> (however usually it is easiest to use <code>Term.absfree</code> to construct <code>Abs</code> because that converts the now bound <code>Free</code> into <code>Bound</code>). Then you prove that goal using a tactic. Then Isabelle generalizes your theorem from arbitrary but fixed variables to schematic variables.</p>",
+        "id": 463631393,
+        "sender_full_name": "Jan van Brügge",
+        "timestamp": 1724142965
+    },
+    {
+        "content": "<p>so users \"prefer\" to see the theorem with schematic variables?</p>",
+        "id": 463631501,
+        "sender_full_name": "Mario Carneiro",
+        "timestamp": 1724143020
+    },
+    {
+        "content": "<p><code>Free</code> corresponds to meta-variables, <code>Var</code> is something that can be replaced by any well typed and well formed term (so a cterm)</p>",
+        "id": 463631527,
+        "sender_full_name": "Jan van Brügge",
+        "timestamp": 1724143037
+    },
+    {
+        "content": "<p>Is there a metavariable context somewhere?</p>",
+        "id": 463631598,
+        "sender_full_name": "Mario Carneiro",
+        "timestamp": 1724143067
+    },
+    {
+        "content": "<p>or are these metavariables just hanging</p>",
+        "id": 463631622,
+        "sender_full_name": "Mario Carneiro",
+        "timestamp": 1724143075
+    },
+    {
+        "content": "<p>A theorem that uses fixed variables can only be applied to exactly those variables, so it would be pretty useless to the user. There is no way to instantiate fixed variables.</p>\n<blockquote>\n<p>Is there a metavariable context somewhere?</p>\n</blockquote>\n<p>No, the variables carry their own types directly</p>",
+        "id": 463631899,
+        "sender_full_name": "Jan van Brügge",
+        "timestamp": 1724143163
+    },
+    {
+        "content": "<p>fixed variables meaning <code>Free</code>?</p>",
+        "id": 463631978,
+        "sender_full_name": "Mario Carneiro",
+        "timestamp": 1724143195
+    },
+    {
+        "content": "<p>yes</p>",
+        "id": 463632037,
+        "sender_full_name": "Jan van Brügge",
+        "timestamp": 1724143203
+    },
+    {
+        "content": "<p>so the usual idea is that you state the theorem with <code>Free</code> variables, then prove it, then use <code>varify</code> to turn everything into <code>Var</code> variables for use in the next theorem?</p>",
+        "id": 463632179,
+        "sender_full_name": "Mario Carneiro",
+        "timestamp": 1724143260
+    },
+    {
+        "content": "<p>Varify only works on terms (so terms that are not checked yet). For theorems isabelle will do this automatically after the proof is done. But conceptually yes.</p>",
+        "id": 463632311,
+        "sender_full_name": "Jan van Brügge",
+        "timestamp": 1724143311
+    },
+    {
+        "content": "<p>I had to deal with this more specifically using the function <code>varifyT_global</code> in thm.ML</p>",
+        "id": 463632522,
+        "sender_full_name": "Mario Carneiro",
+        "timestamp": 1724143365
+    },
+    {
+        "content": "<p>with the comment</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"c\">(*Replace all TFrees not fixed or in the hyps by new TVars*)</span>\n</code></pre></div>",
+        "id": 463632585,
+        "sender_full_name": "Mario Carneiro",
+        "timestamp": 1724143387
+    },
+    {
+        "content": "<p>which I'm hoping is an adequate description of the operation implemented</p>",
+        "id": 463632637,
+        "sender_full_name": "Mario Carneiro",
+        "timestamp": 1724143413
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"740109\">Mario Carneiro</span> <a href=\"#narrow/stream/211483-Isabelle.2FML/topic/What.20is.20the.20meaning.20of.20variables.20in.20isabelle.3F/near/463629201\">said</a>:</p>\n<blockquote>\n<p>...<br>\nThe <code>lift</code> function manipulates the <code>i</code> in <code>Var ((a, i), _)</code> variables, incrementing them all uniformly by some constant. I don't yet understand the specific meaning of this index but it seems to form part of the \"name\" of the variable.</p>\n</blockquote>\n<p>Yes, it is part of the variable's name. These indexes are there to facilitate the generation of fresh meta variables: the maximum index of all variables of certain data structures is tracked as separate data, e.g. in  <code>thm</code> and <code>cterm</code>. So if you need a fresh variable with respect to some<code>thm</code> or <code>cterm</code>, you may just use any variable with a higher index.</p>\n<blockquote>\n<p><code>lift</code> also replaces some variables by <code>(Var _) $ (Bound 0) $ ... $ (Bound n)</code> expressions, where the bound variables refer to some forall quantifiers in the outer spine of the expression. I don't understand why this operation is legal since it seems to imply that <code>Var</code> expressions can capture variables in scope even though they aren't represented in the type. I guess these are what @Kevin Kappelmann calls schematic variables?</p>\n</blockquote>\n<p>The section about <a href=\"https://isabelle.in.tum.de/doc/implementation.pdf\">rule composition in the implementation manual</a> explains the lifting operation. Let me know if it is still unclear after having read it.</p>\n<blockquote>\n<p>Flex-flex pairs are pairs of expressions which we think of as being equated. Is this just the same as an equality hypothesis? </p>\n</blockquote>\n<p>Logically, flex-flex pairs are like equality hypotheses, yes. Unfortunately(?) there's no rule in the kernel to move flex-flex pairs from <code>tpairs</code> in <code>thm</code> to <code>hyps</code> or add them as premises to <code>prop</code>.</p>\n<blockquote>\n<p>Are there constraints on what kind of variables show up here?</p>\n</blockquote>\n<p>No, because after having generated a flex-flex pair, you may later instantiate some of the involved meta variables by an arbitrary (type correct) term.</p>",
+        "id": 463675935,
+        "sender_full_name": "Kevin Kappelmann",
+        "timestamp": 1724155149
+    },
+    {
+        "content": "<p>BTW. there may be some other surprising things when you deal with the <a href=\"#narrow/stream/238552-Beginner-Questions/topic/Certified.20terms/near/207260332\">identification of variables</a> (free variables with the same name but different type)</p>",
+        "id": 463677060,
+        "sender_full_name": "Kevin Kappelmann",
+        "timestamp": 1724155442
+    },
+    {
+        "content": "<p>Oh... I was hoping that isabelle fixed that <span aria-label=\"see no evil\" class=\"emoji emoji-1f648\" role=\"img\" title=\"see no evil\">:see_no_evil:</span>  That's the same bug that hol light had</p>",
+        "id": 463884091,
+        "sender_full_name": "Mario Carneiro",
+        "timestamp": 1724193353
+    },
+    {
+        "content": "<p>I'm not sure everyone would call this a bug, but I think it is surprising at least :)</p>",
+        "id": 463959806,
+        "sender_full_name": "Kevin Kappelmann",
+        "timestamp": 1724222876
+    },
+    {
+        "content": "<p>I think the fancy name is Pollack-consistency and as far as I know, it was solved in very few proof assistants</p>",
+        "id": 463960297,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1724223059
+    },
+    {
+        "content": "<p>(Pollack-consistency is a stronger I think, but it forbids that)</p>",
+        "id": 463960420,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1724223103
+    },
+    {
+        "content": "<p>I don't think this is the same thing as pollack consistency, this is about variable identity being stable under type instantiation</p>",
+        "id": 463960506,
+        "sender_full_name": "Mario Carneiro",
+        "timestamp": 1724223135
+    },
+    {
+        "content": "<p>pollack consistency is broken by most attempts at hiding types</p>",
+        "id": 463960567,
+        "sender_full_name": "Mario Carneiro",
+        "timestamp": 1724223175
+    },
+    {
+        "content": "<p>Regarding identification of variables: If the sort of a type variable matters for variable identification, then why is it okay to strip all the sorts and convert them to hypotheses when unconstraining a theorem statement?</p>",
+        "id": 463968432,
+        "sender_full_name": "Mario Carneiro",
+        "timestamp": 1724225410
+    },
+    {
+        "content": "<p>I guess it all depends on how the unconstraining is done in such cases - but here I need to pass. Maybe <span class=\"user-mention\" data-user-id=\"302181\">@Simon Roßkopf</span> can help...?</p>",
+        "id": 463969578,
+        "sender_full_name": "Kevin Kappelmann",
+        "timestamp": 1724225794
+    },
+    {
+        "content": "<p>It's been a while, but as far as I remember the unconstrain operation does not simply strip all the sorts, but renames type variables if they would coincide.</p>",
+        "id": 463975019,
+        "sender_full_name": "Simon Roßkopf",
+        "timestamp": 1724227258
+    }
+]

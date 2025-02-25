@@ -1,0 +1,20 @@
+[
+    {
+        "content": "<p>From: \"Thiemann, Rene\" &lt;<a href=\"mailto:Rene.Thiemann@uibk.ac.at\">Rene.Thiemann@uibk.ac.at</a>&gt;<br>\nDear all,</p>\n<p>during porting our theories from Isabelle 2016 to 2016-1-RC4, I made two strange observations where I don’t know whether these have been intended.</p>\n<p>Cheers,<br>\nRené</p>\n<p>theory Foo<br>\n  imports Main<br>\nbegin</p>\n<p>datatype \"term\" = Fun int \"term list\" </p>\n<p>text ‹Observation 1: change of simplifier behaviour which more often leads to nontermination.›</p>\n<p>fun get_unit :: \"term ⇒ unit\" where<br>\n  \"get_unit t = (case t of Fun f ts ⇒ undefined (map get_unit ts))\" </p>\n<p>lemma get_unit: \"get_unit t = ()\" by simp<br>\nthm get_unit[unfolded get_unit.simps]</p>\n<p>(* produces the expected result<br>\n  (case ?t of Fun f ts ⇒ undefined (map get_funs ts)) = ()<br>\n  in Isabelle 2016, but the unfolding loops in Isabelle 2016-1 RC4 *)</p>\n<p>text ‹Observation 2: auto is not idempotent.›</p>\n<p>fun funas_term :: \"term ⇒ (int × nat)set\" where<br>\n  \"funas_term (Fun f ts) = {(f, length ts)} ∪ ⋃(set (map funas_term ts))\"</p>\n<p>context <br>\n  fixes F :: \"(int × nat)set\" <br>\n  and comb :: \"term list ⇒ term\" <br>\n assumes comb: \"funas_term (comb ts) ⊆ F ∪ (⋃ (funas_term ` set ts))\" <br>\nbegin<br>\nfun comb_term :: \"term ⇒ term\"<br>\nwhere<br>\n  \"comb_term (Fun f ts) = <br>\n    (if (f,length ts) ∈ F then Fun f (map comb_term ts)<br>\n    else comb (map comb_term ts))\"</p>\n<p>lemma funas_term_clean_comb_term: \"funas_term (comb_term t) ⊆ F\"<br>\nproof (induct t)<br>\n  case (Fun f ts)<br>\n  show ?case<br>\n  proof (cases \"(f,length ts) ∈ F\")<br>\n    case True<br>\n    with Fun show ?thesis by auto <br>\n   (* Here, one \"auto\" suffices in Isabelle 2016, whereas a single auto is not sufficient in RC4.<br>\n      In RC4 one needs \"by (auto, auto)\" *)<br>\n  next<br>\n    case False<br>\n    hence id: \"comb_term (Fun f ts) = comb (map comb_term ts)\" by simp<br>\n    show ?thesis unfolding id using comb[of \"map comb_term ts\"] Fun by auto<br>\n  qed <br>\nqed<br>\nend</p>\n<p>end<br>\n<a href=\"/user_uploads/14278/Y6wLWZqemGuNpmPjmf24iyMl/Foo.thy\">Foo.thy</a></p>",
+        "id": 294699252,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661178634
+    },
+    {
+        "content": "<p>From: Peter Lammich &lt;<a href=\"mailto:lammich@in.tum.de\">lammich@in.tum.de</a>&gt;</p>\n<blockquote>\n<p>lemma get_unit: \"get_unit t = ()\" by simp<br>\nthm get_unit[unfolded get_unit.simps]</p>\n<p>(* produces the expected result<br>\n  (case ?t of Fun f ts ⇒ undefined (map get_funs ts)) = ()<br>\n  in Isabelle 2016, but the unfolding loops in Isabelle 2016-1 RC4 *)</p>\n</blockquote>\n<p>Makarius changed the implementation of unfold, in particular, no<br>\n[abs_def] is needed any more. This effect is probably related to that.</p>\n<blockquote>\n<p>text ‹Observation 2: auto is not idempotent.›</p>\n</blockquote>\n<p>I made the same observation already, but could not yet figure out what<br>\nthe exact problem is. I think auto was never intended to be idempotent,<br>\nbut it's just a matter of experience: Experience says it should be<br>\nidempotent here, but in 2016-1-RC2 it turns out to be not.</p>",
+        "id": 294699275,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661178640
+    },
+    {
+        "content": "<p>From: Simon Wimmer &lt;<a href=\"mailto:wimmersimon@gmail.com\">wimmersimon@gmail.com</a>&gt;<br>\nBtw,<br>\nthe comment for mk_auto_tac in clasimp.ML reads:</p>\n<p>Designed to be idempotent, except if Blast.depth_tac instantiates variables<br>\n  in some of the subgoals</p>\n<p>Simon</p>",
+        "id": 294699291,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661178646
+    }
+]

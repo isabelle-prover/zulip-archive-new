@@ -1,0 +1,149 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Using the Parallel library · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Using.20the.20Parallel.20library.html">[isabelle] Using the Parallel library</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="249452108"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Using%20the%20Parallel%20library/near/249452108" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Using.20the.20Parallel.20library.html#249452108">(Aug 14 2021 at 10:02)</a>:</h4>
+<p>From: Katherine Cordwell &lt;<a href="mailto:kcordwel@andrew.cmu.edu">kcordwel@andrew.cmu.edu</a>&gt;<br>
+Recently I was trying to parallelize an algorithm using the <a href="http://Parallel.map">Parallel.map</a><br>
+function, and ran into some termination issues.  For example, the following<br>
+function does not terminate with this use of "<a href="http://Parallel.map">Parallel.map</a>", though it<br>
+would work fine with vanilla "map".</p>
+<p>function test:: "real poly ⇒ real poly list ⇒  nat"<br>
+  where<br>
+  "test p qs =<br>
+  ( let len = length qs in<br>
+    if len = 0 then 1<br>
+    else if len = 1 then 2<br>
+    else<br>
+    (let q1 = take (len div 2) qs;  q2 = drop (len div 2) qs;<br>
+     parallel_comput = (<a href="http://Parallel.map">Parallel.map</a> (λi. (test p i)) [q1, q2]);<br>
+     left = parallel_comput ! 1;  right = parallel_comput ! 2;<br>
+     comb = left + right in comb<br>
+    )<br>
+  )"<br>
+  by auto</p>
+<p>(* Seems to not be true? *)<br>
+termination test<br>
+  apply (relation "measure (λ(p,qs).(length qs))")<br>
+  apply auto<br>
+  sorry</p>
+<p>Any explanation/advice would be much appreciated.</p>
+<p>Best,<br>
+Katherine Cordwell</p>
+
+
+
+<a name="249456439"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Using%20the%20Parallel%20library/near/249456439" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Using.20the.20Parallel.20library.html#249456439">(Aug 14 2021 at 11:59)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:eberlm@in.tum.de">eberlm@in.tum.de</a>&gt;<br>
+This is a classic case of a missing fundef_cong rule. Basically,<br>
+something needs to tell the function package that "<a href="http://Parallel.map">Parallel.map</a> f xs"<br>
+will only evaluate f on xs. This is done by proving a corresponding<br>
+congruence rule and declaring it as "fundef_cong":</p>
+<p>lemma parallel_map_cong [fundef_cong]:<br>
+  "(⋀x. x ∈ set xs ⟹ f x = g x) ⟹ xs = ys ⟹<br>
+<a href="http://Parallel.map">Parallel.map</a> f xs = <a href="http://Parallel.map">Parallel.map</a> g ys"<br>
+  unfolding Parallel.map_def by (rule map_cong) auto</p>
+<p>This is really an omission of the "HOL-Library.Parallel" theory, in my<br>
+opinion, and should be added there.</p>
+<p>Your termination proof is then pretty straightforward, since you now<br>
+have more information available:</p>
+<p>termination<br>
+proof (relation "measure (λ(p,qs).(length qs))"; clarsimp; goal_cases)<br>
+  case (1 qs xs)<br>
+  have "length xs ≤ Suc (length qs) div 2"<br>
+    using 1 by auto<br>
+  moreover have "length qs &gt; 1"<br>
+    using 1 by (cases qs) auto<br>
+  ultimately have "length xs &lt; length qs"<br>
+    by linarith<br>
+  thus ?case by auto<br>
+qed</p>
+<p>"fundef_cong" is briefly mentioned in section 10 of the Function package<br>
+manual ("Higher-Order Recursion"). But I certainly cannot blame you for<br>
+missing it – it really is the tiniest of remarks. :)</p>
+<p>Cheers,</p>
+<p>Manuel<br>
+<a href="/user_uploads/14278/xHYOOnvxx8uPjztoLgiGp1zk/smime.p7s">smime.p7s</a></p>
+
+
+
+<a name="250099908"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Using%20the%20Parallel%20library/near/250099908" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Using.20the.20Parallel.20library.html#250099908">(Aug 20 2021 at 10:08)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Katherine,</p>
+<p>in Isabelle/HOL there is one quite successful principle when optimizing<br>
+specifications for executability: optimize the specifications for<br>
+provability and succinctness, prove separate lemmas for optimization of<br>
+executability.</p>
+<p>This is the reason why Parallel.thy is not optimized for basing<br>
+specifications on it.</p>
+<p>As far as I understand your example, you would end up with sth. like:</p>
+<p>definition test:: ‹real poly ⇒ real poly list ⇒ nat›<br>
+  where ‹test = …›</p>
+<p>and later prove separately:</p>
+<p>lemma test_code [code]:<br>
+  ‹test p qs =<br>
+  ( let len = length qs in<br>
+     if len = 0 then 1<br>
+     else if len = 1 then 2<br>
+     else<br>
+     (let q1 = take (len div 2) qs;  q2 = drop (len div 2) qs;<br>
+      parallel_comput = (<a href="http://Parallel.map">Parallel.map</a> (λi. (test p i)) [q1, q2]);<br>
+      left = parallel_comput ! 1;  right = parallel_comput ! 2;<br>
+      comb = left + right in comb<br>
+     )<br>
+  )›</p>
+<p>With a logically precise definition of ‹test› already at hand, the prove<br>
+of the code equation is usually easier than proving a complicated<br>
+termination schema.</p>
+<p>I'm curious for your actual example, it seems to me that it utilizes a<br>
+divide-and-conquer schema which is a candidate to be added to<br>
+Parallel.thy explicitly.</p>
+<p>Cheers,<br>
+    Florian<br>
+<a href="/user_uploads/14278/raloAcNLt7aMkLC8jg79BQjd/OpenPGP_signature">OpenPGP_signature</a></p>
+
+
+
+<a name="251380826"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Using%20the%20Parallel%20library/near/251380826" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Using.20the.20Parallel.20library.html#251380826">(Aug 31 2021 at 13:05)</a>:</h4>
+<p>From: "Jens-D. Doll" &lt;<a href="mailto:jens.doll@live.de">jens.doll@live.de</a>&gt;<br>
+Hello Florian,</p>
+<p>please specify the categories executability, provability. What is the <br>
+common ground of these?<br>
+Thanks, Jens</p>
+<p>------ Originalnachricht ------</p>
+
+
+
+<a name="252991050"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Using%20the%20Parallel%20library/near/252991050" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Using.20the.20Parallel.20library.html#252991050">(Sep 12 2021 at 14:38)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Jens,</p>
+<blockquote>
+<p>please specify the categories executability, provability. What is the<br>
+common ground of these?</p>
+</blockquote>
+<p>a good practical introduction is §3 in the tutorial of code generation.</p>
+<p>The use of the terms »provability« and »executability« in my answer was<br>
+indeed a little bit sloppy; »provability and succintness« refers how<br>
+»easy« properties can be derived from the specification as given in the<br>
+theory, »optimization of executability« refers to optimization of the<br>
+resulting executable program.</p>
+<p>Cheers,<br>
+    Florian<br>
+<a href="/user_uploads/14278/fzCVcsCl399W2V1OGPgrl-eL/OpenPGP_signature">OpenPGP_signature</a></p>
+
+
+
+<hr><p>Last updated: Jul 15 2022 at 23:21 UTC</p>
+</html>

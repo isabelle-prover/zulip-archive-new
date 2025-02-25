@@ -1,0 +1,50 @@
+[
+    {
+        "content": "<p>I have the following datatypes and functions</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">type_synonym</span> <span class=\"n\">variable</span> <span class=\"o\">=</span> <span class=\"n\">string</span>\n\n<span class=\"k\">datatype</span> <span class=\"n\">bexpr</span> <span class=\"o\">=</span>\n    <span class=\"n\">Const</span> <span class=\"n\">bool</span>\n  <span class=\"o\">|</span> <span class=\"n\">Var</span> <span class=\"n\">variable</span>\n  <span class=\"o\">|</span> <span class=\"n\">And</span> <span class=\"n\">bexpr</span> <span class=\"n\">bexpr</span>\n  <span class=\"o\">|</span> <span class=\"n\">Or</span> <span class=\"n\">bexpr</span> <span class=\"n\">bexpr</span>\n  <span class=\"o\">|</span> <span class=\"n\">Imp</span> <span class=\"n\">bexpr</span> <span class=\"n\">bexpr</span>\n  <span class=\"o\">|</span> <span class=\"n\">Neg</span> <span class=\"n\">bexpr</span>\n\n<span class=\"k\">datatype</span> <span class=\"n\">occ</span> <span class=\"o\">=</span>\n    <span class=\"n\">Even</span>\n  <span class=\"o\">|</span> <span class=\"n\">Odd</span>\n  <span class=\"o\">|</span> <span class=\"n\">Both</span>\n\n<span class=\"k\">fun</span> <span class=\"n\">negate</span> <span class=\"o\">::</span> <span class=\"s\">\"occ ⇒ occ\"</span> <span class=\"kp\">where</span>\n<span class=\"s\">\"negate Even = Odd\"</span> <span class=\"o\">|</span>\n<span class=\"s\">\"negate Odd = Even\"</span> <span class=\"o\">|</span>\n<span class=\"s\">\"negate Both = Both\"</span>\n\n<span class=\"k\">fun</span> <span class=\"n\">merge</span> <span class=\"o\">::</span> <span class=\"s\">\"occ ⇒ occ ⇒ occ\"</span> <span class=\"kp\">where</span>\n<span class=\"s\">\"merge x y = (if x = y then x else Both)\"</span>\n\n<span class=\"k\">primrec</span> <span class=\"n\">occurrences</span> <span class=\"o\">::</span> <span class=\"s\">\"bexpr ⇒ variable ⇒ occ\"</span> <span class=\"kp\">where</span>\n<span class=\"s\">\"occurrences (Const _) _ = Even\"</span> <span class=\"o\">|</span>\n<span class=\"s\">\"occurrences (Var y) x = Even\"</span> <span class=\"o\">|</span>\n<span class=\"s\">\"occurrences (And phi psi) x = (merge (occurrences phi x) (occurrences psi x))\"</span> <span class=\"o\">|</span>\n<span class=\"s\">\"occurrences (Or phi psi) x = (merge (occurrences phi x) (occurrences psi x))\"</span> <span class=\"o\">|</span>\n<span class=\"s\">\"occurrences (Imp phi psi) x = (merge (negate (occurrences phi x)) (occurrences psi x))\"</span> <span class=\"o\">|</span>\n<span class=\"s\">\"occurrences (Neg phi) x = (negate (occurrences phi x))\"</span>\n</code></pre></div>\n<p>and I want to prove that</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">lemma</span> <span class=\"n\">negateOccEvenIsOdd</span><span class=\"o\">:</span> <span class=\"s\">\"negate (occurrences phi x) = Even ⟶ occurrences phi x = Odd\"</span>\n</code></pre></div>\n<p>I know that Sledgehammer automatically finds proofs for this, e.g. <code>using negate.elims by blast</code> or <code>by (metis negate.cases negate.simps)</code>. </p>\n<p>However, I want to prove this using Isar manually solely for learning purposes but I  am a bit stuck on how to do that.</p>\n<p>I managed to do an <code>apply</code>-style proof:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">lemma</span> <span class=\"n\">negateOccEvenIsOdd</span><span class=\"o\">:</span> <span class=\"s\">\"negate (occurrences phi x) = Even ⟶ occurrences phi x = Odd\"</span>\n  <span class=\"kp\">apply</span> <span class=\"o\">(</span><span class=\"n\">rule</span> <span class=\"n\">impI</span><span class=\"o\">)</span>\n  <span class=\"kp\">apply</span> <span class=\"o\">(</span><span class=\"n\">erule</span> <span class=\"n\">negate.elims</span><span class=\"o\">)</span>\n    <span class=\"kp\">apply</span> <span class=\"n\">simp</span>\n   <span class=\"kp\">apply</span> <span class=\"n\">simp</span>\n  <span class=\"kp\">apply</span> <span class=\"n\">simp</span>\n  <span class=\"k\">done</span>\n</code></pre></div>",
+        "id": 288824511,
+        "sender_full_name": "waynee95",
+        "timestamp": 1657208648
+    },
+    {
+        "content": "<p>That proof looks like a candidate for <code>apply (cases phi)</code></p>",
+        "id": 288825109,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1657208941
+    },
+    {
+        "content": "<p>And replace <code>⟶</code> by <code>==&gt;</code></p>",
+        "id": 288825181,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1657208967
+    },
+    {
+        "content": "<p>Since I wanted to do it in Isar, I did </p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">lemma</span> <span class=\"s\">\"negate (occurrences phi x) = Even ⟹ occurrences phi x = Odd\"</span>\n<span class=\"k\">proof</span> <span class=\"o\">(</span><span class=\"n\">cases</span> <span class=\"n\">phi</span><span class=\"o\">)</span>\n  <span class=\"k\">case</span> <span class=\"o\">(</span><span class=\"n\">Const</span> <span class=\"n\">b</span><span class=\"o\">)</span>\n<span class=\"ow\">...</span>\n</code></pre></div>",
+        "id": 288832924,
+        "sender_full_name": "waynee95",
+        "timestamp": 1657212347
+    },
+    {
+        "content": "<p>I would even go for:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">lemma</span>\n  <span class=\"kp\">assumes</span> <span class=\"s\">\"negate (occurrences phi x) = Even\"</span>\n   <span class=\"kp\">shows</span> <span class=\"s\">\"occurrences phi x = Odd\"</span>\n<span class=\"k\">proof</span> <span class=\"o\">(</span><span class=\"n\">cases</span> <span class=\"n\">phi</span><span class=\"o\">)</span>\n</code></pre></div>",
+        "id": 288833520,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1657212587
+    },
+    {
+        "content": "<p>I would go for:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">lemma</span> <span class=\"n\">negate_Even_iff</span><span class=\"o\">:</span>\n  <span class=\"err\">‹</span><span class=\"n\">negate</span> <span class=\"n\">b</span> <span class=\"o\">=</span> <span class=\"n\">Even</span> <span class=\"err\">⟷</span> <span class=\"n\">b</span> <span class=\"o\">=</span> <span class=\"n\">Odd</span><span class=\"err\">›</span>\n  <span class=\"k\">by</span> <span class=\"o\">(</span><span class=\"n\">cases</span> <span class=\"n\">b</span><span class=\"o\">)</span>\n   <span class=\"o\">(</span><span class=\"n\">simp_all</span> <span class=\"n\">only</span><span class=\"o\">:</span> <span class=\"n\">negate.simps</span> <span class=\"n\">occ.simps</span> <span class=\"n\">refl</span><span class=\"o\">)</span>\n\n<span class=\"kn\">lemma</span>\n  <span class=\"kp\">assumes</span> <span class=\"n\">neg</span><span class=\"o\">:</span> <span class=\"s\">\"negate (occurrences phi x) = Even\"</span>\n  <span class=\"kp\">shows</span> <span class=\"s\">\"occurrences phi x = Odd\"</span>\n  <span class=\"k\">using</span> <span class=\"n\">assms</span>\n  <span class=\"kp\">apply</span> <span class=\"o\">(</span><span class=\"n\">subst</span> <span class=\"o\">(</span><span class=\"n\">asm</span><span class=\"o\">)</span> <span class=\"n\">negate_Even_iff</span><span class=\"o\">)</span>\n  <span class=\"kp\">apply</span> <span class=\"n\">assumption</span>\n  <span class=\"k\">done</span>\n</code></pre></div>",
+        "id": 288834481,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1657212974
+    },
+    {
+        "content": "<p>This proof is also showing that my advice for <code>cases phi</code> was wrong, sorry</p>",
+        "id": 288835028,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1657213207
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"233198\">Mathias Fleury</span> <a href=\"#narrow/stream/238552-Beginner-Questions/topic/Manual.20proof.20using.20.3Cfname.3E.2Ecases.20.3Cfname.2Eelims.3E/near/288835028\">said</a>:</p>\n<blockquote>\n<p>This proof is also showing that my advice for <code>cases phi</code> was wrong, sorry</p>\n</blockquote>\n<p>Yeah I was about to comment that I don't think <code>cases phi</code> is going to work. No worries though! Thanks for the comments.</p>",
+        "id": 288835168,
+        "sender_full_name": "waynee95",
+        "timestamp": 1657213278
+    }
+]

@@ -1,0 +1,74 @@
+[
+    {
+        "content": "<p>From: Lars Hupel &lt;<a href=\"mailto:hupel@in.tum.de\">hupel@in.tum.de</a>&gt;<br>\nDear BNF experts,</p>\n<p>I'm looking for a simple way to obtain a composed map function given a type.</p>\n<p>For example, given</p>\n<p>('a + 'b) option list</p>\n<p>the result should be a term of type</p>\n<p>('a ⇒ 'c) ⇒ ('b ⇒ 'd) ⇒ ('a + 'b) option list ⇒ ('c + 'd) option list</p>\n<p>It doesn't necessarily need to be a constant; instead, it could be a<br>\nsimple term composition of map functions.</p>\n<p>I found \"BNF_Comp.bnf_of_typ\" but I'm a little confused about all the<br>\nparameters it takes. Is there a small, canonical example somewhere?<br>\nAlso, can I get \"bnf_of_typ\" (or something else in BNF) to produce a<br>\nbunch of terms instead of constants, typedefs and everything?</p>\n<p>Cheers<br>\nLars</p>",
+        "id": 294709697,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661181750
+    },
+    {
+        "content": "<p>From: Dmitriy Traytel &lt;<a href=\"mailto:traytel@inf.ethz.ch\">traytel@inf.ethz.ch</a>&gt;<br>\nHi Lars,</p>\n<p>bnf_of_typ is the right function for that. Here is an example usage:</p>\n<p>local_setup ‹ fn lthy =&gt;<br>\n  let<br>\n    val live_As = [@{typ 'a}, @{typ 'b}]<br>\n    val dead_As = []</p>\n<p>fun flatten_tyargs Ass =<br>\n      map dest_TFree live_As<br>\n      |&gt; filter (fn T =&gt; exists (fn Ts =&gt; member (op =) Ts T) Ass);</p>\n<p>val ((bnf, _), (_, lthy)) =<br>\n      BNF_Comp.bnf_of_typ false BNF_Def.Do_Inline I<br>\n        flatten_tyargs (map dest_TFree live_As) (map dest_TFree dead_As)<br>\n        @{typ \"('a + 'b) option list\"}<br>\n        ((BNF_Comp.empty_comp_cache, BNF_Comp.empty_unfolds), lthy)<br>\n    val _ = BNF_Def.map_of_bnf bnf |&gt; Syntax.string_of_term lthy |&gt; warning<br>\n    val _ = BNF_Def.map_of_bnf bnf |&gt; fastype_of |&gt; Syntax.string_of_typ lthy |&gt; warning<br>\n  in<br>\n    lthy<br>\n  end<br>\n›</p>\n<p>Try to play with Do_Inline vs. Dont_Inline and observe the output (whether new map constants are defined or inlined, i.e. composed terms are used).</p>\n<p>Hope that helps,<br>\nDmitriy</p>",
+        "id": 294709707,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661181756
+    },
+    {
+        "content": "<p>From: Lars Hupel &lt;<a href=\"mailto:hupel@in.tum.de\">hupel@in.tum.de</a>&gt;<br>\nHi Dmitriy,</p>\n<p>thanks for that.</p>\n<blockquote>\n<p>val live_As = [@{typ 'a}, @{typ 'b}]<br>\n    val dead_As = []</p>\n</blockquote>\n<p>Is there a reason why I need to specify the live variables? Surely the<br>\ninternal bookkeeping of BNF already knows which variables are live and<br>\nwhich are dead.</p>\n<p>Cheers<br>\nLars</p>",
+        "id": 294709728,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661181762
+    },
+    {
+        "content": "<p>From: Dmitriy Traytel &lt;<a href=\"mailto:traytel@inf.ethz.ch\">traytel@inf.ethz.ch</a>&gt;<br>\nHi Lars,</p>\n<p>sure, BNFs can figure this out by themselves indeed. But then very often the variables will not be in the order in which you expect them. (Same for the dead ones.) Therefore it is better to fix the order on the caller’s side.</p>\n<p>Cheers,<br>\nDmitriy</p>",
+        "id": 294709743,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661181768
+    },
+    {
+        "content": "<p>From: Sebastiaan Joosten &lt;<a href=\"mailto:sjcjoosten@gmail.com\">sjcjoosten@gmail.com</a>&gt;<br>\nHi Dimitriy,</p>\n<p>this is really cool! I haven't looked into the BNF_.. code yet, so I have two questions out of ignorance, that I hope are quick to answer for you:</p>\n<ul>\n<li>\n<p>is there something similar for fold / traverse?</p>\n</li>\n<li>\n<p>in the below example, for the type \"('a option + 'b ) list + 'c\", a function \"sum1.sum1.sum1.list.map_list_lift1_permute_201_01\" is created. Can this be avoided / why is this needed, and why is a function created that ignores its last argument?</p>\n</li>\n</ul>\n<p>local_setup ‹ fn lthy =&gt;<br>\n let<br>\n   val live_As = [@{typ 'a}, @{typ 'b}, @{typ 'c}]<br>\n   val dead_As = []</p>\n<p>fun flatten_tyargs Ass =<br>\n     map dest_TFree live_As<br>\n     |&gt; filter (fn T =&gt; exists (fn Ts =&gt; member (op =) Ts T) Ass);</p>\n<p>val ((bnf, _), (_, lthy)) =<br>\n     BNF_Comp.bnf_of_typ false BNF_Def.Do_Inline I<br>\n       flatten_tyargs (map dest_TFree live_As) (map dest_TFree dead_As)<br>\n       @{typ \"('a option + 'b ) list + 'c\"}<br>\n       ((BNF_Comp.empty_comp_cache, BNF_Comp.empty_unfolds), lthy)<br>\n   val _ = BNF_Def.map_of_bnf bnf |&gt; Syntax.string_of_term lthy |&gt; warning<br>\n   val _ = BNF_Def.map_of_bnf bnf |&gt; fastype_of |&gt; Syntax.string_of_typ lthy |&gt; warning<br>\n in<br>\n   lthy<br>\n end<br>\n›</p>\n<p>(* Note that I could simply use the following term, indicating that no extra functions are required: *)<br>\nterm \"op o (map_sum o map_option) o op o map o map_sum\"</p>",
+        "id": 294709757,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661181774
+    },
+    {
+        "content": "<p>From: Lars Hupel &lt;<a href=\"mailto:hupel@in.tum.de\">hupel@in.tum.de</a>&gt;</p>\n<blockquote>\n<ul>\n<li>in the below example, for the type \"('a option + 'b ) list + 'c\", a function \"sum1.sum1.sum1.list.map_list_lift1_permute_201_01\" is created. Can this be avoided / why is this needed, and why is a function created that ignores its last argument?</li>\n</ul>\n</blockquote>\n<p>For my particular use case, that's not a problem. But I can't find the<br>\ndefinition of that constant, which means I can't unfold it. Is the<br>\ndefinition recorded somewhere?</p>\n<p>Cheers<br>\nLars</p>",
+        "id": 294709782,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661181781
+    },
+    {
+        "content": "<p>From: Jasmin Blanchette &lt;<a href=\"mailto:jasmin.blanchette@inria.fr\">jasmin.blanchette@inria.fr</a>&gt;<br>\nHi Lars,</p>\n<p>Look for \"xxx_def_of_bnf\" in \"bnf_def.ML\", for suitable values of \"xxx\". But you should ask yourself whether you really need to unfold it or if you shouldn't instead rely on the abstract properties given by the BNF (the xxx_of_bnf functions returning \"thm\").</p>\n<p>Jasmin</p>",
+        "id": 294709811,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661181787
+    },
+    {
+        "content": "<p>From: Dmitriy Traytel &lt;<a href=\"mailto:traytel@inf.ethz.ch\">traytel@inf.ethz.ch</a>&gt;<br>\nHi Sebastiaan,</p>\n<blockquote>\n<p>On 10 Apr 2017, at 17:15, Sebastiaan Joosten &lt;<a href=\"mailto:sjcjoosten@gmail.com\">sjcjoosten@gmail.com</a>&gt; wrote:</p>\n<p>Hi Dimitriy,</p>\n<p>this is really cool! I haven't looked into the BNF_.. code yet, so I have two questions out of ignorance, that I hope are quick to answer for you:</p>\n<ul>\n<li>is there something similar for fold / traverse?</li>\n</ul>\n</blockquote>\n<p>Can you give a more precise type of the function you want? Folds (or more precisely recursors) are available for datatypes, but not for compositions of datatypes.</p>\n<blockquote>\n<ul>\n<li>in the below example, for the type \"('a option + 'b ) list + 'c\", a function \"sum1.sum1.sum1.list.map_list_lift1_permute_201_01\" is created. Can this be avoided / why is this needed, and why is a function created that ignores its last argument?</li>\n</ul>\n</blockquote>\n<p>Those intermediate definitions are introduced to avoid large terms. The bnf_of_typ function actually returns something of type unfold_set. However the implementation of this type is not exposed, and it seems that we never needed to actually get the contents outside of the BNF_Comp structure.</p>\n<p>Attached is a small patch that exports the internal representation of unfold_set. For some reason, I can’t push to Isabelle right now (@Lars: is there some known maintenance in Munich, or shall I contact the MTAs? Also feel free to push this.)</p>\n<p>The theorems from the unfold_set returned by bnf_of_typ can be then used to unfold all those intermediate constants in the resulting BNF. This is best done by creating morphism and applying it using BNF_Def.morph_bnf (see some example usages in bnf_comp.ML). </p>\n<p>Dmitriy<br>\n<a href=\"/user_uploads/14278/Z4xRpC-mr36CZwRXP-sXb8t8/unfold_set.patch\">unfold_set.patch</a></p>",
+        "id": 294709822,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661181794
+    },
+    {
+        "content": "<p>From: Lars Hupel &lt;<a href=\"mailto:hupel@in.tum.de\">hupel@in.tum.de</a>&gt;<br>\nHi Jasmin,</p>\n<p>I checked, but unless I'm missing something, \"map_def_of\" is just the theorem \"x = x\".</p>\n<p>The reason I'm asking about unfolding is because in my case, it's a composition of datatypes and I need to use map/constructor commutativity.</p>\n<p>Cheers<br>\nLars</p>",
+        "id": 294709837,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661181800
+    },
+    {
+        "content": "<p>From: Jasmin Blanchette &lt;<a href=\"mailto:jasmin.blanchette@inria.fr\">jasmin.blanchette@inria.fr</a>&gt;<br>\nHi Lars,</p>\n<blockquote>\n<p>I checked, but unless I'm missing something, \"map_def_of\" is just the theorem \"x = x\".</p>\n</blockquote>\n<p>Of course. The constant stands for an intermediate term.</p>\n<p>If you look at the type of \"bnf_of_typ\", you'll see \"unfold_set\" as one of the components of the result. This should contain the theorem you are looking for.</p>\n<p>Cheers,</p>\n<p>Jasmin</p>",
+        "id": 294709866,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661181811
+    },
+    {
+        "content": "<p>From: Lars Hupel &lt;<a href=\"mailto:hupel@in.tum.de\">hupel@in.tum.de</a>&gt;<br>\nHi,</p>\n<blockquote>\n<p>Attached is a small patch that exports the internal representation of unfold_set. For some reason, I can’t push to Isabelle right now (@Lars: is there some known maintenance in Munich, or shall I contact the MTAs? Also feel free to push this.)</p>\n</blockquote>\n<p>I myself also can't log in to our usual nodes. I'll contact our admins.</p>\n<p>Cheers<br>\nLars</p>",
+        "id": 294709884,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661181818
+    },
+    {
+        "content": "<p>From: Lars Hupel &lt;<a href=\"mailto:hupel@in.tum.de\">hupel@in.tum.de</a>&gt;<br>\nHi Dmitriy,</p>\n<blockquote>\n<p>Attached is a small patch that exports the internal representation of unfold_set. For some reason, I can’t push to Isabelle right now (@Lars: is there some known maintenance in Munich, or shall I contact the MTAs? Also feel free to push this.)</p>\n</blockquote>\n<p>thanks for the explanation and the patch. I have pushed it to the<br>\ntemporary repository.</p>\n<blockquote>\n<p>The theorems from the unfold_set returned by bnf_of_typ can be then used to unfold all those intermediate constants in the resulting BNF. This is best done by creating morphism and applying it using BNF_Def.morph_bnf (see some example usages in bnf_comp.ML). </p>\n</blockquote>\n<p>That seems to work. I'm kind of surprised that there seems to be no<br>\ncanonical way to construct a morphism based on unfolding a bunch of<br>\ntheorems. For the time being, I have copied \"expand_term_const\" which<br>\nyou in turn have copied from \"expand_term_free\" :-)</p>\n<p>Cheers<br>\nLars</p>",
+        "id": 294709903,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661181824
+    }
+]

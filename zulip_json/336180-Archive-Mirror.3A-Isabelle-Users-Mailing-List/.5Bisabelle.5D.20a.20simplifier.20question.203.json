@@ -1,0 +1,32 @@
+[
+    {
+        "content": "<p>From: noam neer &lt;<a href=\"mailto:noamneer@gmail.com\">noamneer@gmail.com</a>&gt;<br>\nhi.</p>\n<p>again I'm nitpicking with simplifier details.<br>\nin the following the first proof works while the second doesn't,<br>\nand I don't understand why.</p>\n<p>theory tmp<br>\nimports Complex_Main<br>\nbegin</p>\n<p>lemma \"(4::nat) = 1+1+1+1\"<br>\n    by (simp only : algebra_simps)</p>\n<p>lemma \"(x::real) ^ (4::nat) = x ^ (1+1+1+(1::nat))\"<br>\n    by (simp only : algebra_simps)</p>\n<p>end</p>\n<p>the second proof fails even if I replace 'only' with 'add'.<br>\nI know that the second lemma can be proved with<br>\n    by (simp add:eval_nat_numeral)<br>\nbut I'm trying to use the simplifier with as little simp rules as possible.<br>\nthe reason is that applying it to expressions that contain something like<br>\n\"2^(2^100)\" might get the computer stuck, and the 'only' seems to protect<br>\nfrom it.<br>\nif u have a different solution to this problem I'd be happy to hear as well.</p>\n<p>thnx</p>",
+        "id": 294644095,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661163324
+    },
+    {
+        "content": "<p>From: Lars Noschinski &lt;<a href=\"mailto:noschinl@in.tum.de\">noschinl@in.tum.de</a>&gt;<br>\nOn 20.06.2015 01:19, noam neer wrote:</p>\n<blockquote>\n<p>lemma \"(4::nat) = 1+1+1+1\"<br>\n    by (simp only : algebra_simps)<br>\nThis is not solved by the simplifier itself but by one of the arithmetic<br>\nsolvers employed by the simplifier, I guess \"linarith\" in this instance.<br>\nThe algebra_simps are not necessary, the goal is also solved by \"simp<br>\nonly:\".</p>\n</blockquote>\n<blockquote>\n<p>lemma \"(x::real) ^ (4::nat) = x ^ (1+1+1+(1::nat))\"<br>\n    by (simp only : algebra_simps)<br>\nThe arithmetic solvers cannot deal with powers, so they cannot solve<br>\nthis goal.</p>\n</blockquote>\n<p>One solution would be to prove \"4 = 1+1+1+1\" first and feed this fact<br>\ninto the second equation. If you have longer chains of such reasoning,<br>\nhave a look into calculational reasoning (chapter 1.2 of the Isar<br>\nreference manual). You could also use the rule \"arg_cong\" to remove the<br>\n\"x ^ _\" on both sides, but this is a rather low-level style of proof.</p>\n<p>-- Lars</p>",
+        "id": 294644242,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661163378
+    },
+    {
+        "content": "<p>From: noam neer &lt;<a href=\"mailto:noamneer@gmail.com\">noamneer@gmail.com</a>&gt;<br>\narithmetic<br>\nin a sub expression. everything here happens inside the exponent.<br>\nthere are cases where they are able to do that, for example in</p>\n<p>lemma \"(2<em>(x::real)+2</em>y)^(2<em>x+2</em>y) = (2*(x+y))^(2*(x+y))\"<br>\n    by (simp only:algebra_simps)</p>\n<p>so I was surprised they didn't succeed here.</p>",
+        "id": 294644329,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661163414
+    },
+    {
+        "content": "<p>From: Manuel Eberl &lt;<a href=\"mailto:eberlm@in.tum.de\">eberlm@in.tum.de</a>&gt;<br>\nHallo,</p>\n<p>\"(2<em>(x::real)+2</em>y)^(2<em>x+2</em>y) = (2*(x+y))^(2*(x+y))\"</p>\n<p>gets rewritten with algebra_simps (which contains, among other things, distributivity) to</p>\n<p>\"(real x * 2 + real y * 2) ^ (x * 2 + y * 2) =<br>\n (real x * 2 + real y * 2) ^ (x * 2 + y * 2)\"</p>\n<p>which is trivially true. The decision procedure for linear arithmetic has nothing to do with this. You can see that when you write</p>\n<p>lemma \"(2<em>(x::real)+2</em>y)^(2<em>x+2</em>y) = (2*(x+y))^(2*(x+y))\"<br>\nunfolding algebra_simps</p>\n<p>The linear arithmetic simproc handles equations and inequalities involving linear arithmetic, i.e. it applies to something of the form \"2<em>x = x + x\", never to something like \"2</em>x\" alone.</p>\n<p>An equation like \"(x::real) ^ (4::nat) = x ^ (1+1+1+(1::nat))\" is not in the supported fragment because, clearly, the power operation is not linear. This particular problem can be reduced to the (trivially) linear problem \"(4::nat) = 1+1+1+1\", but the simplifier does not ‘know’ that. For the simproc to apply, the simplifier would first have to set up the goal \"(4::nat) = 1+1+1+1\", and it does not do that, because that is just not how the simplifier works.</p>\n<p>Cheers,</p>\n<p>Manuel</p>",
+        "id": 294644344,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661163421
+    },
+    {
+        "content": "<p>From: noam neer &lt;<a href=\"mailto:noamneer@gmail.com\">noamneer@gmail.com</a>&gt;<br>\nthis reply is just for clarification :</p>\n<p>I didn't want to use the linear arithmetic part at all.<br>\nfor example, here it seems the simplifier performs arithmetic rewrites<br>\nwithout it -</p>\n<p>lemma \"sin(4) = sin(1+1+1+1)\"<br>\n    by simp</p>\n<p>so I wondered why when the sin() was replaced by x^() it didn't.<br>\ntoday I found that the following works -</p>\n<p>lemma \"(x::real)^(4) = x^(1+1+1+1)\"<br>\n    by (simp del: One_nat_def)</p>\n<p>if the rule 'One_nat_def' isn't deleted the simplifier rewrites<br>\n    x^(1+1+1+1)  --&gt;  x<em>x</em>x*x<br>\nafter which it gets stuck. so this seems to solve my problem.</p>\n<p>(and if one wants to prevent the simplifier from overworking on terms<br>\nlike \"2^(2^100)\", one can add \"del: power_numeral\".)</p>",
+        "id": 294648691,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661165206
+    }
+]

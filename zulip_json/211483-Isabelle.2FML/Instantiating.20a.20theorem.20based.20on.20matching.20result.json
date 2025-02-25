@@ -1,0 +1,50 @@
+[
+    {
+        "content": "<p>I am trying to instantiate the schematic variables of a theorem based on the environment found by the matcher. For instance, in the example below, I instantiate the two schematic variables in the theorem <code>exI</code>, and that works.</p>\n<div class=\"codehilite\"><pre><span></span><code>fun prep_trm ctxt (x, (T, t)) = ((x, T), Thm.cterm_of ctxt t)\nfun prep_ty ctxt (x, (S, ty)) = ((x, S), Thm.ctyp_of ctxt ty)\nfun pretty_typ ctxt ty = Syntax.pretty_typ ctxt ty\n\n\nval P = Free (&quot;P&quot;, @{typ &quot;&#39;a ⇒ bool&quot;})\nval x = Free (&quot;x&quot;, @{typ &#39;a})\nval trm = (Thm.term_of (Thm.cterm_of @{context} (P $ x)))\n\nfun inst_exI ctxt trm =\nlet\n  val pat = (HOLogic.dest_Trueprop (nth (Logic.strip_imp_prems (Thm.prop_of exI)) 0))\n  val univ = Unify.matchers (Context.Proof ctxt) [(pat, trm)]\n  val env = nth (Seq.list_of univ) 1\n  val tenv = Vartab.dest (Envir.term_env env)\n  val tyenv = Vartab.dest (Envir.type_env env)\n  val instantiation = (Thm.instantiate (map (prep_ty ctxt) tyenv, map (prep_trm ctxt) tenv) exI)\nin\n  instantiation\nend\n\nval _ = inst_exI @{context} trm\n</code></pre></div>\n<p>However, when I try to instantiate only one of the schematic variables, as in the example below, this does not work.</p>\n<div class=\"codehilite\"><pre><span></span><code>fun prep_trm ctxt (x, (T, t)) = ((x, T), Thm.cterm_of ctxt t)\nfun prep_ty ctxt (x, (S, ty)) = ((x, S), Thm.ctyp_of ctxt ty)\nfun pretty_typ ctxt ty = Syntax.pretty_typ ctxt ty\n\n\nval x = Free (&quot;x&quot;, @{typ &#39;a})\nval trm = (Thm.term_of (Thm.cterm_of @{context} x))\n\nfun inst_exI ctxt trm =\nlet\n  val pat = snd (Term.dest_comb (HOLogic.dest_Trueprop (nth (Logic.strip_imp_prems (Thm.prop_of exI)) 0)))\n  val univ = Unify.matchers (Context.Proof ctxt) [(pat, trm)]\n  val env = nth (Seq.list_of univ) 1\n  val tenv = Vartab.dest (Envir.term_env env)\n  val tyenv = Vartab.dest (Envir.type_env env)\n  val instantiation = (Thm.instantiate (map (prep_ty ctxt) tyenv, map (prep_trm ctxt) tenv) exI)\nin\n  instantiation\nend\n\nval _ = inst_exI @{context} trm\n</code></pre></div>\n<p>Does any one know a work around for that?</p>",
+        "id": 253963484,
+        "sender_full_name": "Mohammad Abdulaziz",
+        "timestamp": 1632076949
+    },
+    {
+        "content": "<p>can you also post the definition of <code>prep_trm</code>?</p>",
+        "id": 254009660,
+        "sender_full_name": "Kevin Kappelmann",
+        "timestamp": 1632123825
+    },
+    {
+        "content": "<p>I added it</p>",
+        "id": 254013954,
+        "sender_full_name": "Mohammad Abdulaziz",
+        "timestamp": 1632126399
+    },
+    {
+        "content": "<p><a href=\"/user_uploads/14278/rM3czGy2KYHiFAp0mJ90BcRf/image.png\">image.png</a></p>\n<div class=\"message_inline_image\"><a href=\"/user_uploads/14278/rM3czGy2KYHiFAp0mJ90BcRf/image.png\" title=\"image.png\"><img src=\"/user_uploads/14278/rM3czGy2KYHiFAp0mJ90BcRf/image.png\"></a></div>",
+        "id": 254019571,
+        "sender_full_name": "Kevin Kappelmann",
+        "timestamp": 1632129585
+    },
+    {
+        "content": "<p>the problem is that in the term substitution, <code>?x</code> has type <code>?'a</code> but <code>?'a</code> will be mapped to <code>'a</code>, so you need to normalise the types in your term substitution as well</p>",
+        "id": 254019700,
+        "sender_full_name": "Kevin Kappelmann",
+        "timestamp": 1632129635
+    },
+    {
+        "content": "<p>Here's something I use to normalise a theorem wrt an environment. You can adapt it to your use case:</p>\n<div class=\"codehilite\" data-code-language=\"OCaml\"><pre><span></span><code><span class=\"k\">fun</span> <span class=\"n\">norm_thm</span> <span class=\"n\">ctxt</span> <span class=\"o\">(</span><span class=\"n\">env</span> <span class=\"k\">as</span> <span class=\"nn\">Envir</span><span class=\"p\">.</span><span class=\"nc\">Envir</span> <span class=\"o\">{</span><span class=\"n\">tyenv</span><span class=\"o\">,...})</span> <span class=\"n\">thm</span> <span class=\"o\">=</span>\n  <span class=\"k\">let</span>\n    <span class=\"k\">val</span> <span class=\"n\">prop</span> <span class=\"o\">=</span> <span class=\"nn\">Thm</span><span class=\"p\">.</span><span class=\"n\">prop_of</span> <span class=\"n\">thm</span>\n    <span class=\"k\">val</span> <span class=\"n\">norm_type</span> <span class=\"o\">=</span> <span class=\"nn\">Envir</span><span class=\"p\">.</span><span class=\"n\">norm_type</span> <span class=\"n\">tyenv</span>\n    <span class=\"k\">val</span> <span class=\"n\">norm_term</span> <span class=\"o\">=</span> <span class=\"nn\">Envir</span><span class=\"p\">.</span><span class=\"n\">norm_term</span> <span class=\"n\">env</span>\n    <span class=\"k\">fun</span> <span class=\"n\">prep_type_entry</span> <span class=\"n\">x</span> <span class=\"o\">=</span> <span class=\"o\">(</span><span class=\"n\">x</span><span class=\"o\">,</span> <span class=\"nn\">Thm</span><span class=\"p\">.</span><span class=\"n\">ctyp_of</span> <span class=\"n\">ctxt</span> <span class=\"o\">(</span><span class=\"n\">norm_type</span> <span class=\"o\">(</span><span class=\"nc\">TVar</span> <span class=\"n\">x</span><span class=\"o\">)))</span>\n    <span class=\"k\">val</span> <span class=\"n\">type_inst</span> <span class=\"o\">=</span> <span class=\"nn\">Term</span><span class=\"p\">.</span><span class=\"n\">add_tvars</span> <span class=\"n\">prop</span> <span class=\"bp\">[]</span> <span class=\"o\">|&gt;</span> <span class=\"n\">map</span> <span class=\"n\">prep_type_entry</span>\n    <span class=\"k\">fun</span> <span class=\"n\">prep_term_entry</span> <span class=\"o\">(</span><span class=\"n\">x</span> <span class=\"k\">as</span> <span class=\"o\">(</span><span class=\"n\">n</span><span class=\"o\">,</span> <span class=\"nc\">T</span><span class=\"o\">))</span> <span class=\"o\">=</span> <span class=\"o\">((</span><span class=\"n\">n</span><span class=\"o\">,</span> <span class=\"n\">norm_type</span> <span class=\"nc\">T</span><span class=\"o\">),</span> <span class=\"nn\">Thm</span><span class=\"p\">.</span><span class=\"n\">cterm_of</span> <span class=\"n\">ctxt</span> <span class=\"o\">(</span><span class=\"n\">norm_term</span> <span class=\"o\">(</span><span class=\"nc\">Var</span> <span class=\"n\">x</span><span class=\"o\">)))</span>\n    <span class=\"k\">val</span> <span class=\"n\">term_inst</span> <span class=\"o\">=</span> <span class=\"nn\">Term</span><span class=\"p\">.</span><span class=\"n\">add_vars</span> <span class=\"n\">prop</span> <span class=\"bp\">[]</span> <span class=\"o\">|&gt;</span> <span class=\"n\">map</span> <span class=\"n\">prep_term_entry</span>\n    <span class=\"k\">val</span> <span class=\"n\">inst</span> <span class=\"o\">=</span> <span class=\"o\">(</span><span class=\"n\">type_inst</span><span class=\"o\">,</span> <span class=\"n\">term_inst</span><span class=\"o\">)</span>\n  <span class=\"k\">in</span> <span class=\"nn\">Thm</span><span class=\"p\">.</span><span class=\"n\">instantiate</span> <span class=\"n\">inst</span> <span class=\"n\">thm</span> <span class=\"k\">end</span>\n</code></pre></div>",
+        "id": 254019742,
+        "sender_full_name": "Kevin Kappelmann",
+        "timestamp": 1632129664
+    },
+    {
+        "content": "<p>Thanks! That works. In general, is it a good idea to always normalise terms and types in thms or instantatiations?</p>",
+        "id": 254026504,
+        "sender_full_name": "Mohammad Abdulaziz",
+        "timestamp": 1632132915
+    },
+    {
+        "content": "<p>Normalisation wrt arbitrary environments can be quite expensive, so if you can avoid the normalisation step, do so. Sometimes however, I think, you cannot get around it since <code>thm.ML</code> checks for type consistency at certain places (as in your case above).<br>\nMoreover, if you already now that you only want to instantiate certain variables, you can get around the term traversals (the <code>add_(t)vars</code> calls in my function above) by only normalising those variables explicitly.</p>",
+        "id": 254162905,
+        "sender_full_name": "Kevin Kappelmann",
+        "timestamp": 1632207184
+    }
+]
