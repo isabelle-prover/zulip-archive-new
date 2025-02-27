@@ -1,0 +1,148 @@
+<html>
+<head><meta charset="utf-8"><title>Partial termination proofs · General · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/202961-General/index.html">General</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Partial.20termination.20proofs.html">Partial termination proofs</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="275597838"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/Partial%20termination%20proofs/near/275597838" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Johannes Neubrand <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Partial.20termination.20proofs.html#275597838">(Mar 17 2022 at 01:26)</a>:</h4>
+<p>I'm trying to prove termination of a partial function. I've read <code>functions.pdf</code>, but I can't figure out a nice way to do exactly what I'm looking for. Ideally, I'd like to be able to provide an “expected” domain to some tactic, and then be required to prove that</p>
+<ul>
+<li>recursive calls stay within that expected domain <strong>and</strong></li>
+<li>show that some provided measure decreases on each recursive call, as with the <code>relation</code> method.</li>
+</ul>
+<blockquote>
+<p>Background info: The function in my use case is a tail-recursive variant of <code>Tree.subtrees</code> that returns a <code>'a tree list</code>, and which has been compiled (for lack of a better word) to use <code>nat</code> as an argument &amp; return type. The termination of the non-encoded version can't be shown by <code>fun</code>, but there's a somewhat simple measure that works with <code>relation</code>. Because of this, my gut feeling is that I should use <code>relation</code> to prove termination of the encoded variant. However, when arguments that don't represent valid <code>'a tree</code> or <code>'a tree list</code> values under the encoding are passed in, the function might not actually terminate.</p>
+</blockquote>
+<div class="spoiler-block"><div class="spoiler-header">
+<p>Isabelle examples of what I'm looking for</p>
+</div><div class="spoiler-content" aria-hidden="true">
+<p>As an example, here's a simple partial function:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">function</span> <span class="n">even_to_zero</span> <span class="o">::</span> <span class="s">"nat ⇒ nat"</span> <span class="kp">where</span>
+  <span class="s">"even_to_zero 0 = 0"</span>
+<span class="o">|</span> <span class="s">"even_to_zero (Suc n) = (case n of (Suc n') ⇒ even_to_zero n' | 0 ⇒ even_to_zero (Suc 0))"</span>
+  <span class="k">using</span> <span class="n">not0_implies_Suc</span> <span class="kp">apply</span> <span class="n">blast</span>
+  <span class="k">by</span> <span class="n">simp_all</span>
+</code></pre></div>
+<p>This proof doesn't (and shouldn't) go through—just pasting it in to show the goals <code>relation</code> would generate:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">lemma</span> <span class="n">even_to_zero_all_dom</span><span class="o">:</span> <span class="s">"All even_to_zero_dom"</span>
+  <span class="kp">apply</span> <span class="o">(</span><span class="n">relation</span> <span class="s">"(λx. x) &lt;*mlex*&gt; {}"</span><span class="o">)</span>
+<span class="k">proof</span> <span class="o">-</span>
+  <span class="k">show</span> <span class="s">"wf ((λx. x) &lt;*mlex*&gt; {})"</span> <span class="k">by</span> <span class="o">(</span><span class="n">simp</span> <span class="n">add</span><span class="o">:</span> <span class="n">wf_mlex</span><span class="o">)</span>
+<span class="k">next</span>
+  <span class="k">show</span> <span class="s">"⋀n. n = 0 ⟹ (Suc 0, Suc n) ∈ (λx. x) &lt;*mlex*&gt; {}"</span> <span class="gr">sorry</span>
+<span class="k">next</span>
+  <span class="k">show</span> <span class="s">"⋀n n'. n = Suc n' ⟹ (n', Suc n) ∈ (λx. x) &lt;*mlex*&gt; {}"</span> <span class="gr">sorry</span>
+<span class="k">qed</span>
+</code></pre></div>
+<p>It seems to me that a tactic _should_ exist that lets me prove the following lemma:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">inductive_set</span> <span class="n">even</span> <span class="o">::</span> <span class="s">"nat set"</span> <span class="kp">where</span>
+  <span class="s">"0 ∈ even"</span>
+<span class="o">|</span> <span class="s">"n ∈ even ⟹ Suc (Suc n) ∈ even"</span>
+
+<span class="kn">lemma</span> <span class="n">even_to_zero_even_dom</span><span class="o">:</span> <span class="s">"x ∈ even ⟹ even_to_zero_dom x"</span>
+  <span class="kp">apply</span> <span class="o">(</span><span class="n">relation</span> <span class="s">"(λx. x) &lt;*mlex*&gt; {}"</span><span class="o">)</span>  <span class="c">(* changeme *)</span>
+<span class="k">proof</span> <span class="o">-</span>
+  <span class="k">show</span> <span class="s">"wf ((λx. x) &lt;*mlex*&gt; {})"</span> <span class="k">by</span> <span class="o">(</span><span class="n">simp</span> <span class="n">add</span><span class="o">:</span> <span class="n">wf_mlex</span><span class="o">)</span>
+<span class="k">next</span>
+  <span class="k">show</span> <span class="s">"⋀n. Suc n ∈ even ⟹ n = 0 ⟹ (Suc 0, Suc n) ∈ (λx. x) &lt;*mlex*&gt; {} ∧ Suc 0 ∈ even"</span>
+    <span class="k">by</span> <span class="o">(</span><span class="n">auto</span> <span class="n">simp</span> <span class="n">add</span><span class="o">:</span> <span class="n">mlex_iff</span> <span class="n">elim</span><span class="o">:</span> <span class="n">even.cases</span><span class="o">)</span>
+<span class="k">next</span>
+  <span class="k">show</span> <span class="s">"⋀n n'. Suc n ∈ even ⟹ n = Suc n' ⟹ (n', Suc n) ∈ (λx. x) &lt;*mlex*&gt; {} ∧ n' ∈ even"</span>
+    <span class="k">by</span> <span class="o">(</span><span class="n">auto</span> <span class="n">simp</span> <span class="n">add</span><span class="o">:</span> <span class="n">mlex_iff</span> <span class="n">elim</span><span class="o">:</span> <span class="n">even.cases</span><span class="o">)</span>
+<span class="k">qed</span>
+</code></pre></div>
+</div></div>
+<p>Does anyone here have pointers for next steps? Am I missing something obvious? I've tried staring at the definition of <code>relation</code> itself, but that just made my eyes glaze over :)</p>
+
+
+
+<a name="275627548"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/Partial%20termination%20proofs/near/275627548" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Christoph <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Partial.20termination.20proofs.html#275627548">(Mar 17 2022 at 09:48)</a>:</h4>
+<p>One way to deal with "partial" functions I've seen and used myself is to use conditional equations. I'm not going to refer to your given example, since you could just split your patterins into <code>Suc 0</code> and <code>Suc (Suc n)</code> to achieve the same effect. Instead I'll try to give you hints for your actual use-case:<br>
+I imagine you have some kind of (inductive) definition of which naturals encode a tree.</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">definition</span> <span class="n">is_tree</span> <span class="o">::</span> <span class="s">"nat ⇒ bool"</span> <span class="kp">where</span>
+  <span class="s">"is_tree n ≡ True"</span>
+</code></pre></div>
+<p>You can then use that predicate to "restrict" your function to your desired domain.</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">function</span> <span class="n">subtrees'</span> <span class="o">::</span> <span class="s">"nat ⇒ nat"</span> <span class="kp">where</span>
+  <span class="s">"subtrees' n = undefined"</span> <span class="kp">if</span> <span class="s">"is_tree n"</span> <span class="err">―</span> <span class="err">‹</span><span class="k">definition</span> <span class="kp">for</span> <span class="n">wellformed</span> <span class="n">input</span><span class="err">›</span>
+<span class="o">|</span> <span class="s">"subtrees' n = undefined"</span> <span class="kp">if</span> <span class="s">"¬is_tree n"</span> <span class="err">―</span> <span class="err">‹</span><span class="n">some</span> <span class="n">dummy</span> <span class="kt">value</span> <span class="kp">for</span> <span class="n">inputs</span> <span class="n">outside</span> <span class="n">your</span> <span class="k">domain</span><span class="err">›</span>
+  <span class="k">by</span> <span class="n">auto</span>
+</code></pre></div>
+<p>You can then (hopefully) proceed with your termination proof using relation again (depending on how your actual definition of <code>subtrees'</code> looks). The conditional equations should then give you your required assumptions in the specific cases.</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">termination</span> <span class="n">subtrees'</span>
+  <span class="kp">apply</span> <span class="o">(</span><span class="n">relation</span> <span class="s">"(λx. x) &lt;*mlex*&gt; {}"</span><span class="o">)</span>
+  <span class="ow">...</span>
+</code></pre></div>
+
+
+
+<a name="275639579"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/Partial%20termination%20proofs/near/275639579" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mohammad Abdulaziz <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Partial.20termination.20proofs.html#275639579">(Mar 17 2022 at 11:43)</a>:</h4>
+<p>Since the function is tail recursive, I propose you use the partial_function command. It is much nicer to deal with than the domain predicate generated by the function package.</p>
+
+
+
+<a name="275639692"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/Partial%20termination%20proofs/near/275639692" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mohammad Abdulaziz <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Partial.20termination.20proofs.html#275639692">(Mar 17 2022 at 11:45)</a>:</h4>
+<p>Take a look at the induction pcpl and other thms it produces, and see if they are usable.</p>
+
+
+
+<a name="275687302"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/Partial%20termination%20proofs/near/275687302" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Johannes Neubrand <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Partial.20termination.20proofs.html#275687302">(Mar 17 2022 at 16:37)</a>:</h4>
+<p>Thanks for the replies!</p>
+<p><del>Both the <code>… if "n ∈ …"</code> and <code>partial_function</code> approaches seem to have the drawback that code equations aren't generated by Isabelle. This is really unfortunate — am I missing something obvious here?</del> Found <code>[code]:</code>, that seems to work fine.</p>
+<p>The restricted <code>function</code> version certainly expects me to prove things that look much better than before when using <code>relation</code>. I'm not super excited about having to deal with weirder (or more!) simp rules, but it might be manageable. Regardless, I tried out Mohammad's suggestion first since I'm trying to avoid changing the generated code :)</p>
+<p><code>partial_function</code>'s induction scheme certainly doesn't look fun. However, I managed to avoid it completely for a correctness lemma for the generated function, using the original (non-partial and non-encoded) function's induction scheme instead. I had to add an additional conclusion, namely that the generated function's result is a valid encoding—this is needed as an IH.</p>
+<p>If I understand this correctly, then, is proving an equation like <code>subtreest' abc = encode (subtreest (decode (abc)))</code> (simplified for sake the of this question) sufficient to convince isabelle that <code>subtreest'</code> terminates on input <code>abc</code>? I'm not sure how much that HOL equality actually means—<code>undefined</code> still makes me nervous :) I did find Manuel's post on stackoverflow <a href="https://stackoverflow.com/a/59821993">here</a> as an explanation of <code>undefined</code> in general, but this still feels wrong as an approach to proving function termination.</p>
+
+
+
+<a name="275702452"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/Partial%20termination%20proofs/near/275702452" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mohammad Abdulaziz <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Partial.20termination.20proofs.html#275702452">(Mar 17 2022 at 18:01)</a>:</h4>
+<p>No, partial_function, by definition, gives you a function that does not necessarily terminate on all inputs. This means that the correctness theorem you prove is only for the inputs on which it terminates. Hence it is called partial correctness. That thm should have the assumption characterising the domain on which it termiantes, however.</p>
+
+
+
+<a name="275702561"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/Partial%20termination%20proofs/near/275702561" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mohammad Abdulaziz <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Partial.20termination.20proofs.html#275702561">(Mar 17 2022 at 18:02)</a>:</h4>
+<p>Also, your approach of using the original function's IH is the right one, at least in my experience of using partial_function.</p>
+
+
+
+<a name="275703019"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/Partial%20termination%20proofs/near/275703019" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Johannes Neubrand <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Partial.20termination.20proofs.html#275703019">(Mar 17 2022 at 18:06)</a>:</h4>
+<blockquote>
+<p>This means that the correctness theorem you prove is only for the inputs on which it terminates.</p>
+</blockquote>
+<p>I understand this, and in my case, the argument domain is implicitly restricted by the encode functions wrapped around <code>subtrees'</code> arguments in the lemma statement. I guess what I'm wondering is whether the partial correctness proof is “all I need” to prove partial termination. Maybe this stems from a misunderstanding on my side of the definition of termination in Isabelle.</p>
+
+
+
+<a name="275703615"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/Partial%20termination%20proofs/near/275703615" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mohammad Abdulaziz <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Partial.20termination.20proofs.html#275703615">(Mar 17 2022 at 18:10)</a>:</h4>
+<p>Yes, that is all you need. The proof of termination is inherent in the induction principle coming from the original function.</p>
+
+
+
+<a name="275784621"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/Partial%20termination%20proofs/near/275784621" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Partial.20termination.20proofs.html#275784621">(Mar 18 2022 at 10:33)</a>:</h4>
+<p>Note that you can also call <code>function</code> with the option <code>(domintros)</code>. That gives you a bunch of rules that allow you to reason explicitly about the domain of the function.</p>
+
+
+
+<a name="275801503"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/Partial%20termination%20proofs/near/275801503" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mohammad Abdulaziz <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Partial.20termination.20proofs.html#275801503">(Mar 18 2022 at 13:25)</a>:</h4>
+<p>I think that is what he wants to avoid since he already has a termination proof for a function that does the same recursion as the partial function.</p>
+
+
+
+<hr><p>Last updated: Jul 15 2022 at 23:21 UTC</p>
+</html>

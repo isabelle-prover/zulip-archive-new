@@ -1,0 +1,93 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] &quot;Illegal schematic variable(s) in case&quot; when u... · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20.22Illegal.20schematic.20variable(s).20in.20case.22.20when.20u.2E.2E.2E.html">[isabelle] &quot;Illegal schematic variable(s) in case&quot; when u...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="257016237"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20%22Illegal%20schematic%20variable%28s%29%20in%20case%22%20when%20u.../near/257016237" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20.22Illegal.20schematic.20variable(s).20in.20case.22.20when.20u.2E.2E.2E.html#257016237">(Oct 11 2021 at 05:55)</a>:</h4>
+<p>From: "<a href="mailto:Isaac@ecs.vuw.ac.nz">Isaac@ecs.vuw.ac.nz</a>" &lt;<a href="mailto:Isaac@ecs.vuw.ac.nz">Isaac@ecs.vuw.ac.nz</a>&gt;<br>
+Hello,<br>
+I seem to have a fund a bug with induction, but I couldn't work out where I should report this;</p>
+<p>Bassically, if I put a function inside a context like this:<br>
+    context fixes par :: bool begin<br>
+        function foo :: ‹bool ⇒ bool› where<br>
+            ‹foo True = (∀ j :: bool. par ∧ (par ⟶ foo False))› |<br>
+            ‹foo False = True›<br>
+            by(auto) termination by(relation ‹measure (λb . if b then 1 else 0)›, auto)<br>
+    end<br>
+The generated "thm foo.induct" is as expected:<br>
+    ((⋀x. ?par ⟹ ?P False) ⟹ ?P True) ⟹ ?P False ⟹ ?P ?a0.0</p>
+<p>However if I try and use it with the "induction" method, it breaks:<br>
+    lemma assumes ‹par› shows ‹foo par val› proof(induction val rule: foo.induct)</p>
+<p>This suggests the proof text:<br>
+    case 1<br>
+    then show ?case sorry<br>
+    next<br>
+    case 2<br>
+    then show ?case sorry<br>
+    qed</p>
+<p>But that text reports an error on the first "case 1":<br>
+    proof (state)<br>
+    goal (2 subgoals):</p>
+<p>1. (⋀x. ?par ⟹ foo par False) ⟹ foo par True<br>
+    2. foo par False<br>
+    Illegal schematic variable(s) in case "1"⌂</p>
+<p>A simple workaround is to use "proof(induction val rule: foo.induct[of par])", and everything works as expected:<br>
+    proof (state)<br>
+    goal (2 subgoals):</p>
+<p>1. (⋀x. par ⟹ foo par False) ⟹ foo par True<br>
+    2. foo par False</p>
+<p>And the proof goes through (after replacing "sorry" with "by (auto)")</p>
+<p>As an asside, the reason I have my function in a context to begin with is so that it dosen't put "⋀par" arround each case, which would break my proof, because each step dosn't hold for each "par", but rather the specific one i've assumed to be true!</p>
+
+
+
+<a name="257037547"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20%22Illegal%20schematic%20variable%28s%29%20in%20case%22%20when%20u.../near/257037547" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20.22Illegal.20schematic.20variable(s).20in.20case.22.20when.20u.2E.2E.2E.html#257037547">(Oct 11 2021 at 09:35)</a>:</h4>
+<p>From: Thomas Sewell &lt;<a href="mailto:tals4@cam.ac.uk">tals4@cam.ac.uk</a>&gt;<br>
+It's not a bug, in that sense. The theorem you're trying to use isn't the usual shape for an induction rule, and it's reporting that as best it can.</p>
+<p>Exporting a theorem out of a context, in general, changes its shape, although typically not much. There's no guarantee that induction-shaped rules are exported to induction-shaped rules, etc. Since you've now left an anonymous context and there's no way to return, or get access to foo.induct by any other name, it might seem confusing that foo.induct is not an induction rule, but it's just a consequence of the steps that have been taken.</p>
+<p>You've written a postscript in which you explain your reasoning for using a context, which looks like it boils down to saying that some other approach wasn't working. I suspect you should rewind and try other fixes to your original induction problem.</p>
+<p>Good luck with it,<br>
+    Thomas.</p>
+
+
+
+<a name="257085638"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20%22Illegal%20schematic%20variable%28s%29%20in%20case%22%20when%20u.../near/257085638" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20.22Illegal.20schematic.20variable(s).20in.20case.22.20when.20u.2E.2E.2E.html#257085638">(Oct 11 2021 at 16:11)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:mail@andreas-lochbihler.de">mail@andreas-lochbihler.de</a>&gt;<br>
+Hi Isaac,</p>
+<p>The generated induction rule depends on the context parameter ?par and you have to tell <br>
+the induction method how it is supposed to be instantiated. That's what the "taking" <br>
+option is good for:</p>
+<p>proof(induction val taking: par rule: foo.induct)</p>
+<p>This is typical for definitions inside a context, be them fun(ction) or (co)inductive(_set).</p>
+<blockquote>
+<p>As an asside, the reason I have my function in a context to begin with is so that it <br>
+dosen't put "⋀par" arround each case, which would break my proof, because each step dosn't <br>
+hold for each "par", but rather the specific one i've assumed to be true!</p>
+</blockquote>
+<p>Right. That's the reason why I often put a function definition into an anonymous context. <br>
+There's also an alternative where you explicitly specify the desired instantiation upon <br>
+each induction call:</p>
+<p>function foo :: ‹bool ⇒ bool ⇒ bool› where<br>
+   ‹foo par True = (∀ j :: bool. par ∧ (par ⟶ foo par False))› |<br>
+   ‹foo par False = True›<br>
+   by(auto) termination by(relation ‹measure (λ(_, b). if b then 1 else 0)›, auto)</p>
+<p>lemma assumes ‹par› shows ‹foo par val›<br>
+proof(induction par'≡"par" val rule: foo.induct)</p>
+<p>For induction, the usability is about the same. The difference comes with the <code>.cases</code> <br>
+rule where you don't have to instantiate "par" in the version with the context.</p>
+<p>Hope this helps,<br>
+Andreas</p>
+
+
+
+<hr><p>Last updated: Jul 15 2022 at 23:21 UTC</p>
+</html>

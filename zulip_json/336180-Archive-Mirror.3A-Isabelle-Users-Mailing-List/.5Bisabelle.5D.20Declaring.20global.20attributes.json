@@ -1,0 +1,44 @@
+[
+    {
+        "content": "<p>From: John Munroe &lt;<a href=\"mailto:munddr@gmail.com\">munddr@gmail.com</a>&gt;<br>\nHi,</p>\n<p>I'm trying to declare an attribute using</p>\n<p>declare [[foo = 3]]</p>\n<p>I have this ML code:</p>\n<p>ML {*<br>\nConfig.declare_global \"foo\" (K (Config.Int 2));<br>\n*}</p>\n<p>But it complains about *** Unknown attribute: \"foo\". Is something else<br>\nneeded for registering attributes?</p>\n<p>Help will be appreciated. Thank you.</p>\n<p>John</p>",
+        "id": 294146353,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660847641
+    },
+    {
+        "content": "<p>From: Jasmin Blanchette &lt;<a href=\"mailto:jasmin.blanchette@gmail.com\">jasmin.blanchette@gmail.com</a>&gt;<br>\nHi John,</p>\n<p>The idiom I was taught by Makarius is</p>\n<p>ML {*<br>\n    val foo = Attrib.setup_config_int @{binding \"foo\"} (K 2);<br>\n    *}</p>\n<p>declare [[foo = 3]]</p>\n<p>ML {*<br>\n    Config.get @{context} foo;<br>\n    *}</p>\n<p>Regards,</p>\n<p>Jasmin</p>",
+        "id": 294146468,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660847669
+    },
+    {
+        "content": "<p>From: John Munroe &lt;<a href=\"mailto:munddr@gmail.com\">munddr@gmail.com</a>&gt;<br>\nThanks. I can't seem to find Attrib.setup_config_int in Isabelle2011.<br>\nAssuming it's the same as Attrib.config_int, the following still gives<br>\nme an error:</p>\n<p>ML {*<br>\nval foo = Attrib.config_int (@{binding \"foo\"} |&gt; Binding.name_of) (K 2);<br>\n*}</p>\n<p>declare [[foo = 3]]</p>\n<p>John</p>",
+        "id": 294146493,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660847677
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nOn Sat, 22 Oct 2011, John Munroe wrote:</p>\n<blockquote>\n<p>I can't seem to find Attrib.setup_config_int in Isabelle2011.</p>\n</blockquote>\n<p>It is there in the current official release, which is Isabelle2011-1.</p>\n<blockquote>\n<p>Assuming it's the same as Attrib.config_int, the following still gives <br>\nme an error:</p>\n<p>ML {*<br>\nval foo = Attrib.config_int (@{binding \"foo\"} |&gt; Binding.name_of) (K 2);<br>\n*}</p>\n<p>declare [[foo = 3]]</p>\n</blockquote>\n<p>The ML foo above is a pair (config, setup).  The setup component needs to <br>\nbe applied to the theory context using the 'setup' command in Isar.</p>\n<p>Makarius</p>",
+        "id": 294146534,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660847696
+    },
+    {
+        "content": "<p>From: John Munroe &lt;<a href=\"mailto:munddr@gmail.com\">munddr@gmail.com</a>&gt;<br>\nThanks. Can I try to imitate the setup_config_int function with:</p>\n<p>ML {*<br>\nval (_,setup) = Attrib.config_int (@{binding \"foo\"} |&gt; Binding.name_of) (K 2);<br>\nval _ = Context.&gt;&gt; (Context.map_theory setup)</p>\n<p>val foo_raw = Config.declare_global \"foo\" (K (Config.Int 2));<br>\nval foo = <a href=\"http://Config.int\">Config.int</a> foo_raw<br>\n*}<br>\ndeclare [[ foo = 3 ]]</p>\n<p>But reading the attribute with</p>\n<p>ML {*<br>\nval max_stuff_arty = Config.get_global @{theory} max_stuff_arity<br>\n*}</p>\n<p>gives 2 rather than 3. Am I missing something here?</p>\n<p>Thanks for the help.</p>\n<p>John</p>",
+        "id": 294146556,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660847708
+    },
+    {
+        "content": "<p>From: Jasmin Blanchette &lt;<a href=\"mailto:jasmin.blanchette@gmail.com\">jasmin.blanchette@gmail.com</a>&gt;<br>\nHi John,</p>\n<p>This declares the attribute \"foo\" twice, which is a bad idea. Try this (tested with Isabelle2011):</p>\n<p>ML {*<br>\n    val (foo, setup) = Attrib.config_int (@{binding \"foo\"} |&gt; Binding.name_of) (K 2);<br>\n    val _ = Context.&gt;&gt; (Context.map_theory setup)<br>\n    *}</p>\n<p>declare [[ foo = 3 ]]</p>\n<p>ML {*<br>\n    val max_stuff_arty = Config.get_global @{theory} foo<br>\n    *}</p>\n<p>Regards,</p>\n<p>Jasmin</p>",
+        "id": 294146591,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660847724
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nYes, you have dropped the actual foo value representing the config option <br>\nin ML, and defined a separate one that is not linked to the attribute name <br>\nspace at all.  The name suffixes \"_global\" and \"_raw\" that you have seen <br>\nin the Pure sources have been chosen to indicate that there is something <br>\nunusual -- normal user-space code is neither global nor raw.</p>\n<p>This is how it works:</p>\n<p>ML {* val (foo, foo_setup) = Attrib.config_int \"foo\" (K 2) *}<br>\nsetup foo_setup</p>\n<p>declare [[ foo = 3 ]]<br>\nML {* Config.get @{context } foo *}</p>\n<p>See also section \"1.1.5 Configuration options\" of the fine Isabelle/Isar <br>\nImplementation manual <br>\n<a href=\"http://isabelle.in.tum.de/website-Isabelle2011/dist/Isabelle2011/doc/implementation.pdf\">http://isabelle.in.tum.de/website-Isabelle2011/dist/Isabelle2011/doc/implementation.pdf</a><br>\nIt even includes some examples of the above kind.</p>\n<p>Anyway, are you really stuck with old Isabelle2011?  Isabelle2011-1 has <br>\nslightly better support for ML programming in the Isabelle/jEdit Prover <br>\nIDE than Isabelle2011 from 8 months ago.</p>\n<p>Makarius</p>",
+        "id": 294146597,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660847726
+    }
+]

@@ -1,0 +1,56 @@
+[
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nNote that the statement is only recorded for Proofterm.proofs 1 or 2.</p>\n<p>Many years ago, it was also done for 0 (the default), but that could lead into<br>\nbad situations: some ambitious users were using oracles to shortcut formal<br>\nreasoning and ended up with rather slow inferences due to large number of<br>\noracles being merged all the time.</p>\n<p>Following the existing policies of Proofterm.proofs I have now added more<br>\nposition information for Proofterm.proofs 1 or 2, see<br>\n<a href=\"https://isabelle-dev.sketis.net/rISABELLE910a081cca74\">https://isabelle-dev.sketis.net/rISABELLE910a081cca74</a> -- this will be in the<br>\nforthcoming Isabelle2020-RC1.</p>\n<p>Makarius</p>",
+        "id": 294822282,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661242731
+    },
+    {
+        "content": "<p>From: Dominique Unruh &lt;<a href=\"mailto:unruh@ut.ee\">unruh@ut.ee</a>&gt;<br>\nHello,</p>\n<p>the following fragment proves False using sorry:</p>\n<p>theory Scratch<br>\n       imports Main<br>\n    begin</p>\n<p>ML ‹<br>\n    Proofterm.proofs := 2<br>\n    ›</p>\n<p>class false = fixes x::'a assumes xx: \"x≠x\"</p>\n<p>instance int :: false sorry</p>\n<p>lemma f: False<br>\n       using xx by simp</p>\n<p>thm_oracles f</p>\n<p>end</p>\n<p>Therefore, thm_oracles should list skip_proof as one of the oracles. (If <br>\nI understood the NEWS entry correctly that says \"In particular, the <br>\nformal tagging with \"Pure.skip_proofs\" of results stemming from <br>\n\"instance ... sorry\" is now propagated properly\").</p>\n<p>However, no oracles are listed:</p>\n<p>If we replace \"using xx\" by \"using xx[where 'a=int]\", it works <br>\ncorrectly. I assume the reason for the problem is that in my proof, the <br>\nstep that uses the incorrect instantiation never uses \"CLASS(int,false)\" <br>\nbut instead just uses the fact that false is an inhabited sort for <br>\nremoving the sort hypothesis. (Evidence for this is that if we remove <br>\nthe instance command, we get an error about sort hypotheses.)</p>\n<p>Best wishes,<br>\nDominique.</p>",
+        "id": 294823542,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661243293
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nThanks for testing it thoroughly. There is indeed something missing:<br>\nThm.strip_shyps implicitly performs a type instantiation and thus needs to<br>\nparticipate in the new management of sort constraints. I have amended that here:<br>\n<a href=\"https://isabelle-dev.sketis.net/rISABELLE439410bf451\">https://isabelle-dev.sketis.net/rISABELLE439410bf451</a></p>\n<p>How did you figure out the above example? Just by accident or do you have<br>\nactual applications with notable coverage of theorems and their derivations?</p>\n<p>I recall that you were trying to work with thm oracles before it was properly<br>\nsupported. Do the various ML operations for it now make sense to you (e.g.<br>\nThm_Deps.all_oracles_of, Thm_Deps.has_skip_proof)?</p>\n<p>Side-remark: Your Proofterm.proofs := 2 did not make sense here and is fragile<br>\nin the face of parallel checking (if required see session option record_proofs<br>\nin HOL-Proofs). Thm dependencies are always recorded and don't need such a flag.</p>\n<p>Makarius</p>",
+        "id": 294823569,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661243309
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nI've done further reading of the surrounding sources, and may have to rethink<br>\nsome details of the approach.</p>\n<p>(NB: \"RC0\" is not even a release candidate yet, just an odd repository snapshot).</p>\n<p>Makarius</p>",
+        "id": 294823573,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661243314
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nOn 17/02/2020 12:12, Makarius wrote:</p>\n<blockquote>\n<p>On 16/02/2020 20:35, Makarius wrote:</p>\n<blockquote>\n<blockquote>\n<p>However, no oracles are listed:</p>\n</blockquote>\n<p>Thanks for testing it thoroughly. There is indeed something missing:<br>\nThm.strip_shyps implicitly performs a type instantiation and thus needs to<br>\nparticipate in the new management of sort constraints. I have amended that here:<br>\n<a href=\"https://isabelle-dev.sketis.net/rISABELLE439410bf451\">https://isabelle-dev.sketis.net/rISABELLE439410bf451</a></p>\n<p>How did you figure out the above example? Just by accident or do you have<br>\nactual applications with notable coverage of theorems and their derivations?</p>\n<p>I recall that you were trying to work with thm oracles before it was properly<br>\nsupported. Do the various ML operations for it now make sense to you (e.g.<br>\nThm_Deps.all_oracles_of, Thm_Deps.has_skip_proof)?</p>\n</blockquote>\n<p>I've done further reading of the surrounding sources, and may have to rethink<br>\nsome details of the approach.</p>\n</blockquote>\n<p>I have made a second round to study the situation, and it should be fine for<br>\nnow, see also <a href=\"https://isabelle-dev.sketis.net/rISABELLEb2c9f94e025f\">https://isabelle-dev.sketis.net/rISABELLEb2c9f94e025f</a></p>\n<p>Included are exotic corner cases concerning a proven class relation a &lt;= b.</p>\n<p>Both examples work correctly, but the second might be surprising: the user has<br>\nwritten a non-normal sort {a,b} and the abstract syntax turns that into {a}<br>\nwithout formal reasoning. Thus the statement of the theorem is different from<br>\nwhat is written in the text, and consequently there is no trace of 'sorry' in<br>\nthe result. Thus it serves as a reminder that the inference kernel is not<br>\neverything: many things don't go through it.</p>\n<blockquote>\n<p>NB: \"RC0\" is not even a release candidate yet, just an odd repository snapshot.</p>\n</blockquote>\n<p>I reckon that we can start with regular Isabelle2020-RC1 in approx. 2 weeks.</p>\n<p>Still missing right now: update of NEWS, CONTRIBUTORS, ANNOUNCE.</p>\n<p>Makarius<br>\n<a href=\"/user_uploads/14278/eRR9FkMCRpbnB090QObsrxRz/Scratch.thy\">Scratch.thy</a></p>",
+        "id": 294823585,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661243320
+    },
+    {
+        "content": "<p>From: Dominique Unruh &lt;<a href=\"mailto:unruh@ut.ee\">unruh@ut.ee</a>&gt;<br>\nHello,</p>\n<blockquote>\n<p>Thanks for testing it thoroughly. There is indeed something missing:<br>\nThm.strip_shyps implicitly performs a type instantiation and thus needs to<br>\nparticipate in the new management of sort constraints. I have amended that here:<br>\n<a href=\"https://isabelle-dev.sketis.net/rISABELLE439410bf451\">https://isabelle-dev.sketis.net/rISABELLE439410bf451</a></p>\n</blockquote>\n<p>Nice. I did not test it yet. (Because I don't have a build of the <br>\ndevelopment version installed / configured.) I noticed one thing in the <br>\ndiff, though: The code uses Sorts.minimal_sorts, which, as far as I <br>\nunderstand, relies on subclass proofs. I may be wrong (because I have <br>\nnot looked at all the related code) but doesn't that mean that oracles <br>\nfrom those subclass proofs need to included, too?</p>\n<blockquote>\n<p>How did you figure out the above example? Just by accident or do you have<br>\nactual applications with notable coverage of theorems and their derivations?</p>\n</blockquote>\n<p>More or less by accident. I was curious about the new oracle tracking <br>\ncode and tried out a few corner cases. That I hit on the sort hypothesis <br>\nremoval was pure accident because \"using xx\" was shorter to type than <br>\n\"using xx[where 'a=int]\".</p>\n<blockquote>\n<p>I recall that you were trying to work with thm oracles before it was properly<br>\nsupported. Do the various ML operations for it now make sense to you (e.g.<br>\nThm_Deps.all_oracles_of, Thm_Deps.has_skip_proof)?</p>\n</blockquote>\n<p>Yes, thm_oracles is basically what I used the old all_oracles_of for. <br>\nWith the goal of being able to track progress in a large development <br>\nwith many sorry's. My code had one additional feature: it would record <br>\nalso the position and an optional comment in the oracle (by implementing <br>\nmy own variant of sorry that records those additional things into the <br>\nterm that is sent to the oracle). Then one can ctrl-click in the oracle <br>\nlist to jump to the position where the corresponding oracle call occurs. <br>\nIf required, I can share code for that.</p>\n<blockquote>\n<p>Side-remark: Your Proofterm.proofs := 2 did not make sense here and is fragile<br>\nin the face of parallel checking (if required see session option record_proofs<br>\nin HOL-Proofs). Thm dependencies are always recorded and don't need such a flag.</p>\n</blockquote>\n<p>I somewhat suspected that but included it just in case in this example <br>\nto make sure the problem did not depend on the proofterms recording level.</p>\n<p>Best wishes,</p>\n<p>Dominique.</p>",
+        "id": 294823593,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661243326
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nYes, I did that already in my second amendment:<br>\n<a href=\"https://isabelle-dev.sketis.net/rISABELLEb2c9f94e025f\">https://isabelle-dev.sketis.net/rISABELLEb2c9f94e025f</a></p>\n<p>I first thought that I need to revisit many more similar situations of<br>\nimplicit subclass reasoning, but did not find any. 10 years ago we have<br>\nalready put almost everything into an almost clear state.</p>\n<p>Makarius</p>",
+        "id": 294823616,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661243341
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nI was actually considering to add official positions to oracle invocations,<br>\nbut that would also mean that much more information needs to be stored within<br>\nthe derivation object because there will be more duplicates.</p>\n<p>Makarius</p>",
+        "id": 294823634,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661243350
+    },
+    {
+        "content": "<p>From: Dominique Unruh &lt;<a href=\"mailto:unruh@ut.ee\">unruh@ut.ee</a>&gt;<br>\nWould there be more duplicates? I would have thought almost all oracle <br>\ninvocations would lead to distinct entries anyway (even without <br>\nposition) because they record the statement that is proven by oracle. <br>\n(And my guess is that this statement would be the same in two oracle <br>\ncalls only in rare coincidences.)</p>\n<p>Best wishes,<br>\nDominique.</p>",
+        "id": 294823774,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661243409
+    }
+]

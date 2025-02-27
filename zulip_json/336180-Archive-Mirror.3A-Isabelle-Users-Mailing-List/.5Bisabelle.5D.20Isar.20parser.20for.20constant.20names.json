@@ -1,0 +1,26 @@
+[
+    {
+        "content": "<p>From: Moa Johansson &lt;<a href=\"mailto:moa.johansson@chalmers.se\">moa.johansson@chalmers.se</a>&gt;<br>\nHi,</p>\n<p>I'm defining a new Isar-command (called hipster) which should take a list of constant names as input. However, I seem to run into some problems. The parser I’ve written so far works fine, but requires me to pass the arguments as strings, which is somewhat ugly, like this:</p>\n<p>hipster \"TreeDemo.mirror\" \"TreeDemo.tmap\"</p>\n<p>It would be nice to be able to use similar syntax to generate_code, i.e. have the theory names deduced automatically, so I though I’d make use of the function Parse.const. However, although this function parses the constant name to a string, it appears it is not the same one as passing the function names explicitly as a string, which I would expect. <br>\nChecking what Parse.const does with print statements makes me no wiser, here it looks OK. </p>\n<p>Hipster uses the code generator, and this is where the problem manifests itself, when I use Parse.const instead of Parse.string: </p>\n<p>exception TYPE raised (line 97 of \"consts.ML\"): Unknown constant: \"TreeDemo.mirror\"</p>\n<p>despite being in the theory “TreeDemo”, where indeed there is a function mirror. Below is the code for my small parser, if anyone has any tips on some other function I can use to reliably parse constants names, please let me know! </p>\n<p>Best,<br>\nMoa</p>\n<p>let<br>\nfun call_hipster consts = <br>\n<a href=\"http://Local_Theory.target\">Local_Theory.target</a> <br>\n  (fn ctxt =&gt; fst(Hipster_Explore.explore ctxt consts));<br>\nin<br>\nOuter_Syntax.local_theory  @{command_spec \"hipster\"} <br>\n      \"Theory Exploration with Hipster”<br>\n     (* This works OK*)<br>\n      (* (Scan.repeat1 Parse.string &gt;&gt; call_hipster) *)<br>\n     (* This cause an error - unknown constant *)<br>\n       (Scan.repeat1 Parse.const &gt;&gt; call_hipster)<br>\nend</p>",
+        "id": 294278114,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660919446
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nParse.const is the right thing, but only half of it, namely the outer <br>\nsyntax parser.  You also need an inners syntax \"read\" function.</p>\n<p>Peeking at the implementation of the 'notation' command suggests the <br>\nfollowing:</p>\n<p>Proof_Context.read_const ctxt false dummyT</p>\n<p>Makarius</p>",
+        "id": 294278150,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660919458
+    },
+    {
+        "content": "<p>From: Lars Hupel &lt;<a href=\"mailto:hupel@in.tum.de\">hupel@in.tum.de</a>&gt;<br>\nHi,</p>\n<p>here's what I do for my Isar command:</p>\n<p>fun const_raw (..., raw_const) thy =<br>\n   let<br>\n     val ctxt = Proof_Context.init_global thy<br>\n     val (name, _) = Syntax.parse_term ctxt raw_const<br>\n       |&gt; Type.strip_constraints<br>\n       |&gt; dest_Const</p>\n<p>(* ... *)<br>\n   in<br>\n     (* ... *)<br>\n   end</p>\n<p>val _ =<br>\n   Outer_Syntax.command<br>\n     @{command_spec \"declassify\"}<br>\n     \"redefines a constant after applying the dictionary construction\"<br>\n     ((* ... *) -- Parse.const &gt;&gt; (Toplevel.theory o const_raw))</p>\n<p>This works with proper markup in Isabelle/jEdit. I'm not sure whether <br>\n this is the canonical solution, but so far I never got any \"unknown <br>\n constant\" exceptions.</p>\n<p>Cheers<br>\n Lars</p>",
+        "id": 294278197,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660919471
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nIt is better than working with raw uninterpreted strings.  Going through <br>\nthe full term language is conceptually simple, and often adequate as <br>\napproximation.</p>\n<p>The business of reading just consts, not terms that are mean to be consts, <br>\nis more delicate.  For the next release I have brushed up the canonical <br>\nfunctions for that: it will also do the right thing for name space <br>\ncompletion.  For Isabelle2013-2 the given ProofContext.read_const should <br>\ndo the job.</p>\n<p>Note that above the Proof_Context.init_global only makes sense in a global <br>\ntheory context, which seems to be the case here, but that is a special <br>\ncase.</p>\n<p>Makarius</p>",
+        "id": 294278235,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660919483
+    }
+]

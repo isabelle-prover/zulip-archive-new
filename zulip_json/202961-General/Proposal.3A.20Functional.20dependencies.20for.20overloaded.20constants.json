@@ -1,0 +1,98 @@
+[
+    {
+        "content": "<p>There is a well-known problem with Isabelle's constant overloading: Suppose we want to define an <code>nth</code> function with the type</p>\n<div class=\"codehilite\"><pre><span></span><code>nth :: &#39;a foo ⇒ &#39;b ⇒ &#39;a\n</code></pre></div>\n\n\n<p>and concrete instances such as:</p>\n<div class=\"codehilite\"><pre><span></span><code>nth :: &#39;a poly ⇒ nat ⇒ &#39;a (polynomials)\nnth :: &#39;a fps ⇒ nat ⇒ &#39;a (formal power series)\nnth :: &#39;a fps ⇒ int ⇒ &#39;a (formal Laurent series)\nnth :: (&#39;a, &#39;n) ⇒ &#39;n ⇒ &#39;a (vectors)\n</code></pre></div>\n\n\n<p>One would want to have something like this to have common notation for these operations (e.g. infix <code>$</code>).</p>\n<p>The problem is now that Isabelle's overloading does not support type constructors. One would have to declare the constant as</p>\n<div class=\"codehilite\"><pre><span></span><code>nth :: &#39;a ⇒ &#39;b ⇒ &#39;c\n</code></pre></div>\n\n\n<p>but now there is no link at all between the different type variables. Even if we know that <code>p</code> is a polynomial, writing <code>nth p n</code> will give <code>nth</code> the type <code>'a poly ⇒ 'b ⇒ 'c</code> so that we have to manually annotate everything.</p>\n<p>In my opinion, the cleanest solution to this would be to allow specifying functional dependencies for overloaded constants (similarly to what is done for multi-parameter type classes in <a href=\"https://wiki.haskell.org/Functional_dependencies\">Haskell</a>).</p>\n<p>For the above, one could specify that the type of the first argument of <code>nth</code> uniquely determines the other two. This could be implemented by a checking phase that attempts to match the types of each available overloading instance and, if there is a unique one, applies the dependencies by adding type constraints.</p>\n<p>This should also work for things like the monadic bind and return operators.</p>\n<p>Open questions:</p>\n<ol>\n<li>Does this work?</li>\n<li>Should there be a type error if the instance is <em>not</em> unique or if none exists? Probably yes.</li>\n<li>How does this differ from <code>adhoc_overloading</code>? I don't actually understand how it works. Perhaps we should ask the people who implemented that.</li>\n<li>Perhaps one should make it so that for the determination of the fitting instance, type parameters that are determined by others are left as variables before unification. That way, something like <code>nth (p :: 'a poly) (-1::int)</code> will result in a type error <code>nat ≠ int</code> instead of the less informative ‘no instance found’. That would be a major advantage over <code>adhoc_overloading</code>!</li>\n</ol>",
+        "id": 199136976,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1590748253
+    },
+    {
+        "content": "<p>Out of interest: has the idea of adding type constructors ever been discussed on the mailing list?</p>",
+        "id": 199137433,
+        "sender_full_name": "Lukas Stevens",
+        "timestamp": 1590748656
+    },
+    {
+        "content": "<p>What do you mean, \"adding type constructors\"? We have type constructors.</p>",
+        "id": 199139135,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1590750067
+    },
+    {
+        "content": "<p>Sorry I meant type constructors for type classes which would enable monads etc.</p>",
+        "id": 199139490,
+        "sender_full_name": "Lukas Stevens",
+        "timestamp": 1590750297
+    },
+    {
+        "content": "<p>I don't think that has ever been discussed. It would probably require a massive overhaul of Isabelle's type class system.</p>",
+        "id": 199139522,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1590750329
+    },
+    {
+        "content": "<p>My intuition says that your approach will run into problems if nth requires sort constraints that do not appear in the rest of the formula. But I am not sure.</p>",
+        "id": 199139951,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1590750650
+    },
+    {
+        "content": "<p>»Should there be a type error if the instance is not unique or if none exists? Probably yes.«<br>\nIsn't the Isabelle way is to take the first one such that the order of the imports matters?</p>",
+        "id": 199140381,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1590750904
+    },
+    {
+        "content": "<p>Not sure what you mean by that. You cannot have overlapping constant specifications (that would be logically inconsistent). Underspecified constants are okay. If you mean type classes: each type either has zero or one instantiations of a type class. If you have two theories that each have an instantiation for that type, the theory merge will just fail.</p>",
+        "id": 199140896,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1590751312
+    },
+    {
+        "content": "<p>I also don't understand your other comment about the sort constraints.</p>",
+        "id": 199140965,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1590751335
+    },
+    {
+        "content": "<p>The order of the imports matters in some cases (like multiple constants with the same name).</p>",
+        "id": 199141039,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1590751425
+    },
+    {
+        "content": "<p>For illustration, here is a working ‘mock up’ in Haskell of how I think it should work in Isabelle as well. Note that the error messages work out exactly how I would like them to work out in Isabelle as well.</p>\n<div class=\"codehilite\"><pre><span></span><code><span class=\"cm\">{-# LANGUAGE FunctionalDependencies, FlexibleInstances #-}</span>\n\n<span class=\"kr\">class</span> <span class=\"kt\">Nth</span> <span class=\"n\">a</span> <span class=\"n\">b</span> <span class=\"n\">c</span> <span class=\"o\">|</span> <span class=\"n\">a</span> <span class=\"ow\">-&gt;</span> <span class=\"n\">c</span><span class=\"p\">,</span> <span class=\"n\">a</span> <span class=\"ow\">-&gt;</span> <span class=\"n\">b</span> <span class=\"kr\">where</span>\n  <span class=\"n\">nth</span> <span class=\"ow\">::</span> <span class=\"n\">a</span> <span class=\"ow\">-&gt;</span> <span class=\"n\">b</span> <span class=\"ow\">-&gt;</span> <span class=\"n\">c</span>\n\n<span class=\"kr\">data</span> <span class=\"kt\">Nat</span> <span class=\"ow\">=</span> <span class=\"kt\">Nat</span> <span class=\"kt\">Int</span>\n<span class=\"kr\">data</span> <span class=\"kt\">MyType</span> <span class=\"ow\">=</span> <span class=\"kt\">MyType</span>\n<span class=\"kr\">data</span> <span class=\"kt\">MyOtherType</span> <span class=\"ow\">=</span> <span class=\"kt\">MyOtherType</span>\n\n<span class=\"kr\">data</span> <span class=\"kt\">Poly</span> <span class=\"n\">a</span> <span class=\"ow\">=</span> <span class=\"kt\">Poly</span> <span class=\"p\">(</span><span class=\"kt\">Nat</span> <span class=\"ow\">-&gt;</span> <span class=\"n\">a</span><span class=\"p\">)</span>\n<span class=\"kr\">data</span> <span class=\"kt\">FPS</span> <span class=\"n\">a</span> <span class=\"ow\">=</span> <span class=\"kt\">FPS</span> <span class=\"p\">(</span><span class=\"kt\">Nat</span> <span class=\"ow\">-&gt;</span> <span class=\"n\">a</span><span class=\"p\">)</span>\n<span class=\"kr\">data</span> <span class=\"kt\">FLS</span> <span class=\"n\">a</span> <span class=\"ow\">=</span> <span class=\"kt\">FLS</span> <span class=\"p\">(</span><span class=\"kt\">Int</span> <span class=\"ow\">-&gt;</span> <span class=\"n\">a</span><span class=\"p\">)</span>\n<span class=\"kr\">data</span> <span class=\"kt\">Vec</span> <span class=\"n\">a</span> <span class=\"n\">n</span> <span class=\"ow\">=</span> <span class=\"kt\">Vec</span> <span class=\"p\">(</span><span class=\"n\">n</span> <span class=\"ow\">-&gt;</span> <span class=\"n\">a</span><span class=\"p\">)</span>\n\n<span class=\"kr\">instance</span> <span class=\"kt\">Nth</span> <span class=\"p\">(</span><span class=\"kt\">Poly</span> <span class=\"n\">a</span><span class=\"p\">)</span> <span class=\"kt\">Nat</span> <span class=\"n\">a</span> <span class=\"kr\">where</span> <span class=\"n\">nth</span> <span class=\"ow\">=</span> <span class=\"n\">undefined</span>\n<span class=\"kr\">instance</span> <span class=\"kt\">Nth</span> <span class=\"p\">(</span><span class=\"kt\">FPS</span> <span class=\"n\">a</span><span class=\"p\">)</span> <span class=\"kt\">Nat</span> <span class=\"n\">a</span> <span class=\"kr\">where</span> <span class=\"n\">nth</span> <span class=\"ow\">=</span> <span class=\"n\">undefined</span>\n<span class=\"kr\">instance</span> <span class=\"kt\">Nth</span> <span class=\"p\">(</span><span class=\"kt\">FLS</span> <span class=\"n\">a</span><span class=\"p\">)</span> <span class=\"kt\">Int</span> <span class=\"n\">a</span> <span class=\"kr\">where</span> <span class=\"n\">nth</span> <span class=\"ow\">=</span> <span class=\"n\">undefined</span>\n<span class=\"kr\">instance</span> <span class=\"kt\">Nth</span> <span class=\"p\">(</span><span class=\"kt\">Vec</span> <span class=\"n\">a</span> <span class=\"n\">n</span><span class=\"p\">)</span> <span class=\"n\">n</span> <span class=\"n\">a</span> <span class=\"kr\">where</span> <span class=\"n\">nth</span> <span class=\"ow\">=</span> <span class=\"n\">undefined</span>\n\n<span class=\"nf\">myPoly</span> <span class=\"ow\">=</span> <span class=\"n\">undefined</span> <span class=\"ow\">::</span> <span class=\"kt\">Poly</span> <span class=\"kt\">MyType</span>\n<span class=\"nf\">myFPS</span> <span class=\"ow\">=</span> <span class=\"n\">undefined</span> <span class=\"ow\">::</span> <span class=\"kt\">FPS</span> <span class=\"kt\">MyType</span>\n<span class=\"nf\">myFLS</span> <span class=\"ow\">=</span> <span class=\"n\">undefined</span> <span class=\"ow\">::</span> <span class=\"kt\">FLS</span> <span class=\"kt\">MyType</span>\n<span class=\"nf\">myNat</span> <span class=\"ow\">=</span> <span class=\"kt\">Nat</span> <span class=\"mi\">0</span>\n<span class=\"nf\">myInt</span> <span class=\"ow\">=</span> <span class=\"mi\">0</span> <span class=\"ow\">::</span> <span class=\"kt\">Int</span>\n<span class=\"nf\">myVec</span> <span class=\"ow\">=</span> <span class=\"n\">undefined</span> <span class=\"ow\">::</span> <span class=\"kt\">Vec</span> <span class=\"kt\">MyType</span> <span class=\"kt\">MyOtherType</span>\n\n<span class=\"nf\">test1</span> <span class=\"ow\">=</span> <span class=\"n\">nth</span> <span class=\"n\">myPoly</span> <span class=\"n\">myNat</span>\n<span class=\"nf\">test2</span> <span class=\"ow\">=</span> <span class=\"n\">nth</span> <span class=\"n\">myFPS</span> <span class=\"n\">myNat</span>\n<span class=\"nf\">test3</span> <span class=\"ow\">=</span> <span class=\"n\">nth</span> <span class=\"n\">myFLS</span> <span class=\"n\">myInt</span>\n\n<span class=\"c1\">-- not enough information to determine instance</span>\n<span class=\"nf\">test4</span> <span class=\"ow\">=</span> <span class=\"n\">nth</span> <span class=\"n\">undefined</span> <span class=\"n\">myNat</span> <span class=\"c1\">-- ERROR: Non type-variable argument in the constraint: Nth a Nat c</span>\n\n<span class=\"c1\">-- inferred type for dependent argument contradicts actual type</span>\n<span class=\"nf\">test5</span> <span class=\"ow\">=</span> <span class=\"n\">nth</span> <span class=\"n\">myFLS</span> <span class=\"n\">myNat</span> <span class=\"c1\">-- ERROR: Couldn&#39;t match type ‘Int’ with ‘Nat’</span>\n\n<span class=\"kt\">:</span><span class=\"n\">t</span> <span class=\"n\">nth</span> <span class=\"n\">myFPS</span> <span class=\"c1\">-- nth myFPS :: Nat -&gt; MyType</span>\n<span class=\"kt\">:</span><span class=\"n\">t</span> <span class=\"n\">nth</span> <span class=\"n\">myFLS</span> <span class=\"c1\">-- nth myFLS :: Int -&gt; MyType</span>\n<span class=\"kt\">:</span><span class=\"n\">t</span> <span class=\"n\">nth</span> <span class=\"n\">myVec</span> <span class=\"c1\">-- nth myVec :: MyOtherType -&gt; MyType</span>\n</code></pre></div>",
+        "id": 199141191,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1590751547
+    },
+    {
+        "content": "<p>@ ‘The order of the imports matters in some cases (like multiple constants with the same name).’</p>\n<p>Yes, for the translation of short name into last name the import order does matter. But this is definitely something we would want to avoid here. Especially because in our case, the instances cannot overlap by design (this is forbidden by the logic), so if we have more than one possible instance, that just means the type is not specific enough.</p>\n<p>This <em>must</em> be fixed by the user by adding additional type constraints. Otherwise the user cannot even use the constant at all since they will not be able to unfold the definition.</p>\n<p>(Of course, there may be rare instances where, for technical reasons, you do want to write down this generic constant. But one could allow disabling the error for these cases)</p>",
+        "id": 199141516,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1590751815
+    },
+    {
+        "content": "<p>Do you have any idea if it is sufficient to add a parsing pass <a href=\"https://isabelle.in.tum.de/dist/library/Doc/Implementation/Syntax.html\">https://isabelle.in.tum.de/dist/library/Doc/Implementation/Syntax.html</a>?</p>",
+        "id": 199142024,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1590752187
+    },
+    {
+        "content": "<p>Pretty sure this is checking, not parsing. We can just add a checking translation (similarly to what <code>adhoc_overloading</code> does). Perhaps another one for the error messages at the very end of checking.</p>",
+        "id": 199145641,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1590754626
+    },
+    {
+        "content": "<p>I meant \"checking phase\".</p>",
+        "id": 199164542,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1590763980
+    },
+    {
+        "content": "<p>Update: I talked this over with Florian. I think functional dependencies don't work that great for Isabelle, but one could instead give a list of subsets of type variables that each determine the instance uniquely by themselves. For instance, for the monadic bind, which is conceptually <code>bind :: 'a m ⇒ ('a ⇒ 'b m) ⇒ 'b m</code> and would have to have the overloaded type <code>'a ⇒ ('b ⇒ 'c ⇒ 'c)</code>, one could give <code>{'a}</code> and <code>{'c}</code> as determining sets, since each of these allows you to read off the <code>m</code>.</p>\n<p>The procedure could be registered as a phase 0 checking phase, which means that it would run intertwined with regular type inference. I'll make a proof of concept implementation as soon as I can figure out how to cleanly and robustly refine types in a checking phase…</p>",
+        "id": 201379105,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1592567074
+    }
+]

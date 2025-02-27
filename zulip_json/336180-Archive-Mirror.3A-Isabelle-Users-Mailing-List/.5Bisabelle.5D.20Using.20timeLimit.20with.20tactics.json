@@ -1,0 +1,38 @@
+[
+    {
+        "content": "<p>From: Ognjen Maric &lt;<a href=\"mailto:ognjen.maric@gmail.com\">ognjen.maric@gmail.com</a>&gt;<br>\nHi all,</p>\n<p>I'm trying to limit the running time of tactics under Isabelle 2011-1, using <br>\ntimeLimit. Both of the following examples work as I want them to:</p>\n<p>ML_prf {*<br>\n  fun loop_tac ctxt i = loop_tac ctxt i<br>\n*}<br>\napply(tactic {* <br>\n    TimeLimit.timeLimit (Time.fromMilliseconds 500) (loop_tac @{context}) 1<br>\n *})</p>\n<p>apply(tactic {* <br>\n    TimeLimit.timeLimit (Time.fromMilliseconds 50) ((auto_tac @{context}))<br>\n    *}) [1]</p>\n<p>i.e. they timeout after the appropriate time. However neither of the following <br>\ndo anything:</p>\n<p>apply(tactic {* <br>\n    TimeLimit.timeLimit (Time.fromMilliseconds 500) loop_tac @{context} 1<br>\n    *})</p>\n<p>apply(tactic {* <br>\n    TimeLimit.timeLimit (Time.fromMilliseconds 500) (auto_tac @{context})<br>\n    *}) [1]</p>\n<p>The difference is the grouping of the arguments in the first example (hence <br>\nchanging the type of timeLimit's result), and increasing the limit in the <br>\nsecond example. I can't really make any sense of it. Can anyone shed some <br>\nlight on this for me? Or point me to some working examples?</p>\n<p>Thanks,<br>\nOgnjen</p>",
+        "id": 294157894,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660851984
+    },
+    {
+        "content": "<p>From: Jasmin Blanchette &lt;<a href=\"mailto:jasmin.blanchette@gmail.com\">jasmin.blanchette@gmail.com</a>&gt;<br>\nLet me point you to a working example. In \"src/HOL/TPTP/CASC_Setup.thy\", there's a \"SOLVE_TIMEOUT\" tactical you can copy paste and use. I got the code from Stefan Berghofer. I won't claim it's 100% fool-proof, but it works well enough for me. ;)</p>\n<p>fun SOLVE_TIMEOUT seconds name tac st =<br>\n  let<br>\n    val result =<br>\n      TimeLimit.timeLimit (Time.fromSeconds seconds)<br>\n        (fn () =&gt; SINGLE (SOLVE tac) st) ()<br>\n      handle TimeLimit.TimeOut =&gt; NONE<br>\n        | ERROR _ =&gt; NONE<br>\n  in<br>\n    (case result of<br>\n      NONE =&gt; (warning (\"FAILURE: \" ^ name); Seq.empty)<br>\n    | SOME st' =&gt; (warning (\"SUCCESS: \" ^ name); Seq.single st'))<br>\n  end</p>\n<p>Regards,</p>\n<p>Jasmin</p>",
+        "id": 294157915,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660851996
+    },
+    {
+        "content": "<p>From: Ognjen Maric &lt;<a href=\"mailto:ognjen.maric@gmail.com\">ognjen.maric@gmail.com</a>&gt;<br>\nOn Friday 18 May 2012 20:08:30 Jasmin Blanchette wrote:<br>\nAh, that code makes a lot of sense, thanks - I doubt I would've been able to <br>\ncome up with it on my own ;)</p>\n<p>Best,<br>\nOgnjen</p>",
+        "id": 294157944,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660852014
+    },
+    {
+        "content": "<p>From: Tjark Weber &lt;<a href=\"mailto:webertj@in.tum.de\">webertj@in.tum.de</a>&gt;<br>\nTimeLimit.timeLimit t f x applies f to x, raising a TimeOut if this<br>\ntakes longer than t.</p>\n<p>loop_tac is a curried function that takes two arguments. With the second<br>\ngrouping, timeLimit limits the runtime of partially applying loop_tac to<br>\none argument (@{context}). But this partial application (which yields<br>\nloop_tac @{context}, a function of one argument) takes (almost) no time<br>\nanyway.</p>\n<p>Infinite recursion happens once you apply loop_tac @{context} to an<br>\nargument (i.e., 1). But with the second grouping, this application is no<br>\nlonger guarded by timeLimit.</p>\n<p>Best regards,<br>\nTjark</p>",
+        "id": 294157959,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660852020
+    },
+    {
+        "content": "<p>From: Ognjen Maric &lt;<a href=\"mailto:ognjen.maric@gmail.com\">ognjen.maric@gmail.com</a>&gt;<br>\nOn Saturday 19 May 2012 13:43:17 Tjark Weber wrote:<br>\nYup, thanks. I guess the auto_tac timeout after 50ms stems from evaluating the <br>\n@{context} and whatever it is that mk_auto_tac does. However I probably <br>\nwouldn't have gotten the whole Seq and SINGLE thing to eagerly everything <br>\nproperly without Jasmin's help.</p>\n<p>Best,<br>\nOgnjen</p>",
+        "id": 294157982,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660852030
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nApart from partial application of context, subgoal number, goal state, <br>\nthere are more degress of freedom that have not been mentioned yet: lazy <br>\nevaluation of results and potential backtracking over them.  This is why <br>\nthe SINGLE combinator is used in the CASC example, to ensure that there is <br>\nat most one result.</p>\n<p>In summary, timeout on an arbitrary tactic is not well-defined.  You need <br>\nto restrict yourself to certain situations.  This also explains why there <br>\nis no tactical for that in the Isabelle/ML library.  Conceptually, a <br>\nrobust timeout works better for certain closed tactic applications, say <br>\nthe 'apply' command in Isar or Goal.prove in ML.</p>\n<p>BTW, the more recent Isabelle/ML function \"seconds\" helps to produce time <br>\nvalues without further ado.</p>\n<p>Makarius</p>",
+        "id": 294157986,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660852032
+    }
+]

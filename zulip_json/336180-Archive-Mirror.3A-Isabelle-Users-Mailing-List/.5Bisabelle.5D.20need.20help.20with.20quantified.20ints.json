@@ -1,0 +1,50 @@
+[
+    {
+        "content": "<p>From: Perry James &lt;<a href=\"mailto:perry@dsrg.org\">perry@dsrg.org</a>&gt;<br>\nHi,<br>\n   I'm having trouble proving the lemma below.  My first idea was to \"apply<br>\n(cases n)\" since there are only 12 values of n that satisfy the assumption,<br>\nbut that's not possible since n is bound. Also, applying arith, algebra, and<br>\nauto have no effect.<br>\n   Is there any way to make progress?<br>\n   Thanks in advance,<br>\n   Perry</p>\n<p>lemma \" !! q qa n. [| 0 &lt; n; int n &lt;= 12; int n * q = 12; int n * qa = 18 |]<br>\n==&gt; int n &lt;= 6\"</p>",
+        "id": 294062697,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660824317
+    },
+    {
+        "content": "<p>From: Amine Chaieb &lt;<a href=\"mailto:chaieb@in.tum.de\">chaieb@in.tum.de</a>&gt;<br>\nHere is a proof:</p>\n<p>lemma<br>\n   fixes q qa n<br>\n   assumes n0: \"n &gt; 0\" and n12: \"int n &lt;= 12\"<br>\n     and nq: \"int n * q = 12\" and nqa: \"int n * qa = 18\"<br>\n   shows \"int n &lt;= 6\"<br>\nproof-<br>\n   from nq nqa<br>\n   have \"int n dvd 12\" \"int n dvd 18\" unfolding dvd_def by auto<br>\n   hence th: \"n dvd 12\" \"n dvd 18\" unfolding int_dvd_iff by auto<br>\n   from gcd_greatest[OF th] have \"n dvd 6\" by (simp add: gcd.simps)<br>\n    (* This is actually stronger than the final conclusion *)<br>\n   hence \"n &lt;= 6\" by (rule dvd_imp_le, simp)<br>\n   then show \"int n &lt;= 6\" by simp<br>\nqed</p>\n<p>Some parts of the proof should be done automatically by algebra, but <br>\napparently there is a bug (on my TODO).</p>\n<p>Hope it helps,<br>\nAmine.</p>\n<p>Perry James wrote:</p>",
+        "id": 294062745,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660824340
+    },
+    {
+        "content": "<p>From: John Matthews &lt;<a href=\"mailto:matthews@galois.com\">matthews@galois.com</a>&gt;<br>\nHi Perry,</p>\n<p>You need to use case_tac rather than cases when n is bound by a meta- <br>\nquantifier in a subgoal, at least if you are carrying out an apply- <br>\nstyle proof. case_tac also works when the variable is not bound, and  <br>\nlike all other proof methods ending in _tac, you can apply it to other  <br>\nthan the first subgoal (e.g. apply (case_tac[3] ...)), to multiple  <br>\nsubgoals (e.g. apply (case_tac[1-3]...)), or to all subgoals (e.g.  <br>\napply (case_tac[!] ...)).</p>\n<p>I'm not sure why cases doesn't allow you to split on meta-bound  <br>\nvariables, as this would be less confusing for new users. Similarly  <br>\nfor induct vs. induct_tac. Feature request?</p>\n<p>-john</p>",
+        "id": 294062759,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660824350
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nIn a proper Isar proof you can never access hidden information from the <br>\ngoal state, such as bound parameters.  The case_tac/induct_tac versions <br>\nmerely imitate the old tactical behaviour.</p>\n<p>In your example there was no point to bind the outer parameters anyway, <br>\nand you can start right away on the problem presented in an open form <br>\n(fixes/assumes/shows, with fixes optionally implicit).</p>\n<p>Makarius</p>",
+        "id": 294062764,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660824353
+    },
+    {
+        "content": "<p>From: Thomas Arthur Leck Sewell &lt;<a href=\"mailto:tsewell@cse.unsw.EDU.AU\">tsewell@cse.unsw.EDU.AU</a>&gt;<br>\nFirstly, you can use (case_tac n) instead of (cases n) to do more or less <br>\nexactly the same thing, except that n can be a qyantified variable. This <br>\nfollows a pattern in isabelle, with induct_tac, rule_tac, drule_tac etc <br>\nallowing in various ways the specification of a constant that only exists <br>\nwithin the context of the rule.</p>\n<p>Something to think about for your particular case - you're working with an <br>\nassumption that a variable is less than a constant, in this case n &lt;= 12. <br>\nThere's a trick for getting all the cases at once. Oddly, I don't seem to <br>\nbe able to get it working for &lt;= thisevening, but consider the trick for<br>\nn &lt; 12:</p>\n<p>lemma n_less_val_disj:<br>\n   \"m ~= (0 :: nat) ==&gt;<br>\n    (n &lt; m) = (n = m - 1 | n &lt; m - 1)\"<br>\n   apply (case_tac n, simp_all)<br>\n    apply fastsimp<br>\n   apply (case_tac m, simp_all)<br>\n   apply fastsimp<br>\n   done</p>\n<p>lemma test_this:<br>\n   \"n &lt; (12 :: nat) ==&gt; P\"<br>\n   apply (simp add: n_less_val_disj)<br>\n   oops</p>\n<p>The reduction to cases can more or less take care of itself. I'm sure <br>\nthere's a nice way to do this for int n &lt;= 12, but I'll leave you to <br>\nfigure out what it might be.</p>\n<p>Yours,<br>\n    Thomas.</p>",
+        "id": 294062781,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660824359
+    },
+    {
+        "content": "<p>From: Perry James &lt;<a href=\"mailto:perry@dsrg.org\">perry@dsrg.org</a>&gt;<br>\nHi Thomas,<br>\n   Thanks for your reply.  The trick in n_less_val_disj will be added to my<br>\nbag.  I've played with variations on it and am not having much luck.<br>\n   The problem I'm having is that the values in my lemma are ints, not<br>\nnats.  Even though n itself is a nat, it is cast to int for the<br>\ncomparisons.  Thus all the nice tools for working with the much simpler nats<br>\nare not available (at least with my limited skills).<br>\n   Best regards,<br>\n   Perry</p>",
+        "id": 294062838,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660824365
+    },
+    {
+        "content": "<p>From: Tobias Nipkow &lt;<a href=\"mailto:nipkow@in.tum.de\">nipkow@in.tum.de</a>&gt;<br>\nAs this goal only involves linear arithmetic, it can be solved <br>\nautomatically:<br>\nby arith</p>\n<p>Tobias</p>",
+        "id": 294062848,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660824371
+    },
+    {
+        "content": "<p>From: Thomas Arthur Leck Sewell &lt;<a href=\"mailto:tsewell@cse.unsw.EDU.AU\">tsewell@cse.unsw.EDU.AU</a>&gt;<br>\nPerhaps a more direct specialisation to your problem is to use the<br>\n\"int _ &lt;= _\" pattern in the helper lemma. Also, as Tobias points out,<br>\nthese helpers can be proven by arith:</p>\n<p>lemma int_le_val_disj:<br>\n   \"m &gt; 0 ==&gt; (int n &lt;= m) = (int n = m | int n &lt;= m - 1)\"<br>\n   by arith</p>\n<p>lemma \"int n &lt;= 12 ==&gt; P\"<br>\n   apply (simp add: int_le_val_disj)<br>\n   oops</p>\n<p>A similar trick was used in our project to prove that<br>\n{0 ..&lt; 5} was equal to {0, 1, 2, 3, 4} - once again,<br>\nspecialisation to the syntactic form in which the &lt;<br>\nappears was helpful.</p>\n<p>Yours,<br>\n    Thomas.</p>",
+        "id": 294062863,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660824378
+    }
+]

@@ -1,0 +1,854 @@
+[
+    {
+        "content": "<p>Making a new thread to distinguish from the previous thread on making isabelle run on musl-c</p>",
+        "id": 475986314,
+        "sender_full_name": "irvin",
+        "timestamp": 1728521362
+    },
+    {
+        "content": "<p><a href=\"https://www21.in.tum.de/~boehmes/proofrec.pdf\">https://www21.in.tum.de/~boehmes/proofrec.pdf</a><br>\nthink this is the paper?</p>",
+        "id": 475986354,
+        "sender_full_name": "irvin",
+        "timestamp": 1728521399
+    },
+    {
+        "content": "<p>Ok looking at it so far Z3 now uses SMTLIB2.<br>\nisabelle already has some code ~~/src/HOL/Tools/SMT/smtlib for smtlib2 which is used for verit i think.</p>",
+        "id": 476020442,
+        "sender_full_name": "irvin",
+        "timestamp": 1728531715
+    },
+    {
+        "content": "<p><a href=\"https://www.verit-solver.org/papers/pxtp2019.pdf\">https://www.verit-solver.org/papers/pxtp2019.pdf</a><br>\nfound another relevant paper</p>",
+        "id": 476021920,
+        "sender_full_name": "irvin",
+        "timestamp": 1728532112
+    },
+    {
+        "content": "<p>The PhD thesis is probably a better start <a href=\"https://www21.in.tum.de/~boehmes/phd_thesis.pdf\">https://www21.in.tum.de/~boehmes/phd_thesis.pdf</a></p>",
+        "id": 476031589,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728536218
+    },
+    {
+        "content": "<p>I have to do some digging if I still have the patch I used back then, but anyway the realistic path to do this is to add a z3_new and keep the old one:</p>\n<ol>\n<li>add a Z3_NEW_SOLVER to the binary to the <code>.isabelle/etc/settings</code> file (compare it to <code>$ isabelle env | grep Z3</code></li>\n<li>add a z3_new system to <code>~/src/HOL/Tools/smt/smt_systems.ML</code> (duplicate the z3 fields + duplicate the reconstruction function by creating a new file)</li>\n<li>copy <code>~~/src/HOL/SMT_Examples/SMT_Examples.thy</code> into <code>~~/src/HOL/SMT_Examples/SMT_Examples_Z3_New.thy</code>, replace z3 by z3_new, remove the certificates stuff (comment out the two lines on top) and look at the examples that fail here</li>\n</ol>",
+        "id": 476032445,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728536686
+    },
+    {
+        "content": "<p>Then you need to know the <code>[[smt_trace]]</code> flag to see what the reconstruction is doing</p>",
+        "id": 476032481,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728536719
+    },
+    {
+        "content": "<p>and the obvious thing: if the lemma you have is only about quantifiers, bool, and int, you can copy it over to SMT.thy and change the reconstruction directly</p>",
+        "id": 476032610,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728536779
+    },
+    {
+        "content": "<p>Do not forget to start Isabelle with Pure as base session (<code>-l Pure</code>)</p>",
+        "id": 476032626,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728536799
+    },
+    {
+        "content": "<p>(PS: there are two people around who can answer questions on the reconstruction, <span class=\"user-mention\" data-user-id=\"477368\">@Hanna Lachnitt</span> and me, so it might be a good idea to explicitly mention me when you have a question)</p>",
+        "id": 476032941,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728537019
+    },
+    {
+        "content": "<p>I have a request: the SMT method sometimes fails if there is high system load, e. g. <a href=\"https://build.proof.cit.tum.de/build?name=all%2F190\">here</a>. While you're delving into SMT, could you check if this can be made more robust? I suspect that there's a timeout somewhere in the internals.</p>",
+        "id": 476071103,
+        "sender_full_name": "Fabian Huch",
+        "timestamp": 1728547625
+    },
+    {
+        "content": "<p>That is another issue that has nothing to do with this (if there is a timeout you get a proper error)</p>",
+        "id": 476072369,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728547926
+    },
+    {
+        "content": "<p>There is no timeout anymore (see the smt_timeout parameter)</p>",
+        "id": 476072419,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728547945
+    },
+    {
+        "content": "<p>I think the issue is that Isabelle is spawning so many tasks that all the external threads (smt is running in a bash shell) is starved until another general timeout happens</p>",
+        "id": 476072855,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728548096
+    },
+    {
+        "content": "<p>Hmm I see</p>",
+        "id": 476074229,
+        "sender_full_name": "Fabian Huch",
+        "timestamp": 1728548514
+    },
+    {
+        "content": "<p>I believe that this issue is somehow linked to the windows issue of stuff not being killed</p>",
+        "id": 476074327,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728548539
+    },
+    {
+        "content": "<p>Internally smt and sledgehammer are relying on this in cache_io to run code:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">fun</span><span class=\"w\"> </span><span class=\"n\">raw_run</span><span class=\"w\"> </span><span class=\"n\">make_cmd</span><span class=\"w\"> </span><span class=\"n\">str</span><span class=\"w\"> </span><span class=\"n\">in_path</span><span class=\"w\"> </span><span class=\"n\">out_path</span><span class=\"w\"> </span><span class=\"o\">=</span>\n<span class=\"w\">  </span><span class=\"k\">let</span>\n<span class=\"w\">    </span><span class=\"n\">val</span><span class=\"w\"> </span><span class=\"o\">_</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">File.write</span><span class=\"w\"> </span><span class=\"n\">in_path</span><span class=\"w\"> </span><span class=\"n\">str</span>\n<span class=\"w\">    </span><span class=\"n\">val</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">out2</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"n\">rc</span><span class=\"o\">)</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">Isabelle_System.bash_output</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">make_cmd</span><span class=\"w\"> </span><span class=\"n\">in_path</span><span class=\"w\"> </span><span class=\"n\">out_path</span><span class=\"o\">)</span>\n<span class=\"w\">    </span><span class=\"n\">val</span><span class=\"w\"> </span><span class=\"n\">out1</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">try_read_lines</span><span class=\"w\"> </span><span class=\"n\">out_path</span>\n<span class=\"w\">  </span><span class=\"kp\">in</span><span class=\"w\"> </span><span class=\"ow\">{</span><span class=\"kp\">output</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">split_lines</span><span class=\"w\"> </span><span class=\"n\">out2</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"n\">redirected_output</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">out1</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"n\">return_code</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">rc</span><span class=\"ow\">}</span><span class=\"w\"> </span><span class=\"k\">end</span>\n</code></pre></div>\n<p>and this:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">fun</span><span class=\"w\"> </span><span class=\"n\">with_time_limit</span><span class=\"w\"> </span><span class=\"n\">ctxt</span><span class=\"w\"> </span><span class=\"n\">timeout_config</span><span class=\"w\"> </span><span class=\"n\">f</span><span class=\"w\"> </span><span class=\"n\">x</span><span class=\"w\"> </span><span class=\"o\">=</span>\n<span class=\"w\">  </span><span class=\"n\">Timeout.apply</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">seconds</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">Config.get</span><span class=\"w\"> </span><span class=\"n\">ctxt</span><span class=\"w\"> </span><span class=\"n\">timeout_config</span><span class=\"o\">))</span><span class=\"w\"> </span><span class=\"n\">f</span><span class=\"w\"> </span><span class=\"n\">x</span>\n<span class=\"w\">    </span><span class=\"n\">handle</span><span class=\"w\"> </span><span class=\"n\">Timeout.TIMEOUT</span><span class=\"w\"> </span><span class=\"o\">_</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"n\">&gt;</span><span class=\"w\"> </span><span class=\"n\">raise</span><span class=\"w\"> </span><span class=\"n\">SMT_Failure.SMT</span><span class=\"w\"> </span><span class=\"n\">SMT_Failure.Time_Out</span>\n</code></pre></div>\n<p>to limit the amount of time</p>",
+        "id": 476074713,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728548656
+    },
+    {
+        "content": "<p>So the culprit would be <code>Isabelle_System.bash_output</code></p>",
+        "id": 476074899,
+        "sender_full_name": "Fabian Huch",
+        "timestamp": 1728548714
+    },
+    {
+        "content": "<p>That is my guess, but I have no clue how to check that</p>",
+        "id": 476074959,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728548732
+    },
+    {
+        "content": "<p>We also get some spurious nitpick errors: </p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"n\">Unexpected</span><span class=\"w\"> </span><span class=\"n\">outcome</span><span class=\"o\">:</span><span class=\"w\"> </span><span class=\"s\">\"unknown\"</span>\n<span class=\"n\">***</span><span class=\"w\">                              </span><span class=\"n\">At</span><span class=\"w\"> </span><span class=\"n\">command</span><span class=\"w\"> </span><span class=\"s\">\"nitpick\"</span>\n</code></pre></div>\n<p>which might be for the same reason</p>",
+        "id": 476075031,
+        "sender_full_name": "Fabian Huch",
+        "timestamp": 1728548755
+    },
+    {
+        "content": "<p>basically yes, but here there is a timeout</p>",
+        "id": 476075135,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728548780
+    },
+    {
+        "content": "<p>hence the unknown answer</p>",
+        "id": 476075151,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728548785
+    },
+    {
+        "content": "<p>Oh you're right, that seems like a weird implementation of nitpick</p>",
+        "id": 476075858,
+        "sender_full_name": "Fabian Huch",
+        "timestamp": 1728548989
+    },
+    {
+        "content": "<p>It is more complicated than that I think: during development it totally makes sense to have such a timeout. Also these problems only appear on big servers or slow machines (I tried to run Isabelle on raspberry pi)</p>",
+        "id": 476076395,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728549127
+    },
+    {
+        "content": "<p>Well also under heavy load on normal machines</p>",
+        "id": 476076457,
+        "sender_full_name": "Fabian Huch",
+        "timestamp": 1728549149
+    },
+    {
+        "content": "<p>I remember the time before I could run <code>-j 8</code> on my office machine (not enough RAM) and back then that was not an issue</p>",
+        "id": 476077260,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728549392
+    },
+    {
+        "content": "<p>but you are right that this should be fixed somehow</p>",
+        "id": 476077372,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728549430
+    },
+    {
+        "content": "<p>It was not an issue before because the build strategy was too inefficient</p>",
+        "id": 476077627,
+        "sender_full_name": "Fabian Huch",
+        "timestamp": 1728549494
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"348400\">Fabian Huch</span> <a href=\"#narrow/stream/202961-General/topic/Making.20isabelle.20run.20on.20modern.20z3.2E/near/476074899\">said</a>:</p>\n<blockquote>\n<p>So the culprit would be <code>Isabelle_System.bash_output</code></p>\n</blockquote>\n<p>But somehow trying to understand the behavior sounds like a bachelor project (at least understanding the behavior)</p>",
+        "id": 476078630,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728549819
+    },
+    {
+        "content": "<p>do you have bachelor students around?</p>",
+        "id": 476078770,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728549859
+    },
+    {
+        "content": "<p>I don't think code archeology is a good thesis project...</p>",
+        "id": 476079179,
+        "sender_full_name": "Fabian Huch",
+        "timestamp": 1728549987
+    },
+    {
+        "content": "<p>Not for a thesis. But as a more practical project (so trying to understand the behavior and the order in which the jobs are done)</p>",
+        "id": 476079738,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728550133
+    },
+    {
+        "content": "<p>Sadly I don't really have students for that</p>",
+        "id": 476079835,
+        "sender_full_name": "Fabian Huch",
+        "timestamp": 1728550162
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"233198\">Mathias Fleury</span> <a href=\"#narrow/stream/202961-General/topic/Making.20isabelle.20run.20on.20modern.20z3.2E/near/476032445\">said</a>:</p>\n<blockquote>\n<p>I have to do some digging if I still have the patch I used back then, but anyway the realistic path to do this is to add a z3_new and keep the old one:</p>\n<ol>\n<li>add a Z3_NEW_SOLVER to the binary to the <code>.isabelle/etc/settings</code> file (compare it to <code>$ isabelle env | grep Z3</code></li>\n<li>add a z3_new system to <code>~/src/HOL/Tools/smt/smt_systems.ML</code> (duplicate the z3 fields + duplicate the reconstruction function by creating a new file)</li>\n<li>copy <code>~~/src/HOL/SMT_Examples/SMT_Examples.thy</code> into <code>~~/src/HOL/SMT_Examples/SMT_Examples_Z3_New.thy</code>, replace z3 by z3_new, remove the certificates stuff (comment out the two lines on top) and look at the examples that fail here</li>\n</ol>\n</blockquote>\n<p>Manage to finally get started. And found the issue specifically its from calling  </p>\n<p>lemma \"(a \\&lt;and&gt; b) \\&lt;or&gt; (c \\&lt;and&gt; d) \\&lt;Longrightarrow&gt; (a \\&lt;and&gt; b) \\&lt;or&gt; (c \\&lt;and&gt; d)\" by (smt (z3_new )) which leads to this issue <a href=\"https://github.com/Z3Prover/z3/issues/5073\">https://github.com/Z3Prover/z3/issues/5073</a></p>",
+        "id": 476384466,
+        "sender_full_name": "irvin",
+        "timestamp": 1728651874
+    },
+    {
+        "content": "<p>Im planning to ignore that issue first try to get proof-bind to work. Can even revert back to an older commit where its fixed</p>",
+        "id": 476386624,
+        "sender_full_name": "irvin",
+        "timestamp": 1728652553
+    },
+    {
+        "content": "<p>I checked it as far as to find a release where that was working</p>",
+        "id": 476387108,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728652681
+    },
+    {
+        "content": "<p>(it is written somewhere on Makarius' bug tracker)</p>",
+        "id": 476387222,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728652708
+    },
+    {
+        "content": "<p>Or not <a href=\"https://isabelle-dev.sketis.net/T29\">https://isabelle-dev.sketis.net/T29</a>, I must be misremembering</p>",
+        "id": 476387587,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728652814
+    },
+    {
+        "content": "<p>but there was one release where this was working</p>",
+        "id": 476387627,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728652827
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"233198\">Mathias Fleury</span> <a href=\"#narrow/stream/202961-General/topic/Making.20isabelle.20run.20on.20modern.20z3.2E/near/476387108\">said</a>:</p>\n<blockquote>\n<p>I checked it as far as to find a release where that was working</p>\n</blockquote>\n<p>You wrote it in the issue itself <a href=\"https://github.com/Z3Prover/z3/issues/5073#issuecomment-1273517432\">https://github.com/Z3Prover/z3/issues/5073#issuecomment-1273517432</a></p>",
+        "id": 476388911,
+        "sender_full_name": "irvin",
+        "timestamp": 1728653252
+    },
+    {
+        "content": "<p>I noticed you mention <a href=\"https://publikationen.bibliothek.kit.edu/1000131835\">https://publikationen.bibliothek.kit.edu/1000131835</a> as papers using z3 with proof reconstruction as one of the latest do you have a list of papers which have z3 reconstruction</p>",
+        "id": 476390549,
+        "sender_full_name": "irvin",
+        "timestamp": 1728653771
+    },
+    {
+        "content": "<p>search engine does not seem to really show any except the isabelle one</p>",
+        "id": 476390857,
+        "sender_full_name": "irvin",
+        "timestamp": 1728653888
+    },
+    {
+        "content": "<p>There is the Isabelle one by Sascha, the HOL4 one by Tjark (<a href=\"https://www21.in.tum.de/~boehmes/fast_proof_rec/fast_proof_rec.pdf\">https://www21.in.tum.de/~boehmes/fast_proof_rec/fast_proof_rec.pdf</a>) -- they both wrote it up together --, and the Key one you found</p>",
+        "id": 476392344,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728654416
+    },
+    {
+        "content": "<p>I had a patch to support proof-bind (it was not hard, I think ignoring it was possible)</p>",
+        "id": 476392492,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728654480
+    },
+    {
+        "content": "<p>but I cannot find it anymore</p>",
+        "id": 476392552,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728654487
+    },
+    {
+        "content": "<p>The main issue is finding out what it does, because I never found any documentation on that</p>",
+        "id": 476392623,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728654514
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"714722\">irvin</span> <a href=\"#narrow/stream/202961-General/topic/Making.20isabelle.20run.20on.20modern.20z3.2E/near/476386624\">said</a>:</p>\n<blockquote>\n<p>Im planning to ignore that issue first try to get proof-bind to work. Can even revert back to an older commit where its fixed</p>\n</blockquote>\n<p>that is a good plan. Better finding out how much is broken before trying to fix the bug on the reconstruction side</p>",
+        "id": 476393360,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728654735
+    },
+    {
+        "content": "<p>(I mostly stopped at that point because I run out of free work cycles while waiting for Z3 answers)</p>",
+        "id": 476394571,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728655102
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"233198\">Mathias Fleury</span> <a href=\"#narrow/stream/202961-General/topic/Making.20isabelle.20run.20on.20modern.20z3.2E/near/476392623\">said</a>:</p>\n<blockquote>\n<p>The main issue is finding out what it does, because I never found any documentation on that</p>\n</blockquote>\n<p>Seems to be the commit where proof-bind was added <a href=\"https://github.com/Z3Prover/z3/commit/520ce9a5ee6079651580b6d83bc2db0f342b8a20\">https://github.com/Z3Prover/z3/commit/520ce9a5ee6079651580b6d83bc2db0f342b8a20</a></p>",
+        "id": 476399700,
+        "sender_full_name": "irvin",
+        "timestamp": 1728656807
+    },
+    {
+        "content": "<p>So it is the equivalent of the Isar block</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"ow\">{</span>\n<span class=\"k\">fix</span><span class=\"w\"> </span><span class=\"n\">x</span>\n<span class=\"w\">  </span><span class=\"ow\">...</span><span class=\"k\">proof</span><span class=\"ow\">..</span>\n<span class=\"ow\">}</span><span class=\"w\"> </span><span class=\"c\">(*exported last fact here*)</span>\n</code></pre></div>",
+        "id": 476402307,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728657639
+    },
+    {
+        "content": "<p>This is not hard to represent in Isabelle (you declare the new variables in the context and export the fact at the end):</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"c\">(*creating a sub_ctxt where the new variable skolem_name is declared*)</span>\n<span class=\"n\">val</span><span class=\"w\"> </span><span class=\"o\">([</span><span class=\"n\">name</span><span class=\"o\">],</span><span class=\"w\"> </span><span class=\"n\">sub_ctxt</span><span class=\"o\">)</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">Variable.variant_fixes</span><span class=\"w\"> </span><span class=\"o\">[</span><span class=\"n\">skolem_name</span><span class=\"o\">]</span><span class=\"w\"> </span><span class=\"n\">ctxt</span>\n<span class=\"w\">       </span><span class=\"o\">||</span><span class=\"n\">&gt;</span><span class=\"w\"> </span><span class=\"n\">Variable.declare_term</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">Free</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">skolem_name</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"n\">fastype_of</span><span class=\"w\"> </span><span class=\"k\">declaration</span><span class=\"o\">))</span>\n<span class=\"w\">    </span><span class=\"n\">val</span><span class=\"w\"> </span><span class=\"n\">old_names</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">Free</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">skolem_name</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"n\">fastype_of</span><span class=\"w\"> </span><span class=\"k\">declaration</span><span class=\"o\">))</span>\n<span class=\"w\">    </span><span class=\"n\">val</span><span class=\"w\"> </span><span class=\"n\">new_names</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">Free</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">name</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"n\">fastype_of</span><span class=\"w\"> </span><span class=\"k\">declaration</span><span class=\"o\">))</span>\n<span class=\"c\">(*now export it*)</span>\n<span class=\"n\">val</span><span class=\"w\"> </span><span class=\"n\">export_thm</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">Proof_Context.export</span><span class=\"w\"> </span><span class=\"n\">sub_ctxt</span><span class=\"w\"> </span><span class=\"n\">ctxt</span><span class=\"w\"> </span><span class=\"kn\">theorem</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">export</span>\n</code></pre></div>",
+        "id": 476403162,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728657914
+    },
+    {
+        "content": "<p>IIRC purely ignoring the rule does work because the format of z3 is not very precise anyway.</p>",
+        "id": 476403349,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728657969
+    },
+    {
+        "content": "<p>But it would be better to change that to properly support that, but this is a lot of work and context manipulation is tough (because of the very weird bugs it generates)</p>",
+        "id": 476403527,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728658036
+    },
+    {
+        "content": "<p>(if you look at the veriT proof, you will see that the used datastructure is recursive exactly to handle these context manipulation properly)</p>",
+        "id": 476403750,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728658090
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"233198\">Mathias Fleury</span> <a href=\"#narrow/stream/202961-General/topic/Making.20isabelle.20run.20on.20modern.20z3.2E/near/476403162\">said</a>:</p>\n<blockquote>\n<p>This is not hard to represent in Isabelle (you declare the new variables in the context and export the fact at the end):</p>\n<p><div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"c\">(*creating a sub_ctxt where the new variable skolem_name is declared*)</span>\n<span class=\"n\">val</span><span class=\"w\"> </span><span class=\"o\">([</span><span class=\"n\">name</span><span class=\"o\">],</span><span class=\"w\"> </span><span class=\"n\">sub_ctxt</span><span class=\"o\">)</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">Variable.variant_fixes</span><span class=\"w\"> </span><span class=\"o\">[</span><span class=\"n\">skolem_name</span><span class=\"o\">]</span><span class=\"w\"> </span><span class=\"n\">ctxt</span>\n<span class=\"w\">       </span><span class=\"o\">||</span><span class=\"n\">&gt;</span><span class=\"w\"> </span><span class=\"n\">Variable.declare_term</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">Free</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">skolem_name</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"n\">fastype_of</span><span class=\"w\"> </span><span class=\"k\">declaration</span><span class=\"o\">))</span>\n<span class=\"w\">    </span><span class=\"n\">val</span><span class=\"w\"> </span><span class=\"n\">old_names</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">Free</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">skolem_name</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"n\">fastype_of</span><span class=\"w\"> </span><span class=\"k\">declaration</span><span class=\"o\">))</span>\n<span class=\"w\">    </span><span class=\"n\">val</span><span class=\"w\"> </span><span class=\"n\">new_names</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">Free</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">name</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"n\">fastype_of</span><span class=\"w\"> </span><span class=\"k\">declaration</span><span class=\"o\">))</span>\n<span class=\"c\">(*now export it*)</span>\n<span class=\"n\">val</span><span class=\"w\"> </span><span class=\"n\">export_thm</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">Proof_Context.export</span><span class=\"w\"> </span><span class=\"n\">sub_ctxt</span><span class=\"w\"> </span><span class=\"n\">ctxt</span><span class=\"w\"> </span><span class=\"kn\">theorem</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">export</span>\n</code></pre></div><br>\n</p>\n</blockquote>\n<p>thanks for the help.</p>",
+        "id": 476513290,
+        "sender_full_name": "irvin",
+        "timestamp": 1728728363
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"233198\">Mathias Fleury</span> <a href=\"#narrow/stream/202961-General/topic/Making.20isabelle.20run.20on.20modern.20z3.2E/near/476403349\">said</a>:</p>\n<blockquote>\n<p>IIRC purely ignoring the rule does work because the format of z3 is not very precise anyway.</p>\n</blockquote>\n<p>Seems to be this bit</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">text</span><span class=\"w\"> </span><span class=\"s\">‹</span>\n<span class=\"s\">Several prof rules of Z3 are not very well documented. There are two</span>\n<span class=\"s\">lemma groups which can turn failing Z3 proof reconstruction attempts</span>\n<span class=\"s\">into succeeding ones: the facts in ‹z3_rule› are tried prior to</span>\n<span class=\"s\">any implemented reconstruction procedure for all uncertain Z3 proof</span>\n<span class=\"s\">rules;  the facts in ‹z3_simp› are only fed to invocations of</span>\n<span class=\"s\">the simplifier when reconstructing theory-specific proof steps.</span>\n<span class=\"s\">›</span>\n</code></pre></div>",
+        "id": 476513493,
+        "sender_full_name": "irvin",
+        "timestamp": 1728728541
+    },
+    {
+        "content": "<p>Right now im directly modifying the z3 proof reconstruction code instead of copying. Hope that it would work for both versions.</p>",
+        "id": 476513724,
+        "sender_full_name": "irvin",
+        "timestamp": 1728728768
+    },
+    {
+        "content": "<p>Do any of the other smt provers use smtlib_proof.ML because according to <a href=\"https://smt-lib.org/papers/smt-lib-reference-v2.6-r2024-09-20.pdf#Hendnote.50\">https://smt-lib.org/papers/smt-lib-reference-v2.6-r2024-09-20.pdf#Hendnote.50</a> there is no standard smt-lib proof format</p>",
+        "id": 476533338,
+        "sender_full_name": "irvin",
+        "timestamp": 1728748293
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"714722\">irvin</span> <a href=\"#narrow/stream/202961-General/topic/Making.20isabelle.20run.20on.20modern.20z3.2E/near/476533338\">said</a>:</p>\n<blockquote>\n<p>Do any of the other smt provers use smtlib_proof.ML because according to <a href=\"https://smt-lib.org/papers/smt-lib-reference-v2.6-r2024-09-20.pdf#Hendnote.50\">https://smt-lib.org/papers/smt-lib-reference-v2.6-r2024-09-20.pdf#Hendnote.50</a> there is no standard smt-lib proof format</p>\n</blockquote>\n<p>grep -r \"SMTLIB_Proof\"<br>\nsrc/HOL/Tools/SMT/lethe_proof.ML: val parse_raw_proof_steps: string option -&gt; SMTLIB.tree list -&gt; SMTLIB_Proof.name_bindings -&gt; int -&gt;<br>\nsrc/HOL/Tools/SMT/lethe_proof.ML: raw_lethe_node list * SMTLIB.tree list * SMTLIB_Proof.name_bindings<br>\nsrc/HOL/Tools/SMT/lethe_proof.ML:open SMTLIB_Proof<br>\nsrc/HOL/Tools/SMT/lethe_proof.ML:         let val (l, cx) = (fst oo SMTLIB_Proof.extract_and_update_name_bindings) t cx<br>\nsrc/HOL/Tools/SMT/lethe_proof.ML:            |&gt; apsnd (SMTLIB_Proof.update_name_binding (name, SMTLIB.Sym id))<br>\nsrc/HOL/Tools/SMT/lethe_proof.ML:         let val (l, cx) = (fst oo SMTLIB_Proof.extract_and_update_name_bindings) (SMTLIB.S l) cx<br>\nsrc/HOL/Tools/SMT/lethe_proof.ML:         let val (l, cx) = (fst oo SMTLIB_Proof.extract_and_update_name_bindings) def cx<br>\nsrc/HOL/Tools/SMT/lethe_proof.ML:          let val ((args, cx), _) = SMTLIB_Proof.extract_and_update_name_bindings args cx<br>\nsrc/HOL/Tools/SMT/lethe_proof.ML:          let val (concl, cx) = fold_map (fst oo SMTLIB_Proof.extract_and_update_name_bindings) concl cx<br>\nsrc/HOL/Tools/SMT/lethe_proof.ML:            val ((t, cx), _) = SMTLIB_Proof.extract_and_update_name_bindings t cx<br>\nsrc/HOL/Tools/SMT/lethe_proof.ML:            val ((t, cx), _) = SMTLIB_Proof.extract_and_update_name_bindings term cx<br>\nsrc/HOL/Tools/SMT/lethe_proof.ML:      fun not_already_bound cx t = SMTLIB_Proof.lookup_binding cx t = None andalso<br>\nsrc/HOL/Tools/SMT/lethe_proof.ML:        parse_raw_proof_steps NONE smtlib_lines_without_qm SMTLIB_Proof.empty_name_binding 0<br>\nsrc/HOL/Tools/SMT/z3_proof.ML:open SMTLIB_Proof<br>\nsrc/HOL/Tools/SMT/smtlib_proof.ML:structure SMTLIB_Proof: SMTLIB_PROOF =<br>\nsrc/HOL/Tools/SMT/smt_real.ML:  SMTLIB_Proof.add_type_parser real_type_parser #&gt;<br>\nsrc/HOL/Tools/SMT/smt_real.ML:  SMTLIB_Proof.add_term_parser real_term_parser #&gt;<br>\nsrc/HOL/Tools/SMT/verit_strategies.ML:open SMTLIB_Proof<br>\nsrc/HOL/Tools/SMT/z3_proof.ML~:open SMTLIB_Proof<br>\nOh looks like it being used</p>",
+        "id": 476534112,
+        "sender_full_name": "irvin",
+        "timestamp": 1728748999
+    },
+    {
+        "content": "<p>Even if there is no smt-lib proof format, all proof formats use the SMT-Lib syntax for terms</p>",
+        "id": 476534318,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728749208
+    },
+    {
+        "content": "<p>hence it is used by veriT (Lethe) and Z3</p>",
+        "id": 476534333,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728749227
+    },
+    {
+        "content": "<p>Z3 seems to support lambdas expressions. Specifically that seems to be what this commit seems to add. </p>\n<p><span class=\"user-mention silent\" data-user-id=\"714722\">irvin</span> <a href=\"#narrow/stream/202961-General/topic/Making.20isabelle.20run.20on.20modern.20z3.2E/near/476399700\">said</a>:</p>\n<blockquote>\n<p><span class=\"user-mention silent\" data-user-id=\"233198\">Mathias Fleury</span> <a href=\"#narrow/stream/202961-General/topic/Making.20isabelle.20run.20on.20modern.20z3.2E/near/476392623\">said</a>:</p>\n<blockquote>\n<p>The main issue is finding out what it does, because I never found any documentation on that</p>\n</blockquote>\n<p>Seems to be the commit where proof-bind was added <a href=\"https://github.com/Z3Prover/z3/commit/520ce9a5ee6079651580b6d83bc2db0f342b8a20\">https://github.com/Z3Prover/z3/commit/520ce9a5ee6079651580b6d83bc2db0f342b8a20</a></p>\n</blockquote>\n<p>Z3 also seems to support algebraic datatypes (part of SMT lib i think) part of the match stuff.</p>\n<p>Right now smt has infrastructure so that lambdas are converted. When doing translations from HOL to MSFOL. Should I try to remove that.</p>\n<p>Lambdas are not part of MSFOL so I probably will do code duplication and write a second function for z3<br>\nCant really figure out this bit but not really a issue just a bad error msg<br>\n<del>Second right now will have to be reworked for z3.  lambda is not part SMT-LIB. However this function gave a weird error message when its executed with SMTLIB.S [SMTLIB.Sym \"lambda\",...] which it then tries to parse term and succeeds but then another later call fail  lookup_binding cx lambda failed and then it called parse_term t which then it incorrect and you get the error bad SMT term which does not make sense. Do you know anyway to future proof against this sort of errors</del></p>\n<div class=\"codehilite\" data-code-language=\"Standard ML\"><pre><span></span><code><span class=\"kr\">fun</span> <span class=\"nf\">term_of</span> <span class=\"n\">t</span> <span class=\"n\">cx</span> <span class=\"p\">=</span>\n  <span class=\"p\">(</span><span class=\"kr\">case</span> <span class=\"n\">t</span> <span class=\"kr\">of</span>\n    <span class=\"nn\">SMTLIB</span><span class=\"p\">.</span><span class=\"n\">S</span> <span class=\"p\">[</span><span class=\"nn\">SMTLIB</span><span class=\"p\">.</span><span class=\"n\">Sym</span> <span class=\"s2\">\"forall\"</span><span class=\"p\">,</span> <span class=\"nn\">SMTLIB</span><span class=\"p\">.</span><span class=\"n\">S</span> <span class=\"n\">vars</span><span class=\"p\">,</span> <span class=\"n\">body</span><span class=\"p\">]</span> <span class=\"p\">=&gt;</span> <span class=\"n\">quant</span> <span class=\"nn\">HOLogic</span><span class=\"p\">.</span><span class=\"n\">mk_all</span> <span class=\"n\">vars</span> <span class=\"n\">body</span> <span class=\"n\">cx</span>\n  <span class=\"n\">|</span> <span class=\"nn\">SMTLIB</span><span class=\"p\">.</span><span class=\"n\">S</span> <span class=\"p\">[</span><span class=\"nn\">SMTLIB</span><span class=\"p\">.</span><span class=\"n\">Sym</span> <span class=\"s2\">\"exists\"</span><span class=\"p\">,</span> <span class=\"nn\">SMTLIB</span><span class=\"p\">.</span><span class=\"n\">S</span> <span class=\"n\">vars</span><span class=\"p\">,</span> <span class=\"n\">body</span><span class=\"p\">]</span> <span class=\"p\">=&gt;</span> <span class=\"n\">quant</span> <span class=\"nn\">HOLogic</span><span class=\"p\">.</span><span class=\"n\">mk_exists</span> <span class=\"n\">vars</span> <span class=\"n\">body</span> <span class=\"n\">cx</span>\n  <span class=\"n\">|</span> <span class=\"nn\">SMTLIB</span><span class=\"p\">.</span><span class=\"n\">S</span> <span class=\"p\">[</span><span class=\"nn\">SMTLIB</span><span class=\"p\">.</span><span class=\"n\">Sym</span> <span class=\"s2\">\"choice\"</span><span class=\"p\">,</span> <span class=\"nn\">SMTLIB</span><span class=\"p\">.</span><span class=\"n\">S</span> <span class=\"n\">vars</span><span class=\"p\">,</span> <span class=\"n\">body</span><span class=\"p\">]</span> <span class=\"p\">=&gt;</span> <span class=\"n\">quant</span> <span class=\"n\">mk_choice</span> <span class=\"n\">vars</span> <span class=\"n\">body</span> <span class=\"n\">cx</span>\n  <span class=\"n\">|</span> <span class=\"nn\">SMTLIB</span><span class=\"p\">.</span><span class=\"n\">S</span> <span class=\"p\">[</span><span class=\"nn\">SMTLIB</span><span class=\"p\">.</span><span class=\"n\">Sym</span> <span class=\"s2\">\"let\"</span><span class=\"p\">,</span> <span class=\"nn\">SMTLIB</span><span class=\"p\">.</span><span class=\"n\">S</span> <span class=\"n\">bindings</span><span class=\"p\">,</span> <span class=\"n\">body</span><span class=\"p\">]</span> <span class=\"p\">=&gt;</span>\n      <span class=\"n\">with_bindings</span> <span class=\"p\">(</span><span class=\"n\">map</span> <span class=\"n\">dest_binding</span> <span class=\"n\">bindings</span><span class=\"p\">)</span> <span class=\"p\">(</span><span class=\"n\">term_of</span> <span class=\"n\">body</span><span class=\"p\">)</span> <span class=\"n\">cx</span>\n  <span class=\"n\">|</span> <span class=\"nn\">SMTLIB</span><span class=\"p\">.</span><span class=\"n\">S</span> <span class=\"p\">(</span><span class=\"nn\">SMTLIB</span><span class=\"p\">.</span><span class=\"n\">Sym</span> <span class=\"s2\">\"!\"</span> <span class=\"n\">::</span> <span class=\"n\">t</span> <span class=\"n\">::</span> <span class=\"p\">_)</span> <span class=\"p\">=&gt;</span> <span class=\"n\">term_of</span> <span class=\"n\">t</span> <span class=\"n\">cx</span>\n  <span class=\"n\">|</span> <span class=\"nn\">SMTLIB</span><span class=\"p\">.</span><span class=\"n\">S</span> <span class=\"p\">(</span><span class=\"n\">f</span> <span class=\"n\">::</span> <span class=\"n\">args</span><span class=\"p\">)</span> <span class=\"p\">=&gt;</span>\n      <span class=\"n\">cx</span>\n      <span class=\"n\">|&gt;</span> <span class=\"n\">fold_map</span> <span class=\"n\">term_of</span> <span class=\"n\">args</span>\n      <span class=\"n\">|-&gt;</span> <span class=\"n\">parse_term</span> <span class=\"n\">f</span>\n  <span class=\"n\">|</span> <span class=\"nn\">SMTLIB</span><span class=\"p\">.</span><span class=\"n\">Sym</span> <span class=\"n\">name</span> <span class=\"p\">=&gt;</span>\n      <span class=\"p\">(</span><span class=\"kr\">case</span> <span class=\"n\">lookup_binding</span> <span class=\"n\">cx</span> <span class=\"n\">name</span> <span class=\"kr\">of</span>\n        <span class=\"n\">Tree</span> <span class=\"n\">u</span> <span class=\"p\">=&gt;</span>\n          <span class=\"n\">cx</span>\n          <span class=\"n\">|&gt;</span> <span class=\"n\">term_of</span> <span class=\"n\">u</span>\n          <span class=\"n\">|-&gt;</span> <span class=\"p\">(</span><span class=\"kr\">fn</span> <span class=\"n\">u'</span> <span class=\"p\">=&gt;</span> <span class=\"n\">pair</span> <span class=\"n\">u'</span> <span class=\"n\">o</span> <span class=\"n\">update_binding</span> <span class=\"p\">(</span><span class=\"n\">name</span><span class=\"p\">,</span> <span class=\"n\">Term</span> <span class=\"n\">u'</span><span class=\"p\">))</span>\n      <span class=\"n\">|</span> <span class=\"n\">Term</span> <span class=\"n\">u</span> <span class=\"p\">=&gt;</span> <span class=\"p\">(</span><span class=\"n\">u</span><span class=\"p\">,</span> <span class=\"n\">cx</span><span class=\"p\">)</span>\n      <span class=\"n\">|</span> <span class=\"n\">None</span> <span class=\"p\">=&gt;</span> <span class=\"n\">parse_term</span> <span class=\"n\">t</span> <span class=\"p\">[]</span> <span class=\"n\">cx</span>\n      <span class=\"n\">|</span> <span class=\"p\">_</span> <span class=\"p\">=&gt;</span> <span class=\"kr\">raise</span> <span class=\"n\">SMTLIB_PARSE</span> <span class=\"p\">(</span><span class=\"s2\">\"bad SMT term format\"</span><span class=\"p\">,</span> <span class=\"n\">t</span><span class=\"p\">))</span>\n  <span class=\"n\">|</span> <span class=\"p\">_</span> <span class=\"p\">=&gt;</span> <span class=\"n\">parse_term</span> <span class=\"n\">t</span> <span class=\"p\">[]</span> <span class=\"n\">cx</span><span class=\"p\">)</span>\n</code></pre></div>",
+        "id": 476544635,
+        "sender_full_name": "irvin",
+        "timestamp": 1728758923
+    },
+    {
+        "content": "<p><del>I think i figured out the second one</del> or maybe not</p>",
+        "id": 476545395,
+        "sender_full_name": "irvin",
+        "timestamp": 1728759658
+    },
+    {
+        "content": "<p><a href=\"/user_uploads/14278/iMUuaK8WwLLm0UyGbkHQsJuY/image.png\">image.png</a></p>\n<div class=\"message_inline_image\"><a href=\"/user_uploads/14278/iMUuaK8WwLLm0UyGbkHQsJuY/image.png\" title=\"image.png\"><img data-original-dimensions=\"620x371\" src=\"/user_uploads/thumbnail/14278/iMUuaK8WwLLm0UyGbkHQsJuY/image.png/840x560.webp\"></a></div>",
+        "id": 476545831,
+        "sender_full_name": "irvin",
+        "timestamp": 1728760075
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"714722\">irvin</span> <a href=\"#narrow/stream/202961-General/topic/Making.20isabelle.20run.20on.20modern.20z3.2E/near/476544635\">said</a>:</p>\n<blockquote>\n<p>Z3 seems to support lambdas expressions. Specifically that seems to be what this commit seems to add. </p>\n</blockquote>\n<p>That does not mean that it must be a lambda in Isabelle. <code>fix</code> variable are usually not written as lambdas in Isabelle</p>",
+        "id": 476547171,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728761472
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"714722\">irvin</span> <a href=\"#narrow/stream/202961-General/topic/Making.20isabelle.20run.20on.20modern.20z3.2E/near/476545395\">said</a>:</p>\n<blockquote>\n<p><del>I think i figured out the second one</del> or maybe not</p>\n</blockquote>\n<p>While trying to figure the parser errors. I realized that the current parser does not do let binding scope correctly.<br>\nThe parser goes through parse generating a binding =&gt; unparsed binding context<br>\nThe term is not parsed as more information is needed to known whether it is a binding to term or proofterm (<em>this is for z3 not sure whether other proof formats it is clear</em>)<br>\nOn the first instance when the binding is encountered. (<em>Now clear whether it is a term or proofterm</em>).<br>\nIts parsed and updated. With the binding of the first encounter of the new context.</p>",
+        "id": 476703756,
+        "sender_full_name": "irvin",
+        "timestamp": 1728891390
+    },
+    {
+        "content": "<p>Also repeated lets wont work<br>\nie.<br>\nlet a = foo in<br>\nlet b = something with a<br>\nlet a = bar in<br>\n...</p>",
+        "id": 476706317,
+        "sender_full_name": "irvin",
+        "timestamp": 1728891958
+    },
+    {
+        "content": "<p>So im going to rewrite the parser</p>",
+        "id": 476707376,
+        "sender_full_name": "irvin",
+        "timestamp": 1728892190
+    },
+    {
+        "content": "<p>Doesn't z3 generate a new name for each binding?</p>",
+        "id": 476707426,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728892201
+    },
+    {
+        "content": "<p>Yup it does so this is really just being more defensive. Against inputs. Current version can run forever on some inputs</p>",
+        "id": 476708066,
+        "sender_full_name": "irvin",
+        "timestamp": 1728892347
+    },
+    {
+        "content": "<p>Also is there any method of execption combinators</p>",
+        "id": 476708271,
+        "sender_full_name": "irvin",
+        "timestamp": 1728892401
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"714722\">irvin</span> <a href=\"#narrow/stream/202961-General/topic/Making.20isabelle.20run.20on.20modern.20z3.2E/near/476708066\">said</a>:</p>\n<blockquote>\n<p>Yup it does so this is really just being more defensive. Against inputs</p>\n</blockquote>\n<p>You can safely assume that you will get inputs from z3 only, so being defensive is not really necessary</p>",
+        "id": 476708632,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728892478
+    },
+    {
+        "content": "<p>(and there will never be another solver that uses that proof format)</p>",
+        "id": 476708805,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728892524
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"714722\">irvin</span> <a href=\"#narrow/stream/202961-General/topic/Making.20isabelle.20run.20on.20modern.20z3.2E/near/476708271\">said</a>:</p>\n<blockquote>\n<p>Also is there any method of execption combinators</p>\n</blockquote>\n<p>No, the first error can just itnerrupt the execution</p>",
+        "id": 476708971,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728892561
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"233198\">Mathias Fleury</span> <a href=\"#narrow/stream/202961-General/topic/Making.20isabelle.20run.20on.20modern.20z3.2E/near/476708805\">said</a>:</p>\n<blockquote>\n<p>(and there will never be another solver that uses that proof format)</p>\n</blockquote>\n<p>This affects the generic smtlib terms also</p>",
+        "id": 476709795,
+        "sender_full_name": "irvin",
+        "timestamp": 1728892759
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"714722\">irvin</span> <a href=\"#narrow/stream/202961-General/topic/Making.20isabelle.20run.20on.20modern.20z3.2E/near/476707376\">said</a>:</p>\n<blockquote>\n<p>So im going to rewrite the parser</p>\n</blockquote>\n<p>Anyone rewriting that scares me a <em>lot</em></p>",
+        "id": 476710866,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728893000
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"233198\">Mathias Fleury</span> <a href=\"#narrow/stream/202961-General/topic/Making.20isabelle.20run.20on.20modern.20z3.2E/near/476710866\">said</a>:</p>\n<blockquote>\n<p><span class=\"user-mention silent\" data-user-id=\"714722\">irvin</span> <a href=\"#narrow/stream/202961-General/topic/Making.20isabelle.20run.20on.20modern.20z3.2E/near/476707376\">said</a>:</p>\n<blockquote>\n<p>So im going to rewrite the parser</p>\n</blockquote>\n<p>Anyone rewriting that scares me a <em>lot</em></p>\n</blockquote>\n<p>Oh</p>",
+        "id": 476710974,
+        "sender_full_name": "irvin",
+        "timestamp": 1728893030
+    },
+    {
+        "content": "<p>I know that it is tempting to make it better</p>",
+        "id": 476710988,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728893036
+    },
+    {
+        "content": "<p>but working stuff that is not buggy is always better</p>",
+        "id": 476711118,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728893066
+    },
+    {
+        "content": "<p>So unless you find a bug, I would not rewrite the smtlib parser (the z3 parser is fine)</p>",
+        "id": 476711225,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728893095
+    },
+    {
+        "content": "<p>For documentation purposes. This is the affected function. A simple fix would probably be to make let call update. </p>\n<div class=\"codehilite\" data-code-language=\"Standard ML\"><pre><span></span><code><span class=\"kr\">fun</span> <span class=\"nf\">term_of</span> <span class=\"n\">t</span> <span class=\"n\">cx</span> <span class=\"p\">=</span>\n  <span class=\"p\">(</span><span class=\"kr\">case</span> <span class=\"n\">t</span> <span class=\"kr\">of</span>\n    <span class=\"nn\">SMTLIB</span><span class=\"p\">.</span><span class=\"n\">S</span> <span class=\"p\">[</span><span class=\"nn\">SMTLIB</span><span class=\"p\">.</span><span class=\"n\">Sym</span> <span class=\"s2\">\"forall\"</span><span class=\"p\">,</span> <span class=\"nn\">SMTLIB</span><span class=\"p\">.</span><span class=\"n\">S</span> <span class=\"n\">vars</span><span class=\"p\">,</span> <span class=\"n\">body</span><span class=\"p\">]</span> <span class=\"p\">=&gt;</span> <span class=\"n\">quant</span> <span class=\"nn\">HOLogic</span><span class=\"p\">.</span><span class=\"n\">mk_all</span> <span class=\"n\">vars</span> <span class=\"n\">body</span> <span class=\"n\">cx</span>\n  <span class=\"n\">|</span> <span class=\"nn\">SMTLIB</span><span class=\"p\">.</span><span class=\"n\">S</span> <span class=\"p\">[</span><span class=\"nn\">SMTLIB</span><span class=\"p\">.</span><span class=\"n\">Sym</span> <span class=\"s2\">\"exists\"</span><span class=\"p\">,</span> <span class=\"nn\">SMTLIB</span><span class=\"p\">.</span><span class=\"n\">S</span> <span class=\"n\">vars</span><span class=\"p\">,</span> <span class=\"n\">body</span><span class=\"p\">]</span> <span class=\"p\">=&gt;</span> <span class=\"n\">quant</span> <span class=\"nn\">HOLogic</span><span class=\"p\">.</span><span class=\"n\">mk_exists</span> <span class=\"n\">vars</span> <span class=\"n\">body</span> <span class=\"n\">cx</span>\n  <span class=\"n\">|</span> <span class=\"nn\">SMTLIB</span><span class=\"p\">.</span><span class=\"n\">S</span> <span class=\"p\">[</span><span class=\"nn\">SMTLIB</span><span class=\"p\">.</span><span class=\"n\">Sym</span> <span class=\"s2\">\"choice\"</span><span class=\"p\">,</span> <span class=\"nn\">SMTLIB</span><span class=\"p\">.</span><span class=\"n\">S</span> <span class=\"n\">vars</span><span class=\"p\">,</span> <span class=\"n\">body</span><span class=\"p\">]</span> <span class=\"p\">=&gt;</span> <span class=\"n\">quant</span> <span class=\"n\">mk_choice</span> <span class=\"n\">vars</span> <span class=\"n\">body</span> <span class=\"n\">cx</span>\n  <span class=\"n\">|</span> <span class=\"nn\">SMTLIB</span><span class=\"p\">.</span><span class=\"n\">S</span> <span class=\"p\">[</span><span class=\"nn\">SMTLIB</span><span class=\"p\">.</span><span class=\"n\">Sym</span> <span class=\"s2\">\"let\"</span><span class=\"p\">,</span> <span class=\"nn\">SMTLIB</span><span class=\"p\">.</span><span class=\"n\">S</span> <span class=\"n\">bindings</span><span class=\"p\">,</span> <span class=\"n\">body</span><span class=\"p\">]</span> <span class=\"p\">=&gt;</span>\n      <span class=\"n\">with_bindings</span> <span class=\"p\">(</span><span class=\"n\">map</span> <span class=\"n\">dest_binding</span> <span class=\"n\">bindings</span><span class=\"p\">)</span> <span class=\"p\">(</span><span class=\"n\">term_of</span> <span class=\"n\">body</span><span class=\"p\">)</span> <span class=\"n\">cx</span>\n  <span class=\"n\">|</span> <span class=\"nn\">SMTLIB</span><span class=\"p\">.</span><span class=\"n\">S</span> <span class=\"p\">(</span><span class=\"nn\">SMTLIB</span><span class=\"p\">.</span><span class=\"n\">Sym</span> <span class=\"s2\">\"!\"</span> <span class=\"n\">::</span> <span class=\"n\">t</span> <span class=\"n\">::</span> <span class=\"p\">_)</span> <span class=\"p\">=&gt;</span> <span class=\"n\">term_of</span> <span class=\"n\">t</span> <span class=\"n\">cx</span>\n  <span class=\"n\">|</span> <span class=\"nn\">SMTLIB</span><span class=\"p\">.</span><span class=\"n\">S</span> <span class=\"p\">(</span><span class=\"n\">f</span> <span class=\"n\">::</span> <span class=\"n\">args</span><span class=\"p\">)</span> <span class=\"p\">=&gt;</span>\n      <span class=\"n\">cx</span>\n      <span class=\"n\">|&gt;</span> <span class=\"n\">fold_map</span> <span class=\"n\">term_of</span> <span class=\"n\">args</span>\n      <span class=\"n\">|-&gt;</span> <span class=\"n\">parse_term</span> <span class=\"n\">f</span>\n  <span class=\"n\">|</span> <span class=\"nn\">SMTLIB</span><span class=\"p\">.</span><span class=\"n\">Sym</span> <span class=\"n\">name</span> <span class=\"p\">=&gt;</span>\n      <span class=\"p\">(</span><span class=\"kr\">case</span> <span class=\"n\">lookup_binding</span> <span class=\"n\">cx</span> <span class=\"n\">name</span> <span class=\"kr\">of</span>\n        <span class=\"n\">Tree</span> <span class=\"n\">u</span> <span class=\"p\">=&gt;</span>\n          <span class=\"n\">cx</span>\n          <span class=\"n\">|&gt;</span> <span class=\"n\">term_of</span> <span class=\"n\">u</span>\n          <span class=\"n\">|-&gt;</span> <span class=\"p\">(</span><span class=\"kr\">fn</span> <span class=\"n\">u'</span> <span class=\"p\">=&gt;</span> <span class=\"n\">pair</span> <span class=\"n\">u'</span> <span class=\"n\">o</span> <span class=\"n\">update_binding</span> <span class=\"p\">(</span><span class=\"n\">name</span><span class=\"p\">,</span> <span class=\"n\">Term</span> <span class=\"n\">u'</span><span class=\"p\">))</span>\n      <span class=\"n\">|</span> <span class=\"n\">Term</span> <span class=\"n\">u</span> <span class=\"p\">=&gt;</span> <span class=\"p\">(</span><span class=\"n\">u</span><span class=\"p\">,</span> <span class=\"n\">cx</span><span class=\"p\">)</span>\n      <span class=\"n\">|</span> <span class=\"n\">None</span> <span class=\"p\">=&gt;</span> <span class=\"n\">parse_term</span> <span class=\"n\">t</span> <span class=\"p\">[]</span> <span class=\"n\">cx</span>\n      <span class=\"n\">|</span> <span class=\"p\">_</span> <span class=\"p\">=&gt;</span> <span class=\"kr\">raise</span> <span class=\"n\">SMTLIB_PARSE</span> <span class=\"p\">(</span><span class=\"s2\">\"bad SMT term format\"</span><span class=\"p\">,</span> <span class=\"n\">t</span><span class=\"p\">))</span>\n  <span class=\"n\">|</span> <span class=\"p\">_</span> <span class=\"p\">=&gt;</span> <span class=\"n\">parse_term</span> <span class=\"n\">t</span> <span class=\"p\">[]</span> <span class=\"n\">cx</span><span class=\"p\">)</span>\n\n<span class=\"kr\">and</span> <span class=\"nf\">quant</span> <span class=\"n\">q</span> <span class=\"n\">vars</span> <span class=\"n\">body</span> <span class=\"n\">cx</span> <span class=\"p\">=</span>\n  <span class=\"kr\">let</span> <span class=\"kr\">val</span> <span class=\"nv\">vs</span> <span class=\"p\">=</span> <span class=\"n\">map</span> <span class=\"p\">(</span><span class=\"n\">dest_var</span> <span class=\"n\">cx</span><span class=\"p\">)</span> <span class=\"n\">vars</span>\n  <span class=\"kr\">in</span>\n    <span class=\"n\">cx</span>\n    <span class=\"n\">|&gt;</span> <span class=\"n\">with_bindings</span> <span class=\"p\">(</span><span class=\"n\">map</span> <span class=\"p\">(</span><span class=\"n\">apsnd</span> <span class=\"p\">(</span><span class=\"n\">Term</span> <span class=\"n\">o</span> <span class=\"n\">Free</span><span class=\"p\">))</span> <span class=\"n\">vs</span><span class=\"p\">)</span> <span class=\"p\">(</span><span class=\"n\">term_of</span> <span class=\"p\">(</span><span class=\"n\">dest_body</span> <span class=\"n\">body</span><span class=\"p\">))</span>\n    <span class=\"n\">|&gt;&gt;</span> <span class=\"n\">fold_rev</span> <span class=\"p\">(</span><span class=\"kr\">fn</span> <span class=\"p\">(_,</span> <span class=\"p\">(</span><span class=\"n\">n</span><span class=\"p\">,</span> <span class=\"n\">T</span><span class=\"p\">))</span> <span class=\"p\">=&gt;</span> <span class=\"kr\">fn</span> <span class=\"n\">t</span> <span class=\"p\">=&gt;</span> <span class=\"n\">q</span> <span class=\"p\">(</span><span class=\"n\">n</span><span class=\"p\">,</span> <span class=\"n\">T</span><span class=\"p\">,</span> <span class=\"n\">t</span><span class=\"p\">))</span> <span class=\"n\">vs</span>\n  <span class=\"kr\">end</span>\n</code></pre></div>",
+        "id": 476715307,
+        "sender_full_name": "irvin",
+        "timestamp": 1728894199
+    },
+    {
+        "content": "<p>Is comments to zulip links considered bad?</p>",
+        "id": 476715471,
+        "sender_full_name": "irvin",
+        "timestamp": 1728894242
+    },
+    {
+        "content": "<p>You mean in the source code? Certainly.</p>",
+        "id": 476721010,
+        "sender_full_name": "Fabian Huch",
+        "timestamp": 1728895691
+    },
+    {
+        "content": "<p>Adding a pattern to <code>term_of</code> is fine</p>",
+        "id": 476728316,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728897576
+    },
+    {
+        "content": "<p>but isn't with ẁith_bindings`already doing an update?</p>",
+        "id": 476728778,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728897691
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"233198\">Mathias Fleury</span> <a href=\"#narrow/stream/202961-General/topic/Making.20isabelle.20run.20on.20modern.20z3.2E/near/476728778\">said</a>:</p>\n<blockquote>\n<p>but isn't with ẁith_bindings`already doing an update?</p>\n</blockquote>\n<p>Oh my bad seems to ok then.</p>",
+        "id": 476730266,
+        "sender_full_name": "irvin",
+        "timestamp": 1728898074
+    },
+    {
+        "content": "<p>At least the code looks like it:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">fun</span><span class=\"w\"> </span><span class=\"n\">with_bindings</span><span class=\"w\"> </span><span class=\"n\">bs</span><span class=\"w\"> </span><span class=\"n\">f</span><span class=\"w\"> </span><span class=\"n\">cx</span><span class=\"w\"> </span><span class=\"o\">=</span>\n<span class=\"w\">  </span><span class=\"k\">let</span><span class=\"w\"> </span><span class=\"n\">val</span><span class=\"w\"> </span><span class=\"n\">bs'</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">map</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">lookup_binding</span><span class=\"w\"> </span><span class=\"n\">cx</span><span class=\"w\"> </span><span class=\"n\">o</span><span class=\"w\"> </span><span class=\"n\">fst</span><span class=\"o\">)</span><span class=\"w\"> </span><span class=\"n\">bs</span>\n<span class=\"w\">  </span><span class=\"kp\">in</span>\n<span class=\"w\">    </span><span class=\"n\">cx</span>\n<span class=\"w\">    </span><span class=\"o\">|</span><span class=\"n\">&gt;</span><span class=\"w\"> </span><span class=\"n\">fold</span><span class=\"w\"> </span><span class=\"n\">update_binding</span><span class=\"w\"> </span><span class=\"n\">bs</span>\n<span class=\"w\">    </span><span class=\"o\">|</span><span class=\"n\">&gt;</span><span class=\"w\"> </span><span class=\"n\">f</span>\n<span class=\"w\">    </span><span class=\"o\">||</span><span class=\"n\">&gt;</span><span class=\"w\"> </span><span class=\"n\">fold2</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">fn</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">name</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"o\">_)</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"n\">&gt;</span><span class=\"w\"> </span><span class=\"n\">update_binding</span><span class=\"w\"> </span><span class=\"n\">o</span><span class=\"w\"> </span><span class=\"n\">pair</span><span class=\"w\"> </span><span class=\"n\">name</span><span class=\"o\">)</span><span class=\"w\"> </span><span class=\"n\">bs</span><span class=\"w\"> </span><span class=\"n\">bs'</span>\n<span class=\"w\">  </span><span class=\"k\">end</span>\n</code></pre></div>\n<p>(and this is one of the cases were always updating is the easiest solution)</p>",
+        "id": 476732032,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728898468
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"233198\">Mathias Fleury</span> <a href=\"#narrow/stream/202961-General/topic/Making.20isabelle.20run.20on.20modern.20z3.2E/near/476732032\">said</a>:</p>\n<blockquote>\n<p>At least the code looks like it:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">fun</span><span class=\"w\"> </span><span class=\"n\">with_bindings</span><span class=\"w\"> </span><span class=\"n\">bs</span><span class=\"w\"> </span><span class=\"n\">f</span><span class=\"w\"> </span><span class=\"n\">cx</span><span class=\"w\"> </span><span class=\"o\">=</span>\n<span class=\"w\">  </span><span class=\"k\">let</span><span class=\"w\"> </span><span class=\"n\">val</span><span class=\"w\"> </span><span class=\"n\">bs'</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">map</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">lookup_binding</span><span class=\"w\"> </span><span class=\"n\">cx</span><span class=\"w\"> </span><span class=\"n\">o</span><span class=\"w\"> </span><span class=\"n\">fst</span><span class=\"o\">)</span><span class=\"w\"> </span><span class=\"n\">bs</span>\n<span class=\"w\">  </span><span class=\"kp\">in</span>\n<span class=\"w\">    </span><span class=\"n\">cx</span>\n<span class=\"w\">    </span><span class=\"o\">|</span><span class=\"n\">&gt;</span><span class=\"w\"> </span><span class=\"n\">fold</span><span class=\"w\"> </span><span class=\"n\">update_binding</span><span class=\"w\"> </span><span class=\"n\">bs</span>\n<span class=\"w\">    </span><span class=\"o\">|</span><span class=\"n\">&gt;</span><span class=\"w\"> </span><span class=\"n\">f</span>\n<span class=\"w\">    </span><span class=\"o\">||</span><span class=\"n\">&gt;</span><span class=\"w\"> </span><span class=\"n\">fold2</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">fn</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">name</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"o\">_)</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"n\">&gt;</span><span class=\"w\"> </span><span class=\"n\">update_binding</span><span class=\"w\"> </span><span class=\"n\">o</span><span class=\"w\"> </span><span class=\"n\">pair</span><span class=\"w\"> </span><span class=\"n\">name</span><span class=\"o\">)</span><span class=\"w\"> </span><span class=\"n\">bs</span><span class=\"w\"> </span><span class=\"n\">bs'</span>\n<span class=\"w\">  </span><span class=\"k\">end</span>\n</code></pre></div>\n<p>(and this is one of the cases were always updating is the easiest solution)</p>\n</blockquote>\n<p>It doesnt it simply registers unparsed tree in the symtab</p>",
+        "id": 476738849,
+        "sender_full_name": "irvin",
+        "timestamp": 1728900207
+    },
+    {
+        "content": "<p><code>with_bindings (map dest_binding bindings) (term_of body) cx</code> term_of is not passed into with_bindings at all so it cant have a chance to parse it</p>",
+        "id": 476739228,
+        "sender_full_name": "irvin",
+        "timestamp": 1728900291
+    },
+    {
+        "content": "<p>Explanation of the code.<br>\nbindings are destructored using <code>map dest_binding bindings</code><br>\nwith_binding call<br>\ncurrent binding is saved in the <br>\n<code>val bs' = map (lookup cx o fst) bs</code><br>\nupdate the binding the unparsed values of (map dest_binding bindings)<br>\ncall the  (term_of body with the context updated.<br>\nreset back the bindings. to the thing so let scoping works. for the case of <br>\nlet a = ... in (let a in ...) (<em>Which i was wrong</em>)<br>\nHowever weird recursion let work<br>\nsomething like <br>\nlet a = b in (let b = a)<br>\nModifing with_binding</p>\n<div class=\"codehilite\" data-code-language=\"Standard ML\"><pre><span></span><code><span class=\"kr\">fun</span> <span class=\"nf\">with_bindings</span> <span class=\"n\">bs</span> <span class=\"n\">f</span> <span class=\"n\">cx</span> <span class=\"p\">=</span>\n  <span class=\"kr\">let</span> <span class=\"kr\">val</span> <span class=\"nv\">bs'</span> <span class=\"p\">=</span> <span class=\"n\">map</span> <span class=\"p\">(</span><span class=\"n\">lookup_binding</span> <span class=\"n\">cx</span> <span class=\"n\">o</span> <span class=\"n\">fst</span><span class=\"p\">)</span> <span class=\"n\">bs</span>\n         <span class=\"kr\">val</span> <span class=\"nv\">cx2</span> <span class=\"p\">=</span> <span class=\"n\">fold</span> <span class=\"n\">update_binding</span> <span class=\"n\">bs</span> <span class=\"n\">cx</span>\n         <span class=\"kr\">val</span> <span class=\"p\">_</span> <span class=\"p\">=</span> <span class=\"n\">writeln</span> <span class=\"p\">(</span><span class=\"n\">@</span><span class=\"p\">{</span><span class=\"n\">make_string</span><span class=\"p\">}</span> <span class=\"p\">(</span><span class=\"n\">map</span> <span class=\"p\">(</span><span class=\"n\">lookup_binding</span> <span class=\"n\">cx2</span> <span class=\"n\">o</span> <span class=\"n\">fst</span><span class=\"p\">)</span> <span class=\"n\">bs</span><span class=\"p\">))</span>\n\n  <span class=\"kr\">in</span>\n    <span class=\"n\">cx</span>\n    <span class=\"n\">|&gt;</span> <span class=\"n\">fold</span> <span class=\"n\">update_binding</span> <span class=\"n\">bs</span>\n    <span class=\"n\">|&gt;</span> <span class=\"n\">f</span>\n    <span class=\"n\">||&gt;</span> <span class=\"n\">fold2</span> <span class=\"p\">(</span><span class=\"kr\">fn</span> <span class=\"p\">(</span><span class=\"n\">name</span><span class=\"p\">,</span> <span class=\"p\">_)</span> <span class=\"p\">=&gt;</span> <span class=\"n\">update_binding</span> <span class=\"n\">o</span> <span class=\"n\">pair</span> <span class=\"n\">name</span><span class=\"p\">)</span> <span class=\"n\">bs</span> <span class=\"n\">bs'</span>\n  <span class=\"kr\">end</span>\n</code></pre></div>\n<p>Everything printed is of Tree (<em>not yet parsed</em>)<br>\n  datatype 'b shared = Tree of SMTLIB.tree | Term of term | Proof of 'b | None</p>",
+        "id": 476753356,
+        "sender_full_name": "irvin",
+        "timestamp": 1728904126
+    },
+    {
+        "content": "<p>Side note I dont seem to see verit make use of let at all is this true</p>",
+        "id": 476753690,
+        "sender_full_name": "irvin",
+        "timestamp": 1728904225
+    },
+    {
+        "content": "<p>Also do you know anyway of creating a   type ('a, 'b) context for testing</p>",
+        "id": 476777089,
+        "sender_full_name": "irvin",
+        "timestamp": 1728910285
+    },
+    {
+        "content": "<p><code>empty_context</code></p>",
+        "id": 476781740,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728911332
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"714722\">irvin</span> <a href=\"#narrow/stream/202961-General/topic/Making.20isabelle.20run.20on.20modern.20z3.2E/near/476753356\">said</a>:</p>\n<blockquote>\n<p>Explanation of the code.<br>\nbindings are destructored using <code>map dest_binding bindings</code><br>\nwith_binding call<br>\ncurrent binding is saved in the <br>\n<code>val bs' = map (lookup cx o fst) bs</code><br>\nupdate the binding the unparsed values of (map dest_binding bindings)<br>\ncall the  (term_of body with the context updated.<br>\nreset back the bindings. to the thing so let scoping works. for the case of <br>\nlet a = ... in (let a in ...) (<em>Which i was wrong</em>)<br>\nHowever weird recursion let work<br>\nsomething like <br>\nlet a = b in (let b = a)<br>\nModifing with_binding</p>\n<div class=\"codehilite\" data-code-language=\"Standard ML\"><pre><span></span><code><span class=\"kr\">fun</span> <span class=\"nf\">with_bindings</span> <span class=\"n\">bs</span> <span class=\"n\">f</span> <span class=\"n\">cx</span> <span class=\"p\">=</span>\n  <span class=\"kr\">let</span> <span class=\"kr\">val</span> <span class=\"nv\">bs'</span> <span class=\"p\">=</span> <span class=\"n\">map</span> <span class=\"p\">(</span><span class=\"n\">lookup_binding</span> <span class=\"n\">cx</span> <span class=\"n\">o</span> <span class=\"n\">fst</span><span class=\"p\">)</span> <span class=\"n\">bs</span>\n         <span class=\"kr\">val</span> <span class=\"nv\">cx2</span> <span class=\"p\">=</span> <span class=\"n\">fold</span> <span class=\"n\">update_binding</span> <span class=\"n\">bs</span> <span class=\"n\">cx</span>\n         <span class=\"kr\">val</span> <span class=\"p\">_</span> <span class=\"p\">=</span> <span class=\"n\">writeln</span> <span class=\"p\">(</span><span class=\"n\">@</span><span class=\"p\">{</span><span class=\"n\">make_string</span><span class=\"p\">}</span> <span class=\"p\">(</span><span class=\"n\">map</span> <span class=\"p\">(</span><span class=\"n\">lookup_binding</span> <span class=\"n\">cx2</span> <span class=\"n\">o</span> <span class=\"n\">fst</span><span class=\"p\">)</span> <span class=\"n\">bs</span><span class=\"p\">))</span>\n\n  <span class=\"kr\">in</span>\n    <span class=\"n\">cx</span>\n    <span class=\"n\">|&gt;</span> <span class=\"n\">fold</span> <span class=\"n\">update_binding</span> <span class=\"n\">bs</span>\n    <span class=\"n\">|&gt;</span> <span class=\"n\">f</span>\n    <span class=\"n\">||&gt;</span> <span class=\"n\">fold2</span> <span class=\"p\">(</span><span class=\"kr\">fn</span> <span class=\"p\">(</span><span class=\"n\">name</span><span class=\"p\">,</span> <span class=\"p\">_)</span> <span class=\"p\">=&gt;</span> <span class=\"n\">update_binding</span> <span class=\"n\">o</span> <span class=\"n\">pair</span> <span class=\"n\">name</span><span class=\"p\">)</span> <span class=\"n\">bs</span> <span class=\"n\">bs'</span>\n  <span class=\"kr\">end</span>\n</code></pre></div>\n<p>Everything printed is of Tree (<em>not yet parsed</em>)<br>\n  datatype 'b shared = Tree of SMTLIB.tree | Term of term | Proof of 'b | None</p>\n</blockquote>\n<p>The question is how to represent the end of a scope</p>",
+        "id": 476781889,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728911376
+    },
+    {
+        "content": "<p><del>For verit we \"open\" a new context and can close is outside of a subproof)</del><br>\nI have to think about your text again</p>",
+        "id": 476782055,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728911410
+    },
+    {
+        "content": "<p>You just duplicate context until you reach the end of a context</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">let</span><span class=\"w\"> </span><span class=\"n\">a</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">b</span><span class=\"w\"> </span><span class=\"kp\">in</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"k\">let</span><span class=\"w\"> </span><span class=\"n\">b</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">a</span><span class=\"w\"> </span><span class=\"kp\">in</span><span class=\"w\"> </span><span class=\"n\">a</span><span class=\"o\">)</span><span class=\"w\">    </span><span class=\"o\">+</span><span class=\"w\">   </span><span class=\"n\">b</span>\n<span class=\"n\">ctxt</span><span class=\"o\">-----------------------</span><span class=\"n\">x</span>\n<span class=\"w\">           </span><span class=\"n\">\\</span><span class=\"o\">-----------------------</span><span class=\"n\">&gt;</span>\n</code></pre></div>",
+        "id": 476811427,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1728919793
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"233198\">Mathias Fleury</span> <a href=\"#narrow/stream/202961-General/topic/Making.20isabelle.20run.20on.20modern.20z3.2E/near/476707426\">said</a>:</p>\n<blockquote>\n<p>Doesn't z3 generate a new name for each binding?</p>\n</blockquote>\n<p>I just checked again and z3 doesnt generate a new name for each binding</p>",
+        "id": 476816463,
+        "sender_full_name": "irvin",
+        "timestamp": 1728921674
+    },
+    {
+        "content": "<p>Ok finally got the z3 proofs to be parsed</p>",
+        "id": 476824414,
+        "sender_full_name": "irvin",
+        "timestamp": 1728925079
+    },
+    {
+        "content": "<p><a href=\"/user_uploads/14278/ArsdJNvbc3EbsTwGVkqd8hP4/image.png\">image.png</a></p>\n<div class=\"message_inline_image\"><a href=\"/user_uploads/14278/ArsdJNvbc3EbsTwGVkqd8hP4/image.png\" title=\"image.png\"><img data-original-dimensions=\"1169x623\" src=\"/user_uploads/thumbnail/14278/ArsdJNvbc3EbsTwGVkqd8hP4/image.png/840x560.webp\"></a></div>",
+        "id": 476873433,
+        "sender_full_name": "irvin",
+        "timestamp": 1728955612
+    },
+    {
+        "content": "<p>So from what i understand. The proof-bind is not really a \"proof method\" and is handled at the parser level. Currently the implementation automatically does the free variables.  So ignoring it is possible.</p>",
+        "id": 476876757,
+        "sender_full_name": "irvin",
+        "timestamp": 1728958083
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"233198\">Mathias Fleury</span> <a href=\"#narrow/stream/202961-General/topic/Making.20isabelle.20run.20on.20modern.20z3.2E/near/476547171\">said</a>:</p>\n<blockquote>\n<p><span class=\"user-mention silent\" data-user-id=\"714722\">irvin</span> <a href=\"#narrow/stream/202961-General/topic/Making.20isabelle.20run.20on.20modern.20z3.2E/near/476544635\">said</a>:</p>\n<blockquote>\n<p>Z3 seems to support lambdas expressions. Specifically that seems to be what this commit seems to add. </p>\n</blockquote>\n<p>That does not mean that it must be a lambda in Isabelle. <code>fix</code> variable are usually not written as lambdas in Isabelle</p>\n</blockquote>\n<p>In this case is it just !!a. P a</p>",
+        "id": 476877339,
+        "sender_full_name": "irvin",
+        "timestamp": 1728958426
+    },
+    {
+        "content": "<p>The current situation is the z3 rule  rewrite failing. rewrite a rewrite which does not provide justification and according to z3 proof reconstruction should use internal decision provers to reconstruct the rewrite rule</p>",
+        "id": 477336414,
+        "sender_full_name": "irvin",
+        "timestamp": 1729132682
+    },
+    {
+        "content": "<p>Also does anyone know if there is any tooling to make isabelle build expose warning/ errors similar to how a compiler exposes the errors when compiling <br>\nSource of the issue is that the SMT_Examples_*.thy requires Complex_Main which results in every single edit requiring the whole state below to be parsed. Im guessing that it will be extremely hard to make isabelle graph based and only reloading the nodes affected below.<br>\nIf there isnt where would i look to make a component to make it do this.</p>",
+        "id": 477340255,
+        "sender_full_name": "irvin",
+        "timestamp": 1729134589
+    },
+    {
+        "content": "<p>It is not that bad actually in practise</p>",
+        "id": 477352258,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1729141050
+    },
+    {
+        "content": "<p>there are two ways to make it less horrible:</p>\n<p>1. replace the import by HOL.SMT. Will not work for everything (mostly the first part of the file will work, but for debugging that is usually enough)</p>",
+        "id": 477352337,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1729141105
+    },
+    {
+        "content": "<ol start=\"2\">\n<li>you can also remove SMT and Sledgehammer and nitpick by replacing the point where there are imported by their own imports. Then you only import SMT in the example file. Just sorry the stuff that does not work</li>\n</ol>",
+        "id": 477352404,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1729141198
+    },
+    {
+        "content": "<blockquote>\n<p>make isabelle graph based and only reloading the nodes affected below[...] If there isnt where would i look to make a component to make it do this.</p>\n</blockquote>\n<p>I am pretty sure that this is part of the \"you do not want to do that because an error here can make Isabelle incorrect so no sane person would want to use that\". Also the SMT method is used in List.thy anyway</p>",
+        "id": 477355292,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1729143146
+    },
+    {
+        "content": "<blockquote>\n<p>Also does anyone know if there is any tooling to make isabelle build expose warning/ errors similar to how a compiler exposes the errors when compiling </p>\n</blockquote>\n<p>Usually I have SMT.thy open at the point of the SML import files and the ML files I am editing, then you see in the output panel all the error messages</p>",
+        "id": 477355544,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1729143334
+    },
+    {
+        "content": "<p>Yup the graph based version is not something i would try to do. However im asking on the feasibility  of making isabelle build output warning and errors</p>",
+        "id": 477355641,
+        "sender_full_name": "irvin",
+        "timestamp": 1729143366
+    },
+    {
+        "content": "<p><a href=\"/user_uploads/14278/_7mOKroYb2SOniDEi1DqCZC9/image.png\">image.png</a><br>\nhere you can see the error message at the bottom. In the right theory you can see the follow-up places where there are errors</p>\n<div class=\"message_inline_image\"><a href=\"/user_uploads/14278/_7mOKroYb2SOniDEi1DqCZC9/image.png\" title=\"image.png\"><img data-original-dimensions=\"2559x1047\" src=\"/user_uploads/thumbnail/14278/_7mOKroYb2SOniDEi1DqCZC9/image.png/840x560.webp\"></a></div>",
+        "id": 477355918,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1729143592
+    },
+    {
+        "content": "<p>This is much better than the alternative with <code>isabelle build</code> which stops at the first error</p>",
+        "id": 477355987,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1729143613
+    },
+    {
+        "content": "<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"n\">$</span><span class=\"w\"> </span><span class=\"ow\">.</span><span class=\"n\">/bin/isabelle</span><span class=\"w\"> </span><span class=\"n\">build</span><span class=\"w\"> </span><span class=\"o\">-</span><span class=\"n\">b</span><span class=\"w\"> </span><span class=\"n\">HOL</span>\n<span class=\"n\">Building</span><span class=\"w\"> </span><span class=\"n\">HOL</span><span class=\"w\"> </span><span class=\"ow\">...</span>\n<span class=\"n\">HOL</span><span class=\"w\"> </span><span class=\"n\">FAILED</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">see</span><span class=\"w\"> </span><span class=\"k\">also</span><span class=\"w\"> </span><span class=\"s\">\"isabelle build_log -H Error HOL\"</span><span class=\"o\">)</span>\n<span class=\"ow\">...</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.String\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Bit_Operations\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Code_Numeral\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Enum\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.BNF_Greatest_Fixpoint\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.String\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Predicate\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.String\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Typerep\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.String\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Random\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Code_Numeral\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Groups_List\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.List\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Lazy_Sequence\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Predicate\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Limited_Sequence\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Lazy_Sequence\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Code_Evaluation\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Limited_Sequence\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Typerep\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Quickcheck_Random\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Code_Evaluation\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Enum\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Random\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Quickcheck_Exhaustive\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Quickcheck_Random\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Record\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Quickcheck_Exhaustive\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Nitpick\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.GCD\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Record\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Nunchaku\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Nitpick\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Quickcheck_Narrowing\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Quickcheck_Random\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Random_Pred\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Quickcheck_Random\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Random_Sequence\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Random_Pred\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Predicate_Compile\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Quickcheck_Exhaustive\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Random_Sequence\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Mirabelle\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Predicate_Compile\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Sledgehammer\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"Main\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.BNF_Greatest_Fixpoint\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Binomial\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.GCD\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Mirabelle\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Nunchaku\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Predicate_Compile\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Quickcheck_Narrowing\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Archimedean_Field\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"Main\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Rat\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Archimedean_Field\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Real\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Rat\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Hull\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"Main\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Modules\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Hull\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Vector_Spaces\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Modules\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Topological_Spaces\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"Main\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Real_Vector_Spaces\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Real\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Topological_Spaces\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Vector_Spaces\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Inequalities\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Real_Vector_Spaces\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Limits\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Real_Vector_Spaces\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Deriv\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Limits\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.NthRoot\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Deriv\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Series\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Inequalities\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Limits\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Transcendental\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Deriv\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.NthRoot\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Series\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Complex\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Real_Vector_Spaces\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Transcendental\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.MacLaurin\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Transcendental\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"Complex_Main\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Complex\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.MacLaurin\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"k\">ML</span><span class=\"w\"> </span><span class=\"n\">error</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">line</span><span class=\"w\"> </span><span class=\"n\">129</span><span class=\"w\"> </span><span class=\"n\">of</span><span class=\"w\"> </span><span class=\"s\">\"~~/src/HOL/Tools/SMT/alethe/alethe_proof.ML\"</span><span class=\"o\">):</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Expression</span><span class=\"w\"> </span><span class=\"n\">expected</span><span class=\"w\"> </span><span class=\"n\">but</span><span class=\"w\"> </span><span class=\"o\">|</span><span class=\"w\"> </span><span class=\"n\">was</span><span class=\"w\"> </span><span class=\"n\">found</span>\n<span class=\"n\">***</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">At</span><span class=\"w\"> </span><span class=\"n\">command</span><span class=\"w\"> </span><span class=\"s\">\"ML_file\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">line</span><span class=\"w\"> </span><span class=\"n\">688</span><span class=\"w\"> </span><span class=\"n\">of</span><span class=\"w\"> </span><span class=\"s\">\"~~/src/HOL/SMT.thy\"</span><span class=\"o\">)</span>\n<span class=\"n\">Unfinished</span><span class=\"w\"> </span><span class=\"n\">session</span><span class=\"o\">(</span><span class=\"n\">s</span><span class=\"o\">):</span><span class=\"w\"> </span><span class=\"n\">HOL</span>\n<span class=\"n\">0</span><span class=\"o\">:</span><span class=\"n\">00</span><span class=\"o\">:</span><span class=\"n\">49</span><span class=\"w\"> </span><span class=\"n\">elapsed</span><span class=\"w\"> </span><span class=\"n\">time</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"n\">0</span><span class=\"o\">:</span><span class=\"n\">02</span><span class=\"o\">:</span><span class=\"n\">22</span><span class=\"w\"> </span><span class=\"n\">cpu</span><span class=\"w\"> </span><span class=\"n\">time</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"n\">factor</span><span class=\"w\"> </span><span class=\"n\">2.85</span>\n</code></pre></div>",
+        "id": 477356133,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1729143720
+    },
+    {
+        "content": "<p>(this output is not edited)</p>",
+        "id": 477356195,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1729143747
+    },
+    {
+        "content": "<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"n\">$</span><span class=\"w\"> </span><span class=\"ow\">.</span><span class=\"n\">/bin/isabelle</span><span class=\"w\"> </span><span class=\"n\">build_log</span><span class=\"w\"> </span><span class=\"o\">-</span><span class=\"n\">H</span><span class=\"w\"> </span><span class=\"n\">Error</span><span class=\"w\"> </span><span class=\"n\">HOL</span>\n\n<span class=\"n\">Theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Sledgehammer\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"kp\">in</span><span class=\"w\"> </span><span class=\"n\">HOL</span><span class=\"o\">):</span><span class=\"w\"> </span><span class=\"n\">MISSING</span>\n<span class=\"o\">[</span><span class=\"ow\">...</span><span class=\"o\">]</span><span class=\"w\"> </span><span class=\"n\">#here</span><span class=\"w\"> </span><span class=\"n\">removed</span><span class=\"w\"> </span><span class=\"n\">many</span><span class=\"w\"> </span><span class=\"n\">MISSING</span>\n<span class=\"n\">Theory</span><span class=\"w\"> </span><span class=\"s\">\"Complex_Main\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"kp\">in</span><span class=\"w\"> </span><span class=\"n\">HOL</span><span class=\"o\">):</span><span class=\"w\"> </span><span class=\"n\">MISSING</span>\n\n<span class=\"n\">Build</span><span class=\"w\"> </span><span class=\"n\">errors</span><span class=\"o\">:</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Sledgehammer\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.SMT\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.List\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Sledgehammer\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Groups_List\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.List\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Bit_Operations\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Groups_List\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Code_Numeral\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Bit_Operations\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Factorial\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Groups_List\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Binomial\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Factorial\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.GCD\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Code_Numeral\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Groups_List\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Map\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.List\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Enum\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Groups_List\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Map\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.String\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Bit_Operations\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Code_Numeral\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Enum\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.BNF_Greatest_Fixpoint\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.String\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Predicate\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.String\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Typerep\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.String\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Random\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Code_Numeral\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Groups_List\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.List\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Lazy_Sequence\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Predicate\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Limited_Sequence\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Lazy_Sequence\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Code_Evaluation\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Limited_Sequence\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Typerep\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Quickcheck_Random\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Code_Evaluation\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Enum\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Random\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Quickcheck_Exhaustive\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Quickcheck_Random\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Record\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Quickcheck_Exhaustive\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Nitpick\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.GCD\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Record\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Nunchaku\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Nitpick\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Quickcheck_Narrowing\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Quickcheck_Random\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Random_Pred\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Quickcheck_Random\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Random_Sequence\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Random_Pred\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Predicate_Compile\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Quickcheck_Exhaustive\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Random_Sequence\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Mirabelle\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Predicate_Compile\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Sledgehammer\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"Main\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.BNF_Greatest_Fixpoint\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Binomial\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.GCD\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Mirabelle\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Nunchaku\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Predicate_Compile\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Quickcheck_Narrowing\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Archimedean_Field\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"Main\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Rat\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Archimedean_Field\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Real\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Rat\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Hull\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"Main\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Modules\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Hull\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Vector_Spaces\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Modules\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Topological_Spaces\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"Main\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Real_Vector_Spaces\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Real\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Topological_Spaces\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Vector_Spaces\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Inequalities\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Real_Vector_Spaces\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Limits\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Real_Vector_Spaces\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Deriv\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Limits\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.NthRoot\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Deriv\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Series\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Inequalities\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Limits\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Transcendental\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Deriv\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.NthRoot\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Series\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Complex\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Real_Vector_Spaces\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Transcendental\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"HOL.MacLaurin\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Transcendental\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Failed</span><span class=\"w\"> </span><span class=\"n\">to</span><span class=\"w\"> </span><span class=\"n\">load</span><span class=\"w\"> </span><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"s\">\"Complex_Main\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">unresolved</span><span class=\"w\"> </span><span class=\"s\">\"HOL.Complex\"</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"s\">\"HOL.MacLaurin\"</span><span class=\"o\">)</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"k\">ML</span><span class=\"w\"> </span><span class=\"n\">error</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">line</span><span class=\"w\"> </span><span class=\"n\">129</span><span class=\"w\"> </span><span class=\"n\">of</span><span class=\"w\"> </span><span class=\"s\">\"~~/src/HOL/Tools/SMT/alethe/alethe_proof.ML\"</span><span class=\"o\">):</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">Expression</span><span class=\"w\"> </span><span class=\"n\">expected</span><span class=\"w\"> </span><span class=\"n\">but</span><span class=\"w\"> </span><span class=\"o\">|</span><span class=\"w\"> </span><span class=\"n\">was</span><span class=\"w\"> </span><span class=\"n\">found</span>\n<span class=\"n\">***</span>\n<span class=\"n\">***</span><span class=\"w\"> </span><span class=\"n\">At</span><span class=\"w\"> </span><span class=\"n\">command</span><span class=\"w\"> </span><span class=\"s\">\"ML_file\"</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">line</span><span class=\"w\"> </span><span class=\"n\">688</span><span class=\"w\"> </span><span class=\"n\">of</span><span class=\"w\"> </span><span class=\"s\">\"~~/src/HOL/SMT.thy\"</span><span class=\"o\">)</span>\n\n<span class=\"n\">Return</span><span class=\"w\"> </span><span class=\"n\">code</span><span class=\"o\">:</span><span class=\"w\"> </span><span class=\"n\">1</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">ERROR</span><span class=\"o\">)</span>\n</code></pre></div>",
+        "id": 477356328,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1729143850
+    },
+    {
+        "content": "<p>Ok i guess i spend time looking at the code to see how to add warnings</p>",
+        "id": 477356605,
+        "sender_full_name": "irvin",
+        "timestamp": 1729144034
+    },
+    {
+        "content": "<p>usually you want to add printing, not warnings</p>",
+        "id": 477370256,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1729149292
+    },
+    {
+        "content": "<p>@{print} allows you to print pretty-much anything</p>",
+        "id": 477370284,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1729149303
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"233198\">Mathias Fleury</span> <a href=\"#narrow/channel/202961-General/topic/Making.20isabelle.20run.20on.20modern.20z3.2E/near/477370284\">said</a>:</p>\n<blockquote>\n<p>@{print} allows you to print pretty-much anything</p>\n</blockquote>\n<p>Oh thanks i was doing writeln @{make_string}.<br>\nIs there any conventions regarding whether to use @{lemma ... by ...} or doing the proof in isar then using @{thm ....}</p>",
+        "id": 477570487,
+        "sender_full_name": "irvin",
+        "timestamp": 1729226335
+    },
+    {
+        "content": "<p>Not that I am aware of. My convention: if it already exists or is long I use <code>@{thm}</code>. Otherwise I use @{lemma}.</p>\n<p>But: Put it in a constant instead of evaluating in a function, just to be sure that it is not reproven whenever you run the function. (Yes, Polyml probably is able to optimize but I do not trust that because I do not understand the quotations enough to be sure of that)</p>",
+        "id": 477571082,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1729226795
+    },
+    {
+        "content": "<p>Oh its because i see that smt.thy has a lot of verit theories and i wondered whether I should do the same for the z3 theorems i prove and move them to the smt file</p>",
+        "id": 477572962,
+        "sender_full_name": "irvin",
+        "timestamp": 1729227994
+    },
+    {
+        "content": "<p>Yeah just put it there too</p>",
+        "id": 477573686,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1729228562
+    },
+    {
+        "content": "<p>Do you have any guide on understanding the abs_context code in smt_replay_method.</p>",
+        "id": 477599650,
+        "sender_full_name": "irvin",
+        "timestamp": 1729238729
+    },
+    {
+        "content": "<p>It is used to abstract over the structure of a term if you know that the reconstruction is needing some details of the term</p>",
+        "id": 477776995,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1729317633
+    },
+    {
+        "content": "<p>for example,  if you know that you are reconstructing an arithmetic step, then if-then-else constructs are seen as black box and thus you can abstract over it naming it with a fresh name (like <code>x12</code> or whatever)</p>",
+        "id": 477777086,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1729317698
+    },
+    {
+        "content": "<p>this improves the performance of the reconstruction and make it more robust (like if you use auto, it will not get lost on some unrelated part of the term)</p>",
+        "id": 477777178,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1729317736
+    },
+    {
+        "content": "<p>I never had to change it, except when it turns out that the assumption over the abstraction is wrong</p>",
+        "id": 477777189,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1729317764
+    },
+    {
+        "content": "<p>(like arithmetic steps actually reason below if-then-else)</p>",
+        "id": 477777217,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1729317788
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"233198\">Mathias Fleury</span> <a href=\"#narrow/channel/202961-General/topic/Making.20isabelle.20run.20on.20modern.20z3.2E/near/477777189\">said</a>:</p>\n<blockquote>\n<p>I never had to change it, except when it turns out that the assumption over the abstraction is wrong</p>\n</blockquote>\n<p>Is there a way to deal with the abstraction over comm assoc or<br>\nI have a proof rule which has to to destructive equality resolution<br>\nwhich is a rewrite of <br>\nlemma \"∀a. ¬(a = c) ∨ P a = P c\"<br>\nexcept for that its a or chain and ¬(a = c) may not be the first in the or</p>",
+        "id": 479604724,
+        "sender_full_name": "irvin",
+        "timestamp": 1730261829
+    },
+    {
+        "content": "<p>Btw sorry for not replying lately my linux system broke and I had to spend time troubleshooting it</p>",
+        "id": 479604807,
+        "sender_full_name": "irvin",
+        "timestamp": 1730261893
+    },
+    {
+        "content": "<p>my intuition says that abstraction is too naive to do that</p>",
+        "id": 479611951,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1730267765
+    },
+    {
+        "content": "<p>It is not even clear to me how easy it would to reorder the chains to have them before</p>",
+        "id": 479612103,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1730267917
+    },
+    {
+        "content": "<p>(for Alethe we know it is ordered)</p>",
+        "id": 479612114,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1730267932
+    },
+    {
+        "content": "<p>I would do a <code>simp only:</code> as just rewriting is enough. And only if performance is too bad, I would spend more thinking into it</p>",
+        "id": 479612134,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1730267958
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"233198\">Mathias Fleury</span> <a href=\"#narrow/channel/202961-General/topic/Making.20isabelle.20run.20on.20modern.20z3.2E/near/479612103\">said</a>:</p>\n<blockquote>\n<p>It is not even clear to me how easy it would to reorder the chains to have them before</p>\n</blockquote>\n<p>actually it should be easy on the perfect shared term as <code>P a</code> must have a bigger term number than <code>a</code>, but there is a lot of work in the parsing to fix the ordering (or at least extract the <code>P</code> which would be enough).</p>",
+        "id": 479612477,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1730268125
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"233198\">Mathias Fleury</span> <a href=\"#narrow/channel/202961-General/topic/Making.20isabelle.20run.20on.20modern.20z3.2E/near/479612134\">said</a>:</p>\n<blockquote>\n<p>I would do a <code>simp only:</code> as just rewriting is enough. And only if performance is too bad, I would spend more thinking into it</p>\n</blockquote>\n<p>For now apparently most of the time just running auto on the goals seems to solve them. But pretty sure its going have a performance impact.</p>",
+        "id": 480299846,
+        "sender_full_name": "irvin",
+        "timestamp": 1730632966
+    },
+    {
+        "content": "<p><span class=\"user-mention\" data-user-id=\"233198\">@Mathias Fleury</span>  Btw an update. Apparent HOL4 decided to deal with the \"bug\" in z3 output and i think im going to try and do the same and deal with it rather than fix it on the z3 side. The rest works I think</p>",
+        "id": 486684895,
+        "sender_full_name": "irvin",
+        "timestamp": 1733589526
+    },
+    {
+        "content": "<p>So they are sure that this is the only bug?</p>",
+        "id": 486684956,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1733589581
+    },
+    {
+        "content": "<p>theses are apparently the relevant commits that the HOL4 maintainer sent me. I havent figured it out but they seem to be able to handle define-fun at the top of the proof block.<br>\n<a href=\"https://github.com/HOL-Theorem-Prover/HOL/commit/8f8bd67b8c5a3d799144a14206aa8d4266edd36b\">https://github.com/HOL-Theorem-Prover/HOL/commit/8f8bd67b8c5a3d799144a14206aa8d4266edd36b</a><br>\n<a href=\"https://github.com/HOL-Theorem-Prover/HOL/commit/def62b7000cb313b19c84cabe8c1867e63a9c624\">https://github.com/HOL-Theorem-Prover/HOL/commit/def62b7000cb313b19c84cabe8c1867e63a9c624</a> <a href=\"https://github.com/HOL-Theorem-Prover/HOL/commit/4324a79a32b7cccf11efbef4ecee637784ad28c4\">https://github.com/HOL-Theorem-Prover/HOL/commit/4324a79a32b7cccf11efbef4ecee637784ad28c4</a> <a href=\"https://github.com/HOL-Theorem-Prover/HOL/commit/313365a0e83c847c9767d67ab52b2f69135dcaba\">https://github.com/HOL-Theorem-Prover/HOL/commit/313365a0e83c847c9767d67ab52b2f69135dcaba</a> <a href=\"https://github.com/HOL-Theorem-Prover/HOL/commit/4b763209b040de35cf9d408e76a9c4898ce848d5\">https://github.com/HOL-Theorem-Prover/HOL/commit/4b763209b040de35cf9d408e76a9c4898ce848d5</a> <a href=\"https://github.com/HOL-Theorem-Prover/HOL/commit/120e7bb43bc3ffcca4efb2cafbeed0605d620bff\">https://github.com/HOL-Theorem-Prover/HOL/commit/120e7bb43bc3ffcca4efb2cafbeed0605d620bff</a> <a href=\"https://github.com/HOL-Theorem-Prover/HOL/commit/525694a1f1c7016dea954894bea6e6e396f7d6b3\">https://github.com/HOL-Theorem-Prover/HOL/commit/525694a1f1c7016dea954894bea6e6e396f7d6b3</a></p>",
+        "id": 486685375,
+        "sender_full_name": "irvin",
+        "timestamp": 1733589861
+    },
+    {
+        "content": "<p>Ahh thanks for the links!</p>",
+        "id": 486685577,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1733589999
+    },
+    {
+        "content": "<p>I guess it might be easier as they can be made schematic variables in isabelle?</p>",
+        "id": 486685749,
+        "sender_full_name": "irvin",
+        "timestamp": 1733590110
+    },
+    {
+        "content": "<p>I always tried to avoid those in the reconstruction.</p>",
+        "id": 486685838,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1733590201
+    },
+    {
+        "content": "<p>Also a lot of the reconstruction is actively avoiding them too (by fixing them prior to proving anything). This also avoids accidentally instantiating them.</p>",
+        "id": 486686040,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1733590332
+    }
+]

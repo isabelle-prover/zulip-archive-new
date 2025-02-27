@@ -1,0 +1,140 @@
+[
+    {
+        "content": "<p>Hi everyone,<br>\nI have been pointed at the Interval library in <code>Decision_Procs/Approximation</code> and I am trying to prove some simple examples with it.<br>\nLooking at <code>Decision_Procs/ex/Approximation_ex</code>, a goal like the following should be provable:</p>\n<div class=\"codehilite\"><pre><span></span><code>theory Scratch\n  imports Complex_Main &quot;HOL-Library.Reflection&quot;\n    &quot;~~/src/HOL/Decision_Procs/Approximation&quot;\nbegin\nlemma bar:\n  shows &quot;0 ≤ x ∧ x ≤ 1 ⟹ abs (sin (x)) &lt; 2&quot;\n  by (approximation 10)\nend\n</code></pre></div>\n<p>However, the proof of lemma <code>bar</code> fails with the error <code>Reification failed: Cannot find the atoms equation\nApproximation does not support \"x ∈ {0..1} ⟶ ¦sin x¦ &lt; 2\"</code><br>\nCan someone help me understand this error message?</p>",
+        "id": 277838452,
+        "sender_full_name": "Heiko Becker",
+        "timestamp": 1649144303
+    },
+    {
+        "content": "<p>Hah, I can see why that might be confusing. The problem, as is so often the case in Isabelle when something that ought to work doesn't work, is polymorphism.</p>\n<p>The way you wrote it down, Isabelle infers the following type for <code>x</code>:</p>\n<div class=\"codehilite\"><pre><span></span><code>&#39;a::{abs,ord,banach,real_normed_algebra_1}\n</code></pre></div>\n<p>You can find that out by doing a <code>declare [[show_sorts]]</code> above your lemma and ctrl+hovering over the <code>x</code>. The <code>banach</code> and <code>real_normed_algebra_1</code> comes from the <code>sin</code>, the <code>ord</code> comes from the <code>≤</code>, and the <code>abs</code> comes from the <code>abs</code>.</p>\n<p>If you add an explicit <code>:: real</code> constraint, it works without any problems.</p>",
+        "id": 277839185,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1649144798
+    },
+    {
+        "content": "<p>Someone ought to improve the error message for <code>approximation</code> to detect these cases…</p>",
+        "id": 277839212,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1649144816
+    },
+    {
+        "content": "<p>I'll put that on my to do list.</p>",
+        "id": 277839233,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1649144830
+    },
+    {
+        "content": "<p>Thanks a lot for the explanation! That makes sense. I will add that explicitly. HOL4 does support something along the lines of <code>realsLib.prefer_reals()</code> which tells the parser to disambiguate into reals as much as possible. Is there maybe something similar for Isabelle?/HOL?</p>",
+        "id": 277839424,
+        "sender_full_name": "Heiko Becker",
+        "timestamp": 1649144987
+    },
+    {
+        "content": "<p>One more question: I was pointed at the <code>approximation</code> work by a reviewer whom suggested to look into it for polynomial inequalities. I am now trying a very simple goal from our evaluation, and the only error I get is <code>Failed to apply initial proof method⌂:[...]</code> when using <code>apply (approximation 30)</code> on this goal</p>\n<div class=\"codehilite\"><pre><span></span><code>lemma foo:\n  assumes &quot;(0 ≤ x ∧ x &lt;= 2/5)&quot;\n  shows &quot;(abs(cos (x) - (50000000135927169520044799355673603713512420654297 /\n50000000000000000000000000000000000000000000000000 +\n(x *\n (-1225409217893488553021618054153507593184713186929 /\n  2500000000000000000000000000000000000000000000000000000) +\n (x * x *\n  (-24999283897945898114123508548800600692629814147949 /\n   50000000000000000000000000000000000000000000000000) +\n  (x * x * x *\n   (-3061900846609820763151443845373478325200267136097 /\n    20000000000000000000000000000000000000000000000000000) +\n   (x * x * x * x *\n    (21203466323626414535841178121700068004429340362549 /\n     500000000000000000000000000000000000000000000000000) +\n    x * x * x * x * x *\n    (-16524268822046756562821334668456074723508208990097 /\n     10000000000000000000000000000000000000000000000000000))))))):: real)\n    &lt;=\n    19552407163238115144356799930793053619830587160513/5000000000000000000000000000000000000000000000000000000000&quot;\n</code></pre></div>",
+        "id": 277840083,
+        "sender_full_name": "Heiko Becker",
+        "timestamp": 1649145420
+    },
+    {
+        "content": "<p>That usually indicates that <code>approximation</code> wasn't able to verify the statement, either because it is false or because the precision wasn't high enough.</p>",
+        "id": 277844029,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1649147877
+    },
+    {
+        "content": "<p>(Or because there is a completeness bug in the code)</p>",
+        "id": 277844078,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1649147888
+    },
+    {
+        "content": "<p>But you shouldn't forget to chain in the assumption here.</p>",
+        "id": 277844179,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1649147944
+    },
+    {
+        "content": "<p>i.e. <code>using assms by (approximation …)</code></p>",
+        "id": 277844189,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1649147951
+    },
+    {
+        "content": "<p>I think it may also help to cut the interval a bit more</p>",
+        "id": 277844372,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1649148044
+    },
+    {
+        "content": "<p>Ok, thanks for the explanations. I will try with <code>using assms</code> again and see what happens. We used CoqInterval on those examples too where we needed bisections and taylor models. I will experiment with the parameters to <code>approximation</code> a bit then.</p>",
+        "id": 277845073,
+        "sender_full_name": "Heiko Becker",
+        "timestamp": 1649148410
+    },
+    {
+        "content": "<p>It does support Taylor stuff and bisections, have a look at the examples in the <code>HOL/Decision_Procs/ex</code> directory.</p>",
+        "id": 277845134,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1649148456
+    },
+    {
+        "content": "<p>but I wasn't able to get this one through, so it's possible that there is some problem there</p>",
+        "id": 277845146,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1649148468
+    },
+    {
+        "content": "<p>i.e. that what <code>approximation</code> does is simply not good enough</p>",
+        "id": 277845204,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1649148484
+    },
+    {
+        "content": "<p>there are Taylor Models in Isabelle as well; Fabian Immler will be able to help you with those (though he works at Apple now; not sure if he will reply)</p>",
+        "id": 277845225,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1649148503
+    },
+    {
+        "content": "<p>Thanks a lot for all of the help. I will keep experimenting with it.</p>",
+        "id": 277845332,
+        "sender_full_name": "Heiko Becker",
+        "timestamp": 1649148591
+    },
+    {
+        "content": "<p>I cobbled something together for you. <a href=\"/user_uploads/14278/zTpVZ5XPHLepYy1vq9qmkrWp/My_Experiment.thy\">My_Experiment.thy</a></p>",
+        "id": 277850998,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1649151670
+    },
+    {
+        "content": "<p>Unless I messed something while copy-pasting, this verifies that your inequality holds using Taylor models, within about 1.7 seconds in my machine.</p>",
+        "id": 277851035,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1649151696
+    },
+    {
+        "content": "<p>It's a bit messy because Fabian never seems to have done the same kind of nice reification that exists for <code>approximation</code> and the interface to the Taylor Model library is a bit unpolished, but I think I figured out how to set it up correctly.</p>",
+        "id": 277851170,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1649151752
+    },
+    {
+        "content": "<p>You might want to run this by Fabian for a comment though.</p>",
+        "id": 277851191,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1649151763
+    },
+    {
+        "content": "<p>Thank you very much for the file. I will look at it carefully. I will first check whether I can automatically generate inputs of the form described in the file before I start bugging more people.</p>",
+        "id": 277980262,
+        "sender_full_name": "Heiko Becker",
+        "timestamp": 1649226569
+    },
+    {
+        "content": "<p>I mean you could contact him about what this <code>prove_pos</code> thing actually does and whether there is a correctness proof</p>",
+        "id": 277981461,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1649227775
+    }
+]

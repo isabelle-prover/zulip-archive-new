@@ -1,0 +1,32 @@
+[
+    {
+        "content": "<p>From: Katherine Cordwell &lt;<a href=\"mailto:kcordwel@andrew.cmu.edu\">kcordwel@andrew.cmu.edu</a>&gt;<br>\nRecently I was trying to parallelize an algorithm using the <a href=\"http://Parallel.map\">Parallel.map</a><br>\nfunction, and ran into some termination issues.  For example, the following<br>\nfunction does not terminate with this use of \"<a href=\"http://Parallel.map\">Parallel.map</a>\", though it<br>\nwould work fine with vanilla \"map\".</p>\n<p>function test:: \"real poly ⇒ real poly list ⇒  nat\"<br>\n  where<br>\n  \"test p qs =<br>\n  ( let len = length qs in<br>\n    if len = 0 then 1<br>\n    else if len = 1 then 2<br>\n    else<br>\n    (let q1 = take (len div 2) qs;  q2 = drop (len div 2) qs;<br>\n     parallel_comput = (<a href=\"http://Parallel.map\">Parallel.map</a> (λi. (test p i)) [q1, q2]);<br>\n     left = parallel_comput ! 1;  right = parallel_comput ! 2;<br>\n     comb = left + right in comb<br>\n    )<br>\n  )\"<br>\n  by auto</p>\n<p>(* Seems to not be true? *)<br>\ntermination test<br>\n  apply (relation \"measure (λ(p,qs).(length qs))\")<br>\n  apply auto<br>\n  sorry</p>\n<p>Any explanation/advice would be much appreciated.</p>\n<p>Best,<br>\nKatherine Cordwell</p>",
+        "id": 249452108,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1628935374
+    },
+    {
+        "content": "<p>From: Manuel Eberl &lt;<a href=\"mailto:eberlm@in.tum.de\">eberlm@in.tum.de</a>&gt;<br>\nThis is a classic case of a missing fundef_cong rule. Basically,<br>\nsomething needs to tell the function package that \"<a href=\"http://Parallel.map\">Parallel.map</a> f xs\"<br>\nwill only evaluate f on xs. This is done by proving a corresponding<br>\ncongruence rule and declaring it as \"fundef_cong\":</p>\n<p>lemma parallel_map_cong [fundef_cong]:<br>\n  \"(⋀x. x ∈ set xs ⟹ f x = g x) ⟹ xs = ys ⟹<br>\n<a href=\"http://Parallel.map\">Parallel.map</a> f xs = <a href=\"http://Parallel.map\">Parallel.map</a> g ys\"<br>\n  unfolding Parallel.map_def by (rule map_cong) auto</p>\n<p>This is really an omission of the \"HOL-Library.Parallel\" theory, in my<br>\nopinion, and should be added there.</p>\n<p>Your termination proof is then pretty straightforward, since you now<br>\nhave more information available:</p>\n<p>termination<br>\nproof (relation \"measure (λ(p,qs).(length qs))\"; clarsimp; goal_cases)<br>\n  case (1 qs xs)<br>\n  have \"length xs ≤ Suc (length qs) div 2\"<br>\n    using 1 by auto<br>\n  moreover have \"length qs &gt; 1\"<br>\n    using 1 by (cases qs) auto<br>\n  ultimately have \"length xs &lt; length qs\"<br>\n    by linarith<br>\n  thus ?case by auto<br>\nqed</p>\n<p>\"fundef_cong\" is briefly mentioned in section 10 of the Function package<br>\nmanual (\"Higher-Order Recursion\"). But I certainly cannot blame you for<br>\nmissing it – it really is the tiniest of remarks. :)</p>\n<p>Cheers,</p>\n<p>Manuel<br>\n<a href=\"/user_uploads/14278/xHYOOnvxx8uPjztoLgiGp1zk/smime.p7s\">smime.p7s</a></p>",
+        "id": 249456439,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1628942362
+    },
+    {
+        "content": "<p>From: Florian Haftmann &lt;<a href=\"mailto:florian.haftmann@informatik.tu-muenchen.de\">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>\nHi Katherine,</p>\n<p>in Isabelle/HOL there is one quite successful principle when optimizing<br>\nspecifications for executability: optimize the specifications for<br>\nprovability and succinctness, prove separate lemmas for optimization of<br>\nexecutability.</p>\n<p>This is the reason why Parallel.thy is not optimized for basing<br>\nspecifications on it.</p>\n<p>As far as I understand your example, you would end up with sth. like:</p>\n<p>definition test:: ‹real poly ⇒ real poly list ⇒ nat›<br>\n  where ‹test = …›</p>\n<p>and later prove separately:</p>\n<p>lemma test_code [code]:<br>\n  ‹test p qs =<br>\n  ( let len = length qs in<br>\n     if len = 0 then 1<br>\n     else if len = 1 then 2<br>\n     else<br>\n     (let q1 = take (len div 2) qs;  q2 = drop (len div 2) qs;<br>\n      parallel_comput = (<a href=\"http://Parallel.map\">Parallel.map</a> (λi. (test p i)) [q1, q2]);<br>\n      left = parallel_comput ! 1;  right = parallel_comput ! 2;<br>\n      comb = left + right in comb<br>\n     )<br>\n  )›</p>\n<p>With a logically precise definition of ‹test› already at hand, the prove<br>\nof the code equation is usually easier than proving a complicated<br>\ntermination schema.</p>\n<p>I'm curious for your actual example, it seems to me that it utilizes a<br>\ndivide-and-conquer schema which is a candidate to be added to<br>\nParallel.thy explicitly.</p>\n<p>Cheers,<br>\n    Florian<br>\n<a href=\"/user_uploads/14278/raloAcNLt7aMkLC8jg79BQjd/OpenPGP_signature\">OpenPGP_signature</a></p>",
+        "id": 250099908,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1629454134
+    },
+    {
+        "content": "<p>From: \"Jens-D. Doll\" &lt;<a href=\"mailto:jens.doll@live.de\">jens.doll@live.de</a>&gt;<br>\nHello Florian,</p>\n<p>please specify the categories executability, provability. What is the <br>\ncommon ground of these?<br>\nThanks, Jens</p>\n<p>------ Originalnachricht ------</p>",
+        "id": 251380826,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1630415157
+    },
+    {
+        "content": "<p>From: Florian Haftmann &lt;<a href=\"mailto:florian.haftmann@informatik.tu-muenchen.de\">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>\nHi Jens,</p>\n<blockquote>\n<p>please specify the categories executability, provability. What is the<br>\ncommon ground of these?</p>\n</blockquote>\n<p>a good practical introduction is §3 in the tutorial of code generation.</p>\n<p>The use of the terms »provability« and »executability« in my answer was<br>\nindeed a little bit sloppy; »provability and succintness« refers how<br>\n»easy« properties can be derived from the specification as given in the<br>\ntheory, »optimization of executability« refers to optimization of the<br>\nresulting executable program.</p>\n<p>Cheers,<br>\n    Florian<br>\n<a href=\"/user_uploads/14278/fzCVcsCl399W2V1OGPgrl-eL/OpenPGP_signature\">OpenPGP_signature</a></p>",
+        "id": 252991050,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1631457529
+    }
+]

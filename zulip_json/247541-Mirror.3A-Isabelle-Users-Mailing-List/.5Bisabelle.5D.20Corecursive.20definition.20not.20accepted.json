@@ -1,0 +1,44 @@
+[
+    {
+        "content": "<p>From: Wolfgang Jeltsch &lt;<a href=\"mailto:wolfgang@well-typed.com\">wolfgang@well-typed.com</a>&gt;<br>\nHello!</p>\n<p>Consider the following minimal example:</p>\n<p>codatatype 'a option_stream =<br>\n      OptionCons ‹'a option› ‹'a option_stream›</p>\n<p>corec example :: \"unit option_stream\" where<br>\n      \"example = OptionCons (Some ()) example\"</p>\n<p>This is rejected by the coinduction package with the following error<br>\nmessage:</p>\n<p>Proof failed.</p>\n<p>1. option_stream.congclp ?R x2 y2 ⟹ rel_option (=) x1 x1<br>\n     2. x1 = y1 ⟹ option_stream.congclp ?R x2 y2 ⟹ option_stream.congclp ?R x2 y2<br>\n    The error(s) above occurred for the goal statement⌂:<br>\n    x1 = y1 ⟹ option_stream.congclp ?R x2 y2 ⟹ option_stream.congclp ?R (OptionCons x1 x2) (OptionCons y1 y2)</p>\n<p>When choosing the <code>show_types</code> option, it becomes sort of clear that the<br>\nproof is to be conducted in a polymorphic setting, because the error<br>\nmessage becomes the following one:</p>\n<p>Proof failed.</p>\n<p>1. option_stream.congclp (?R::?'a option_stream ⇒ ?'a option_stream ⇒ bool) x2 y2 ⟹ rel_option (=) x1 x1<br>\n     2. x1 = y1 ⟹ option_stream.congclp (?R::?'a option_stream ⇒ ?'a option_stream ⇒ bool) x2 y2 ⟹ option_stream.congclp ?R x2 y2<br>\n    variables:<br>\n    x1, y1 :: ?'a option<br>\n    x2, y2 :: ?'a option_stream<br>\n    ?R :: ?'a option_stream ⇒ ?'a option_stream ⇒ bool<br>\n    The error(s) above occurred for the goal statement⌂:<br>\n    (x1::?'a option) = (y1::?'a option) ⟹ option_stream.congclp (?R::?'a option_stream ⇒ ?'a option_stream ⇒ bool) (x2::?'a option_stream) (y2::?'a option_stream) ⟹ option_stream.congclp ?R (OptionCons x1 x2) (OptionCons y1 y2)</p>\n<p>Now consider the following non-polymorphic version of the above code:</p>\n<p>codatatype unit_option_stream =<br>\n      UnitOptionCons ‹unit option› ‹unit_option_stream›</p>\n<p>corec example' where<br>\n      \"example' = UnitOptionCons (Some ()) example'\"</p>\n<p>This one succeeds.</p>\n<p>I don’t see a convincing reason why the first example shouldn’t work as<br>\nwell. Am I missing something important or is this behavior not intended?</p>\n<p>By the way, also the polymorphic example <em>does</em> succeed when using<br>\n<code>primcorec</code>, but in my actual use case I need <code>corec</code>, because I need to<br>\nintroduce several layers of data constructors in each round.</p>\n<p>All the best,<br>\nWolfgang</p>",
+        "id": 380786235,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1690910821
+    },
+    {
+        "content": "<p>From: Dmitriy Traytel &lt;<a href=\"mailto:traytel@di.ku.dk\">traytel@di.ku.dk</a>&gt;<br>\nHi Wolfgang,</p>\n<p>Thank you for the report. Indeed one of corec’s tactics was not powerful enough to finish the proof. I have amended the tactic in the development repository (isabelle/e72f8009a4f0) and your minimal example should work in the forthcoming release candidates. Please let me know if the actual, non-minimal example also works.</p>\n<p>@Jasmin: you may want to have a look at my change. I’m never entirely sure of what invariants I might be violating in corec. But my patch fixes Wolfgang’s example and does not break existing corec examples.</p>\n<p>Best wishes,<br>\nDmitriy</p>",
+        "id": 382825323,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1691473024
+    },
+    {
+        "content": "<p>From: Wolfgang Jeltsch &lt;<a href=\"mailto:wolfgang@well-typed.com\">wolfgang@well-typed.com</a>&gt;<br>\nHi, Dmitriy!</p>\n<p>Thanks a lot for the improvement. Yes, the respective error messages are<br>\ngone also for the real code.</p>\n<p>That said, there are more error messages, which I had seen already<br>\nbefore but considered to perhaps come from the same problem. The<br>\nfollowing code exemplifies these:</p>\n<p>codatatype ('m, 'r) process =<br>\n      Return ‹'r› |<br>\n      Send ‹'m<br>\noption› |<br>\n      Receive ‹'m ⇒ ('m, 'r) process›</p>\n<p>corec nothing where<br>\n      \"nothing = Return ()\"</p>\n<p>The following error messages are shown:</p>\n<p>Tactic failed<br>\n    The error(s) above occurred for the goal statement⌂:<br>\n    rel_fun (rel_sum R2 (rel_sum (=) (rel_fun (=) R1))) (rel_pre_process R2 R1) Abs_process_pre_process Abs_process_pre_process <br>\n    Tactic failed<br>\n    The error(s) above occurred for the goal statement⌂:<br>\n    rel_fun (rel_pre_process R2 R1) (rel_sum R2 (rel_sum (=) (rel_fun (=) R1))) Rep_process_pre_process Rep_process_pre_process </p>\n<p>The above example seems to be minimal. When trying to shrink it further,<br>\nI tripped over another error message. I tried the following code:</p>\n<p>codatatype ('m, 'r) process =<br>\n      Return ‹'r› |<br>\n      Send ‹'m option› |<br>\n      Receive ‹'m ⇒ unit›</p>\n<p>corec nothing where<br>\n      \"nothing = Return ()\"</p>\n<p>This resulted in the following error message:</p>\n<p>exception Option raised (line 83 of \"General/basics.ML\")</p>\n<p>Sorry for bothering you with so many error messages. <span aria-label=\"wink\" class=\"emoji emoji-1f609\" role=\"img\" title=\"wink\">:wink:</span> Any chance to<br>\novercome the issues behind them?</p>\n<p>All the best,<br>\nWolfgang</p>",
+        "id": 382953210,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1691500574
+    },
+    {
+        "content": "<p>From: Dmitriy Traytel &lt;<a href=\"mailto:traytel@di.ku.dk\">traytel@di.ku.dk</a>&gt;<br>\nHi Wolfgang,</p>\n<p>Thanks for these examples. I have another patch now running on testboard (<a href=\"https://ci.isabelle.systems/jenkins/job/testboard/930/\">https://ci.isabelle.systems/jenkins/job/testboard/930/</a>), that should improve the tactic failures for theorems involving Abs/Rep. The resolution is the same as in the previous case, but this time two different tactics are involved. I will push it if the testboard run goes through.</p>\n<p>The other error message is funnier. If you remove the Receive constructor you will see a user-friendlier error message that explains why this cannot work:</p>\n<p>Noncorecursive codatatypes are not supported (try \"definition\" instead of \"corec”)</p>\n<p>I’m not sure why the nice error message is replaced with the low-level error, but since this is not supposed to work anyway, I guess this is not as urgent.</p>\n<p>Best wishes,<br>\nDmitriy</p>",
+        "id": 382970757,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1691503659
+    },
+    {
+        "content": "<p>From: Wolfgang Jeltsch &lt;<a href=\"mailto:wolfgang@well-typed.com\">wolfgang@well-typed.com</a>&gt;<br>\nAm Dienstag, dem 08.08.2023 um 14:07 +0000 schrieb Dmitriy Traytel:</p>\n<blockquote>\n<p>Hi Wolfgang,</p>\n</blockquote>\n<p>Hello, hello! <span aria-label=\"smile\" class=\"emoji emoji-1f642\" role=\"img\" title=\"smile\">:smile:</span></p>\n<blockquote>\n<p>Thanks for these examples. I have another patch now running on<br>\ntestboard (<a href=\"https://ci.isabelle.systems/jenkins/job/testboard/930/\">https://ci.isabelle.systems/jenkins/job/testboard/930/</a>),<br>\nthat should improve the tactic failures for theorems involving<br>\nAbs/Rep. The resolution is the same as in the previous case, but this<br>\ntime two different tactics are involved. I will push it if the<br>\ntestboard run goes through.</p>\n</blockquote>\n<p>Great! Thanks a lot. Could you ping us on the mailing list once your<br>\npatch is pushed and also tell us its ID?</p>\n<blockquote>\n<p>The other error message is funnier. If you remove the Receive<br>\nconstructor you will see a user-friendlier error message that explains<br>\nwhy this cannot work:</p>\n<p>Noncorecursive codatatypes are not supported (try \"definition\" instead of \"corec”)</p>\n</blockquote>\n<p>Oh, indeed I accidentally removed the last occurrence of actual<br>\ncorecursion. <span aria-label=\"sweat smile\" class=\"emoji emoji-1f605\" role=\"img\" title=\"sweat smile\">:sweat_smile:</span></p>\n<blockquote>\n<p>Best wishes,<br>\nDmitriy</p>\n</blockquote>\n<p>All the best,<br>\nWolfgang</p>",
+        "id": 383284596,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1691587850
+    },
+    {
+        "content": "<p>From: Dmitriy Traytel &lt;<a href=\"mailto:traytel@di.ku.dk\">traytel@di.ku.dk</a>&gt;<br>\nHi Wolfgang,</p>\n<p>It is pushed as isabelle/da437a9f2823.</p>\n<p>Best wishes,<br>\nDmitriy</p>",
+        "id": 383285483,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1691587983
+    },
+    {
+        "content": "<p>From: Wolfgang Jeltsch &lt;<a href=\"mailto:wolfgang@well-typed.com\">wolfgang@well-typed.com</a>&gt;<br>\nMy real code now works. Great! Thanks a lot for making this happen.</p>\n<p>All the best,<br>\nWolfgang</p>",
+        "id": 383420376,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1691616168
+    }
+]

@@ -1,0 +1,68 @@
+[
+    {
+        "content": "<p>Hi community,</p>\n<p>For a complex function f which terminates, sometimes the Isabelle sledgehammer cannot prove properties like f x = y, despite evaluating \"f x\" using the value command yields the result \"y\". How do you leverage the result of a value command in the proof?</p>\n<p>I have attached the theory file and marked the place to look at using (****)</p>\n<p><a href=\"/user_uploads/14278/sfj6HaQF_Le146FrnCeIHYOu/valueMWE.thy\">valueMWE.thy</a><br>\n<a href=\"/user_uploads/14278/CtgzgR7T5b8U42Fyqdeh8bJU/Screenshot-2023-07-07-at-12.52.02.png\">Screenshot-2023-07-07-at-12.52.02.png</a><br>\n<a href=\"/user_uploads/14278/iOzWwnElnNbW2OxV-hPYVhtd/Screenshot-2023-07-07-at-12.52.23.png\">Screenshot-2023-07-07-at-12.52.23.png</a></p>\n<div class=\"message_inline_image\"><a href=\"/user_uploads/14278/CtgzgR7T5b8U42Fyqdeh8bJU/Screenshot-2023-07-07-at-12.52.02.png\" title=\"Screenshot-2023-07-07-at-12.52.02.png\"><img src=\"/user_uploads/14278/CtgzgR7T5b8U42Fyqdeh8bJU/Screenshot-2023-07-07-at-12.52.02.png\"></a></div><div class=\"message_inline_image\"><a href=\"/user_uploads/14278/iOzWwnElnNbW2OxV-hPYVhtd/Screenshot-2023-07-07-at-12.52.23.png\" title=\"Screenshot-2023-07-07-at-12.52.23.png\"><img src=\"/user_uploads/14278/iOzWwnElnNbW2OxV-hPYVhtd/Screenshot-2023-07-07-at-12.52.23.png\"></a></div>",
+        "id": 373182164,
+        "sender_full_name": "Chengsong Tan",
+        "timestamp": 1688730755
+    },
+    {
+        "content": "<p>You can use the <code>eval</code> method.</p>",
+        "id": 373198241,
+        "sender_full_name": "Fabian Huch",
+        "timestamp": 1688733985
+    },
+    {
+        "content": "<p>Or <code>code_simp</code> if you don't want to rely on using the ML evaluation oracle. It will be much slower for bigger computations though.</p>",
+        "id": 373200050,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1688734338
+    },
+    {
+        "content": "<p>It might also be a good idea to define your <code>do_transition</code> function with <code>definition</code> instead of <code>fun</code>. It's much faster. And your function isn't recursive anyway.</p>",
+        "id": 373200542,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1688734438
+    },
+    {
+        "content": "<p>Generally, I would say that <code>sledgehammer</code> is not great at doing a lot of ‘stupid’ equational rewriting. This sort of thing is normally done by the simplifier, and my guess would be that you'd simply have to declare a few equations as <code>simp</code> or add them to the simp set manually when you need them and then the simplifier could unfold everything and prove the theorem in question easily. I'm not quite sure what those equations would be though.</p>",
+        "id": 373202797,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1688734817
+    },
+    {
+        "content": "<p><code>onestep_def</code> is probably one of them, but that's not enough; it still gets stuck somewhere. It's a bit tricky to debug this, to, because the size of the goal blows up so much. If all you want to do here is evaluating these terms then <code>eval</code> and <code>code_simp</code> will probably work great, but if you want to prove things about these functions then setting up a good simp set will be useful regardless.</p>",
+        "id": 373203228,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1688734904
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"232736\">Manuel Eberl</span> <a href=\"#narrow/stream/202961-General/topic/using.20value.20command.20result.20for.20proofs/near/373200050\">said</a>:</p>\n<blockquote>\n<p>Or <code>code_simp</code> if you don't want to rely on using the ML evaluation oracle. It will be much slower for bigger computations though.</p>\n</blockquote>\n<p>Is there any danger (like getting the wrong results) relying on the ML evaluation oracle?</p>",
+        "id": 373281065,
+        "sender_full_name": "Chengsong Tan",
+        "timestamp": 1688750009
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"232736\">Manuel Eberl</span> <a href=\"#narrow/stream/202961-General/topic/using.20value.20command.20result.20for.20proofs/near/373200542\">said</a>:</p>\n<blockquote>\n<p>It might also be a good idea to define your <code>do_transition</code> function with <code>definition</code> instead of <code>fun</code>. It's much faster. And your function isn't recursive anyway.</p>\n</blockquote>\n<p>Thanks! This speeds up the processing considerably.</p>",
+        "id": 373590808,
+        "sender_full_name": "Chengsong Tan",
+        "timestamp": 1688866017
+    },
+    {
+        "content": "<p>If the ML-Compiler has bugs, the result might be wrong.</p>",
+        "id": 373844869,
+        "sender_full_name": "Lukas Stevens",
+        "timestamp": 1688971031
+    },
+    {
+        "content": "<p>If you use the ML evaluation oracle, your proof doesn't go through the Isabelle kernel anymore but rather the goal gets converted to some ML code by the (unverified) code generator and then evaluated by Poly/ML, and if the result is <code>true</code> then Isabelle accepts it as a theorem.</p>\n<p>This effectively greatly increases the trusted code base, and it is easy to achieve inconsistencies (i.e. prove \"false\") if you manually fiddle with the code generator setup (e.g. reconfigure it with e.g. the <code>code_printing</code> command).</p>\n<p>That said, I am not aware of any real-life problems caused by this, i.e. someone accidentally proving something that was wrong by relying on computational reflection (which is what this process is called, i.e. what <code>eval</code> does). I for one tend to avoid using reflection as long as it's feasible to do so, but if it isn't then I'm fine with it. Other people are less scrupulous than me and just always use it when it's applicable.</p>",
+        "id": 373910866,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1688985704
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"233155\">Lukas Stevens</span> <a href=\"#narrow/stream/202961-General/topic/using.20value.20command.20result.20for.20proofs/near/373844869\">said</a>:</p>\n<blockquote>\n<p>If the ML-Compiler has bugs, the result might be wrong.</p>\n</blockquote>\n<p>I'd say the code generator is much more of an issue than the ML compiler. After all, Isabelle itself is written in ML and running in the Poly/ML runtime, so we're relying on that being correct anyway.</p>\n<p>That said, there was an issue with Poly/ML's handling of \"big integer\" arithmetic a few years ago that <span class=\"user-mention\" data-user-id=\"234178\">@Fabian Immler</span> uncovered while he was running code generated by the code generator. So it <em>is</em> something to keep in mind. Isabelle itself doesn't really use \"big integers\" much.</p>",
+        "id": 373911442,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1688985803
+    }
+]

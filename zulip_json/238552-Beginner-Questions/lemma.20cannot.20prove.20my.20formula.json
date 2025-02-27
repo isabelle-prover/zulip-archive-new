@@ -1,0 +1,56 @@
+[
+    {
+        "content": "<p>Hi everybody,</p>\n<p>I defined basic for my proving as follows:</p>\n<div class=\"codehilite\"><pre><span></span><code>(*----------set up Type and Instances------------*)\ndefinition TypeTrig :: &quot;nat list&quot; (*port types*)\n  where &quot;TypeTrig = [0, 1]&quot;\n\ndefinition IncTrig :: &quot;nat set list&quot; (*port instances of each port type IncTrig*)\n  where &quot;IncTrig = [{10, 14}, {11,12,13}]&quot;\n\ndefinition TypeSync :: &quot;nat list&quot; (*port types*)\n  where &quot;TypeSync = [0]&quot;\n\ndefinition IncSync :: &quot;nat set list&quot; (*port instances of each port type IncTrig*)\n  where &quot;IncSync = [{5,6}]&quot;\n\n(*----------funcs for mapping and searching between types and instances------------*)\nfun pair_ns :: &quot;nat ⇒ nat list ⇒ (nat * nat) list&quot; where\n&quot;pair_ns x [] = []&quot; |\n&quot;pair_ns x (y # ys) = [(x,y)] @ (pair_ns x ys)&quot;\n\nfun pair_mapping :: &quot;nat list ⇒ nat set list ⇒ (nat * nat) list&quot; where\n&quot;pair_mapping [] [] = []&quot; |\n&quot;pair_mapping (x # xs) [] = []&quot; |\n&quot;pair_mapping [] (y # ys)  = []&quot; |\n&quot;pair_mapping (x # xs) (y # ys) = pair_ns x (sorted_list_of_set y) @ pair_mapping xs ys &quot;\n\nfun pair_mapping_lists :: &quot;nat list ⇒ nat set list ⇒ (nat * nat) list list&quot; where\n&quot;pair_mapping_lists [] [] = []&quot; |\n&quot;pair_mapping_lists (x # xs) [] = []&quot; |\n&quot;pair_mapping_lists [] (y # ys)  = []&quot; |\n&quot;pair_mapping_lists (x # xs) (y # ys) = [pair_ns x (sorted_list_of_set y)] @ pair_mapping_lists xs ys &quot;\n\nfun lookup :: &quot;&#39;k ⇒ (&#39;k × &#39;v) list ⇒ &#39;v list&quot; where\n&quot;lookup k [] = []&quot; |\n&quot;lookup k (x#xs) = (if fst x = k then [(snd x)]@lookup k (xs) else lookup k xs)&quot;\n\nvalue &quot;pair_mapping TypeTrig IncTrig&quot;\nvalue &quot;pair_mapping_lists TypeTrig IncTrig&quot;\nvalue &quot;length (pair_mapping_lists TypeTrig IncTrig)&quot;\nvalue &quot;nth (pair_mapping_lists TypeTrig IncTrig) 0&quot;\nvalue &quot;hd (pair_mapping_lists TypeTrig IncTrig)&quot;\n\n(*---------product functions for creating alphaSet and betaSet------------*)\nfun product_2lists :: &quot;&#39;a list =&gt; &#39;a list =&gt; &#39;a list list&quot; where\n&quot;product_2lists [] ys = []&quot; |\n&quot;product_2lists xs [] = []&quot; |\n&quot;product_2lists (x#xs) (y#ys) = [x # y # []] @ product_2lists xs (y#ys) @ product_2lists (x#[]) ys&quot;\n\nfun insert_list :: &quot;&#39;a =&gt; &#39;a list list =&gt; &#39;a list list&quot; where\n&quot;insert_list x [] = []&quot; |\n&quot;insert_list x (y#ys) = [List.insert x y] @ insert_list x (tl (y#ys))&quot;\n\nvalue &quot;insert_list 3 [[1::nat,2], [4,5]]&quot;\n\nfun product_l2ll :: &quot;&#39;a list =&gt; &#39;a list list =&gt; &#39;a list list&quot; where\n&quot;product_l2ll [] ys = []&quot; |\n&quot;product_l2ll xs [] = []&quot; |\n&quot;product_l2ll (x#xs) (ys) = insert_list x ys @ product_l2ll xs ys&quot;\n\nfun product_inListList :: &quot;&#39;a list list =&gt; &#39;a list list&quot; where\n&quot;product_inListList [] = []&quot; |\n&quot;product_inListList (x#[]) = (x#[])&quot; |\n&quot;product_inListList (x#y#[]) = product_2lists x y&quot; |\n&quot;product_inListList (x#ys) = product_l2ll x (product_inListList (ys))&quot;\n\nvalue &quot;pair_mapping_lists TypeTrig IncTrig&quot;\nvalue &quot;product_inListList (pair_mapping_lists TypeTrig IncTrig)&quot;\n\ndefinition betaSet :: &quot;(nat*nat) list set&quot; where\n&quot;betaSet = set (product_inListList (pair_mapping_lists TypeTrig IncTrig))&quot;\n\ndefinition alphaSet :: &quot;(nat*nat) list set&quot; where\n&quot;alphaSet = set (product_inListList (pair_mapping_lists TypeSync IncSync))&quot;\n\ndefinition trigInSet_of :: &quot;nat ⇒ nat set&quot; where\n&quot;trigInSet_of k = (if k ∈ (set TypeTrig) then set (lookup k (pair_mapping TypeTrig IncTrig)) else {})&quot;\n\ndefinition syncInSet_of :: &quot;nat ⇒ nat set&quot; where\n&quot;syncInSet_of t = (if t ∈ (set TypeSync) then set (lookup t (pair_mapping TypeSync IncSync)) else {})&quot;\n</code></pre></div>\n<p>Then, I tried to prove this lemma:</p>\n<div class=\"codehilite\"><pre><span></span><code>lemma &quot;∀bet∈betaSet.∀k∈(set TypeTrig). P k (hd (lookup k bet))\n        ⟶ (∀h1∈(trigInSet_of k)-{(hd (lookup k bet))}.¬P k h1)\n⟹ (∃bet∈betaSet.∀k∈(set TypeTrig).∀h1∈(trigInSet_of k)-{(hd (lookup k bet))}.¬P k h1)&quot;\n  unfolding betaSet_def TypeTrig_def IncTrig_def trigInSet_of_def\n  apply auto\n  done\n</code></pre></div>\n<p>But Isabelle keeps running forever at <code>apply auto</code>. I thought that because Isabelle doesn't calculate that <code>lookup k bet</code> always returns 1 value. So I added a lemma:</p>\n<div class=\"codehilite\"><pre><span></span><code>lemma lookup_length: &quot;∀bet∈betaSet.∀k∈(set TypeTrig). (length (lookup k bet) = 1)&quot;\n  unfolding betaSet_def TypeTrig_def IncTrig_def\n  apply auto\n  done\n\nlemma &quot;∀bet∈betaSet.∀k∈(set TypeTrig). P k (hd (lookup k bet))\n        ⟶ (∀h1∈(trigInSet_of k)-{(hd (lookup k bet))}.¬P k h1)\n⟹ (∃bet∈betaSet.∀k∈(set TypeTrig).∀h1∈(trigInSet_of k)-{(hd (lookup k bet))}.¬P k h1)&quot;\n  unfolding betaSet_def TypeTrig_def IncTrig_def trigInSet_of_def\n  using lookup_length\n  apply auto\n  done\n</code></pre></div>\n<p>The <code>lookup_length</code> is ok but the latter is still unprovable.<br>\nThen, I calculated each formula using <code>value</code> and wrote another <code>lemma</code> to prove the result from them:</p>\n<div class=\"codehilite\"><pre><span></span><code>value &quot;∀bet∈betaSet.∀k∈(set TypeTrig).∀h∈(set (lookup k bet)). P k (hd (lookup k bet))\n⟶ (∀h1∈(trigInSet_of k)-{(hd (lookup k bet))}.¬P k h1)&quot;\n\nvalue &quot;(∃bet∈betaSet.∀k∈(set TypeTrig).∀h1∈(trigInSet_of k)-{(hd (lookup k bet))}.¬P k h1)&quot;\n\nlemma &quot;(¬ P 0 14 ∧ ¬ P 1 12 ∧ ¬ P 1 13 ∨\n ¬ P 0 10 ∧ ¬ P 1 12 ∧ ¬ P 1 13 ∨\n ¬ P 0 10 ∧ ¬ P 1 11 ∧ ¬ P 1 13 ∨\n ¬ P 0 10 ∧ ¬ P 1 11 ∧ ¬ P 1 12 ∨ ¬ P 0 14 ∧ ¬ P 1 11 ∧ ¬ P 1 13 ∨ ¬ P 0 14 ∧ ¬ P 1 11 ∧ ¬ P 1 12)\n⟹ (((P 0 10 ⟶ ¬ P 0 14) ∧ (P 1 11 ⟶ ¬ P 1 12 ∧ ¬ P 1 13)) ∧\n ((P 0 14 ⟶ ¬ P 0 10) ∧ (P 1 11 ⟶ ¬ P 1 12 ∧ ¬ P 1 13)) ∧\n ((P 0 14 ⟶ ¬ P 0 10) ∧ (P 1 12 ⟶ ¬ P 1 11 ∧ ¬ P 1 13)) ∧\n ((P 0 14 ⟶ ¬ P 0 10) ∧ (P 1 13 ⟶ ¬ P 1 11 ∧ ¬ P 1 12)) ∧\n ((P 0 10 ⟶ ¬ P 0 14) ∧ (P 1 12 ⟶ ¬ P 1 11 ∧ ¬ P 1 13)) ∧\n (P 0 10 ⟶ ¬ P 0 14) ∧ (P 1 13 ⟶ ¬ P 1 11 ∧ ¬ P 1 12))&quot;\n  apply auto\n  done\n</code></pre></div>\n<p>It worked. Could you explain why Isabelle cannot prove my first formula, please?</p>",
+        "id": 216895863,
+        "sender_full_name": "Trinh Le Khanh",
+        "timestamp": 1605544344
+    },
+    {
+        "content": "<p>Tracing the simplifier shows that simp is already looping, but it is not immediately clear to me why (<code>P 0 14 ⟹ ?x1 ∈ {10, 14} - {14} ⟹ P 0 ?x1</code> is generated and repeatedly rewritten, whatever the reason).</p>",
+        "id": 216969448,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1605593341
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"233198\">Mathias Fleury</span> <a href=\"#narrow/stream/238552-Beginner-Questions/topic/lemma.20cannot.20prove.20my.20formula/near/216969448\">said</a>:</p>\n<blockquote>\n<p>Tracing the simplifier shows that simp is already looping, but it is not immediately clear to me why (<code>P 0 14 ⟹ ?x1 ∈ {10, 14} - {14} ⟹ P 0 ?x1</code> is generated and repeatedly rewritten, whatever the reason).</p>\n</blockquote>\n<p>Hi Mathias,<br>\nWhat is the difference between <code>⟹</code> and  <code>≡</code> in lemma?<br>\nAs I understand, <code>⟹</code> is considered as <em>imply</em> (but <code>P ⟹ Q ⟹ R</code> means <code>(P &amp; Q) --&gt; R</code><br>\nMeanwhile,  <code>≡</code> is to present the equivalence between two formulas (e.g. <code>P ≡ Q</code>)<br>\nIs that right?<br>\nI tested these two lemmas and both of them are provable. I think in this case,  <code>⟹</code> and  <code>≡</code> are the same</p>\n<div class=\"codehilite\"><pre><span></span><code>lemma: &quot;∀x ∈ {0, 1}. P x ⟹ P 0 ∧ P 1&quot;\n  by auto\n</code></pre></div>\n<div class=\"codehilite\"><pre><span></span><code>lemma: &quot;∀x ∈ {0, 1}. P x ≡ P 0 ∧ P 1&quot;\n  by auto\n</code></pre></div>\n<p>Then, I tested a concrete example that is</p>\n<div class=\"codehilite\"><pre><span></span><code>lemma &quot;((P 1 ⟶ ¬ P 2) ∧ (P 2 ⟶ ¬ P 1)) ⟹ (¬ P 1 ∨ ¬ P 2)&quot;\nby auto\n</code></pre></div>\n<p>It is provable.</p>\n<div class=\"codehilite\"><pre><span></span><code>lemma &quot;((P 1 ⟶ ¬ P 2) ∧ (P 2 ⟶ ¬ P 1)) ≡ (¬ P 1 ∨ ¬ P 2)&quot;\nby auto\n</code></pre></div>\n<p>It's unprovable. However, if I use <code>argo</code> instead of  <code>auto</code>, both of them are provable. Could you explain and confirm my understanding, please?</p>",
+        "id": 217578587,
+        "sender_full_name": "Trinh Le Khanh",
+        "timestamp": 1606091309
+    },
+    {
+        "content": "<p>Avoid <code>≡</code> unless you are programming a tool.  It tends to confuse tactics like auto</p>",
+        "id": 217591534,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1606110579
+    },
+    {
+        "content": "<p>So is my understanding of them correct?<br>\nI asked this because when I used <code>==</code> instead of <code>==&gt;</code>, my lemma is provable. (This lemma aims to prove two formulas are equivalent)</p>\n<div class=\"codehilite\"><pre><span></span><code>lemma &quot;∀bet∈betaSet.∀k∈(set TypeTrig). P k (hd (lookup k bet))\n        ⟶ (∀h1∈(trigInSet_of k)-{(hd (lookup k bet))}.¬P k h1)\n≡ (∃bet∈betaSet.∀k∈(set TypeTrig).∀h1∈(trigInSet_of k)-{(hd (lookup k bet))}.¬P k h1)&quot;\n  unfolding betaSet_def TypeTrig_def IncTrig_def trigInSet_of_def\n  using [[simp_trace]]\n  apply auto\n  done\n</code></pre></div>",
+        "id": 217600468,
+        "sender_full_name": "Trinh Le Khanh",
+        "timestamp": 1606120775
+    },
+    {
+        "content": "<p><code>≡</code> is equal on the Pure level, not implication.</p>",
+        "id": 217603138,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1606122485
+    },
+    {
+        "content": "<p>I believe in your case it works because the LHS and the RHS are simplified separately, instead of being simplified together..</p>",
+        "id": 217603200,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1606122527
+    },
+    {
+        "content": "<p>I'm clear. Thank you for your explanation.</p>",
+        "id": 217603643,
+        "sender_full_name": "Trinh Le Khanh",
+        "timestamp": 1606122786
+    },
+    {
+        "content": "<p>(deleted)</p>",
+        "id": 217607679,
+        "sender_full_name": "Trinh Le Khanh",
+        "timestamp": 1606125286
+    }
+]

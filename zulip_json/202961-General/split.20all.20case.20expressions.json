@@ -1,0 +1,44 @@
+[
+    {
+        "content": "<p>I have a lemma/code with lots of case expressions. To split each one of them I have to add the corresponding <code>splits</code> rule for every type that appears. For example:</p>\n<div class=\"codehilite\"><pre><span></span><code>lemma &quot;(case xs of [] ⇒ (case n of 0 ⇒ True | Suc x ⇒ True) | (x#xs) ⇒ True) = True&quot;\n  by (auto split: list.splits nat.splits)\n</code></pre></div>\n<p>Does someone know of a way to do this automatically? I want a method that does:  Split all case expression in the current subgoal.</p>",
+        "id": 215338168,
+        "sender_full_name": "Max W. Haslbeck",
+        "timestamp": 1604332867
+    },
+    {
+        "content": "<p>If you can live with declaring the splitting rules once:</p>\n<div class=\"codehilite\"><pre><span></span><code>named_theorems mysplit &quot;Theorems used by mysplit&quot;\ndeclare list.splits[mysplit] nat.splits[mysplit]\nmethod mysplit = (split list.splits nat.splits)+\n\nlemma &quot;(case xs of [] ⇒ (case n of 0 ⇒ True | Suc x ⇒ True) | (x#xs) ⇒ True) = True&quot;\n   apply mysplit\n</code></pre></div>",
+        "id": 215339173,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1604333319
+    },
+    {
+        "content": "<p>Yes, thanks. Already doing that.</p>\n<p>I still would like to know if such a method is generally possible.</p>",
+        "id": 215343946,
+        "sender_full_name": "Max W. Haslbeck",
+        "timestamp": 1604335122
+    },
+    {
+        "content": "<p>A very low-tech: find all constants that contain the name <code>case_</code>. The part after the <code>_</code> of the name contains the type name. Therefore the theorem <code>[stuff_after_the_underscore].splits</code> will give the theorem you want to use.</p>",
+        "id": 215347567,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1604336636
+    },
+    {
+        "content": "<div class=\"codehilite\"><pre><span></span><code>ML ‹\nfun split_thms ctxt t =\n  (case first_field &quot;case_&quot; t of\n    NONE =&gt; []\n  | SOME (_, stuff) =&gt;\n     (Proof_Context.get_thms ctxt (stuff ^ &quot;.splits&quot;) handle _ =&gt; [])\n  )\n\nfun find_split_rules ctxt (a $ b) = find_split_rules ctxt a @ find_split_rules ctxt b\n  | find_split_rules _ (Free (_, _)) = []\n  | find_split_rules ctxt (Const (name, _)) = split_thms ctxt name\n  | find_split_rules ctxt (Abs (_, _, a)) = find_split_rules ctxt a\n  | find_split_rules _ (Bound _) = []\n  | find_split_rules _ (Var _) = []\n\n(*taken from the definition of the split tactic*)\nfun gen_split_tac _ [] = K no_tac\n  | gen_split_tac ctxt (split::splits) =\n      split_tac ctxt [split] ORELSE&#39;\n         gen_split_tac ctxt splits;\n\nfun splitter ctxt i thm =\n   (CHANGED_PROP o gen_split_tac ctxt (@{thms if_splits} @ find_split_rules ctxt (Thm.prop_of thm))) i thm\n›\n\nmethod_setup mysplit = ‹\n  Scan.optional Attrib.thms [] &gt;&gt;\n    (fn thms =&gt; fn ctxt =&gt;\n      METHOD (fn facts =&gt; REPEAT (HEADGOAL (splitter ctxt))))\n› &quot;apply splits the goal&quot;\n\n\nlemma &quot;(case case_xs of [] ⇒ (case n of 0 ⇒ True | Suc x ⇒ True) | (x#xs) ⇒ True) = True&quot;\n  apply mysplit\n</code></pre></div>",
+        "id": 215351335,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1604338223
+    },
+    {
+        "content": "<p>(some clean-up is required: I copy-pasted the setup for smt to define the <code>mysplit</code> tactic, but I am too lazy to do it)</p>",
+        "id": 215353525,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1604339223
+    },
+    {
+        "content": "<p>Thanks, I'll play around with that :)</p>",
+        "id": 215354055,
+        "sender_full_name": "Max W. Haslbeck",
+        "timestamp": 1604339426
+    }
+]

@@ -1,0 +1,38 @@
+[
+    {
+        "content": "<p>From: Thomas Genet &lt;<a href=\"mailto:thomas.genet@irisa.fr\">thomas.genet@irisa.fr</a>&gt;<br>\nDear Isabelle users,</p>\n<p>I finally came up with a very concise version of my theory leading to a <br>\nfailure of quickcheck that I do not understand.</p>\n<p>Here is the theory:</p>\n<hr>\n<p>datatype statement= Inc | Nop | Seq statement statement</p>\n<p>fun eval:: \"statement ⇒ nat ⇒ nat\"<br>\n   where<br>\n\"eval Inc n = n+1\" |<br>\n\"eval Nop n = n\" |<br>\n\"eval (Seq s1 s2) n = (eval s1 (eval s2 n))\"</p>\n<p>lemma A: \"(∀ s. (eval s n)&gt;0) ⟶ (n&gt;1)\"<br>\nnitpick<br>\nquickcheck [tester=narrowing,timeout=300]    (* no couterex! *)<br>\nquickcheck [tester=narrowing,size=1,timeout=300]<br>\nquickcheck [tester=narrowing,size=2,timeout=300]<br>\nquickcheck [tester=narrowing,size=3,timeout=300]<br>\nquickcheck [tester=narrowing,size=4,timeout=300]<br>\noops</p>\n<p>lemma B: \"∀ s. eval s 0 &lt; 10\"<br>\nquickcheck[tester=narrowing]     (* one counterex! *)<br>\noops</p>\n<hr>\n<p>And some questions:</p>\n<p>1) With Isabelle (2018), all quickcheck calls fail to find a <br>\ncounter-example on lemma A. However, n=1 is a counter-example: <br>\nevaluating all statements (sequences of Nop or Inc) on n=1 results into <br>\nvalues greater to 0. However, n=1 is not greater to 1.</p>\n<p>I tried to increase the timeout and to limit the maximal size (since <br>\n\"narrowing\" first generate and then test).</p>\n<p>Note that quickcheck narrowing succeeds in generating statements for <br>\nfinding a counter-example on lemma B.</p>\n<p>2) Nitpick finds a counter-example but claims that it may be spurious<br>\nbecause it \"trivially holds for the given scopes or lies outside <br>\nNitpick's supported fragment\".</p>\n<p>Since it does not hold, what makes this example to be \"outside\" of <br>\nNitpick's fragment?</p>\n<p>Best regards,</p>\n<p>Thomas</p>",
+        "id": 294757469,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661198155
+    },
+    {
+        "content": "<p>From: Thomas Genet &lt;<a href=\"mailto:thomas.genet@irisa.fr\">thomas.genet@irisa.fr</a>&gt;<br>\nDear all,</p>\n<p>I may have some guesses but I still wonder if this is correct...</p>\n<p>Counterexample generation (for nitpick and quickcheck) is easier on <br>\nlemma B because to have a counter example it is enough to produce <br>\n<strong>one</strong> value for s.</p>\n<p>To contradict lemma A, we need one value for n that falsify n&gt;1 for all <br>\npossible s. Nitpick takes a chance to propose n=1 but claims that it may <br>\nbe wrong whereas quickcheck does not even take this risk?</p>\n<p>\"lies outside Nitpick's supported fragment\" is the universal quantifier <br>\non the left-hand side of --&gt; ?</p>\n<p>Are these correct guesses?</p>\n<p>Best regards,</p>\n<p>Thomas</p>",
+        "id": 294757476,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661198161
+    },
+    {
+        "content": "<p>From: Lukas Bulwahn &lt;<a href=\"mailto:lukas.bulwahn@gmail.com\">lukas.bulwahn@gmail.com</a>&gt;<br>\nYes, I believe you are guessing correct. There are some limited cases<br>\nwhere quickcheck can (magically) derive (with narrowing or the<br>\npredicate compiler) that it is sufficient to only check for certain<br>\nterms or certain partial terms to actually evaluate an universal<br>\nquantified formula, i.e., the formula to be true or to be false for<br>\nall possible candidates, but that magic only works with various<br>\nlimitations. Already considerably minor syntactic changes (and even<br>\nmore so semantic changes) can lead that quickcheck is not able to do<br>\nthat and hence simply is doomed to fail.</p>\n<p>Nitpick tries similar magic based on a three-valued logic encoding.</p>\n<p>Some of those limitations are ultimately due to the fact that<br>\nquickcheck relies on Isabelle's code generator.</p>\n<p>Lukas</p>",
+        "id": 294757532,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661198167
+    },
+    {
+        "content": "<p>From: Thomas Genet &lt;<a href=\"mailto:thomas.genet@irisa.fr\">thomas.genet@irisa.fr</a>&gt;<br>\nDear Isabelle users,</p>\n<p>with the following lemma:</p>\n<p>lemma \"∀ l3. (∀ l1 l2. l1@l2 = l3) ⟶ (length l3&gt;1)\"</p>\n<p>quickcheck [tester=narrowing] fails to find a counter-example, though <br>\nnitpick finds one.</p>\n<p>Is there a way to overcome this? If I understand well, the use of <br>\nquantifiers forbids to use random/exhaustive on this lemma?</p>\n<p>Thanks in advance,</p>\n<p>Thomas</p>",
+        "id": 294759083,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661198720
+    },
+    {
+        "content": "<p>From: Andreas Lochbihler &lt;<a href=\"mailto:mail@andreas-lochbihler.de\">mail@andreas-lochbihler.de</a>&gt;<br>\nDear Thomas,</p>\n<p>If you look closely at nitpick's output, then you will see the hint that the <br>\ncounterexample is \"potentially spurious\", and it is in this case. Because for any l3, the <br>\nantecedent of the implication can simply be falsified, which makes the implication true. <br>\nSo quickcheck is actually right in not finding anything.</p>\n<p>Andreas</p>",
+        "id": 294759251,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661198799
+    },
+    {
+        "content": "<p>From: Thomas Genet &lt;<a href=\"mailto:thomas.genet@irisa.fr\">thomas.genet@irisa.fr</a>&gt;<br>\nOops, Andreas, you are totally right.</p>\n<p>I tried to reproduce the problem I have (on a big theory) using a <br>\nsmaller example but it is clearly broken (even provable with auto!). <br>\nSorry for this.</p>\n<p>I will try to isolate the problem I have on a small theory and correct <br>\ncounter example.</p>\n<p>Best regards,</p>\n<p>Thomas</p>",
+        "id": 294759312,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661198824
+    }
+]

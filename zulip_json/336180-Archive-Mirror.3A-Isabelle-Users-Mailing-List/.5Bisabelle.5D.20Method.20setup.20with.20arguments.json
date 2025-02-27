@@ -1,0 +1,14 @@
+[
+    {
+        "content": "<p>From: Zhe Hou &lt;<a href=\"mailto:zhe.hou@hotmail.com\">zhe.hou@hotmail.com</a>&gt;<br>\nHi,</p>\n<p>Suppose I have already defined a ML function my_tac that takes a term as<br>\ninput and returns a tactic, now I want to setup a method (here called<br>\nmethod1) to wrap it up. Is there a way to pass a term as an argument of the<br>\nmethod?</p>\n<p>For example, suppose I want to use method1 inside an Eisbach method called<br>\nmethod2:</p>\n<p>method method2 = (match premises in P:\"?A /\\ ?B\" =&gt; &lt;method1 P&gt;)</p>\n<p>How should I define the setup and parser for method1 so that I can pass the<br>\nargument P as a term to my_tac?</p>\n<p>Thank you very much!</p>\n<p>Zhe</p>",
+        "id": 294699533,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661178722
+    },
+    {
+        "content": "<p>From: <a href=\"mailto:Daniel.Matichuk@data61.csiro.au\">Daniel.Matichuk@data61.csiro.au</a><br>\nThe \"classic\" solution is to use the method_setup command and define a parser, here you'll most likely want \"Args.term\"</p>\n<p>However in you're example you aren't passing a term to method1, you're passing the fact P (now a fact as a result of the match subgoal focus). You would have to use the Attribs.thm parser to do that. So there are a few solutions to your problem:</p>\n<ol>\n<li>\n<p>Define a method that takes a fact and extracts its underlying term:</p>\n<p>method_setup method1 = <br>\n  ‹Attrib.thm &gt;&gt; (fn thm =&gt; fn ctxt =&gt; SIMPLE_METHOD (my_tac (Thm.prop_of thm)))›</p>\n<p>method method2 = (match premises in P:\"?A ∧ ?B\" ⇒ ‹method1 P›)</p>\n<p>However here \"method1\" can only work inside a match/focus (where P is an assumed fact).</p>\n</li>\n<li>\n<p>Define a method that takes a term and quote the premise back through to method1</p>\n<p>method_setup method1 = <br>\n  ‹Args.term &gt;&gt; (fn t =&gt; fn ctxt =&gt; SIMPLE_METHOD (my_tac t))›</p>\n<p>method method2 = (match premises in \"A ∧ B\" for A B ⇒ ‹method1 \"A ∧ B\"›)</p>\n</li>\n<li>\n<p>As above, but bind the premise to a separate name first:</p>\n<p>method method2 = (match premises in P for P ⇒ ‹match (P) in \"?A ∧ ?B\" ⇒ ‹method1 P››)</p>\n</li>\n</ol>\n<p>We can also define method1 with the \"tactic\" method, although it is maybe not as straightforward as it could be.</p>\n<p>method method1 for P = (tactic ‹my_tac (Morphism.term morphism @{term P})›)</p>\n<p>The implicitly bound \"morphism\" here instructs the tactic to re-evaluate \"P\" in the evaluation environment of \"method1\" when it is executed. Using a bare \"@{term P}\" will not give the expected result.</p>",
+        "id": 294700602,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661179057
+    }
+]

@@ -1,0 +1,32 @@
+[
+    {
+        "content": "<p>From: Lars Hupel &lt;<a href=\"mailto:hupel@in.tum.de\">hupel@in.tum.de</a>&gt;<br>\nIt appears that the 'ind_cases' method, which is supposed to produce an<br>\nelimination rule on the fly and immediately apply it to the goal state,<br>\ndoes not take chained facts into account. Consider this small-ish example:</p>\n<p>inductive app :: \"'a list ⇒ 'a list ⇒ 'a list ⇒ bool\" where<br>\n\"app [] ys ys\" |<br>\n\"app xs ys zs ⟹ app (x # xs) ys (x # zs)\"</p>\n<p>notepad begin</p>\n<p>fix xs ys zs :: \"'a list\" and x :: 'a</p>\n<p>assume \"app (x # xs) ys zs\"<br>\n  then obtain zs' where \"zs = x # zs'\"<br>\n    apply - (* remove this and 'ind_cases' fails *)<br>\n    apply (ind_cases \"app (x # xs) ys zs\")<br>\n    apply auto<br>\n    done</p>\n<p>end</p>\n<p>Same happens when I declare</p>\n<p>inductive_cases foo: \"app (x # xs) ys zs\"</p>\n<p>outside and use 'apply (erule foo)'. OTOH, both 'apply (rule foo)' and<br>\n'apply (elim foo)' do consume the chained facts. Looking closely at the<br>\nreference manual (§§6.2.3, 6.3.3) explains the behaviour of 'rule'<br>\n(namely, perform elimination under presence of chained facts). Still,<br>\nthis does not explain why 'ind_cases' ignores chained facts. There's an<br>\nold thread [0] on this list about a related topic, but I couldn't find<br>\nan explanation there either.</p>\n<p>Cheers<br>\nLars</p>\n<p>[0]<br>\n&lt;<a href=\"https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2011-April/msg00002.html\">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2011-April/msg00002.html</a>&gt;</p>",
+        "id": 294329722,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660929833
+    },
+    {
+        "content": "<p>From: Lars Hupel &lt;<a href=\"mailto:hupel@in.tum.de\">hupel@in.tum.de</a>&gt;<br>\nAfter some discussion with Lars, this question reduced to: Why does<br>\n'ind_cases' internally call 'Method.erule' instead of 'Method.rule' (or<br>\neven 'eresolve_tac')?</p>",
+        "id": 294329742,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660929838
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nIt is mainly historic: inductive_cases and ind_cases were never quite sure <br>\nif they belong to proper Isar or to old stuff.  Things in this area have <br>\nslowly moved towards proper Isar-ness over the years.</p>\n<p>I shall take another look for the coming release, if the move can be <br>\ncontinued, and old behaviours discontinued without too much effort.</p>\n<p>Makarius</p>",
+        "id": 294330992,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660930237
+    },
+    {
+        "content": "<p>From: Lars Hupel &lt;<a href=\"mailto:hupel@in.tum.de\">hupel@in.tum.de</a>&gt;</p>\n<blockquote>\n<p>I shall take another look for the coming release, if the move can be<br>\ncontinued, and old behaviours discontinued without too much effort.</p>\n</blockquote>\n<p>I have just attempted to perform this change. Turns out, a lot of proofs<br>\nactually break (I did not investigate the failures). So, I guess this<br>\nwould not qualify as a \"minor\" change wrt to the approaching release.</p>\n<p>Cheers<br>\nLars</p>",
+        "id": 294634580,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661159618
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nIt is normal that any attempt to change anything does not work out by <br>\ndefault.  This is why I make all these jokes about \"bugs\" and \"fixes\" <br>\nhere.  Without special precautions, a change usually makes the situation <br>\nworse than before.</p>\n<p>I had one round of looking at ind_cases some weeks ago, made some tiny <br>\nreforms, and then got stuck with more fundamental questions what the whole <br>\npurpose of ind_cases actually is.  (I did not try to answer this question, <br>\nand merely put it on my TODO list.)</p>\n<p>Since Isabelle2015-RC0 has already 'private' (or 'qualified') <br>\ndeclarations, one could try the canonical pattern for proof-local <br>\nspecifications like that and thus avoid ind_cases:</p>\n<p>context<br>\nbegin</p>\n<p>private inductive_cases my_cases: ...</p>\n<p>lemma ... by (cases rule: my_cases)</p>\n<p>end</p>\n<p>Note that 'private' only affects the name space.  So if rules are declared <br>\n(e.g. as [elim]) in the local context, they will be outside as well.</p>\n<p>The new 'experiment' target prevents this by wrapping a locale around the <br>\nwhole block.  But here the very point is to export nothing from it.</p>\n<p>Makarius</p>",
+        "id": 294634607,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661159631
+    }
+]

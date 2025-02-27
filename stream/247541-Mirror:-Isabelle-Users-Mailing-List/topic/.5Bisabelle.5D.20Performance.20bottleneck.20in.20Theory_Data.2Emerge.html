@@ -1,0 +1,238 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Performance bottleneck in Theory_Data.merge · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Performance.20bottleneck.20in.20Theory_Data.2Emerge.html">[isabelle] Performance bottleneck in Theory_Data.merge</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="245838379"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Performance%20bottleneck%20in%20Theory_Data.merge/near/245838379" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Performance.20bottleneck.20in.20Theory_Data.2Emerge.html#245838379">(Jul 13 2021 at 15:03)</a>:</h4>
+<p>From: Norbert Schirmer via Cl-isabelle-users &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Hi,</p>
+<p>I try to track down a performance bottleneck in theory merge.</p>
+<p>I enabled timing information by</p>
+<p>ML “val _ = Context.timing := true”</p>
+<p>Unfortunately the position information of the “slow" data slot is not available, I just get the message:</p>
+<p>Theory_Data.merge<br>
+44.390s elapsed time, 88.221s cpu time, 0.000s GC time</p>
+<p>Compared to other data slots where the position information is available as a link or a file reference:</p>
+<p>Theory_Data.merge⌂<br>
+0.016s elapsed time, 0.030s cpu time, 0.000s GC time</p>
+<p>Theory_Data.merge (file "global_theory.ML")<br>
+0.264s elapsed time, 0.523s cpu time, 0.000s GC time</p>
+<p>Any idea how to continue?</p>
+<p>What is the reason that the position information is lost? Could this be a hint which kind of data slot it could possibly be?</p>
+<p>Regards,<br>
+Norbert</p>
+
+
+
+<a name="245844565"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Performance%20bottleneck%20in%20Theory_Data.merge/near/245844565" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Performance.20bottleneck.20in.20Theory_Data.2Emerge.html#245844565">(Jul 13 2021 at 15:45)</a>:</h4>
+<p>From: Thomas Sewell &lt;<a href="mailto:tals4@cam.ac.uk">tals4@cam.ac.uk</a>&gt;<br>
+I think that the position information there boils down to<br>
+that fetched by<br>
+   let val pos = Position.thread_data () in<br>
+in the definition of the function Theory_Data' in src/Pure.context.ML.</p>
+<p>I guess means that the data tables which don't have one are<br>
+defined at points at which the local thread_data position<br>
+wasn't set. It seems to link to ML blocks and to the position<br>
+of ML_file commands pretty consistently for those kinds, so probably<br>
+this is theory data defined in some special ML file, maybe one of the<br>
+ones in Pure. That's not much help, is it?</p>
+<p>If you're very keen to figure it out, I'd be tempted to locally edit<br>
+context.ML to expose an alternative interface to Theory_Data that lets<br>
+the client suggest a name which appears with the position info in <br>
+timing.</p>
+<p>I was motivated to investigate this a little because I've had issues <br>
+with<br>
+this in the past.</p>
+<p>Best regards,<br>
+     Thomas.</p>
+
+
+
+<a name="245983767"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Performance%20bottleneck%20in%20Theory_Data.merge/near/245983767" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Performance.20bottleneck.20in.20Theory_Data.2Emerge.html#245983767">(Jul 14 2021 at 16:26)</a>:</h4>
+<p>From: Norbert Schirmer via Cl-isabelle-users &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+I followed your advice and manually named all data. Here is what I found:</p>
+<ol>
+<li>
+<p>The inefficient data is in locale.ML, namely: structure Thms. Sets of theorems are represented as lists there. Changing this to Thmtab.set, and doing a pointer_eq test on merge seems to solve my performance issue.</p>
+</li>
+<li>
+<p>Whether position information is displayed or not seems to depend on how the structure is actually generated, ie.<br>
+via. Theory_Data’, Theory_Data, or Generic_Data and also how the arguments are declared. Some observations:</p>
+</li>
+</ol>
+<ul>
+<li>Theory_Data’ seems to result in a filename as position</li>
+<li>Generic_Data(struct Type T = … end) seems to result in a link as position</li>
+<li>Generic_Data(Type T = …) (without the explicit struct) seems to have no position information.</li>
+</ul>
+<p>Regards,<br>
+Norbert</p>
+
+
+
+<a name="254349080"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Performance%20bottleneck%20in%20Theory_Data.merge/near/254349080" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Performance.20bottleneck.20in.20Theory_Data.2Emerge.html#254349080">(Sep 22 2021 at 11:03)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+(This rather old thread still requires more comments.)</p>
+<p>On 14/07/2021 18:26, Norbert Schirmer via Cl-isabelle-users wrote:</p>
+<blockquote>
+<p>On 13. Jul 2021, at 17:44, Thomas Sewell &lt;<a href="mailto:tals4@cam.ac.uk">tals4@cam.ac.uk</a></p>
+<blockquote>
+<p>&lt;mailto:<a href="mailto:tals4@cam.ac.uk">tals4@cam.ac.uk</a>&gt;&gt; wrote:</p>
+<p>If you're very keen to figure it out, I'd be tempted to locally edit<br>
+context.ML to expose an alternative interface to Theory_Data that lets<br>
+the client suggest a name which appears with the position info in timing.</p>
+</blockquote>
+<p>I followed your advice and manually named all data. Here is what I found:</p>
+<ol>
+<li>The inefficient data is in locale.ML, namely: structure Thms. Sets of<br>
+theorems are represented as lists there. Changing this to Thmtab.set, and<br>
+doing a pointer_eq test on merge seems to solve my performance issue.</li>
+</ol>
+</blockquote>
+<p>I have already changed that some weeks ago, to use more scalable data<br>
+structures. See<br>
+<a href="https://isabelle-dev.sketis.net/rISABELLEc3b3517ef4ba">https://isabelle-dev.sketis.net/rISABELLEc3b3517ef4ba</a></p>
+<p>Note that thm Item_Net.T preserves the original "canonical order of<br>
+declarations": it is an index structure paired with a plain list; thus I don't<br>
+have to argue if the order matters or not. (A minor disadvantage is that the<br>
+net produces more heap garbage, so in extreme applications it might need to be<br>
+revisited.)</p>
+<blockquote>
+<ol start="2">
+<li>Whether position information is displayed or not seems to depend on how the<br>
+structure is actually generated, ie.<br>
+via. Theory_Data’, Theory_Data, or Generic_Data and also how the arguments are<br>
+declared. Some observations:
+* Theory_Data’ seems to result in a filename as position
+* Generic_Data(struct Type T = … end) seems to result in a link as position
+* Generic_Data(Type T = …) (without the explicit struct) seems to have no<br>
+position information.</li>
+</ol>
+</blockquote>
+<p>I could not reproduce this observation.</p>
+<p>Makarius</p>
+
+
+
+<a name="255007519"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Performance%20bottleneck%20in%20Theory_Data.merge/near/255007519" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Performance.20bottleneck.20in.20Theory_Data.2Emerge.html#255007519">(Sep 27 2021 at 07:50)</a>:</h4>
+<p>From: Norbert Schirmer via Cl-isabelle-users &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Below is some example output from my debug-version (based on Isabelle2021) were I have explicitly named the data slots (cf. "name" below). Note the difference in the output for <br>
+sign.ML, locale.ML (locale), classical.ML. My guess was that it might be related to how the data slot is declared. Or is it related to the build (bootstrap) process of the sessions?</p>
+<p>From context.ML:</p>
+<p>type kind =<br>
+ {pos: Position.T,<br>
+  name: string, <br>
+  empty: Any.T,<br>
+  extend: Any.T -&gt; Any.T,<br>
+  merge: theory * theory -&gt; Any.T * Any.T -&gt; Any.T};</p>
+<p>fun invoke name f k x =<br>
+  (case Datatab.lookup (Synchronized.value kinds) k of<br>
+    SOME kind =&gt;<br>
+      if ! timing andalso name &lt;&gt; "" then<br>
+        Timing.cond_timeit true ("Theory_Data." ^ name ^ <a href="http://Position.here">Position.here</a> (#pos kind) ^ " " ^ (#name kind))<br>
+          (fn () =&gt; f kind x)<br>
+      else f kind x<br>
+  | NONE =&gt; raise Fail "Invalid theory data identifier");</p>
+<p>From sign.ML: </p>
+<p>structure Data = Theory_Data'<br>
+(<br>
+  type T = sign;<br>
+  val name = "sign.ML";<br>
+  val extend = I;<br>
+  val empty = make_sign (Syntax.empty_syntax, Type.empty_tsig, Consts.empty);<br>
+  fun merge old_thys (sign1, sign2) =<br>
+    let<br>
+      val Sign {syn = syn1, tsig = tsig1, consts = consts1} = sign1;<br>
+      val Sign {syn = syn2, tsig = tsig2, consts = consts2} = sign2;</p>
+<p>val syn = Syntax.merge_syntax (syn1, syn2);<br>
+      val tsig = Type.merge_tsig (Context.Theory (fst old_thys)) (tsig1, tsig2);<br>
+      val consts = Consts.merge (consts1, consts2);<br>
+    in make_sign (syn, tsig, consts) end;<br>
+);</p>
+<p>From locale.ML:</p>
+<p>structure Locales = Theory_Data<br>
+(<br>
+  type T = locale Name_Space.table;<br>
+  val name = "locale.ML (locale)";<br>
+  val empty : T = Name_Space.empty_table "locale";<br>
+  val extend = I;<br>
+  val merge = Name_Space.join_tables (K merge_locale);<br>
+);</p>
+<p>From classical.ML:</p>
+<p>structure Claset = Generic_Data<br>
+(<br>
+  type T = claset;<br>
+  val name = "classical.ML";<br>
+  val empty = empty_cs;<br>
+  val extend = I;<br>
+  val merge = merge_cs;<br>
+);</p>
+<p>=======================================<br>
+Theory_Data.merge (file "sign.ML") sign.ML<br>
+0.223s elapsed time, 1.291s cpu time, 0.707s GC time <br>
+Theory_Data.merge (file "theory.ML") theory.ML<br>
+0.017s elapsed time, 0.105s cpu time, 0.000s GC time <br>
+Theory_Data.merge (file "thm.ML") thm.ML<br>
+0.003s elapsed time, 0.020s cpu time, 0.000s GC time <br>
+Theory_Data.merge (file "global_theory.ML") global_theory.ML<br>
+0.073s elapsed time, 0.432s cpu time, 0.000s GC time <br>
+Theory_Data.merge (file "raw_simplifier.ML") raw_simplifier.ML (simpset)<br>
+0.005s elapsed time, 0.032s cpu time, 0.000s GC time <br>
+Theory_Data.merge (file "ML/ml_env.ML") ml_env.ML<br>
+0.000s elapsed time, 0.001s cpu time, 0.000s GC time <br>
+Theory_Data.merge attrib.ML (attribute)<br>
+0.000s elapsed time, 0.001s cpu time, 0.000s GC time <br>
+Theory_Data.merge context_rules.ML<br>
+0.006s elapsed time, 0.047s cpu time, 0.000s GC time <br>
+Theory_Data.merge locale.ML (locale)<br>
+0.000s elapsed time, 0.001s cpu time, 0.000s GC time <br>
+Theory_Data.merge locale.ML (idents)<br>
+0.017s elapsed time, 0.089s cpu time, 0.000s GC time <br>
+Theory_Data.merge locale.ML (global_registrations)<br>
+0.000s elapsed time, 0.006s cpu time, 0.000s GC time <br>
+Theory_Data.merge locale.ML (thms)<br>
+0.001s elapsed time, 0.004s cpu time, 0.000s GC time <br>
+Theory_Data.merge bundle.ML<br>
+0.000s elapsed time, 0.002s cpu time, 0.000s GC time <br>
+Theory_Data.merge axclass.ML<br>
+0.000s elapsed time, 0.005s cpu time, 0.000s GC time <br>
+Theory_Data.merge class.ML<br>
+0.000s elapsed time, 0.002s cpu time, 0.000s GC time <br>
+Theory_Data.merge code.ML<br>
+0.001s elapsed time, 0.014s cpu time, 0.000s GC time <br>
+Theory_Data.merge spec_rules.ML<br>
+0.002s elapsed time, 0.010s cpu time, 0.000s GC time <br>
+Theory_Data.merge named_theorems.ML<br>
+0.003s elapsed time, 0.011s cpu time, 0.000s GC time <br>
+Theory_Data.merge generated_files.ML<br>
+0.000s elapsed time, 0.001s cpu time, 0.000s GC time <br>
+Theory_Data.merge (line 788 of "~~/src/HOL/HOL.thy") classical.ML<br>
+0.002s elapsed time, 0.009s cpu time, 0.000s GC time <br>
+Theory_Data.merge (line 1529 of "~~/src/HOL/HOL.thy") induct.ML<br>
+0.001s elapsed time, 0.006s cpu time, 0.000s GC time <br>
+Theory_Data.merge (line 416 of "~~/src/HOL/Inductive.thy") inductive.ML<br>
+0.000s elapsed time, 0.001s cpu time, 0.000s GC time <br>
+Theory_Data.merge (line 13 of "~~/src/HOL/Fun_Def_Base.thy") function_common.ML<br>
+0.000s elapsed time, 0.006s cpu time, 0.000s GC time <br>
+Theory_Data.merge (line 14 of "~~/src/HOL/Fun_Def_Base.thy") function_context_tree.ML<br>
+0.000s elapsed time, 0.004s cpu time, 0.000s GC time <br>
+Theory_Data.merge (line 260 of "~~/src/HOL/Transfer.thy") transfer.ML<br>
+0.001s elapsed time, 0.007s cpu time, 0.000s GC time</p>
+<p>Regards,<br>
+Norbert</p>
+
+
+
+<hr><p>Last updated: Jul 15 2022 at 23:21 UTC</p>
+</html>

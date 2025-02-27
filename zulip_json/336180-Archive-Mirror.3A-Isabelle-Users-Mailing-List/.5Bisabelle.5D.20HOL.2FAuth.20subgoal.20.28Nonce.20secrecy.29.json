@@ -1,0 +1,56 @@
+[
+    {
+        "content": "<p>From: Denis Butin &lt;<a href=\"mailto:denis.butin@gmail.com\">denis.butin@gmail.com</a>&gt;<br>\nHi all,</p>\n<p>I am using the security protocol framework from HOL/Auth, and I am<br>\nfrustratingly stuck on the following subgoal:</p>\n<p>[A \\&lt;notin&gt; bad; R \\&lt;notin&gt; bad;<br>\n         evsp1 \\&lt;in&gt; ns_public_pki;<br>\n        Says A B (Crypt (pubK R) {Nonce NC, Agent A}) \\&lt;in&gt; set evsp1;<br>\n        Nonce NC \\&lt;notin&gt; analz (knows Spy evsp1);<br>\n        Nonce NC \\&lt;in&gt; analz (insert (Key (pubK Aa)) (insert {Agent<br>\nAa, Number certa} (knows Spy evsp1)))]</p>\n<p>==&gt; False</p>\n<p>It seems easy: I just have to show that adding a public key, an<br>\nagent's name and a number to the Spy's knowledge doesn't change the<br>\nsecrecy of the nonce NC, which leads to the required contradiction.</p>\n<p>The following lemmas seem helpful:</p>\n<ul>\n<li>\n<p>privateKey_neq_publicKey (a private key can never be a public key,<br>\nhence pubK Aa cannot be the inverse of pubK R) ;</p>\n</li>\n<li>\n<p>parts_insert_spies ( parts (insert ?X (knows Spy ?evs)) = parts {?X}<br>\n\\&lt;union&gt; parts (knows Spy ?evs));</p>\n</li>\n<li>\n<p>analz_into_parts, which is already declared as [dest] at the<br>\nbeginning of my theory;</p>\n</li>\n<li>\n<p>knows_Cons, which is part of the inductive definition of the knows function.</p>\n</li>\n</ul>\n<p>My only problem is how to put them together; I unsuccessfuly tried things like</p>\n<p>apply (auto intro: privateKey_neq_publicKey knows_Cons simp add:<br>\nparts_insert_spies)</p>\n<p>I am not too sure on the best way to use/combine auto or blast with<br>\nexisting lemmas, so I may have missed something obvious.</p>\n<p>Sledgehammer suggested a metis command which resulted in an Ill-typed<br>\ninstantiation error.</p>\n<p>Many thanks for reading this, and for any help.</p>\n<p>Regards,<br>\nDenis</p>",
+        "id": 294118898,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660839159
+    },
+    {
+        "content": "<p>From: Jasmin Blanchette &lt;<a href=\"mailto:jasmin.blanchette@gmail.com\">jasmin.blanchette@gmail.com</a>&gt;<br>\nHi Denis,</p>\n<blockquote>\n<p>Sledgehammer suggested a metis command which resulted in an Ill-typed<br>\ninstantiation error.</p>\n</blockquote>\n<p>I'll let others answer the rest of your email, but when this happens one solution is to try passing the \"full_types\" option to Sledgehammer:</p>\n<p>sledgehammer [full_types]</p>\n<p>(See the manual sledgehammer.pdf for details.) Then the encoding used is somewhat heavier but is much less likely to cause metis failures.</p>\n<p>Regards,</p>\n<p>Jasmin</p>",
+        "id": 294118927,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660839167
+    },
+    {
+        "content": "<p>From: Lawrence Paulson &lt;<a href=\"mailto:lp15@cam.ac.uk\">lp15@cam.ac.uk</a>&gt;<br>\nAny theorem involving the function analz requires special care. As you say, this one is conceptually trivial because all the information being added to the spy's knowledge is already publicly available. But you still have to go about the proof in the right way.</p>\n<p>This subgoal appears to be unsimplified. The standard setup of simplification rules for analz is designed to deal with this sort of term. They permute the inserted items so that trivial ones (such as agent names) are called to the front and then taken outside of the analz call altogether. So try </p>\n<p>apply (simp add: analz_insert_eq pushes split_ifs)</p>\n<p>You should be left with nothing but the key. For a secrecy theorem, dealing with the key is complicated, and you need to use some of the measures outlined in section 4.5 of my paper “The Inductive Approach to Verifying Cryptographic Protocols”. But because this is a public key, you should only need to use the theorem Set.insert_absorb to erase it. In fact you probably won't need this final step, because analz_insert_eq above should take care of it. Good luck!</p>\n<p>Larry Paulson</p>",
+        "id": 294118943,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660839171
+    },
+    {
+        "content": "<p>From: Jean Martina &lt;<a href=\"mailto:Jean.Martina@cl.cam.ac.uk\">Jean.Martina@cl.cam.ac.uk</a>&gt;<br>\nLarry/Denis</p>\n<p>I think the problem here has to do with the proof strategy you are taking. It is not unusual you ending up with these complications (double insert inside an analz) if you are too aggressive at the beginning of the proof. Larry's reading recommendation can be complemented by chapter 4 in Giampaolo Bella's book.</p>\n<p>If you want to post privately the entire lemma and the proof commands you written so far I can take a look to see if it is one of the usuals.</p>\n<p>Regards,</p>\n<p>Jean</p>",
+        "id": 294118958,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660839177
+    },
+    {
+        "content": "<p>From: Jasmin Blanchette &lt;<a href=\"mailto:jasmin.blanchette@gmail.com\">jasmin.blanchette@gmail.com</a>&gt;<br>\nHi Jean,</p>\n<p>(I'm taking the liberty of answering to the mailing list.)</p>\n<blockquote>\n<p>From my own trial and error experiences in this specific domain inside Isabelle, E and vampire tend to give a lot of ill-typed translations.</p>\n<p>SPASS on the other hand don't do that often. A critical issue in his initial problem is the willing to inspect the analz set. I would say (empirically again) that 80% of sledgehammer's output in this situation is ill-typed.</p>\n</blockquote>\n<p>That's a lot (Nipkow &amp; Boehme found it was &lt; 10% on their test data), but it's known to vary from theory to theory. SPASS is usually run with the SOS (set of support) strategy, which might make it less likely that it finds (untyped) contradictions between the included facts.</p>\n<blockquote>\n<p>If you enable fuil_types, you need around 5 times more CPU time to arrive to the same results (again just considering this domain, I did the test 2 years ago), so in the end it is worth to get some ill-typed results that you can sieve out quickly.</p>\n</blockquote>\n<p>And have you tried playing with the \"no_atp\" (previously \"noatp\") attribute? Unsound proofs tend to always involve the same facts, and using this tag you can instruct Sledgehammer to leave them out. Alternatively, with 2009-2, you can try the syntax</p>\n<p>sledgehammer (del: evil_facts_go_here)</p>\n<p>We haven't given up all hopes of coming up with a sound (or at least sounder) yet efficient encoding for Sledgehammer, but in the meantime these are the workarounds.</p>\n<p>Regards,</p>\n<p>Jasmin</p>",
+        "id": 294118985,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660839185
+    },
+    {
+        "content": "<p>From: Jean Martina &lt;<a href=\"mailto:Jean.Martina@cl.cam.ac.uk\">Jean.Martina@cl.cam.ac.uk</a>&gt;<br>\nThis number i cited above is a specific case where sledgehammer need to deal with the analz function. Probably it does not have anything to do with Sledgehammer, but with the way things are thrown to it.  I noticed that the rate of success of sledgehammer is dependent on the way you generate and prepare the subgoals to be sledgehammered. </p>\n<p>Jean</p>",
+        "id": 294119001,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660839189
+    },
+    {
+        "content": "<p>From: Denis Butin &lt;<a href=\"mailto:denis.butin@gmail.com\">denis.butin@gmail.com</a>&gt;<br>\nHi all,</p>\n<p>Thank you for those helpful answers.</p>\n<p>Simon: I saw your presentation at FLOC and found the framework very<br>\ninteresting; however, for my protocol I had to modify Public.thy and<br>\nEvent.thy, so this might be a problem. What do you think?</p>\n<p>Jasmin: I tried sledgehammer [full_types], but unfortunately it timed<br>\nout even with a limit of 10 minutes.</p>\n<p>Larry: Thanks, this is helpful. I was able to conclude the proof with<br>\npushes and insert_absorb. The only problem that remains is that to do<br>\nthis, I had to allow the Spy to have initial knowledge of all public<br>\nkeys, which I didn't assume initially for this particular setting.<br>\nIdeally, I would like to find a way to go from</p>\n<p>Nonce NC \\&lt;in&gt; analz (insert (Key (pubK Aa)) (knows Spy evsp1))<br>\nto<br>\nNonce NC \\&lt;in&gt; analz (insert (knows Spy evsp1))</p>\n<p>that would only use the fact that a pubK can never decode a ciphertext<br>\nencrypted with another pubK. privateKey_neq_publicKey seems a nice<br>\ncandidate for this, but I seem to need something additional.</p>\n<p>Jean: I'll send you an email then.</p>\n<p>Kind regards,<br>\nDenis</p>",
+        "id": 294119020,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660839197
+    },
+    {
+        "content": "<p>From: Lawrence Paulson &lt;<a href=\"mailto:lp15@cam.ac.uk\">lp15@cam.ac.uk</a>&gt;<br>\nIf it is plausible that the spy could possess this particular public key, then it's unrealistic to assume he doesn't. So it makes sense to assume that he possesses all public keys. And it will make the proof very much simpler. To do what you want for a key that isn't known to the spy requires a full-blown confidentiality proof, which is a big deal.</p>\n<p>Larry Paulson</p>",
+        "id": 294119047,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660839208
+    },
+    {
+        "content": "<p>From: Simon Meier &lt;<a href=\"mailto:iridcode@gmail.com\">iridcode@gmail.com</a>&gt;<br>\nHi Denis,</p>\n<p>Simon: I saw your presentation at FLOC and found the framework very</p>\n<blockquote>\n<p>interesting; however, for my protocol I had to modify Public.thy and<br>\nEvent.thy, so this might be a problem. What do you think?</p>\n</blockquote>\n<p>Hmm, it depends on the changes. The question is, if you can model your<br>\nprotocol as a set of linear roles and if you can evaluate your security<br>\nproperty over the state our security protocol model provides. If yes, then<br>\nour framework might be of quite some help to you. Otherwise, your problem<br>\nmight be amenable (in the future) to the generalization of the protocol<br>\nmodel that I am working on.</p>\n<p>In any case, I would be very interested in seeing the protocol you are<br>\ninvestigating in order to guide me where the put my resources. For example<br>\nin the form of your source files. If you'd have an informal description of<br>\nthe protocol, then this would probably help me understand your sources.</p>\n<p>best regards,<br>\nSimon</p>",
+        "id": 294119093,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660839225
+    }
+]

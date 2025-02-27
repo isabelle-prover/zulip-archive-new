@@ -1,0 +1,32 @@
+[
+    {
+        "content": "<p>From: Ondřej Kunčar &lt;<a href=\"mailto:kuncar@in.tum.de\">kuncar@in.tum.de</a>&gt;<br>\nHi.<br>\nRecently I've experienced a bit odd behavior of schematic_lemma.<br>\nLet's consider this minimal example:</p>\n<p>schematic_lemma surprise:<br>\n\"?A ⟹ ?B ⟹ ?C\"<br>\nproof -<br>\n   fix a1 :: 'a<br>\n   fix a2 :: 'a<br>\n   fix A :: \"'a set\"<br>\n   show \"a1 ∈ A ⟹ a2 ∈ A ⟹ a1 = a1 ∧ a2 = a2\" by auto<br>\nqed</p>\n<p>Then what I get as a lemma surprise is the following theorem:<br>\n?a1.0 ∈ ?A ⟹ ?B ⟹ ?a1.0 = ?a1.0 ∧ ?a1.0 = ?a1.0</p>\n<p>That hints that a2 ∈ A got somehow unified against a1 ∈ A and is not <br>\nused any more as an assumption. Thus I get a more special theorem than I <br>\nwanted to have.</p>\n<p>I guess I am going to get the canonical answer: \"it has never been <br>\nintended to be used like that\" but I am wondering anyway if there is an <br>\neasy way to make schematic_lemma working for this kind of situations.</p>\n<p>Ondrej</p>",
+        "id": 294239621,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660906389
+    },
+    {
+        "content": "<p>From: Lars Noschinski &lt;<a href=\"mailto:noschinl@in.tum.de\">noschinl@in.tum.de</a>&gt;<br>\nNot that it helps in your concrete case, but using meta implication in <br>\nshow will often get you unexpected results and is thus best avoided (by <br>\nusing assume instead).</p>\n<p>-- Lars</p>",
+        "id": 294239631,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660906395
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nI am still trying to see what you are trying to do, to understand better <br>\nfrom where the actual surprise is coming from.</p>\n<p>Maybe it is just a misunderstanding about the scope of a1, a2, A.  As <br>\nwritten above, they become arbitrary in the goal context, and unification <br>\ngets lots of freedom -- the details of it are explained in the usual <br>\nfoundational papers about Isabelle/Pure and Isar.</p>\n<p>This one might be closer to what you intend:</p>\n<p>schematic_lemma no_surprise:<br>\n   fixes a1 :: 'a<br>\n   fixes a2 :: 'a<br>\n   fixes A :: \"'a set\"<br>\n   shows \"?A ⟹ ?B ⟹ ?C\"<br>\nproof -<br>\n   assume \"a1 ∈ A\" and \"a2 ∈ A\"<br>\n   then show \"a1 = a1 ∧ a2 = a2\" by auto<br>\nqed</p>\n<p>Makarius</p>",
+        "id": 294239650,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660906402
+    },
+    {
+        "content": "<p>From: Brian Huffman &lt;<a href=\"mailto:huffman.brian.c@gmail.com\">huffman.brian.c@gmail.com</a>&gt;<br>\nI don't have any workaround to offer, but I think I can explain the<br>\ncurrent behavior.</p>\n<p>Step 1: When you prove the goal using \"show\", this proposition is<br>\nimmediately generalized over a1, a2 and A (i.e. it is \"exported\"). You<br>\ncan see the exported result in the goals buffer:</p>\n<p>Successful attempt to solve goal by exported rule:<br>\n  ?a1.2 ∈ ?A2 ⟹ ?a2.2 ∈ ?A2 ⟹ ?a1.2 = ?a1.2 ∧ ?a2.2 = ?a2.2</p>\n<p>Step 2: The exported rule is applied to the first matching goal in the<br>\ncurrent proof state. The new proof state is not shown by default, but<br>\nyou can see it by inserting a \"next\" before the \"qed\":</p>\n<p>goal (2 subgoals):</p>\n<ol>\n<li>⟦?A; ?B⟧ ⟹ ?a1.8 ∈ ?A8</li>\n<li>⟦?A; ?B⟧ ⟹ ?a2.8 ∈ ?A8</li>\n</ol>\n<p>Applying the exported rule usually discharges a goal, but in this case<br>\nit has introduced two new ones! This is what happens when you use<br>\nmeta-implication with \"show\", as has been discussed several times<br>\nbefore:</p>\n<p><a href=\"https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2009-April/msg00052.html\">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2009-April/msg00052.html</a><br>\n<a href=\"https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2009-September/msg00044.html\">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2009-September/msg00044.html</a><br>\n<a href=\"https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2009-December/msg00043.html\">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2009-December/msg00043.html</a><br>\n<a href=\"https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2010-November/msg00022.html\">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2010-November/msg00022.html</a></p>\n<p>Step 3: Processing \"qed\" causes all remaining subgoals to be solved by<br>\nassumption. Solving goal 1 unifies ?A with \"?a1.8 ∈ ?A8\", leaving goal<br>\n2 looking something like this:</p>\n<p>⟦?a1.8 ∈ ?A8; ?B⟧ ⟹ ?a2.8 ∈ ?A8</p>\n<p>Now it unifies the conclusion with the first matching assumption, so<br>\n?a1.8 gets unified to ?a2.8. Finally this results in the surprising<br>\ntheorem you found.</p>\n<p>Hope this helps,</p>\n<ul>\n<li>Brian</li>\n</ul>",
+        "id": 294239717,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660906434
+    },
+    {
+        "content": "<p>From: Ondřej Kunčar &lt;<a href=\"mailto:kuncar@in.tum.de\">kuncar@in.tum.de</a>&gt;<br>\nOK, this really sheds light on what happens there.<br>\nThanks Brian.</p>\n<p>Ondrej</p>",
+        "id": 294239791,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660906451
+    }
+]

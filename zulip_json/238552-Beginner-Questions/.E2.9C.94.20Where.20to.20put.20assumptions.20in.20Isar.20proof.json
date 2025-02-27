@@ -1,0 +1,38 @@
+[
+    {
+        "content": "<p>Hello,</p>\n<p>I am trying to prove the following lemma to aid in a later theorem:</p>\n<div class=\"codehilite\"><pre><span></span><code>lemma char_of_symmetric: &quot;((of_char (char_of n))::nat) = n&quot; (is &quot;?P n&quot;)\nproof (induction n)\n  case 0\n  show ?case by auto\nnext\n  fix n assume &quot;?P n&quot;\n  thus &quot;?P (Suc n)&quot; by simp\nqed\n</code></pre></div>\n<p>(<code>of_char</code> and <code>char_of</code> come from the <code>Show.Show_Instances</code> theory)</p>\n<p>After this, the proof state has 1 subgoal remaining:</p>\n<div class=\"codehilite\"><pre><span></span><code>1. n mod 256 = n ⟹ Suc n mod 256 = Suc n\n</code></pre></div>\n<p>I believe this <code>mod 256</code> is coming from the fact that the Isabelle <code>char</code> and <code>string</code> implementation implements UTF-8, which sets this limit on character code digits (I'm not a UTF-8 expert, but this seems plausible).</p>\n<p>In my case, I am serializing single digits, so I know that <code>n</code> here will always be <code>&lt; 10</code>. Where can I put this assumption to hopefully get this proof goal to be discharged?</p>\n<p>I have tried <code>fix n assume \"n &lt; 10 /\\ (?P n)\"</code>, and I've tried <code>assume \"n &lt; 10\"</code> at the beginning of the proof, before all case analyses. I am always met with a syntax error, or the errors:  \"Illegal application of proof command in \"state\" mode.\"</p>\n<p>Any tips here?</p>",
+        "id": 262213720,
+        "sender_full_name": "Alex Weisberger",
+        "timestamp": 1637455597
+    },
+    {
+        "content": "<p>I made some progress by re-reading the \"Structured Lemma Statements\" section of Concrete Semantics:</p>\n<div class=\"codehilite\"><pre><span></span><code>lemma char_of_symmetric:\n  assumes single_digit: &quot;(n::nat) &lt; 10&quot;\n  shows &quot;((of_char (char_of n))::nat) = n&quot; (is &quot;?P n&quot;)\nproof (induction n)\n  case 0\n  show ?case by auto\nnext\n  fix n assume &quot;(?P n)&quot;\n  with single_digit show &quot;?P (Suc n)&quot; by simp\nqed\n</code></pre></div>\n<p>I think adding the assumption <code>single_digit</code> at the top level makes sense, though it doesn't seem to actually apply the assumption unless I use <code>with single_digit_show</code> (which is slightly surprising). Even still, I'm left with this final proof goal:</p>\n<p><code>1. n &lt; 10 ⟹ n mod 256 = n ⟹ Suc n mod 256 = Suc n</code></p>\n<p>This looks to me like a true statement - <code>n mod 256 = n</code> if <code>n &lt; 10</code>. I even proved that in a separate lemma to double check, though it required some casting which might be the source of the issue:</p>\n<div class=\"codehilite\"><pre><span></span><code>lemma &quot;(n::nat) &lt; 10 ⟹ n mod 256 = n&quot;\n  by auto\n\n(* This is correctly proven *)\n</code></pre></div>\n<p>So, I'm not sure how to discharge this final goal.</p>",
+        "id": 262221295,
+        "sender_full_name": "Alex Weisberger",
+        "timestamp": 1637469289
+    },
+    {
+        "content": "<p>you are missing an <code>using assms</code> before the <code>proof (induction n)</code></p>",
+        "id": 262225917,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1637477927
+    },
+    {
+        "content": "<p>Assuming the constants<code>of_char</code> and <code>char_of</code> come from <code>HOL.String</code>, a relevant lemma can be found through <code>find_theorems of_char char_of</code>:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"n\">String.unique_euclidean_semiring_with_bit_shifts_class.of_char_of</span><span class=\"o\">:</span>\n    <span class=\"n\">of_char</span> <span class=\"o\">(</span><span class=\"n\">char_of</span> <span class=\"o\">?</span><span class=\"n\">a</span><span class=\"o\">)</span> <span class=\"o\">=</span> <span class=\"o\">?</span><span class=\"n\">a</span> <span class=\"n\">mod</span> <span class=\"n\">256</span>\n</code></pre></div>\n<p>In particular, this lemma has been declared as a simplification rule, so that we don't need to invoke it explicitly. Your intended lemma should be provable without induction:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">lemma</span>\n  <span class=\"kp\">assumes</span> <span class=\"s\">\"n&lt;256\"</span>\n  <span class=\"kp\">shows</span> <span class=\"s\">\"((of_char (char_of n))::nat) = n\"</span>\n  <span class=\"k\">using</span> <span class=\"n\">assms</span> <span class=\"k\">by</span> <span class=\"n\">auto</span>\n</code></pre></div>",
+        "id": 262235534,
+        "sender_full_name": "Wenda Li",
+        "timestamp": 1637493592
+    },
+    {
+        "content": "<p><code>using assms</code> worked - here is the final proof:</p>\n<div class=\"codehilite\"><pre><span></span><code>lemma char_of_symmetric:\n  fixes n :: nat\n  assumes &quot;n &lt; 10&quot;\n  shows &quot;of_char (char_of n) = n&quot;\n  using assms\nproof (induction n)\n  case 0\n  show ?case by auto\nnext\n  case (Suc n)\n  then show ?case by auto\nqed\n</code></pre></div>\n<p>I also didn't know about <code>find_theorems</code>, so that is very helpful. I just wanted to carry the proof out myself for learning purposes, but obviously I want to use existing theorems as much as possible.</p>\n<p>Thanks everyone!</p>",
+        "id": 262240017,
+        "sender_full_name": "Alex Weisberger",
+        "timestamp": 1637500145
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"459086\">Alex Weisberger</span> has marked this topic as resolved.</p>",
+        "id": 262241055,
+        "sender_full_name": "Notification Bot",
+        "timestamp": 1637501686
+    }
+]

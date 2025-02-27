@@ -1,0 +1,32 @@
+[
+    {
+        "content": "<p>From: Andreas Lochbihler &lt;<a href=\"mailto:andreas.lochbihler@inf.ethz.ch\">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>\nDear all,</p>\n<p>I am trying to replace the quotient package (by Cezary and Urban) with <br>\nlifting and transfer for the theory TLList in AFP-Coinductive. When I <br>\ninvoke transfer on the new coinduction rule for tllist_all2 (see below), <br>\nthe second subgoal is</p>\n<p>\"Transfer.Rel<br>\n      (((cr_tllist ===&gt; cr_tllist ===&gt; op =) ===&gt; op =) ===&gt; op =) ?a76<br>\n      transfer_forall\"</p>\n<p>and the first one is cluttered with transfer_forall and <br>\ntransfer_implies. Can anyone knowledgable please help me in figuring out <br>\nwhat ?a76 should be? I hope that there's a canonical solution. I can <br>\nalso try to produce a smaller example but have failed so far.</p>\n<p>lemma tllist_all2_coinduct:<br>\n   assumes \"X xs ys\"<br>\n   and \"!!xs ys. X xs ys ==&gt;<br>\n   (is_TNil xs = is_TNil ys) &amp;<br>\n   (is_TNil xs --&gt; is_TNil ys --&gt; R (terminal xs) (terminal ys)) &amp;<br>\n   (~ is_TNil xs --&gt; ~ is_TNil ys<br>\n    --&gt; P (thd xs) (thd ys) &amp;<br>\n        (X (ttl xs) (ttl ys) | tllist_all2 P R (ttl xs) (ttl ys)))\"<br>\n   shows \"tllist_all2 P R xs ys\"<br>\nusing assms<br>\napply transfer</p>\n<p>Some more data on the setup:</p>\n<p>definition cr_tllist :: \"('a llist * 'b) =&gt; ('a, 'b) tllist =&gt; bool\"<br>\n   where \"cr_tllist = (%(xs, b) ys. tllist_of_llist b xs = ys)\"</p>\n<p>lemma Quotient_tllist:<br>\n   \"Quotient (%(xs, a) (ys, b). xs = ys &amp; (lfinite ys --&gt; a = b))<br>\n      (%(xs, a). tllist_of_llist a xs)<br>\n      (%ys. (llist_of_tllist ys, terminal ys))<br>\n      cr_tllist\"</p>\n<p>lemma reflp_tllist:<br>\n   \"reflp (%(xs, a) (ys, b). xs = ys &amp; (lfinite ys --&gt; a = b))\"</p>\n<p>setup_lifting (no_code) Quotient_tllist reflp_tllist</p>\n<p>Thanks in advance for any pointers,<br>\nAndreas</p>",
+        "id": 294238246,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660905770
+    },
+    {
+        "content": "<p>From: Ondřej Kunčar &lt;<a href=\"mailto:kuncar@in.tum.de\">kuncar@in.tum.de</a>&gt;<br>\nI'll take a look at it. Could please send me a self-contained file? Thanks.</p>\n<p>Ondrej</p>",
+        "id": 294238266,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660905782
+    },
+    {
+        "content": "<p>From: Ondřej Kunčar &lt;<a href=\"mailto:kuncar@in.tum.de\">kuncar@in.tum.de</a>&gt;<br>\nOK. The rule you are looking for already exists. It's called <br>\nDomainp_forall_transfer:<br>\n   assumes \"right_total A\"<br>\n   shows \"((A ===&gt; op =) ===&gt; op =)<br>\n     (transfer_bforall (Domainp A)) transfer_forall\"</p>\n<p>But the transfer method has to be able to prove that A is right_total, <br>\nwhich didn't happen in your case. The reason is that you didn't prove <br>\nthese properties about your relator llist_all2:<br>\nlemma[transfer_rule]: \"right_total A ==&gt; right_total (llist_all2 A)\" sorry<br>\nlemma[transfer_rule]: \"right_unique A ==&gt; right_unique (llist_all2 A)\" sorry</p>\n<p>You were already warned in the setup_lifting:<br>\nNon-trivial assumptions in right_unique transfer rule found: <br>\nright_unique (llist_all2 ?T5).<br>\nNon-trivial assumptions in right_total transfer rule found: right_total <br>\n(llist_all2 ?T5).</p>\n<p>This error message comes from a big patch of Lifitng, which I pushed on <br>\nFriday, so there is not any documentation to it yet (explaining what to <br>\ndo in this situation). That's an disadvantage of the development version.</p>\n<p>In general, you might want to take a look to <br>\nHOL/Library/Quotient_List.thy and get an inspiration what should be <br>\nproved about your \"list\" type.</p>\n<p>Hope this helps.<br>\nOndrej</p>",
+        "id": 294238310,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660905803
+    },
+    {
+        "content": "<p>From: Andreas Lochbihler &lt;<a href=\"mailto:andreas.lochbihler@inf.ethz.ch\">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>\nDear Ondřej,</p>\n<p>Thanks a lot for looking into this. It now works fine.<br>\nBut I still don't understand what all these attributes do. In <br>\nLibrary/Quotient_List, e.g., list_left_total is declared as <br>\nreflexivity_rule, but list_right_total as transfer_rule. Is that meant <br>\nto be that way?</p>\n<p>Best,<br>\nAndreas</p>",
+        "id": 294238339,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660905825
+    },
+    {
+        "content": "<p>From: Ondřej Kunčar &lt;<a href=\"mailto:kuncar@in.tum.de\">kuncar@in.tum.de</a>&gt;<br>\nYes, it is meant that way. We don't have any proper left_total relations <br>\nthus this rule is not registered as a transfer rule: all correspondence <br>\nrelations for quotients (or subtypes) are at least right_total and <br>\nright_unique. It might happen that somebody in future will try to use <br>\ntransfer with proper left_total and left_unique relations but nobody has <br>\ncome up with an example so far.</p>\n<p>But this rule is used to prove that assumptions of abstraction function <br>\nequations (f.abs_eq generated by lift_definition) holds (i.e., R x x <br>\nholds). It's namely used when you have to prove that a composition of <br>\nquotients yields a reflexive relation; then you have to prove that the <br>\nouter relation is left_total. See the theorem reflp_Quotient_composition.</p>\n<p>Ondrej</p>",
+        "id": 294238575,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660905929
+    }
+]

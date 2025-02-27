@@ -1,0 +1,122 @@
+[
+    {
+        "content": "<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">lemma</span><span class=\"w\"> </span><span class=\"n\">Dummy</span><span class=\"o\">:</span><span class=\"w\"> </span><span class=\"n\">True</span><span class=\"w\"> </span><span class=\"ow\">..</span><span class=\"w\"></span>\n<span class=\"kn\">lemma</span><span class=\"w\"> </span><span class=\"n\">X</span><span class=\"w\"> </span><span class=\"k\">using</span><span class=\"w\"> </span><span class=\"n\">Dummy</span><span class=\"w\"> </span><span class=\"kp\">apply</span><span class=\"w\"> </span><span class=\"n\">simp</span><span class=\"o\">+</span><span class=\"w\"></span>\n</code></pre></div>\n<p>In the above <code>simp+</code> loops infinitely. It appears to be related to pulling the <code>True</code> premise from wherever <code>using</code> puts them into the regular premises of the goal beacause <code>apply - apply simp+</code> works as expected. The problem appears to depend on how exactly the <code>Dummy</code> lemma looks. There is no problem in the following</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">definition</span><span class=\"w\"> </span><span class=\"s\">\"A ≡ True\"</span><span class=\"w\"></span>\n<span class=\"kn\">lemma</span><span class=\"w\"> </span><span class=\"n\">Dummy</span><span class=\"o\">:</span><span class=\"w\"> </span><span class=\"n\">A</span><span class=\"w\"> </span><span class=\"k\">unfolding</span><span class=\"w\"> </span><span class=\"n\">A_def</span><span class=\"w\"> </span><span class=\"ow\">..</span><span class=\"w\"></span>\n<span class=\"kn\">lemma</span><span class=\"w\"> </span><span class=\"n\">X</span><span class=\"w\"> </span><span class=\"k\">using</span><span class=\"w\"> </span><span class=\"n\">Dummy</span><span class=\"w\"> </span><span class=\"kp\">apply</span><span class=\"w\"> </span><span class=\"n\">simp</span><span class=\"o\">+</span><span class=\"w\"></span>\n</code></pre></div>\n<p>I am on Isabelle 2021. Is this a known issue? Anyone have an idea how to work around this in an eisbach method? I don't want to have to type <code>apply -</code> but <code>method s = -, simp</code> does not fix the problem. Is this maybe fixed in Isabelle 2022?</p>",
+        "id": 308284851,
+        "sender_full_name": "Leander Behr",
+        "timestamp": 1667759223
+    },
+    {
+        "content": "<p>Also, what's the proper place to look for known bugs/problems in Isabelle and report them if they are unknown? I didn't find any kind of issue tracker.</p>",
+        "id": 308285045,
+        "sender_full_name": "Leander Behr",
+        "timestamp": 1667759360
+    },
+    {
+        "content": "<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"n\">supply</span><span class=\"w\"> </span><span class=\"o\">[[</span><span class=\"n\">simp_trace</span><span class=\"o\">]]</span><span class=\"w\"> </span><span class=\"k\">using</span><span class=\"w\"> </span><span class=\"n\">Dummy</span><span class=\"w\"> </span><span class=\"kp\">apply</span><span class=\"w\"> </span><span class=\"n\">simp</span><span class=\"o\">+</span><span class=\"w\"></span>\n</code></pre></div>",
+        "id": 308325955,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1667796747
+    },
+    {
+        "content": "<p><code>+</code> works by repeating a tactic until it fails</p>",
+        "id": 308325974,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1667796774
+    },
+    {
+        "content": "<p>So when does simp fail? when it has nothing to do.</p>",
+        "id": 308325998,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1667796821
+    },
+    {
+        "content": "<p>Except that simplifying Dummy <em>counts as something</em></p>",
+        "id": 308326067,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1667796876
+    },
+    {
+        "content": "<p>so simp is repeatedly simplifying the Dummy assumption. Then <code>+</code> asks simp to do the same thing again.</p>",
+        "id": 308326105,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1667796939
+    },
+    {
+        "content": "<p>This is why <code>apply -</code> works: it adds Dummy to the assumption, so <code>simp</code> can simplify only once and fails in the next iteration of <code>+</code></p>",
+        "id": 308326156,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1667796977
+    },
+    {
+        "content": "<p>So: this is exactly the expected behavior of <code>+</code> and of <code>simp</code></p>",
+        "id": 308326201,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1667797050
+    },
+    {
+        "content": "<p>I don't know what are trying to achieve, but: <code>apply (simp; fail)+</code> or <code>apply (solves simp)+</code> repeats simp as long as the goal is solved, not as long as simp can do something. This is also usually more robust than <code>simp+</code></p>",
+        "id": 308326297,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1667797163
+    },
+    {
+        "content": "<p>I use simp to do some normalizations and it's used in a loop like <code>(simp add: norm_simps | ... | ... )+</code> which forms a simple solver. Now this solver loops in the described case. I don't think I can apply your solution here because I don't expect simp to solve any goals usually.</p>",
+        "id": 308451794,
+        "sender_full_name": "Leander Behr",
+        "timestamp": 1667846988
+    },
+    {
+        "content": "<p>curiously <code>apply (-, simp+)</code>, which was my first idea for a fix, also loops</p>",
+        "id": 308452083,
+        "sender_full_name": "Leander Behr",
+        "timestamp": 1667847080
+    },
+    {
+        "content": "<p>so, <code>simp (no_asm)</code> fixes this, which would work for me, except I'm actually using </p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">method_setup</span><span class=\"w\"> </span><span class=\"n\">normalize_with_impl</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"></span>\n<span class=\"w\">  </span><span class=\"s\">‹Attrib.thms &gt;&gt;</span>\n<span class=\"s\">  (fn thms =&gt; fn ctxt =&gt;</span>\n<span class=\"s\">    SIMPLE_METHOD'</span>\n<span class=\"s\">      (simp_tac (</span>\n<span class=\"s\">        ((empty_simpset ctxt) addsimps thms)</span>\n<span class=\"s\">      )</span>\n<span class=\"s\">  ))›</span><span class=\"w\"></span>\n</code></pre></div>\n<p>because I want simp to use absolutely nothing except for my normalization rules</p>",
+        "id": 308453705,
+        "sender_full_name": "Leander Behr",
+        "timestamp": 1667847651
+    },
+    {
+        "content": "<p><code>simp only: norm_simps</code></p>",
+        "id": 308454052,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1667847761
+    },
+    {
+        "content": "<p>will use only the rule you are specifying</p>",
+        "id": 308454093,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1667847774
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"450067\">Leander Behr</span> <a href=\"#narrow/stream/202961-General/topic/simp.20looping.20on.20trivial.20goal/near/308452083\">said</a>:</p>\n<blockquote>\n<p>curiously <code>apply (-, simp+)</code>, which was my first idea for a fix, also loops</p>\n</blockquote>\n<p>you can check with <code>supply [[simp_trace]]</code> what is looping</p>",
+        "id": 308454157,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1667847799
+    },
+    {
+        "content": "<p><code>apply (-, simp+)</code> loops for the same reason as <code>simp+</code> apparently. The <code>True</code> premise is there in every invokation. <code>simp only: norm_simps</code> still solves some trivial subgoals which I don't want</p>",
+        "id": 308457629,
+        "sender_full_name": "Leander Behr",
+        "timestamp": 1667849052
+    },
+    {
+        "content": "<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kp\">apply</span><span class=\"w\"> </span><span class=\"o\">(-</span><span class=\"n\">;</span><span class=\"w\"> </span><span class=\"n\">simp</span><span class=\"o\">)</span><span class=\"w\"></span>\n</code></pre></div>",
+        "id": 308529611,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1667891757
+    },
+    {
+        "content": "<p>will apply simp on all goals exactly once</p>",
+        "id": 308529721,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1667891826
+    },
+    {
+        "content": "<p>Not sure if I'm missing something here, but why wouldn't you just use <code>simp_all</code> at that point?</p>",
+        "id": 308541678,
+        "sender_full_name": "Christoph Madlener",
+        "timestamp": 1667897812
+    }
+]
