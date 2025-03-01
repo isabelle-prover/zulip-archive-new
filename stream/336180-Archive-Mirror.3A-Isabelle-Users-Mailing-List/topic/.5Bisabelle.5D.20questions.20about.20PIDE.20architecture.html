@@ -1,0 +1,229 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] questions about PIDE architecture · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20questions.20about.20PIDE.20architecture.html">[isabelle] questions about PIDE architecture</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294326251"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20questions%20about%20PIDE%20architecture/near/294326251" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20questions.20about.20PIDE.20architecture.html#294326251">(Aug 19 2022 at 17:03)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On Thu, 19 Feb 2015, Walther Neuper wrote:</p>
+<blockquote>
+<p>But may I ask for "notes on PIDE architecture" ?</p>
+<p>In PIDE communication between Java (i.e. Isabelle/jEdit) and Isabelle/Scala <br>
+seems straight forward, because both run in the same JRE.<br>
+But how is communication between Isabelle/Scala and Isabelle/ML possible?</p>
+</blockquote>
+<p>This question might sound trivial to some people, but I have struggled <br>
+with the problem over many years, to make it really really work -- <br>
+robustly, efficiently, portably.</p>
+<p>There is a brief sketch on "PIDE Protocol Layers" in my ITP-2014 paper:</p>
+<p>Makarius Wenzel. Asynchronous User Interaction and Tool Integration in<br>
+   Isabelle/PIDE. In G. Klein and R. Gamboa, editors, Interactive Theorem<br>
+   Proving (ITP 2014). 2014. Springer, LNCS 8558.</p>
+<p><a href="http://www4.in.tum.de/~wenzelm/papers/itp-pide.pdf">http://www4.in.tum.de/~wenzelm/papers/itp-pide.pdf</a></p>
+<p>The relevant text is cited here for convenience:</p>
+<p>\para{PIDE Protocol Layers.}  Conceptually, the two processes are<br>
+   connected by two independent streams of \emph{protocol functions}.<br>
+   These streams are essentially symmetric, but input from the editor<br>
+   to the prover is called \emph{protocol command}, and output from the<br>
+   prover to the editor is called \emph{protocol message}.<br>
+   Syntactically, a protocol function consists of a name and argument<br>
+   list (arbitrary strings).  Semantically, the stream of protocol<br>
+   functions is applied consecutively to a private \emph{protocol<br>
+   state} on each side; there are extensible tables in Isabelle/Scala<br>
+   and Isabelle/ML to define the meaning for protocol functions.</p>
+<p>The arguments of protocol functions usually consist of algebraic<br>
+   datatypes (tuples and recursive variants). This well-known ML<br>
+   concept is represented in Scala by case classes<br>
+   \cite[\S7.2]{Scala:2004}.  The PIDE implementation starts out with<br>
+   raw byte streams between the processes, then uses YXML transfer<br>
+   syntax for untyped XML trees \cite[\S2.3]{Wenzel:2011:CICM}, and<br>
+   finally adds structured XML/ML data representation via some<br>
+   combinator library.  Further details are explained in<br>
+   \cite{Wenzel:2013:CoqPIDE}, including a full implementation on a few<br>
+   pages of OCaml; the Standard ML version is part of Isabelle/PIDE.<br>
+   This elementary PIDE protocol stack is easily ported to other<br>
+   functional languages to connect different back-ends, but actual<br>
+   document-oriented interaction requires further reforms of the<br>
+   prover.</p>
+<p>See also the included fragment of some slides that explain that (and a bit <br>
+more).</p>
+<p>The citation Wenzel:2013:CoqPIDE is here: <a href="http://arxiv.org/abs/1304.6626">http://arxiv.org/abs/1304.6626</a> <br>
+-- it explains more things in a prover-agnostic fashion.</p>
+<blockquote>
+<p>Over the years watching the advent of *.scala in ~~/src/Pure/ I imagined some <br>
+magic about the parallelism between the *.scala files and the *.ML files. But <br>
+in</p>
+<p><a href="https://github.com/larsrh/libisabelle/tree/master/pide-core/src/main/scala">https://github.com/larsrh/libisabelle/tree/master/pide-core/src/main/scala</a></p>
+<p>there are some directories from ~~/src/Pure/, and all of the copied <br>
+directories contain exact copies of all the *.scala files and while dropping <br>
+all *.ML files.</p>
+<p>So, where comes communication between Isabelle/Scala and Isabelle/ML from?</p>
+</blockquote>
+<p>As long as these are exact copies of the Isabelle/Pure Scala files, and <br>
+used in a suitable environment of properties and/or process variables, <br>
+they will magically work with an Isabelle/ML process that expects exactly <br>
+that communication scheme.</p>
+<p>In Isabelle/Eclipse, Andrius Velykis has made his own clone of basic PIDE <br>
+functionality, although with some actual changes managed in a systematic <br>
+way.</p>
+<p>In the longer run, we need to draw further conclusions from practical <br>
+experience with such derivatice projects.  Somehow the idea of modularity <br>
+seems to be very weak in the JVM world, and Isabelle/Java/Scala does not <br>
+make this easier for mainstream project and package management tools out <br>
+there.  (It only makes it very easy for an Isabelle-only environment, as <br>
+explained for "isabelle scalac" in the "system" manual.)</p>
+<p>Makarius<br>
+<a href="/user_uploads/14278/viw-aMjDJ3FmsfnePLJplLrI/pide-protocol.pdf">pide-protocol.pdf</a></p>
+
+
+
+<a name="294326273"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20questions%20about%20PIDE%20architecture/near/294326273" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20questions.20about.20PIDE.20architecture.html#294326273">(Aug 19 2022 at 17:03)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;</p>
+<blockquote>
+<p>As long as these are exact copies of the Isabelle/Pure Scala files, and<br>
+used in a suitable environment of properties and/or process variables,<br>
+they will magically work with an Isabelle/ML process that expects<br>
+exactly that communication scheme.</p>
+</blockquote>
+<p>Those files are indeed exact copies.</p>
+<blockquote>
+<p>In the longer run, we need to draw further conclusions from practical<br>
+experience with such derivatice projects.  Somehow the idea of<br>
+modularity seems to be very weak in the JVM world, and<br>
+Isabelle/Java/Scala does not make this easier for mainstream project and<br>
+package management tools out there.  (It only makes it very easy for an<br>
+Isabelle-only environment, as explained for "isabelle scalac" in the<br>
+"system" manual.)</p>
+</blockquote>
+<p>I don't think modularity in the Java ecosystem is significantly weaker<br>
+than anywhere else. The problem with system integration in Isabelle is<br>
+that Isabelle has "high gravity", i.e. it usually assumes that<br>
+applications are centered around Isabelle. From that point of view, it<br>
+also makes sense that Isabelle/Scala observes ML coding conventions wrt<br>
+naming and architecture. With the rise of the document model, new<br>
+applications become possible, some of which can't (or don't want to)<br>
+adhere to that world view.</p>
+<p>So far, I know of two major applications where significant development<br>
+effort has been spent to integrate Isabelle into existing software:</p>
+<ul>
+<li>Isabelle/Eclipse with Eclipse being the "center of the universe"</li>
+<li>Clide [0] with a Play! web application</li>
+</ul>
+<p>(There's also Leon+Isabelle, but that was more of a "proof of concept".)</p>
+<p>The Isabelle integration in Clide works almost exactly in the same way<br>
+as libisabelle: They copied the Isabelle/Pure JAR into some suitable<br>
+'lib' directory. (Taking a JAR instead of the full sources has the<br>
+disadvantage that cross-compiling against different versions of Scala is<br>
+ruled out, and that the Scala version for Clide must be the same as the<br>
+Scala version for Isabelle.)</p>
+<p>I think it is fair to say that we already have practical experience. It<br>
+might be worth getting feedback from Clide's authors (not sure if they<br>
+read this mailing list) [1].</p>
+<p>But all this brings me back to my original point: Modularity. It would<br>
+be entirely possible to ship an "official" JAR file with some metadata<br>
+(in Java lingo: "artifact") to a repository. Integrating Isabelle into a<br>
+Scala application then becomes a matter of one line in the build definition:</p>
+<p>libraryDependencies += "de.tum.in.isabelle" %% "pide" % "2014"</p>
+<p>Of course, the PIDE sources would need to be enriched with functionality<br>
+to fetch an Isabelle distribution, unpack it, and build the required<br>
+components in a way that doesn't require shell scripts or Perl. (I have<br>
+that on my agenda.)</p>
+<p>Cheers<br>
+Lars</p>
+<p>[0] &lt;<a href="http://clide.flatmap.net/login">http://clide.flatmap.net/login</a>&gt;<br>
+[1] their paper at ITP'14 is also quite interesting: Christoph Lüth,<br>
+Martin Ring: "Collaborative Interactive Theorem Proving with Clide"</p>
+
+
+
+<a name="294328508"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20questions%20about%20PIDE%20architecture/near/294328508" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20questions.20about.20PIDE.20architecture.html#294328508">(Aug 19 2022 at 17:17)</a>:</h4>
+<p>From: Walther Neuper &lt;<a href="mailto:wneuper@ist.tugraz.at">wneuper@ist.tugraz.at</a>&gt;<br>
+I see, you have found a way to replace IDEs' "run configurations", and I <br>
+had the opportunity so see that used on your laptop efficiently such <br>
+that I never could follow what is going on ;-))</p>
+<p>But may I ask for "notes on PIDE architecture" ?</p>
+<p>In PIDE communication between Java (i.e. Isabelle/jEdit) and <br>
+Isabelle/Scala seems straight forward, because both run in the same JRE.<br>
+But how is communication between Isabelle/Scala and Isabelle/ML possible?</p>
+<p>Over the years watching the advent of *.scala in ~~/src/Pure/ I imagined <br>
+some magic about the parallelism between the *.scala files and the *.ML <br>
+files. But in</p>
+<p><a href="https://github.com/larsrh/libisabelle/tree/master/pide-core/src/main/scala">https://github.com/larsrh/libisabelle/tree/master/pide-core/src/main/scala</a></p>
+<p>there are some directories from ~~/src/Pure/, and all of the copied <br>
+directories contain exact copies of all the *.scala files and while <br>
+dropping all *.ML files.</p>
+<p>So, where comes communication between Isabelle/Scala and Isabelle/ML from?</p>
+<p>Walther</p>
+
+
+
+<a name="294328543"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20questions%20about%20PIDE%20architecture/near/294328543" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20questions.20about.20PIDE.20architecture.html#294328543">(Aug 19 2022 at 17:17)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;</p>
+<blockquote>
+<p>In PIDE communication between Java (i.e. Isabelle/jEdit) and <br>
+Isabelle/Scala seems straight forward, because both run in the same <br>
+JRE. But how is communication between Isabelle/Scala and Isabelle/ML <br>
+possible?</p>
+</blockquote>
+<p>I don't understand all low-level details myself, but a useful intuition<br>
+is that the JVM spawns a prover process and then exchanges XML trees<br>
+with it. This mechanism is extensible: Both processes speak a common<br>
+protocol for process management (e.g. jEdit can tell the prover "here's<br>
+an updated document", to which the prover replies "annotate this piece<br>
+of text with a warning message"), but users can extend the communication<br>
+with custom messages. These XML messages are transmitted via the<br>
+intermediate "YXML" format which is a space-efficient representation of<br>
+most of XML. A reasonable summary of this is "a custom IPC protocol".</p>
+<p>The low-level implementation can be found in the files<br>
+'System/system_channel.scala' and 'System/system_channel.ML'. In<br>
+Isabelle2014, this is done with FIFOs or sockets (depending on the OS),<br>
+but the current development version uses sockets exclusively.</p>
+<blockquote>
+<p>Over the years watching the advent of *.scala in ~~/src/Pure/ I <br>
+imagined some magic about the parallelism between the *.scala files <br>
+and the *.ML files.</p>
+</blockquote>
+<p>Conceptually, the Scala files are not required for running the prover<br>
+process. They merely provide one way to interact with it. On the other<br>
+side, the JVM process doesn't need the ML file to do whatever it's<br>
+doing. Files of both languages could be separated without any problems<br>
+(it wouldn't even complicate the build of Isabelle).</p>
+<p>The reason why both sources are being kept together is because there's<br>
+some symmetry which can be exploited. Some modules (e.g. XML processing,<br>
+graph algorithms) are actually the same in both languages so that it<br>
+makes sense to keep them together.</p>
+<blockquote>
+<p>But in</p>
+<p><a href="https://github.com/larsrh/libisabelle/tree/master/pide-core/src/main/scala">https://github.com/larsrh/libisabelle/tree/master/pide-core/src/main/scala</a></p>
+<p>there are some directories from ~~/src/Pure/, and all of the copied <br>
+directories contain exact copies of all the *.scala files and while <br>
+dropping all *.ML files.</p>
+</blockquote>
+<p>I could've just taken the 'Pure.jar' file unmodified from Isabelle and<br>
+used that. There are two reasons against this:<br>
+1) I wouldn't be able to cross-compile 'libisabelle' against different<br>
+Scala versions, since 'Pure.jar' would be fixed to whatever Scala<br>
+version is currently used in Isabelle.<br>
+2) I would include some extra dependencies (e.g. Scala Swing) which are<br>
+not needed for a non-GUI library.</p>
+<p>I did that for my work on Isabelle integration with Leon, but figured<br>
+that there ought to be a better way. Copying source files is also what<br>
+Andrius Velykis did for isabelle-eclipse.</p>
+<p>Cheers<br>
+Lars<br>
+<a href="/user_uploads/14278/NwgCMsnELZa1-otJX8mAHsfw/smime.p7s">smime.p7s</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

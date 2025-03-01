@@ -1,0 +1,226 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Query about the transfer method · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Query.20about.20the.20transfer.20method.html">[isabelle] Query about the transfer method</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294294697"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Query%20about%20the%20transfer%20method/near/294294697" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Query.20about.20the.20transfer.20method.html#294294697">(Aug 19 2022 at 15:50)</a>:</h4>
+<p>From: Wenda Li &lt;<a href="mailto:wl302@cam.ac.uk">wl302@cam.ac.uk</a>&gt;<br>
+Dear Isabelle experts,</p>
+<p>I have defined a function to convert rational polynomials to real ones, <br>
+and want to prove this function respects some other operations on <br>
+polynomials.</p>
+<p>theory Scratch1<br>
+   imports Complex_Main "~~/src/HOL/Library/Polynomial"<br>
+begin</p>
+<p>lift_definition real_poly:: "rat poly ⇒ real poly" is<br>
+  "%p. real_of_rat o p " unfolding almost_everywhere_zero_def by auto</p>
+<p>lemma real_poly_plus: "real_poly (p + q) = real_poly p + real_poly q"<br>
+   (<em>apply transfer</em>)<br>
+using real_poly.rep_eq Rat.of_rat_add by (intro poly_eqI,auto)</p>
+<p>end</p>
+<p>Although the lemma real_poly_plus can be proved by "using <br>
+real_poly.rep_eq Rat.of_rat_add by (intro poly_eqI,auto)", I really want <br>
+to use the transfer method to convert goals from abstract types to <br>
+representation types as many lemmas related to "of_rat" do. However, <br>
+after "apply transfer" the lemma real_poly_plus becomes:</p>
+<ol>
+<li>
+<p>!!p q. almost_everywhere_zero p ==&gt;<br>
+            almost_everywhere_zero q ==&gt; real_of_rat ∘ ?ad16 p q = ?ae16 <br>
+(real_of_rat ∘ p) (real_of_rat ∘ q)</p>
+<ol start="2">
+<li>
+<p>Transfer.Rel (rel_fun (pcr_poly op =) (rel_fun (pcr_poly op =) <br>
+(pcr_poly op =))) ?ad16 op +</p>
+</li>
+<li>
+<p>Transfer.Rel (rel_fun (pcr_poly op =) (rel_fun (pcr_poly op =) <br>
+(pcr_poly op =))) ?ae16 op +</p>
+</li>
+</ol>
+</li>
+</ol>
+<p>which I don't know how to proceed. Is there anything I can do to use the <br>
+transfer method properly in my case?</p>
+<p>Many thanks,<br>
+Wenda</p>
+
+
+
+<a name="294306036"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Query%20about%20the%20transfer%20method/near/294306036" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Query.20about.20the.20transfer.20method.html#294306036">(Aug 19 2022 at 15:52)</a>:</h4>
+<p>From: Wenda Li &lt;<a href="mailto:wl302@cam.ac.uk">wl302@cam.ac.uk</a>&gt;<br>
+Dear Isabelle experts,</p>
+<p>I have investigated my previous problem. The problem can be solved by <br>
+providing an alternative plus operation for polynomials:</p>
+<p>lift_definition plus_poly1 :: "'a::comm_monoid_add poly ⇒ 'a poly ⇒ 'a <br>
+poly"<br>
+   is "%p q n. p n + q n" sorry</p>
+<p>lemma real_poly_plus: "real_poly (plus_poly1 p q) = plus_poly1 <br>
+(real_poly p) (real_poly q)"<br>
+   apply transfer<br>
+   (<em>as desired</em>)</p>
+<p>Compared to the original plus operation for polynomials:</p>
+<p>lift_definition plus_poly :: "'a poly ⇒ 'a poly ⇒ 'a poly"<br>
+   is "%p q n. coeff p n + coeff q n"</p>
+<p>then only difference between plus_poly1 and plus_poly is that plus_poly1 <br>
+takes its arguments as<br>
+representation types for polynomials (i.e. "nat =&gt; 'a") while plus_poly <br>
+takes its arguments as abstract types (i.e. "'a poly"). In my case, <br>
+plus_poly1 works much better for the transfer method than plus_poly.</p>
+<p>Therefore, it occurs to me when we are using lift_defition, shall we try <br>
+to use representation types and avoid abstract types? I have checked <br>
+Int.thy, Rat.thy and Real.thy, and they all fit my hypothesis, while <br>
+definitions in Polynomial.thy confuse me.</p>
+<p>Many thanks for any help,<br>
+Wenda</p>
+
+
+
+<a name="294306082"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Query%20about%20the%20transfer%20method/near/294306082" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Query.20about.20the.20transfer.20method.html#294306082">(Aug 19 2022 at 15:52)</a>:</h4>
+<p>From: Brian Huffman &lt;<a href="mailto:huffman.brian.c@gmail.com">huffman.brian.c@gmail.com</a>&gt;<br>
+Hi Wenda,</p>
+<p>You are completely right about the uses of lift_definition in the<br>
+Polynomial theory. The point of lift_definition is to avoid writing<br>
+definitions in terms of the Rep/Abs functions for types. Function<br>
+"coeff" is the Rep function for the polynomial type, and so it should<br>
+be avoided when using lift_definition.</p>
+<p>Polynomial.thy was written before lift_definition/transfer existed, so<br>
+the original definitions all used "coeff" explicitly. When it was<br>
+ported over to use lift_definition (apparently by Florian Haftmann<br>
+some time last year), I guess some redundant uses of "coeff" were<br>
+overlooked.</p>
+<p>If it makes the "transfer" method more useful, it would probably be a<br>
+good idea to change the definitions in Polynomial.thy to match the<br>
+style of your "plus_poly1". Perhaps Florian is willing to take this<br>
+on?</p>
+<ul>
+<li>Brian</li>
+</ul>
+
+
+
+<a name="294306121"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Query%20about%20the%20transfer%20method/near/294306121" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Query.20about.20the.20transfer.20method.html#294306121">(Aug 19 2022 at 15:52)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Wenda &amp; al.</p>
+<blockquote>
+<p>You are completely right about the uses of lift_definition in the<br>
+Polynomial theory. The point of lift_definition is to avoid writing<br>
+definitions in terms of the Rep/Abs functions for types. Function<br>
+"coeff" is the Rep function for the polynomial type, and so it should<br>
+be avoided when using lift_definition.</p>
+</blockquote>
+<p>the issue is related to the fact that lifting always operates on<br>
+expressions of a certain type, not on expressions consisting of certain<br>
+»transferable« operations.  Hence, if an expression you want to lift<br>
+contains operations not defined using lift_definition, you get<br>
+unexpected (unusable) results from transfer.</p>
+<p>There are a couple of subissues actually arising here, which should not<br>
+bother you at the moment and I will set them out in a separate thread.<br>
+For the moment just note that you can often help yourself using the<br>
+following pattern</p>
+<p>lemma …<br>
+unfolding (*) proof transfer<br>
+  …<br>
+qed</p>
+<p>where in * you place equational theorems which unfold the<br>
+»untransferable« operations to »transferable« ones.</p>
+<blockquote>
+<p>If it makes the "transfer" method more useful, it would probably be a<br>
+good idea to change the definitions in Polynomial.thy to match the<br>
+style of your "plus_poly1". Perhaps Florian is willing to take this<br>
+on?</p>
+</blockquote>
+<p>I am currently absorbed in preparing a co-work for an AFP submission<br>
+concerning multivariate polynomials.  After that the future of<br>
+Polynomial.thy can come on the agenda again.</p>
+<p>Cheers,<br>
+    Florian</p>
+<blockquote>
+<ul>
+<li>Brian</li>
+</ul>
+<p>On Thu, Sep 18, 2014 at 6:24 AM, Wenda Li &lt;<a href="mailto:wl302@cam.ac.uk">wl302@cam.ac.uk</a>&gt; wrote:</p>
+<blockquote>
+<p>Dear Isabelle experts,</p>
+<p>I have investigated my previous problem. The problem can be solved by<br>
+providing an alternative plus operation for polynomials:</p>
+<p>lift_definition plus_poly1 :: "'a::comm_monoid_add poly ⇒ 'a poly ⇒ 'a poly"<br>
+  is "%p q n. p n + q n" sorry</p>
+<p>lemma real_poly_plus: "real_poly (plus_poly1 p q) = plus_poly1 (real_poly p)<br>
+(real_poly q)"<br>
+  apply transfer<br>
+  (<em>as desired</em>)</p>
+<p>Compared to the original plus operation for polynomials:</p>
+<p>lift_definition plus_poly :: "'a poly ⇒ 'a poly ⇒ 'a poly"<br>
+  is "%p q n. coeff p n + coeff q n"</p>
+<p>then only difference between plus_poly1 and plus_poly is that plus_poly1<br>
+takes its arguments as<br>
+representation types for polynomials (i.e. "nat =&gt; 'a") while plus_poly<br>
+takes its arguments as abstract types (i.e. "'a poly"). In my case,<br>
+plus_poly1 works much better for the transfer method than plus_poly.</p>
+<p>Therefore, it occurs to me when we are using lift_defition, shall we try to<br>
+use representation types and avoid abstract types? I have checked Int.thy,<br>
+Rat.thy and Real.thy, and they all fit my hypothesis, while definitions in<br>
+Polynomial.thy confuse me.</p>
+<p>Many thanks for any help,<br>
+Wenda</p>
+</blockquote>
+<p>On 2014-09-16 13:14, Wenda Li wrote:</p>
+<blockquote>
+<blockquote>
+<p>Dear Isabelle experts,</p>
+<p>I have defined a function to convert rational polynomials to real<br>
+ones, and want to prove this function respects some other operations<br>
+on polynomials.</p>
+<p>theory Scratch1<br>
+  imports Complex_Main "~~/src/HOL/Library/Polynomial"<br>
+begin</p>
+<p>lift_definition real_poly:: "rat poly ⇒ real poly" is<br>
+ "%p. real_of_rat o p " unfolding almost_everywhere_zero_def by auto</p>
+<p>lemma real_poly_plus: "real_poly (p + q) = real_poly p + real_poly q"<br>
+  (<em>apply transfer</em>)<br>
+using real_poly.rep_eq Rat.of_rat_add by (intro poly_eqI,auto)</p>
+<p>end</p>
+<p>Although the lemma real_poly_plus can be proved by "using<br>
+real_poly.rep_eq Rat.of_rat_add by (intro poly_eqI,auto)", I really<br>
+want to use the transfer method to convert goals from abstract types<br>
+to representation types as many lemmas related to "of_rat" do.<br>
+However, after "apply transfer" the lemma real_poly_plus becomes:</p>
+<ol>
+<li>!!p q. almost_everywhere_zero p ==&gt;<br>
+           almost_everywhere_zero q ==&gt; real_of_rat ∘ ?ad16 p q =<br>
+?ae16 (real_of_rat ∘ p) (real_of_rat ∘ q)</li>
+<li>Transfer.Rel (rel_fun (pcr_poly op =) (rel_fun (pcr_poly op =)<br>
+(pcr_poly op =))) ?ad16 op +</li>
+<li>Transfer.Rel (rel_fun (pcr_poly op =) (rel_fun (pcr_poly op =)<br>
+(pcr_poly op =))) ?ae16 op +</li>
+</ol>
+<p>which I don't know how to proceed. Is there anything I can do to use<br>
+the transfer method properly in my case?</p>
+<p>Many thanks,<br>
+Wenda</p>
+</blockquote>
+<p>--<br>
+Wenda Li<br>
+PhD Candidate<br>
+Computer Laboratory<br>
+University of Cambridge<br>
+</p>
+</blockquote>
+<p><a href="/user_uploads/14278/TepfdEYwqUPK12yWVWIkoLh2/signature.asc">signature.asc</a></p>
+</blockquote>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

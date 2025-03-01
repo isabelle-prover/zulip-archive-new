@@ -1,0 +1,32 @@
+[
+    {
+        "content": "<p>From: Lars Noschinski &lt;<a href=\"mailto:noschinl@in.tum.de\">noschinl@in.tum.de</a>&gt;<br>\nOn 17.07.2013 06:33, Gottfried Barrow wrote:</p>\n<blockquote>\n<p>abbreviation (input) sequ1233a :: \"prop =&gt; prop\"<br>\n(\"|1')'(2')'(3')'(3a')\") where<br>\n\"sequ1233a == (%x. x)\"</p>\n<p>The THY and PDF show how I'm using something like that, but I test it<br>\nlike this:</p>\n</blockquote>\n<p>For testing, try \"term\" first and see that your syntax works:</p>\n<p>term \"|1)(2)(3)(3a) (A ⟹ B)\"</p>\n<blockquote>\n<p>theorem \"|1)(2)(3)(3a) (A ==&gt; B)\"</p>\n</blockquote>\n<p>To understand why your theory command fails, please note that A and B in <br>\nmy term command above have type bool, not prop.</p>\n<p>The reason is that the user should never need to care about Trueprop in <br>\nnormal operation. So Isabelle inserts Trueprop automatically if type <br>\nprop is expected, except if the argument has !! or ==&gt; as an outermost <br>\nfunction symbol.</p>\n<p>Your debugging attempt shows this:</p>\n<blockquote>\n<p>notation Trueprop(\"Tr\") and \"prop\"(\"Pr\")</p>\n<p>I get the same message with some more information:</p>\n<p>Operator: Tr :: bool =&gt; prop<br>\nOperand: sequ1233a (Tr (A::bool) ==&gt; Tr (B::bool)) :: prop</p>\n</blockquote>\n<p>It typed \"sequ1233a (A ==&gt; B)\" just fine (note again, A, B :: bool, <br>\nsurrounded by a Tr)). However, another Tr is applied to \"sequ1233a (A <br>\n==&gt; B)\" which then cannot be typed.</p>\n<p>You can instruct Isabelle to not insert Trueprop automatically by <br>\nprefixing it with the PROP syntax:</p>\n<p>theorem \"PROP |1)(2)(3)(3a) (A ⟹ B)\"<br>\n     term \"sequ1233ax (PROP A ⟹ PROP B)\"</p>\n<p>-- Lars</p>",
+        "id": 294245430,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660908712
+    },
+    {
+        "content": "<p>From: Lars Noschinski &lt;<a href=\"mailto:noschinl@in.tum.de\">noschinl@in.tum.de</a>&gt;<br>\nActually, is the PROP syntax documented somewhere? I looked in the index <br>\nof the reference manual and the best I could find was the the following <br>\ncomment in the reference manual in the chapter about inner syntax:</p>\n<p>| aprop denotes atomic propositions, which are embedded into regular<br>\n| prop by means of an explicit PROP token.<br>\n|<br>\n| Terms of type prop with non-constant head, e.g. a plain variable, are<br>\n| printed in this form. Constants that yield type prop are expected to<br>\n| provide their own concrete syntax; otherwise the printed version will<br>\n| appear like logic and cannot be parsed again as prop.</p>\n<p>-- Lars</p>",
+        "id": 294245440,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660908716
+    },
+    {
+        "content": "<p>From: Lars Noschinski &lt;<a href=\"mailto:noschinl@in.tum.de\">noschinl@in.tum.de</a>&gt;<br>\nBTW: Searching for PROP in the reference manual, I learned a new trick: <br>\nIf you want e.g. to apply a rule X: \"A ==&gt; B ==&gt; C\", but only have the <br>\n\"B\" available  as a fact, you can do</p>\n<p>from _ and <code>B</code> have \"C\" apply (rule X)</p>\n<p>to skip the first precondition of X and don't need to resort to things like</p>\n<p>have \"C\"<br>\n     apply (rule X)<br>\n     prefer 2<br>\n     apply (fact <code>B</code>)</p>\n<p>or</p>\n<p>have \"C\" apply (rule X[OF _ <code>B</code>])</p>\n<p>Judging from the few occurrences in Isabelle and the AFP, I guess this <br>\ntechnique is not very well known.</p>\n<p>-- Lars</p>",
+        "id": 294245471,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660908722
+    },
+    {
+        "content": "<p>From: Gottfried Barrow &lt;<a href=\"mailto:gottfried.barrow@gmx.com\">gottfried.barrow@gmx.com</a>&gt;<br>\nLars,</p>\n<p>Thanks for the information about PROP. I experimented with it some, but <br>\nI couldn't figure out how to use it with \"abbreviation\" to not get an error.</p>\n<p>All the typing looks right for this:</p>\n<p>abbreviation (input)  tester :: \"prop ⇒ prop\"  where<br>\n        \"tester x == x\"</p>\n<p>term \"tester (A ==&gt; B)\"<br>\n        (* \"A::bool ==&gt; B::bool\" :: \"prop\" *)</p>\n<p>--\"1\" theorem \"PROP tester (A ⟹ B)\" oops</p>\n<p>theorem \"tester (A ==&gt; B)\"<br>\n        (* Error *)</p>\n<p>Using PROP to turn off all the coercion like with --\"1\" is not the thing <br>\nto do.</p>\n<p>Somehow getting around \"another Tr is applied to \"sequ1233a (A ==&gt; B)\" <br>\nis the problem. The ==&gt; operator requires I give it a prop, and the <br>\nautomatic Trueprop requires the abbreviation return it a bool. I can <br>\nmake my abbreviation \"'a =&gt; 'a\", \"prop =&gt; prop\", and \"bool =&gt; prop\", but <br>\nI can't make it \"prop =&gt; bool\".</p>\n<p>I've improvised some to get more mileage out of what I have.</p>\n<p>Trueprop priority is 5, and ==&gt; priority is 1, so I only have priorities <br>\n1, 2, 3, and 4 to use for other notation for ==&gt;. I put the turnstile at <br>\npriority 4, and cycle the use of priorities 1, 2, and 3 with other <br>\noperators, so I don't have to use parentheses. When I go from 3 to 4, I <br>\nhave to use parentheses, but 4, 5, and 6 operators can be parentheses <br>\nfree in their block.</p>\n<p>I attached a screen shot. Getting everything to line up is big. Six <br>\nlevels should be enough for most things.</p>\n<p>Regards,<br>\nGB<br>\n<a href=\"/user_uploads/14278/etBqTHMPwvoAUDCKgyeOJkxI/130716_sequ_prop_notation.png\">130716_sequ_prop_notation.png</a></p>\n<div class=\"message_inline_image\"><a href=\"/user_uploads/14278/etBqTHMPwvoAUDCKgyeOJkxI/130716_sequ_prop_notation.png\" title=\"130716_sequ_prop_notation.png\"><img src=\"/user_uploads/14278/etBqTHMPwvoAUDCKgyeOJkxI/130716_sequ_prop_notation.png\"></a></div>",
+        "id": 294245497,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660908729
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nSee isar-ref manual section \"7.4 The Pure Syntax\".  This should be mostly <br>\nup-to-date, but it is a long way to go through the manual to find the way <br>\nto PROP.  (It is rarely needed in regular practice.)</p>\n<p>Makarius</p>",
+        "id": 294245551,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660908753
+    }
+]

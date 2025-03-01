@@ -1,0 +1,124 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Code serialisation for type rat · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20serialisation.20for.20type.20rat.html">[isabelle] Code serialisation for type rat</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294271169"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20serialisation%20for%20type%20rat/near/294271169" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20serialisation.20for.20type.20rat.html#294271169">(Aug 19 2022 at 13:54)</a>:</h4>
+<p>From: Jose Divasón &lt;<a href="mailto:jose.divasonm@unirioja.es">jose.divasonm@unirioja.es</a>&gt;<br>
+Hello,</p>
+<p>Thank you so much for your help Fabian, now it works.</p>
+<p>One remark for the rest of the users of the list. It's worth noting the<br>
+importance of the order when we are importing theories involving code<br>
+generation. In my case, I work using the Multivariate_Analysis session.</p>
+<p>If one creates a new file importing both the Multivariate Analysis files<br>
+and the file "Code_Rational" that Fabian has sent previously, then an<br>
+exception is got when the code is exported. This is an example:</p>
+<p>theory Code_Rational_Problem<br>
+imports<br>
+  "~~/src/HOL/Multivariate_Analysis/Multivariate_Analysis"<br>
+  Code_Rational<br>
+begin</p>
+<p>definition "test11 = [[273/2::rat,7],[28/2,7]]"</p>
+<p>export_code test11<br>
+  in Haskell<br>
+  module_name "Gauss_Haskell"<br>
+  file "haskell"<br>
+end</p>
+<p>The exception is: exception BAD_THM "Not an abstract type: Rat.rat" raised<br>
+(line 436 of "Isar/code.ML")"</p>
+<p>To solve it, in my case, I have had to import<br>
+"~~/src/HOL/Multivariate_Analysis/Multivariate_Analysis" at the beginning<br>
+of the theory Code_Rational attached by Fabian.</p>
+<p>Thanks again.</p>
+<p>Best,<br>
+Jose</p>
+
+
+
+<a name="294272909"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20serialisation%20for%20type%20rat/near/294272909" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20serialisation.20for.20type.20rat.html#294272909">(Aug 19 2022 at 14:02)</a>:</h4>
+<p>From: Jose Divasón &lt;<a href="mailto:jose.divasonm@unirioja.es">jose.divasonm@unirioja.es</a>&gt;<br>
+Dear all,</p>
+<p>attached you can find an attempt to serialise the rat type in Isabelle to<br>
+the Rational type in Haskell. It works, but I think that there are better<br>
+ways to do that.</p>
+<p>For the moment, I have serialised the operations "Frct" and "quotient_of"<br>
+in the following way:</p>
+<p>constant "Frct" ⇀ (Haskell) "(let (x,y) = _ in (Rational.fract<br>
+(integer'_of'_int x) (integer'_of'_int y)))"<br>
+ | constant "quotient_of" ⇀ (Haskell) "(let x = _ in (Int'_of'_integer<br>
+(Rational.numerator x), Int'_of'_integer (Rational.denominator x)))"</p>
+<p>I would like to avoid the use of integer_of_int and Int_of_integer in those<br>
+lines (because they are Isabelle functions and then, sometimes, if I don't<br>
+export them they are not automatically generated to Haskell).</p>
+<p>I have tried to work out that problem by means of a function "Frct_integer"<br>
+and a code lemma, but it doesn't work:</p>
+<p>lift_definition Frct_integer :: "integer × integer =&gt; rat"<br>
+  is "Frct :: int × int =&gt; rat" .</p>
+<p>lemma [code]:<br>
+"Frct a = Frct_integer ((of_int (fst a)), (of_int (snd a)))"<br>
+  by (transfer, simp)</p>
+<p>code_printing<br>
+ constant "Frct_integer" ⇀ (Haskell) "Rational.fract (_)"</p>
+<p>The problem arises in the code lemma, because the output says that there is<br>
+an "abstractor as head in equation". So I can prove it but not use it as a<br>
+code lemma.</p>
+<p>I have a similar problem working with "quotient_of".</p>
+<p>definition numerator :: "rat =&gt; int"<br>
+where "numerator x = fst (quotient_of x)"</p>
+<p>definition denominator :: "rat =&gt; int"<br>
+where "denominator x = snd (quotient_of x)"</p>
+<p>lemma quotient_of_num_den: "quotient_of x = ((numerator x), (denominator<br>
+x))"<br>
+unfolding numerator_def denominator_def<br>
+by simp</p>
+<p>lift_definition numerator_integer :: "rat =&gt; integer"<br>
+  is "numerator" .</p>
+<p>lift_definition denominator_integer :: "rat =&gt; integer"<br>
+  is "denominator" .</p>
+<p>lemma [code]: "quotient_of x = (int_of_integer (numerator_integer x),<br>
+int_of_integer(denominator_integer x))"<br>
+by (transfer, simp add: quotient_of_num_den)</p>
+<p>code_printing<br>
+ constant "numerator_integer" ⇀ (Haskell) "Rational.numerator (_)"<br>
+  | constant "denominator_integer" ⇀ (Haskell) "Rational.denominator (_)"</p>
+<p>The code lemma can't be proven because there is a "Projection as head in<br>
+equation".</p>
+<p>I think that all comes from this theorem, which is in the file HOL/Rat.thy:</p>
+<p>lemma [code abstype]:<br>
+  "Frct (quotient_of q) = q"<br>
+  by (cases q) (auto intro: quotient_of_eq)</p>
+<p>But I don't know if it is possible to remove that tag [code abstype], or<br>
+maybe there is another way to avoid the use of integer_of_int and<br>
+int_of_integer in the serialisation.</p>
+<p>Thanks in advance for any advice.</p>
+<p>Best,<br>
+Jose<br>
+<a href="/user_uploads/14278/-ft9O4ojfnp5NdH2zWJCn5Cv/Code_Rational.thy">Code_Rational.thy</a></p>
+
+
+
+<a name="294272951"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20serialisation%20for%20type%20rat/near/294272951" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20serialisation.20for.20type.20rat.html#294272951">(Aug 19 2022 at 14:03)</a>:</h4>
+<p>From: Fabian Immler &lt;<a href="mailto:immler@in.tum.de">immler@in.tum.de</a>&gt;<br>
+Hi Jose,</p>
+<p>Apparently, you can delete Frct as abstractor by declaring any other constant as code_datatype (should not matter, because you map type rat to Haskell type Prelude.Rational):</p>
+<p>consts Foo::rat<br>
+code_datatype Foo</p>
+<p>With some minor tweaks and additional code equations, the setup you had commented out generates valid Haskell-code.<br>
+(See also the attached file).</p>
+<p>Best regards,<br>
+Fabian<br>
+<a href="/user_uploads/14278/6jarcV0F9qVqU06kBAFxEP_Y/Code_Rational.thy">Code_Rational.thy</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

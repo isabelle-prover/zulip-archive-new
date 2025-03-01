@@ -1,0 +1,158 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] trying to convince Isabelle to accept some pro... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20trying.20to.20convince.20Isabelle.20to.20accept.20some.20pro.2E.2E.2E.html">[isabelle] trying to convince Isabelle to accept some pro...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294062319"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20trying%20to%20convince%20Isabelle%20to%20accept%20some%20pro.../near/294062319" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20trying.20to.20convince.20Isabelle.20to.20accept.20some.20pro.2E.2E.2E.html#294062319">(Aug 18 2022 at 12:02)</a>:</h4>
+<p>From: Andrei Popescu &lt;<a href="mailto:uuomul@yahoo.com">uuomul@yahoo.com</a>&gt;<br>
+Hello, </p>
+<p>I have proved the consistency of specialized theorem prover <br>
+in Isabelle, but when I am trying to use it, I find serious problems <br>
+with "executing"/simplifying some functions that initally looked to me <br>
+very amenable to simplification.&nbsp; </p>
+<p>Particularly, I have the following problems: <br>
+-- Isabelle won't simplify underneath&nbsp; existential quantifiers, and would loop <br>
+if I try to simplify after replacing the existentially quantified variables <br>
+with schematic variables (via existential introduction) or if try <br>
+to enforce an "under-exists" simplification rule<br>
+-- in cases when simplification does<br>
+ what I wish (using auto<br>
+ for some <br>
+trivial FOL<br>
+ arrangements to help<br>
+ simplification), it takes too much time (I think <br>
+auto tries to hard) </p>
+<p>I have tried to capture these problems with the following small example, <br>
+where: <br>
+-- a term is either a basic term "Bas n" or a compound term "Cpd Ts"; <br>
+-- a rule deduces terms (conclusions) from lists of terms (hypotheses); <br>
+-- there are only five rules: R1, R2, R1', R1'', R2'; <br>
+-- the function mdr mathes a term against these rules constructing <br>
+&nbsp;&nbsp; backwards a proof subject to some constraints (that the term is the <br>
+&nbsp;&nbsp; conclusion of the rule and its immediate <br>
+&nbsp;&nbsp; subterms are less or equal to (le) the hypotheses of the rule -- I <br>
+&nbsp;&nbsp; have added this complication with "le" so that I do not have <br>
+&nbsp;&nbsp; unique proofs). </p>
+<p>Here is the theory (I am also attaching it as a thy file):&nbsp; </p>
+<hr>
+<p>datatype trm = Bas nat | Cpd "trm list"</p>
+<p>record rule =</p>
+<p>&nbsp; hyps :: "trm list"<br>
+&nbsp; cnc :: "trm" </p>
+<p>constdefs<br>
+R1 :: "rule"&nbsp; <br>
+"R1 == (| hyps = [Bas 1, Cpd[Bas 2, Bas 3]], <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; cnc = Cpd [Bas 1, Cpd[Bas 2, Bas 3]] |)"<br>
+R2 :: "rule"&nbsp; <br>
+"R2 == (|hyps = [Bas 2, Cpd[Bas 3, Bas 4]], <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; cnc = Cpd [Bas 1, Cpd[Bas 2, Bas 3]] |)"&nbsp; <br>
+R1' :: "rule"&nbsp; <br>
+"R1' == (|hyps = [Bas 2, Bas 3], <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp; &nbsp;&nbsp; cnc = Cpd [Bas 2, Bas 3] |)"<br>
+R1'' :: "rule"&nbsp; <br>
+"R1'' == (|hyps = [Bas 3, Bas 4], <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp; &nbsp;&nbsp; cnc = Cpd [Bas 2, Bas 3] |)"<br>
+R2' :: "rule"&nbsp; <br>
+"R2' == (|hyps = [Bas 4, Bas 5], <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; cnc = Cpd [Bas 3, Bas 4] |)"</p>
+<p>constdefs Rls :: "rule<br>
+ set"<br>
+"Rls == {R1, R2, R1', R1'', R2'}"</p>
+<p>consts le :: "trm =&gt; rm =&gt; bool"<br>
+axioms le_simps_Bas:<br>
+"ge (Bas n) T' = True"</p>
+<p>axioms le_simps_Ind: <br>
+"le (Cpd Ts) T' = <br>
+&nbsp; (case T' of Bas n' =&gt; False <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; |Cpd Ts' =&gt; length Ts = length Ts' /\ <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; (ALL i &lt; length Ts. le (Ts!i) (Ts'!i)))"<br>
+lemmas le_simps = le_simps_Bas le_simps_Ind<br>
+declare le_simps [simp]</p>
+<p>lemmas rules_defs = Rls_def R1_def R2_def R1'_def R1''_def R2'_def&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <br>
+declare rules_defs [simp]<br>
+&nbsp;<br>
+consts mdr :: "trm =&gt; rule set" <br>
+axioms mdr_simps_Bas: <br>
+"mdr (Bas n) = {(| hyps = [Bas n], cnc = Bas n<br>
+ |)}" </p>
+<p>axioms mdr_simps_Cpd: <br>
+"mdr (Cpd Ts) = <br>
+&nbsp; {(|hyps = concat (map hyps drls), <br>
+&nbsp;&nbsp;&nbsp;&nbsp; cnc = Cpd Ts |) <br>
+&nbsp;&nbsp; |rl drls.&nbsp; <br>
+&nbsp;&nbsp;&nbsp; rl: Rls /\ <br>
+&nbsp;&nbsp;&nbsp; cnc rl = Cpd Ts /\ <br>
+&nbsp;&nbsp;&nbsp; length (hyps rl) = length Ts /\ <br>
+&nbsp;&nbsp;&nbsp; length drls = length Ts /\<br>
+&nbsp;&nbsp;&nbsp; (ALL i &lt; length Ts. le (Ts ! i) (hyps rl ! i) /\<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; drls!i : mdr (hyps rl ! i))}"</p>
+<p>lemmas mdr_simps = mdr_simps_Bas mdr_simps_Cpd<br>
+declare mdr_simps [simp]</p>
+<hr>
+<p>I would like to be able to execute mdr, so that I always obtain, for example, <br>
+instead <br>
+of "x : mdr(Cpd [Bas 1, Cpd[Bas 2, Bas 3]])", a disjunction of 6 facts <br>
+(according to the six<br>
+ possible decompositions), where, for example, one of the dijuncts would be </p>
+<p>"x = (| hyps = [Bas (Suc 0), Bas 2, Bas 3], <br>
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp; &nbsp; cnc = Cpd [Bas (Suc 0), Cpd [Bas 2, Bas 3]]&nbsp; |)"</p>
+<p>In order to achieve this, I try to help the engine by adding the following simplification rules: <br>
+&nbsp;</p>
+<hr>
+<p>lemma help_map0[simp]:<br>
+"length xs = 0 ==&gt; map f xs = []"<br>
+sorry </p>
+<p>lemma help_map1[simp]: <br>
+&nbsp;"length xs = Suc n ==&gt; <br>
+&nbsp; map f xs = map f (butlast xs) @ [f(xs ! n)]" <br>
+sorry</p>
+<p>lemma help_butlast[simp]:<br>
+"i &lt; length xs ==&gt; butlast xs ! i = xs ! i"<br>
+sorry </p>
+<p>lemma help_finite_pred[simp]:<br>
+"(ALL j &lt; Suc n. phi j) = ((ALL j &lt; n. phi j) /\ phi n)"<br>
+sorry </p>
+<hr>
+<p>With these, auto is able to reduce a goal like</p>
+<p>"mdr(Cpd [Bas 1, Cpd[Bas 2, Bas 3]]) &lt;= X"</p>
+<p>to six goals having conclusions of the form "rl : X" for <br>
+each of the six elements rl of "mdr(Cpd [Bas 1, Cpd[Bas 2, Bas 3]])", <br>
+which is satisfactory, although the reduction is quite slow for this <br>
+small example already. </p>
+<p>The above reduction is clearly safe, which would make me hope for the possibility of a dual reduction to a disjunction.&nbsp; However, if I place <br>
+"mdr(Cpd [Bas 1, Cpd[Bas 2, Bas 3]])" on a positive position <br>
+in a goal, as in "x : mdr(Cpd [Bas 1, Cpd[Bas 2, Bas 3]])",<br>
+I am not able to decompose the goal into a disjunction no matter how I try.&nbsp; <br>
+For instance, if I try (adding a seemingly useful distributive law) </p>
+<p>lemma "x : mdr(Cpd [Bas 1, Cpd[Bas 2, Bas 3]])"<br>
+apply (auto simp add: conj_disj_distribR)</p>
+<p>it will not apply the needed simplifications.&nbsp; </p>
+<p>If I try (at&nbsp; the same lemma),&nbsp;</p>
+<p>apply (auto simp add: conj_disj_distribR, rule exI, rule exI, auto) </p>
+<p>it will loop, </p>
+<p>and also if I add the further lemma </p>
+<p>lemma simp_inside_EX:<br>
+"(!! x y. P x y = Q x y) ==&gt; (EX x y. P x y) = (EX x y. Q x y)"<br>
+by blast</p>
+<p>and then try </p>
+<p>apply (auto simp add: conj_disj_distribR, <br>
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp; &nbsp; simp add: simp_inside_EX)</p>
+<p>it will loop again. </p>
+<p>So my question is: do I need to write my own rewrite engine/tactical, or <br>
+would a proper use of existing ones in Isabelle solve my problems regarding the <br>
+possibility of decomposition and its computational complexity ? </p>
+<p>Many thanks in advance for any advice regarding this matter, <br>
+&nbsp;&nbsp;&nbsp; Andrei Popescu<br>
+<a href="/user_uploads/14278/PwoxiNVGum3pwJiQ3lBUsRkm/miniTest.thy">miniTest.thy</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

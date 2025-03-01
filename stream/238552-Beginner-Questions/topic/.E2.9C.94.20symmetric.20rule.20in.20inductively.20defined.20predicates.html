@@ -1,0 +1,401 @@
+<html>
+<head><meta charset="utf-8"><title>✔ symmetric rule in inductively defined predicates · Beginner Questions · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/index.html">Beginner Questions</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20symmetric.20rule.20in.20inductively.20defined.20predicates.html">✔ symmetric rule in inductively defined predicates</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="250112665"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/%E2%9C%94%20symmetric%20rule%20in%20inductively%20defined%20predicates/near/250112665" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Chengsong Tan <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20symmetric.20rule.20in.20inductively.20defined.20predicates.html#250112665">(Aug 20 2021 at 12:47)</a>:</h4>
+<p>It seems that symmetric rule in inductively defined predicates causes difficulty for proving <br>
+certain arguments make it evaluate to False.<br>
+If we define an inductive datatype called <code>tfoo</code>:<br>
+<code>datatype tfoo = TZERO | TONE | TSEQ tfoo tfoo
+</code><br>
+Then we can define an inductive predicate that <br>
+determines whether two terms of the type <code>tfoo</code><br>
+are "similar":</p>
+<div class="codehilite"><pre><span></span><code>inductive tsimilar :: &quot;tfoo ⇒ tfoo ⇒ bool&quot;
+  where
+  &quot;tsimilar TZERO TZERO&quot;
+(*|  &quot;tsimilar t1 t2 ⟹ tsimilar t2 t1&quot;*)
+| &quot;tsimilar TONE TONE&quot;
+| &quot;⟦tsimilar t1 t2; tsimilar t3 t4 ⟧ ⟹ tsimilar (TSEQ t1 t3) (TSEQ t2 t4)&quot;
+</code></pre></div>
+<p>And showing that two concrete instances of type <code>tfoo</code><br>
+are not similar is quite straightforward:</p>
+<div class="codehilite"><pre><span></span><code>lemma notsimilar : assumes &quot;tsimilar TZERO TONE&quot;
+  shows &quot;False&quot;
+  using assms
+  apply(erule_tac tsimilar.cases)
+    apply simp
+    apply simp
+  by fastforce
+</code></pre></div>
+<p>The problem arises once you add (uncomment)<br>
+the symmetric rule:<br>
+<code> 
+"tsimilar t1 t2 ⟹ tsimilar t2 t1"
+</code><br>
+This causes automation to fail.<br>
+The reason why is probably because sledgehammer/.... <br>
+tries to apply the symmetric rule back and forth, creating<br>
+an infinite loop.<br>
+Apparently<code> tsimilar TZERO TONE</code> should <br>
+always evaluate to false, as the inductive definition<br>
+defines the minimal set closed under the rules,<br>
+so how can we make this obvious again to Isabelle?</p>
+
+
+
+<a name="250113232"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/%E2%9C%94%20symmetric%20rule%20in%20inductively%20defined%20predicates/near/250113232" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20symmetric.20rule.20in.20inductively.20defined.20predicates.html#250113232">(Aug 20 2021 at 12:52)</a>:</h4>
+<p>I think the real problem here is that when you add that new rule, your statement is simply not strong enough to be provable by direct induction.</p>
+
+
+
+<a name="250113325"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/%E2%9C%94%20symmetric%20rule%20in%20inductively%20defined%20predicates/near/250113325" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20symmetric.20rule.20in.20inductively.20defined.20predicates.html#250113325">(Aug 20 2021 at 12:53)</a>:</h4>
+<p>You get <code>tsimilar TONE TZERO ⟹ False</code> as one of the cases and that's not provable without another induction.</p>
+
+
+
+<a name="250113520"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/%E2%9C%94%20symmetric%20rule%20in%20inductively%20defined%20predicates/near/250113520" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20symmetric.20rule.20in.20inductively.20defined.20predicates.html#250113520">(Aug 20 2021 at 12:55)</a>:</h4>
+<p>The obvious solution is to just prove something stronger, e.g.:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">lemma</span> <span class="s">"tsimilar x y ⟹ x = y"</span>
+  <span class="k">by</span> <span class="o">(</span><span class="n">induction</span> <span class="n">rule</span><span class="o">:</span> <span class="n">tsimilar.induct</span><span class="o">)</span> <span class="n">auto</span>
+</code></pre></div>
+
+
+
+<a name="250120568"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/%E2%9C%94%20symmetric%20rule%20in%20inductively%20defined%20predicates/near/250120568" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Chengsong Tan <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20symmetric.20rule.20in.20inductively.20defined.20predicates.html#250120568">(Aug 20 2021 at 13:56)</a>:</h4>
+<p><span class="user-mention silent" data-user-id="232736">Manuel Eberl</span> <a href="#narrow/stream/238552-Beginner-Questions/topic/symmetric.20rule.20in.20inductively.20defined.20predicates/near/250113232">said</a>:</p>
+<blockquote>
+<p>I think the real problem here is that when you add that new rule, your statement is simply not strong enough to be provable by direct induction.</p>
+</blockquote>
+<p>Thank you!<br>
+How about when the relation is slightly more complicated that this lemma <br>
+doesn't hold?</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">lemma</span> <span class="s">"tsimilar x y ⟹ x = y"</span>
+</code></pre></div>
+<p>If I change the relation to include those<br>
+that are slightly different:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">datatype</span> <span class="n">tfoo</span> <span class="o">=</span> <span class="n">TZERO</span> <span class="o">|</span> <span class="n">TONE</span> <span class="n">nat</span> <span class="o">|</span> <span class="n">TSEQ</span> <span class="n">tfoo</span> <span class="n">tfoo</span>
+
+
+<span class="k">inductive</span> <span class="n">tsimilar</span> <span class="o">::</span> <span class="s">"tfoo ⇒ tfoo ⇒ bool"</span>
+  <span class="kp">where</span>
+  <span class="s">"tsimilar TZERO TZERO"</span>
+<span class="o">|</span>  <span class="s">"tsimilar t1 t2 ⟹ tsimilar t2 t1"</span>
+<span class="o">|</span> <span class="s">"tsimilar (TONE i)  (TONE j)"</span>
+<span class="o">|</span> <span class="s">"⟦tsimilar t1 t2; tsimilar t3 t4 ⟧ ⟹ tsimilar (TSEQ t1 t3) (TSEQ t2 t4)"</span>
+
+<span class="kn">lemma</span> <span class="n">notsimilar</span> <span class="o">:</span> <span class="kp">assumes</span> <span class="s">"tsimilar TZERO (TONE i)"</span>
+</code></pre></div>
+<p>Then how can I prove the lemma notsimilar?</p>
+
+
+
+<a name="250120881"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/%E2%9C%94%20symmetric%20rule%20in%20inductively%20defined%20predicates/near/250120881" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Chengsong Tan <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20symmetric.20rule.20in.20inductively.20defined.20predicates.html#250120881">(Aug 20 2021 at 13:59)</a>:</h4>
+<p>The reason I came up with this question was that<br>
+I defined a predicate where two instances which are<br>
+semantically equal but syntactically different<br>
+are deemed similar. It would be nice<br>
+to be able to prove certain instances of them<br>
+are not similar because there is no induction rule <br>
+to derive the similarity.</p>
+
+
+
+<a name="250121528"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/%E2%9C%94%20symmetric%20rule%20in%20inductively%20defined%20predicates/near/250121528" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20symmetric.20rule.20in.20inductively.20defined.20predicates.html#250121528">(Aug 20 2021 at 14:03)</a>:</h4>
+<p>Well, first of all, your <code>tsimilar</code> would be symmetric even without that additional explicit symmetry rule. So I suggest removing it to make things easier, and then prove it from the remaining ones by induction.</p>
+
+
+
+<a name="250121573"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/%E2%9C%94%20symmetric%20rule%20in%20inductively%20defined%20predicates/near/250121573" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20symmetric.20rule.20in.20inductively.20defined.20predicates.html#250121573">(Aug 20 2021 at 14:04)</a>:</h4>
+<p>You could even define this by recursion instead of an <code>inductive</code>, that might also make things easier.</p>
+
+
+
+<a name="250121914"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/%E2%9C%94%20symmetric%20rule%20in%20inductively%20defined%20predicates/near/250121914" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20symmetric.20rule.20in.20inductively.20defined.20predicates.html#250121914">(Aug 20 2021 at 14:06)</a>:</h4>
+<p>Otherwise, I guess you will have to strengthen your goal in such a way that it survives the induction, i.e. in particular in a way that makes it symmetric in <code>x</code> and <code>y</code>, e.g.:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">lemma</span> <span class="n">notsimilar</span><span class="o">:</span>
+  <span class="kp">assumes</span> <span class="s">"tsimilar x y"</span> <span class="s">"∃c. x = TZERO ∧ y = TONE c ∨ x = TONE c ∧ y = TZERO"</span>
+  <span class="kp">shows</span> <span class="n">False</span>
+  <span class="k">using</span> <span class="n">assms</span> <span class="k">by</span> <span class="o">(</span><span class="n">induction</span> <span class="n">rule</span><span class="o">:</span> <span class="n">tsimilar.induct</span><span class="o">)</span> <span class="n">auto</span>
+</code></pre></div>
+
+
+
+<a name="250122045"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/%E2%9C%94%20symmetric%20rule%20in%20inductively%20defined%20predicates/near/250122045" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20symmetric.20rule.20in.20inductively.20defined.20predicates.html#250122045">(Aug 20 2021 at 14:07)</a>:</h4>
+<p>But if you can get rid of the symmetry rule in the <code>inductive</code>, I would. It only complicates things.</p>
+
+
+
+<a name="250125142"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/%E2%9C%94%20symmetric%20rule%20in%20inductively%20defined%20predicates/near/250125142" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Chengsong Tan <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20symmetric.20rule.20in.20inductively.20defined.20predicates.html#250125142">(Aug 20 2021 at 14:31)</a>:</h4>
+<p><span class="user-mention silent" data-user-id="232736">Manuel Eberl</span> <a href="#narrow/stream/238552-Beginner-Questions/topic/symmetric.20rule.20in.20inductively.20defined.20predicates/near/250121914">said</a>:</p>
+<blockquote>
+<p>Otherwise, I guess you will have to strengthen your goal in such a way that it survives the induction, i.e. in particular in a way that makes it symmetric in <code>x</code> and <code>y</code>, e.g.:</p>
+<p><div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">lemma</span> <span class="n">notsimilar</span><span class="o">:</span>
+  <span class="kp">assumes</span> <span class="s">"tsimilar x y"</span> <span class="s">"∃c. x = TZERO ∧ y = TONE c ∨ x = TONE c ∧ y = TZERO"</span>
+  <span class="kp">shows</span> <span class="n">False</span>
+  <span class="k">using</span> <span class="n">assms</span> <span class="k">by</span> <span class="o">(</span><span class="n">induction</span> <span class="n">rule</span><span class="o">:</span> <span class="n">tsimilar.induct</span><span class="o">)</span> <span class="n">auto</span>
+</code></pre></div><br>
+</p>
+</blockquote>
+<p>Thanks a lot!<br>
+How do you come up with such strengthening methods (is it<br>
+more on an ad-hoc basis or is there a general rule of thumb), and<br>
+can you elaborate a bit more about<br>
+what do you mean by "survive the induction" (for example a <br>
+formal definition)?</p>
+<p>For me an intuitive and naive reason to think that there should <br>
+be a method to prove</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">lemma</span> <span class="n">notsimilar</span> <span class="o">:</span> <span class="kp">assumes</span> <span class="s">"tsimilar TZERO (TONE i)"</span>
+</code></pre></div>
+<p>is that we know that from rules like these</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code>  <span class="s">"tsimilar TZERO TZERO"</span>
+</code></pre></div>
+<p>you can never derive a similarity between instances<br>
+that breaks the "hierarchy", and therefore</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="n">tsimilar</span> <span class="n">TZERO</span> <span class="o">(</span><span class="n">TONE</span> <span class="n">i</span><span class="o">)</span>
+<span class="n">tsimilar</span> <span class="n">TZERO</span> <span class="o">(</span><span class="n">TSEQ</span> <span class="n">t1</span> <span class="n">t2</span><span class="o">)</span>
+<span class="n">tsimilar</span> <span class="o">(</span><span class="n">TONE</span> <span class="n">i</span><span class="o">)</span> <span class="o">(</span><span class="n">TSEQ</span> <span class="n">t1</span> <span class="n">t2</span><span class="o">)</span>
+</code></pre></div>
+<p>are always false.</p>
+
+
+
+<a name="250125270"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/%E2%9C%94%20symmetric%20rule%20in%20inductively%20defined%20predicates/near/250125270" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Chengsong Tan <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20symmetric.20rule.20in.20inductively.20defined.20predicates.html#250125270">(Aug 20 2021 at 14:32)</a>:</h4>
+<p>From your example I came up with another strengthening<br>
+lemma that is like the below:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">lemma</span> <span class="n">hierachy_maintained</span><span class="o">:</span>
+  <span class="kp">assumes</span> <span class="s">"tsimilar x y"</span> <span class="s">"∃c t1 t2.</span>
+<span class="s"> x = TZERO ∧ y = TONE c ∨ x = TONE c ∧ y = TZERO</span>
+<span class="s">∨  x = TONE c ∧ y = TSEQ t1 t2 ∨  x = TSEQ t1 t2 ∧ y = TONE c</span>
+<span class="s">∨  x = TZERO ∧ y = TSEQ t1 t2 ∨  x = TSEQ t1 t2 ∧ y = TZERO"</span>
+  <span class="kp">shows</span> <span class="n">False</span>
+  <span class="k">using</span> <span class="n">assms</span>
+  <span class="kp">apply</span><span class="o">(</span><span class="n">induction</span> <span class="n">rule</span><span class="o">:</span> <span class="n">tsimilar.induct</span><span class="o">)</span>
+  <span class="kp">apply</span> <span class="n">fastforce</span>
+  <span class="kp">apply</span> <span class="n">fastforce</span>
+  <span class="kp">apply</span> <span class="n">fastforce</span>
+  <span class="kp">apply</span> <span class="n">fastforce</span>
+  <span class="k">done</span>
+</code></pre></div>
+
+
+
+<a name="250126067"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/%E2%9C%94%20symmetric%20rule%20in%20inductively%20defined%20predicates/near/250126067" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20symmetric.20rule.20in.20inductively.20defined.20predicates.html#250126067">(Aug 20 2021 at 14:38)</a>:</h4>
+<p><span class="user-mention silent" data-user-id="241231">Chengsong Tan</span> <a href="#narrow/stream/238552-Beginner-Questions/topic/symmetric.20rule.20in.20inductively.20defined.20predicates/near/250125142">said</a>:</p>
+<blockquote>
+<p>For me an intuitive and naive reason to think that there should <br>
+be a method to prove</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">lemma</span> <span class="n">notsimilar</span> <span class="o">:</span> <span class="kp">assumes</span> <span class="s">"tsimilar TZERO (TONE i)"</span>
+</code></pre></div>
+<p>is that we know that from rules like these</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code>  <span class="s">"tsimilar TZERO TZERO"</span>
+</code></pre></div>
+<p>you can never derive a similarity between instances<br>
+that breaks the "hierarchy", and therefore</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="n">tsimilar</span> <span class="n">TZERO</span> <span class="o">(</span><span class="n">TONE</span> <span class="n">i</span><span class="o">)</span>
+<span class="n">tsimilar</span> <span class="n">TZERO</span> <span class="o">(</span><span class="n">TSEQ</span> <span class="n">t1</span> <span class="n">t2</span><span class="o">)</span>
+<span class="n">tsimilar</span> <span class="o">(</span><span class="n">TONE</span> <span class="n">i</span><span class="o">)</span> <span class="o">(</span><span class="n">TSEQ</span> <span class="n">t1</span> <span class="n">t2</span><span class="o">)</span>
+</code></pre></div>
+<p>are always false.</p>
+</blockquote>
+<p>Yeah but the problem is that due to your symmetry rule, you could also have <code>tsimilar TZERO (TONE x)</code> from <code>tsimilar (TONE x) TZERO</code>, so if you do try to disprove it, you have to disprove both of them simultaneously.</p>
+
+
+
+<a name="250126101"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/%E2%9C%94%20symmetric%20rule%20in%20inductively%20defined%20predicates/near/250126101" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Chengsong Tan <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20symmetric.20rule.20in.20inductively.20defined.20predicates.html#250126101">(Aug 20 2021 at 14:38)</a>:</h4>
+<p><span class="user-mention silent" data-user-id="241231">Chengsong Tan</span> <a href="#narrow/stream/238552-Beginner-Questions/topic/symmetric.20rule.20in.20inductively.20defined.20predicates/near/250125270">said</a>:</p>
+<blockquote>
+<p>From your example I came up with another strengthening<br>
+lemma that is like the below:</p>
+<p><div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">lemma</span> <span class="n">hierachy_maintained</span><span class="o">:</span>
+  <span class="kp">assumes</span> <span class="s">"tsimilar x y"</span> <span class="s">"∃c t1 t2.</span>
+<span class="s"> x = TZERO ∧ y = TONE c ∨ x = TONE c ∧ y = TZERO</span>
+<span class="s">∨  x = TONE c ∧ y = TSEQ t1 t2 ∨  x = TSEQ t1 t2 ∧ y = TONE c</span>
+<span class="s">∨  x = TZERO ∧ y = TSEQ t1 t2 ∨  x = TSEQ t1 t2 ∧ y = TZERO"</span>
+  <span class="kp">shows</span> <span class="n">False</span>
+  <span class="k">using</span> <span class="n">assms</span>
+  <span class="kp">apply</span><span class="o">(</span><span class="n">induction</span> <span class="n">rule</span><span class="o">:</span> <span class="n">tsimilar.induct</span><span class="o">)</span>
+  <span class="kp">apply</span> <span class="n">fastforce</span>
+  <span class="kp">apply</span> <span class="n">fastforce</span>
+  <span class="kp">apply</span> <span class="n">fastforce</span>
+  <span class="kp">apply</span> <span class="n">fastforce</span>
+  <span class="k">done</span>
+</code></pre></div><br>
+</p>
+</blockquote>
+<p>For me the summary of doing a strengthening of a lemma about inductive definitions,<br>
+is to </p>
+<div class="codehilite"><pre><span></span><code>1. add existential quantifiers rather than using free variables
+2. try to prove/disprove together a bunch of things if they are interderivable
+</code></pre></div>
+
+
+
+<a name="250126105"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/%E2%9C%94%20symmetric%20rule%20in%20inductively%20defined%20predicates/near/250126105" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20symmetric.20rule.20in.20inductively.20defined.20predicates.html#250126105">(Aug 20 2021 at 14:38)</a>:</h4>
+<p>I don't think there's any general method for finding out how to generalise things sufficiently. It's just intuition and experience.</p>
+
+
+
+<a name="250126219"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/%E2%9C%94%20symmetric%20rule%20in%20inductively%20defined%20predicates/near/250126219" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20symmetric.20rule.20in.20inductively.20defined.20predicates.html#250126219">(Aug 20 2021 at 14:39)</a>:</h4>
+<p>By "survive the induction" I mean that your statement must be strong enough so that you can actually apply the induction hypothesis in the induction step.</p>
+
+
+
+<a name="250126439"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/%E2%9C%94%20symmetric%20rule%20in%20inductively%20defined%20predicates/near/250126439" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20symmetric.20rule.20in.20inductively.20defined.20predicates.html#250126439">(Aug 20 2021 at 14:41)</a>:</h4>
+<p>A classic example is the tail-recursive list reversal function:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">fun</span> <span class="n">itrev</span> <span class="o">::</span> <span class="s">"'a list ⇒ 'a list ⇒ 'a list"</span> <span class="kp">where</span>
+  <span class="s">"itrev acc [] = acc"</span>
+<span class="o">|</span> <span class="s">"itrev acc (x # xs) = itrev (x # acc) xs"</span>
+</code></pre></div>
+<p>If you try to prove <code>itrev [] xs = rev xs</code> by induction directly, you will run into a problem in the induction step because your induction hypothesis will tell you that <code>itrev [] xs = rev xs</code> (i.e. where <code>acc = []</code>), but in the induction step, you will have <code>acc = [x]</code> so you cannot apply the induction hypothesis.</p>
+
+
+
+<a name="250126531"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/%E2%9C%94%20symmetric%20rule%20in%20inductively%20defined%20predicates/near/250126531" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20symmetric.20rule.20in.20inductively.20defined.20predicates.html#250126531">(Aug 20 2021 at 14:42)</a>:</h4>
+<p>The trick is then to try to generalise the <code>[]</code> and prove something about <code>itrev acc xs</code> in general, namely <code>itrev acc xs = rev xs @ acc</code>.</p>
+
+
+
+<a name="250126607"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/%E2%9C%94%20symmetric%20rule%20in%20inductively%20defined%20predicates/near/250126607" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20symmetric.20rule.20in.20inductively.20defined.20predicates.html#250126607">(Aug 20 2021 at 14:43)</a>:</h4>
+<p>But, let me stress again, in the above case, the real solution is to remove the symmetry rule. You don't need it, and it just makes the proofs harder.</p>
+
+
+
+<a name="250127366"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/%E2%9C%94%20symmetric%20rule%20in%20inductively%20defined%20predicates/near/250127366" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Chengsong Tan <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20symmetric.20rule.20in.20inductively.20defined.20predicates.html#250127366">(Aug 20 2021 at 14:48)</a>:</h4>
+<p><span class="user-mention silent" data-user-id="232736">Manuel Eberl</span> <a href="#narrow/stream/238552-Beginner-Questions/topic/symmetric.20rule.20in.20inductively.20defined.20predicates/near/250126607">said</a>:</p>
+<blockquote>
+<p>But, let me stress again, in the above case, the real solution is to remove the symmetry rule. You don't need it, and it just makes the proofs harder.</p>
+</blockquote>
+<p>Of course this example is contrived, but I feel like<br>
+in more complicated cases where you can't get<br>
+rid of a rule that tricks Isabelle into loops the technique shown<br>
+here can be really useful.</p>
+<p>Thanks again for your helpful advice.</p>
+
+
+
+<a name="250127968"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/%E2%9C%94%20symmetric%20rule%20in%20inductively%20defined%20predicates/near/250127968" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20symmetric.20rule.20in.20inductively.20defined.20predicates.html#250127968">(Aug 20 2021 at 14:52)</a>:</h4>
+<p>I still don't see where Isabelle "looped" here.</p>
+
+
+
+<a name="250129600"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/%E2%9C%94%20symmetric%20rule%20in%20inductively%20defined%20predicates/near/250129600" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Chengsong Tan <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20symmetric.20rule.20in.20inductively.20defined.20predicates.html#250129600">(Aug 20 2021 at 15:03)</a>:</h4>
+<p><span class="user-mention silent" data-user-id="232736">Manuel Eberl</span> <a href="#narrow/stream/238552-Beginner-Questions/topic/symmetric.20rule.20in.20inductively.20defined.20predicates/near/250127968">said</a>:</p>
+<blockquote>
+<p>I still don't see where Isabelle "looped" here.</p>
+</blockquote>
+<p>The automatic prover tries to <br>
+say that there is no rule leading to the term</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="n">tsimilar</span> <span class="n">TZERO</span> <span class="o">(</span><span class="n">TONE</span> <span class="n">i</span><span class="o">)</span>
+</code></pre></div>
+<p>(which we abbreviate as <code>t</code>)<br>
+being true</p>
+<p>by finding out<br>
+that </p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="n">tsimilar</span> <span class="n">TZERO</span> <span class="n">TZERO</span>
+</code></pre></div>
+<p>can't lead to  the <code>t</code>,<br>
+and </p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="n">tsimilar</span> <span class="o">(</span><span class="n">TONE</span> <span class="n">i</span><span class="o">)</span> <span class="o">(</span><span class="n">TONE</span> <span class="n">j</span><span class="o">)</span>
+</code></pre></div>
+<p>can't lead to <code>t</code>,<br>
+and .......... so forth<br>
+Until it finds the rule</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="n">tsimilar</span> <span class="n">t1</span> <span class="n">t2</span> <span class="o">==</span><span class="err">&gt;</span> <span class="n">tsimilar</span> <span class="n">t2</span> <span class="n">t1</span>
+</code></pre></div>
+<p>it says umm, if we unify t1 with<br>
+TONE i and t2 with TZERO,<br>
+then the fact <code>t'</code></p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="n">tsimilar</span> <span class="n">t1</span> <span class="n">t2</span>
+</code></pre></div>
+<p>leads to </p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="n">tsimilar</span> <span class="n">TZERO</span> <span class="o">(</span><span class="n">TONE</span> <span class="n">i</span><span class="o">)</span>
+</code></pre></div>
+<p>How to get <code>t'</code>?<br>
+Well by rule</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="n">tsimilar</span> <span class="n">t1</span> <span class="n">t2</span> <span class="o">==</span><span class="err">&gt;</span> <span class="n">tsimilar</span> <span class="n">t2</span> <span class="n">t1</span>
+</code></pre></div>
+<p>again, which requires <code>t''</code>,<br>
+which requires <code>t'''</code>,<br>
+..............<br>
+that's where the loop (I think) happens.<br>
+Is there a misunderstanding here?</p>
+<p>Since the inductive definition means the minimal set that<br>
+is closed under the rules, if the prover checked all rules<br>
+and found out that none can lead to the desired relation of instances,<br>
+it proved the fact that <code>P x1.... xn</code> is false. In our example here it got stuck in the last rule,<br>
+not being able to disprove possibility of deriving the result.</p>
+
+
+
+<a name="250129844"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/%E2%9C%94%20symmetric%20rule%20in%20inductively%20defined%20predicates/near/250129844" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20symmetric.20rule.20in.20inductively.20defined.20predicates.html#250129844">(Aug 20 2021 at 15:05)</a>:</h4>
+<p>Pretty sure it has a limited search depth for <code>intro</code> rules though, so I don't think there should be any infinite loop.</p>
+
+
+
+<a name="250129887"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/%E2%9C%94%20symmetric%20rule%20in%20inductively%20defined%20predicates/near/250129887" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20symmetric.20rule.20in.20inductively.20defined.20predicates.html#250129887">(Aug 20 2021 at 15:05)</a>:</h4>
+<p>Infinite loops can happen with the simplifier sometimes, but the intro rules of an <code>inductive</code> are not declared as <code>simp</code> rules.</p>
+
+
+
+<a name="250130003"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/%E2%9C%94%20symmetric%20rule%20in%20inductively%20defined%20predicates/near/250130003" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20symmetric.20rule.20in.20inductively.20defined.20predicates.html#250130003">(Aug 20 2021 at 15:06)</a>:</h4>
+<p>I don't think I saw any looping behaviour when I tried your example before either.</p>
+
+
+
+<a name="250130283"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/%E2%9C%94%20symmetric%20rule%20in%20inductively%20defined%20predicates/near/250130283" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Chengsong Tan <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20symmetric.20rule.20in.20inductively.20defined.20predicates.html#250130283">(Aug 20 2021 at 15:08)</a>:</h4>
+<p><span class="user-mention silent" data-user-id="232736">Manuel Eberl</span> <a href="#narrow/stream/238552-Beginner-Questions/topic/symmetric.20rule.20in.20inductively.20defined.20predicates/near/250130003">said</a>:</p>
+<blockquote>
+<p>I don't think I saw any looping behaviour when I tried your example before either.</p>
+</blockquote>
+<p>Ah my bad, shouldn't use the terminology loop, but just stuck and gave up?</p>
+
+
+
+<a name="250130995"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/%E2%9C%94%20symmetric%20rule%20in%20inductively%20defined%20predicates/near/250130995" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20symmetric.20rule.20in.20inductively.20defined.20predicates.html#250130995">(Aug 20 2021 at 15:13)</a>:</h4>
+<p>Sure, yes, at some point most methods will just give up.</p>
+
+
+
+<a name="250137188"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/%E2%9C%94%20symmetric%20rule%20in%20inductively%20defined%20predicates/near/250137188" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Notification Bot <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20symmetric.20rule.20in.20inductively.20defined.20predicates.html#250137188">(Aug 20 2021 at 15:59)</a>:</h4>
+<p><span class="user-mention silent" data-user-id="241231">Chengsong Tan</span> has marked this topic as resolved.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

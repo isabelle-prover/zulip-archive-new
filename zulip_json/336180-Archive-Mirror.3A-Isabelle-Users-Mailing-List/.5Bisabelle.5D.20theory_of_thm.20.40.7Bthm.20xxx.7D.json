@@ -1,0 +1,56 @@
+[
+    {
+        "content": "<p>From: Peter Lammich &lt;<a href=\"mailto:lammich@in.tum.de\">lammich@in.tum.de</a>&gt;<br>\nHi all,</p>\n<p>consider the following toy example:</p>\n<p>theory Scratch<br>\nimports Pure<br>\nbegin</p>\n<p>ML_val {*<br>\n  theory_of_thm @{thm meta_mp}<br>\n*}</p>\n<p>Output: val it = {Pure, Scratch:1}: theory</p>\n<p>Why is Scratch contained in here? The theorem is defined in Pure, not in<br>\nScratch. <br>\nIs there a way to reference to the theorem by name such that its theory<br>\nis the one it was defined in, and not the one the antiquotation occurs<br>\nin? <br>\nIn my real application (using HOL instead of Pure), I get odd<br>\n\"non-trivial theory-merge\" exceptions, because \"theory_of_thm @{thm<br>\nxxx}\" contains too much.</p>\n<p>Regards and thanks in advance for any help,<br>\n  Peter</p>",
+        "id": 294220608,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660897259
+    },
+    {
+        "content": "<p>From: Thomas Sewell &lt;<a href=\"mailto:Thomas.Sewell@nicta.com.au\">Thomas.Sewell@nicta.com.au</a>&gt;<br>\nIn principle, having @{thm meta_mp} live only in @{theory Pure} would <br>\nmake perfect sense.</p>\n<p>In practice, this would create a problem if you tried, say:</p>\n<p>theory Scratch<br>\nimports A B<br>\nbegin</p>\n<p>ML_val {*<br>\nThm.transitive @{thm A.eq1} @{thm B.eq2}<br>\n*}</p>\n<p>How does Thm.transitive figure out an appropriate context for a rule <br>\nderived from A.eq1 and B.eq2?</p>\n<p>To avoid this problem, A.eq1 and B.eq2 are \"pulled\" up into theory <br>\nScratch when they are fetched, thus allowing derivation operations to <br>\nproceed without doing any interesting work.</p>\n<p>There are other ways in ML to fetch these theorems in their original <br>\ncontext, at which point if you attempt resolution or similar you will <br>\nsee the error \"Attempt to perform non-trivial merge of theories\" from <br>\nPure/context.ML.</p>\n<p>Yours,<br>\n     Thomas.</p>",
+        "id": 294220619,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660897265
+    },
+    {
+        "content": "<p>From: Peter Lammich &lt;<a href=\"mailto:lammich@in.tum.de\">lammich@in.tum.de</a>&gt;<br>\nThanks Thomas.</p>\n<p>In my particular case, I have implemented an attribute that also uses<br>\ntheorems fetched from record types. The problem is, that the theory that<br>\ndeclares the record type does not import the theory that declares the<br>\nattribute.</p>\n<p>For now, I solved the problem by fetching the theorems in their original<br>\ncontext, and then transferring them to HOL/Main, assuming that all<br>\ntheorems that my attribute sees depend on a super-theory of Main, which<br>\nis realistic in my case.</p>\n<p>Peter</p>",
+        "id": 294220629,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660897272
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nThe proper technical term for \"pulled\" is \"transfer\" in Isabelle <br>\nterminology.  What you mention in a certain context needs to be understood <br>\nin the sense of that context.  Formal entities with a back-reference to a <br>\ncontext certificate (theory stamp) need to be transferred explicitly, <br>\nunlike terms who might get re-checked implicitly.  (Such system operations <br>\nare carefully implemented to be monotonic wrt. the theory context.)</p>\n<p>The Isar source language alreadys transfers formal entities mentioned in <br>\nthe text: notably 'thm' and @{thm} etc. so one never has to worry about <br>\nit.</p>\n<p>In really ancient times we did not understand this important principle <br>\nyet, and there were many oddities coming from theorems with incomparable <br>\ntheory stamps, or comparable theory stamps that were just too little for <br>\nthe current context, say to perform an instantiation.</p>\n<p>These problems are long forgotten, because the transfer principle is the <br>\nestablished way for such a long time already.  (This is in disagreement <br>\nwith the very first sentence above.)</p>\n<p>Makarius</p>",
+        "id": 294220657,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660897290
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nSo why not make the imports right, according to what you do formally?</p>\n<p>Makarius</p>",
+        "id": 294220665,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660897296
+    },
+    {
+        "content": "<p>From: Peter Lammich &lt;<a href=\"mailto:lammich@in.tum.de\">lammich@in.tum.de</a>&gt;<br>\nBecause this is not the \"right\" way from a modularization standpoint.<br>\nThe theory that declares the record type and the theory that declares<br>\nthe attribute are independent, so I see no need to import the one from<br>\nthe other. The dependence is established by a third theory, importing<br>\nboth, and using the attribute declared in the latter with a theorem<br>\ncontaining the record type declared in the former.</p>\n<p>However, just introducing this (artificial, and on first glance<br>\nunnecessary) dependence might be the quickest way to solve the problem.</p>\n<p>The cleanest (?) might be to manually transfer the theorems extracted<br>\nfrom the record type to the theory of the theorem that is passed to the<br>\nattribute (This theory should always include both, the theory of the<br>\nrecord type and the one declaring the attribute)</p>",
+        "id": 294220674,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660897302
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nI can only guess what your overall structure is, but the latter also <br>\nsounds right to me.  The function for that is Thm.transfer.</p>\n<p>Makarius</p>",
+        "id": 294220677,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660897308
+    },
+    {
+        "content": "<p>From: Thomas Sewell &lt;<a href=\"mailto:Thomas.Sewell@nicta.com.au\">Thomas.Sewell@nicta.com.au</a>&gt;<br>\nApologies for nitpicking, but there is room for us both to be right. <br>\nThis might be a principled approach, and it has pragmatic merit and the <br>\nweight of tradition, but, in principle, there might be other valid <br>\napproaches.</p>\n<p>For instance, a system like Isabelle could have theorems depend on lists <br>\nof theories, or equivalently construct meet/join objects in the theory <br>\nlattice. It would probably be inefficient and sometimes surprising, but <br>\nit could be done. I'm not saying that this is a good approach, I'm <br>\nsaying that the vagueness of principle encompasses it.</p>\n<p>Yours,<br>\n     Thomas.</p>",
+        "id": 294220682,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660897314
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nUntil 1997 there was indeed an explicit join (merge) constructed for <br>\nincomparable theory stamps.  This was a bit inefficient, and sometimes <br>\noccurred in surprising situations, so we discontinued it.</p>\n<p>Nonetheless, the join (least upper bound of given theory stamps) is <br>\nsometimes not sufficient to do the job, it might be still too small for <br>\nthe current context where you are working.  Say you want to instantiate a <br>\ntheorem with variables that have type class constraints, but the merge of <br>\ntheories does not give you the required instance yet.  (Such incidents did <br>\nhappen in practical situations in the past and motivated the rethinking of <br>\nthe concepts.)</p>\n<p>The claim of the current Isabelle scheme of trivial merges of already <br>\nrelated theories + transfer to the context where you are working is that <br>\nit addresses all practical situations.  I am ready to see counter examples <br>\nfor that claim, if they exist.</p>\n<p>Makarius</p>",
+        "id": 294220684,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660897320
+    }
+]

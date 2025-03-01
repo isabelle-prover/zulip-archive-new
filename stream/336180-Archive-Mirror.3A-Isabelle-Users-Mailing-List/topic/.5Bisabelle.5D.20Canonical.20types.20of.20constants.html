@@ -1,0 +1,88 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Canonical types of constants · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Canonical.20types.20of.20constants.html">[isabelle] Canonical types of constants</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294668821"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Canonical%20types%20of%20constants/near/294668821" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Canonical.20types.20of.20constants.html#294668821">(Aug 22 2022 at 12:52)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+In order to obtain the type of a constant c I am using this code snippet:</p>
+<p>Proof_Context.read_const {proper = true, strict = false} ctxt c</p>
+<p>It gives me back a term Const(c,T) and then I proceed with T. How can I make <br>
+sure that the type variables in T have canonical names 'a, 'b etc? Should I be <br>
+using some other piece of code?</p>
+<p>The background is that in 7f5579b12b0a, constant "card" has type "?'b set =&gt; <br>
+nat" instead of "?'a set =&gt; nat" as in the past. I assume that I should not rely <br>
+on canonicity of names in T? If not, how can I convert a type into a `canonical' <br>
+one?</p>
+<p>Thanks<br>
+Tobias<br>
+<a href="/user_uploads/14278/WGvkddFje9DAWpimAEeRCB1F/smime.p7s">smime.p7s</a></p>
+
+
+
+<a name="294668844"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Canonical%20types%20of%20constants/near/294668844" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Canonical.20types.20of.20constants.html#294668844">(Aug 22 2022 at 12:52)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On Tue, 9 Feb 2016, Tobias Nipkow wrote:</p>
+<blockquote>
+<p>In order to obtain the type of a constant c I am using this code snippet:</p>
+<p>Proof_Context.read_const {proper = true, strict = false} ctxt c</p>
+<p>It gives me back a term Const(c,T) and then I proceed with T. How can I make <br>
+sure that the type variables in T have canonical names 'a, 'b etc? Should I <br>
+be using some other piece of code?</p>
+</blockquote>
+<p>This correctly produces a type scheme for the constant, according to its <br>
+declaration.  It uses schematic type variables, but these are considered <br>
+"private" to a declaration and not necessarily canonical in an application <br>
+context.</p>
+<p>The proper way to make schematics visible in a context (and printable) can <br>
+be seen in the implementation of the document antiquotation @{const}: <br>
+Variable.import_terms.</p>
+<p>Note that show_question_marks = false produces unreliable results: <br>
+pretending that schematic variables are not schematic is fragile. <br>
+LaTeXsugar.thy seems to suffer from that wrong assumption.</p>
+<blockquote>
+<p>The background is that in 7f5579b12b0a, constant "card" has type "?'b <br>
+set =&gt; nat" instead of "?'a set =&gt; nat" as in the past.</p>
+</blockquote>
+<p>The definition of "card" has changed here <br>
+<a href="http://isabelle.in.tum.de/repos/isabelle/rev/9f4f0dc7be2c">http://isabelle.in.tum.de/repos/isabelle/rev/9f4f0dc7be2c</a> and thus its <br>
+internal type declaration.</p>
+<p>Here is an example that illustrates the situation and shows how to make <br>
+canonical types inside a given context:</p>
+<p>consts a :: 'a<br>
+consts b :: 'b</p>
+<p>ML ‹<br>
+   fun read_const ctxt s =<br>
+     let<br>
+       val t = Proof_Context.read_const {proper = true, strict = false} ctxt s;<br>
+       val ([t'], _) = Variable.import_terms true [t] ctxt;<br>
+     in (t, t') end;</p>
+<p>read_const @{context} "a";<br>
+   read_const @{context} "b";<br>
+   read_const @{context} "card";<br>
+›</p>
+<p>Of course, the result depends on the context.  E.g. within the context of <br>
+"context fixes x :: 'a begin" new types start at 'b.</p>
+<p>Makarius</p>
+
+
+
+<a name="294668852"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Canonical%20types%20of%20constants/near/294668852" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Canonical.20types.20of.20constants.html#294668852">(Aug 22 2022 at 12:52)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+Thanks, that works fine.</p>
+<p>Tobias<br>
+<a href="/user_uploads/14278/_-M2eJJY5kjzsZIT8clXzifU/smime.p7s">smime.p7s</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

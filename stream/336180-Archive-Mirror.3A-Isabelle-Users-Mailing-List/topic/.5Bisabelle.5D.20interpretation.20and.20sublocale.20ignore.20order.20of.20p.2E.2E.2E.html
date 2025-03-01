@@ -1,0 +1,93 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] interpretation and sublocale ignore order of p... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20interpretation.20and.20sublocale.20ignore.20order.20of.20p.2E.2E.2E.html">[isabelle] interpretation and sublocale ignore order of p...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294646777"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20interpretation%20and%20sublocale%20ignore%20order%20of%20p.../near/294646777" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20interpretation.20and.20sublocale.20ignore.20order.20of.20p.2E.2E.2E.html#294646777">(Aug 22 2022 at 10:33)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear locale experts,</p>
+<p>The commands for interpreting a locale (interpret/interpretation/sublocale) accept <br>
+parameters declared with a for clause. The generated abbreviations for the constants <br>
+defined in the locale then take the declared parameters as additional arguments. However, <br>
+the order of these additional arguments is IMHO all but intutive and a night-mare for <br>
+maintainability. The two examples below illustrate this.</p>
+<ol>
+<li>
+<p>Suppose we have a locale which fixes a parameter and defines a function f using the <br>
+parameter x. For the interpretation, let's define an abbreviation foo with two arguments <br>
+and interpret the locale for foo with both parameters declared in a for clause.</p>
+<p>locale l = fixes x :: int begin<br>
+ definition f where "f y = x + y"<br>
+ end</p>
+<p>abbreviation foo :: "nat ⇒ int ⇒ int" where "foo x y == y - 2 * int x"<br>
+ interpretation sl!: l "foo x y" for x :: nat and y :: int .<br>
+ term sl.f  (* λy x. l.f (foo x y) *)</p>
+</li>
+</ol>
+<p>As can be seen by inspecting the generated abbreviation sl.f, the order of the parameters <br>
+in the for clause (first x, then y) has been ignored, as sl.f takes first the y and then <br>
+the x.</p>
+<p>Now, if I later change foo from an abbreviation to a definition, the order of parameters <br>
+changes. Now, sl'.f takes the x first and then the y.</p>
+<p>definition foo' :: "nat ⇒ int ⇒ int" where "foo' x y == y - 2 * int x"<br>
+   interpretation sl'!: l "foo' x y" for x :: nat and y :: int .<br>
+   term sl'.f  (* λx y. l.f (foo' x y) *)</p>
+<p>Apparently, not the order of the parameters in the for clause matters, but the order of <br>
+the parameters as they occur in the term which is used to instantiate the parameter. So, <br>
+when I going from an abbreviation to a definition, I have to reorder the first two <br>
+parameters of all occurrences of sl.f in my theories.</p>
+<ol start="2">
+<li>
+<p>If we have a locale with several parameters (say 2), things get even worse. The order <br>
+of the parameter is not consistent over several constant declarations. In this example, <br>
+there are two parameters and two definitions each of which depends on only one of the <br>
+parameters.</p>
+<p>locale l2 = fixes x :: int and z :: int begin<br>
+ definition f where "f y = x + y"<br>
+ definition g where "g y = z + y"<br>
+ end</p>
+<p>interpretation sl2!: l2 "y - 2 * int x" "int x - 2 * y" for x :: nat and y :: int .<br>
+ term "sl2.f :: int ⇒ nat ⇒ int ⇒ int"<br>
+ term "sl2.g :: nat ⇒ int ⇒ int ⇒ int"</p>
+</li>
+</ol>
+<p>Now we see that sl2.f first takes the y and then the x, whereas sl2.g first takes the x <br>
+and then the y.</p>
+<p>I find this particularly annoying, because for every function defined in my locale I have <br>
+to remember separately the order of the parameters. I'd prefer much more if interpretation <br>
+and friends used the order of the parameters as given in the for clause consistently for <br>
+all constants. Can this behaviour be somehow changed?</p>
+<p>I tried to use unnamed context blocks to fix the order of parameters, but interpretations <br>
+are gone at the end of the block and sublocale and permanent_interpretation do not work <br>
+inside such blocks.</p>
+<p>Andreas</p>
+
+
+
+<a name="294650701"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20interpretation%20and%20sublocale%20ignore%20order%20of%20p.../near/294650701" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20interpretation.20and.20sublocale.20ignore.20order.20of.20p.2E.2E.2E.html#294650701">(Aug 22 2022 at 10:59)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Andreas,</p>
+<p>if I conclude correctly you suggest that exporting a term out of an<br>
+eigencontext (»for«) should honour the order in which variables have<br>
+been specified.</p>
+<p>This sounds reasonable.  What appears strange to me is that the<br>
+behaviour of eigencontexts differs from unnamed context blocks in that<br>
+respect, because as far as I know and can glimpse from the<br>
+implementation the internal treatment should be the same… can anybody<br>
+shed further light on this?</p>
+<p>Cheers,<br>
+    Florian<br>
+<a href="/user_uploads/14278/hYqnnMqdK9EZI_-_nGjKuKyT/signature.asc">signature.asc</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

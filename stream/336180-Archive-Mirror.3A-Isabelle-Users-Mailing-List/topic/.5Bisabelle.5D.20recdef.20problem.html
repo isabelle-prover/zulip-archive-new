@@ -1,0 +1,119 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] recdef problem · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20recdef.20problem.html">[isabelle] recdef problem</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294046842"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20recdef%20problem/near/294046842" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20recdef.20problem.html#294046842">(Aug 18 2022 at 10:13)</a>:</h4>
+<p>From: Christian Sternagel &lt;<a href="mailto:christian.sternagel@uibk.ac.at">christian.sternagel@uibk.ac.at</a>&gt;<br>
+In <code>Isabelle/HOL - A Proof Assistant for Higher-Order Logic' ([1] in the following) </code>recdef' is used to define functions for the datatype</p>
+<p>datatype ('v,'f)"term" =<br>
+    Var 'v<br>
+  | Fun 'f "('v,'f)term list"</p>
+<p>For me it gets interesting as soon as higher-order functions can be used to define functions with `recdef'. In [1] there is following example:</p>
+<p>consts trev :: "('v,'f)term =&gt; ('v,'f)term"<br>
+ recdef trev "measure size"<br>
+  "trev (Var x) = Var x"<br>
+  "trev (Fun f ts) = Fun f (rev (map trev ts))"</p>
+<p>which could be proved terminating after the hint </p>
+<p>t : set ts --&gt; size t &lt; Suc (term_list_size ts)</p>
+<p>I wanted to define following function (which gives the set of positions of a term---where a position is a possibly empty list of natural numbers):</p>
+<p>consts pos :: "('v,'f)term =&gt; nat list set"<br>
+  recdef pos "measure (% t. size t)"<br>
+   "pos (Var v) = {[]}"<br>
+   "pos (Fun f ts) = <br>
+    {[]} Un {(i#p) | i p. i : {0..&lt;length ts} &amp; p : pos (ts!i)}"</p>
+<p>which is not possible automatically because of the unsolved goal:</p>
+<p>\&lt;forall&gt; :001 ts. size (ts ! :001) &lt; Suc (term_list_size ts)</p>
+<p>now my questions:<br>
+1) what does :001 mean (I just assumed its the index variable i from my definition).<br>
+2) why is the information i : {0..&lt;length ts} lost, which would make the unsolved goal equivalent to: </p>
+<p>t : set ts --&gt; size t &lt; Suc (term_list_size ts)</p>
+<p>3) is it possible to do a termination proof for a recdef definition fully by hand in order to make sure, that i : {0..&lt;length ts} is used?</p>
+<p>Thanks in advance.</p>
+<p>cheers</p>
+<p>christian sternagel</p>
+
+
+
+<a name="294046952"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20recdef%20problem/near/294046952" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20recdef.20problem.html#294046952">(Aug 18 2022 at 10:14)</a>:</h4>
+<p>From: Alexander Krauss &lt;<a href="mailto:krauss@in.tum.de">krauss@in.tum.de</a>&gt;<br>
+Christian,</p>
+<blockquote>
+<p>I wanted to define following function (which gives the set of   <br>
+positions of a term---where a position is a possibly empty list of   <br>
+natural numbers):</p>
+<p>consts pos :: "('v,'f)term =&gt; nat list set"<br>
+  recdef pos "measure (% t. size t)"<br>
+   "pos (Var v) = {[]}"<br>
+   "pos (Fun f ts) =<br>
+    {[]} Un {(i#p) | i p. i : {0..&lt;length ts} &amp; p : pos (ts!i)}"</p>
+<p>which is not possible automatically because of the unsolved goal:</p>
+<p>\&lt;forall&gt; :001 ts. size (ts ! :001) &lt; Suc (term_list_size ts)</p>
+<p>now my questions:<br>
+1) what does :001 mean (I just assumed its the index variable i from  <br>
+ my definition).</p>
+</blockquote>
+<p>It's an internal variable produced by the simplifier. I am not sure why<br>
+you get to see this strange name, but reading it as "i" is probably just<br>
+right.</p>
+<blockquote>
+<p>2) why is the information i : {0..&lt;length ts} lost, which would make  <br>
+ the unsolved goal equivalent to:</p>
+</blockquote>
+<p>You are missing a congruence rule here. Congruence rules are needed for recdef<br>
+to know at which values the recursive call actually occurs. In your  <br>
+example, the<br>
+following congruence rule for conjunction helps:</p>
+<p>lemma conj_cong[recdef_cong]:<br>
+   "[| A = A'; A' ==&gt; B = B' |] ==&gt; A &amp; B = A' &amp; B' "<br>
+by blast</p>
+<p>In the second premise, you see the hypothesis A'. This gives you the  <br>
+extra hypothesis for the termination proof.</p>
+<p>You can see congruence rules as if they express something about evaluation<br>
+order, which is not otherwise defined, since we're just doing logic. By giving<br>
+this congruence rule to recdef you state (and have proved) that the  <br>
+second part of the conjunction only relevant if the first part is  <br>
+satisfied. In the tutorial<br>
+(end of 9.2.2) this is only mentioned briefly, but the example given  <br>
+there works<br>
+out-of-the-box, because the map_cong rule is there already (and  <br>
+conj_cong should<br>
+probably also be). In general you need a suitable congruence rule for every<br>
+higher-order combinator you use in the definition.</p>
+<p>You can see the preconfigured congruence rules by issuing</p>
+<p>ML "RecdefPackage.print_recdefs (the_context ())"</p>
+<p>By looking at some of them you will quickly learn how to make your own ones if<br>
+you need them.</p>
+<blockquote>
+<p>3) is it possible to do a termination proof for a recdef definition   <br>
+fully by hand in order to make sure, that i : {0..&lt;length ts} is used?</p>
+</blockquote>
+<p>Yes you can, by a largely unkown feature:</p>
+<p>Issue your recdef definition using the "permissive" keyword:</p>
+<p>recdef (permissive) pos ....</p>
+<p>Then the defintion goes through, but the unproven termination  <br>
+conditions end up as premises of the pos.simps rules:</p>
+<p>thm pos.simps</p>
+<p>Then you can set up a manual proof by</p>
+<p>recdef_tc abc: pos</p>
+<p>and when you have finished the proof, the lemmas will be stored as "abc". You<br>
+will still have to remove the premises manually from pos.simps though.</p>
+<p>The above information is for Isabelle 2005. In the developer snapshot  <br>
+you would<br>
+instead use the new "function" package. There, handling termination proofs is<br>
+easier and can be done manually, but the issue with congruence rules remains.</p>
+<p>Hope this helps...</p>
+<p>Alex</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

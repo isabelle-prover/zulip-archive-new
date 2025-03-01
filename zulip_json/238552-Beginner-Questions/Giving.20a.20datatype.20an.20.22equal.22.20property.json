@@ -1,0 +1,74 @@
+[
+    {
+        "content": "<p>Hey guys,</p>\n<p>I'm completely new to Isabelle and having a lot of trouble with types.</p>\n<p>I have this function,<br>\nfun getArcs::\"'a set ⇒  ('a*'a) set\" where \"getArcs A = {(u,v). (u,v)∈(A×A) ∧ (u≠v)}\"<br>\n,which is supposed to get me all pairs of a set, except for the ones with the same value in both places.</p>\n<p>It compiles fine, but I can't test it.</p>\n<p>I thought since 'a is polymorphic, using a set of nats would work, but it doesn't, because it's \"not of sort {enum,equal}\".<br>\nSo I tried creating my own datatype, but I ran into the same problem.</p>\n<p>Without the u≠v both of those approaches work.</p>\n<p>Can someone help me?</p>",
+        "id": 313589610,
+        "sender_full_name": "Umon",
+        "timestamp": 1670015342
+    },
+    {
+        "content": "<p>I've managed to narrow the problem down to this:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">fun</span><span class=\"w\"> </span><span class=\"n\">minError</span><span class=\"o\">::</span><span class=\"s\">\"'a ⇒ 'a set\"</span><span class=\"w\"> </span><span class=\"kp\">where</span><span class=\"w\"></span>\n<span class=\"s\">\"minError x = {y. y=y}\"</span><span class=\"w\"></span>\n</code></pre></div>\n<p>(I'm aware this function makes no sense but before it runs into the problem you'd expect, it runs into the error I encountered.)<br>\nIt's the same if you put y=x at the end instead of y=y.</p>\n<p>I suppose the problem is that y doesn't have a type yet? Is there a way to give an element, that's introduced in a set to be returned, a type?</p>",
+        "id": 314076232,
+        "sender_full_name": "Umon",
+        "timestamp": 1670258684
+    },
+    {
+        "content": "<p>You just have to add the missing sorts to the type annotation:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">fun</span><span class=\"w\"> </span><span class=\"n\">minError</span><span class=\"o\">::</span><span class=\"s\">\"'a :: {enum, equal} ⇒ 'a set\"</span><span class=\"w\"> </span><span class=\"kp\">where</span><span class=\"w\"></span>\n<span class=\"s\">\"minError x = {y. y=y}\"</span><span class=\"w\"></span>\n</code></pre></div>",
+        "id": 314090046,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1670262698
+    },
+    {
+        "content": "<p>I don't think that works?</p>\n<p>Calling <code>value \"minError 0\"</code> with your function just gives me </p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"n\">Wellsortedness</span><span class=\"w\"> </span><span class=\"n\">error</span><span class=\"o\">:</span><span class=\"w\"></span>\n<span class=\"n\">Type</span><span class=\"w\"> </span><span class=\"n n-Type\">'a</span><span class=\"w\"> </span><span class=\"n\">not</span><span class=\"w\"> </span><span class=\"n\">of</span><span class=\"w\"> </span><span class=\"n\">sort</span><span class=\"w\"> </span><span class=\"n\">term_of</span><span class=\"w\"></span>\n<span class=\"n\">Cannot</span><span class=\"w\"> </span><span class=\"n\">derive</span><span class=\"w\"> </span><span class=\"n\">subsort</span><span class=\"w\"> </span><span class=\"n\">relation</span><span class=\"w\"> </span><span class=\"ow\">{</span><span class=\"n\">enum</span><span class=\"o\">,</span><span class=\"n\">zero</span><span class=\"o\">,</span><span class=\"n\">equal</span><span class=\"ow\">}</span><span class=\"w\"> </span><span class=\"n\">&lt;</span><span class=\"w\"> </span><span class=\"n\">term_of</span><span class=\"w\"></span>\n</code></pre></div>",
+        "id": 314097991,
+        "sender_full_name": "Umon",
+        "timestamp": 1670265024
+    },
+    {
+        "content": "<p>then add <code>term_of</code></p>",
+        "id": 314098571,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1670265209
+    },
+    {
+        "content": "<p>That error message just means: \"I want to you user do add XXX to the sorts\"</p>",
+        "id": 314098664,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1670265241
+    },
+    {
+        "content": "<p>Remark that you can also drop the type annotation completely</p>",
+        "id": 314098848,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1670265291
+    },
+    {
+        "content": "<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">fun</span><span class=\"w\"> </span><span class=\"n\">minError</span><span class=\"w\"> </span><span class=\"kp\">where</span><span class=\"w\"></span>\n<span class=\"s\">\"minError x = {y. y=y}\"</span><span class=\"w\"></span>\n</code></pre></div>",
+        "id": 314098904,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1670265310
+    },
+    {
+        "content": "<p>then there is no type annotation and Isabelle will take care of adding the correct sorts and types</p>",
+        "id": 314098996,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1670265335
+    },
+    {
+        "content": "<blockquote>\n<p>It compiles fine, but I can't test it.</p>\n</blockquote>\n<p>I assume by \"test\" you mean you want to use the <code>value</code> command?</p>\n<p>Since you are using a proof assistant you can \"test\" with a <code>lemma</code> instead: </p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">lemma</span><span class=\"w\"> </span><span class=\"s\">\"getArcs ({True, False}) = {(True, False), (False, True)}\"</span><span class=\"w\"></span>\n<span class=\"w\">  </span><span class=\"k\">by</span><span class=\"w\"> </span><span class=\"n\">auto</span><span class=\"w\"></span>\n\n<span class=\"kn\">lemma</span><span class=\"w\"> </span><span class=\"s\">\"getArcs ({0::nat, 1, 2}) = {(0, 1), (1,0), (1, 2), (2,1), (0, 2), (2, 0)}\"</span><span class=\"w\"></span>\n<span class=\"w\">  </span><span class=\"k\">by</span><span class=\"w\"> </span><span class=\"n\">auto</span><span class=\"w\"></span>\n</code></pre></div>\n<p>The better approach is to \"test\" it abstractly:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">lemma</span><span class=\"w\"> </span><span class=\"s\">\"(n,n) ∉ getArcs A\"</span><span class=\"w\"></span>\n<span class=\"w\">  </span><span class=\"s\">\"n ≠ m ⟹ n ∈ A ⟹ m ∈ A ⟹ (m, n) ∈ getArcs A\"</span><span class=\"w\"></span>\n<span class=\"w\">  </span><span class=\"s\">\"n ≠ m ⟹ n ∈ A ⟹ m ∈ A ⟹ (n, m) ∈ getArcs A\"</span><span class=\"w\"></span>\n<span class=\"w\">  </span><span class=\"k\">by</span><span class=\"w\"> </span><span class=\"n\">auto</span><span class=\"w\"></span>\n</code></pre></div>",
+        "id": 314103663,
+        "sender_full_name": "Jonathan Julian Huerta y Munive",
+        "timestamp": 1670266733
+    },
+    {
+        "content": "<p>Alright, I'll be doing that going forward.</p>\n<p>Thanks a lot, both of you.</p>",
+        "id": 314105609,
+        "sender_full_name": "Umon",
+        "timestamp": 1670267342
+    },
+    {
+        "content": "<p>Since the command <code>value</code> calls the code generator, you are asking Isabelle to compute on sets. Sets can be infinite, requiring us to have extra constraints on the type e.g. <code>enum</code> and <code>equal</code>.  If you want to know more about these, they are type classes <a href=\"https://isabelle.in.tum.de/dist/Isabelle2022/doc/classes.pdf\">https://isabelle.in.tum.de/dist/Isabelle2022/doc/classes.pdf</a>. Thus, if you are just starting with Isabelle, I recommend using <code>value</code> for things \"clearly\" computable (e.g. lists, nats, ints and functions on these).</p>",
+        "id": 314106342,
+        "sender_full_name": "Jonathan Julian Huerta y Munive",
+        "timestamp": 1670267606
+    }
+]

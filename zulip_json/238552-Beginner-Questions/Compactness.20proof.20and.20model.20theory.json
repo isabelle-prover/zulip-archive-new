@@ -1,0 +1,128 @@
+[
+    {
+        "content": "<p>Hi everyone!</p>\n<p>We are trying to prove the compactness of classical first order logic. We chose to go for the proof based on ultraproducts and model theory.<br>\nHowever, it seems that we are running into an expressivity problem of Isabelle/HOL.</p>\n<p>Here is how we represented satisfiability of a set of closed formulas:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">abbreviation</span><span class=\"w\"> </span><span class=\"n\">sat</span><span class=\"w\"> </span><span class=\"o\">::</span><span class=\"w\"> </span><span class=\"s\">‹'m itself ⇒ ('f, 'p, 'v) th ⇒ bool›</span><span class=\"w\"> </span><span class=\"kp\">where</span>\n<span class=\"w\">  </span><span class=\"s\">‹sat _ T ≡ (∃ ℳ :: ('f, 'p, 'm) model. is_model_of ℳ T)›</span>\n</code></pre></div>\n<p><code>'f</code>, <code>'p</code> and <code>'v</code> are abstract types for function, predicate and variable symbols respectively.<br>\nThe problem here is that we have to provide <code>'m</code> ourselves (which is the type of values in the domain of the model).</p>\n<p>This definition does not really convey the meaning we want: we would like to obtain any model on any domain, so something like <code>∃ m'. ∃ ℳ :: ('f, 'p, 'm) model. is_model_of ℳ T</code>.<br>\nThis problem appears further into the proof of compactness (which states that <code>sat TYPE('m) T ⟷ (∀ T' ⊆ T. finite T' ⟶ sat TYPE('m) T')</code>).<br>\nThe left to right direction follows quite clearly from the definition of modelhood on set of closed formulas, but the other direction is quite tricky.<br>\nIn the proof using ultraproducts, a model with another domain (of a different type) is constructed, which satisfies every closed formula in <code>T</code>.<br>\nUnfortunately, this does not allow us to conclude, because we have a model on <code>(('f, 'p, 'v) statement set ⇒ 'm) set</code>, not on <code>'m</code>.</p>\n<p>Here are the things that we considered to solve this issue:</p>\n<ol>\n<li>Quantify types (so <code>∃ m'. P TYPE(m')</code> or <code>∀ m'. P TYPE('m)</code> for example), which does not appear to be doable in Isabelle/HOL;</li>\n<li>Try to \"flatten\" the domain of type <code>(('f, 'p, 'v) statement set ⇒ 'm) set set</code> into <code>'m set</code>, which does not seem to be quite doable in the general case (or our understanding of the problem isn't enough);</li>\n<li>Try to restrict ourselves to a very specific case (which is of interest to us): consider that all the models of <code>T'</code> are infinite, countable and more specifically the same. We have not looked into this much further yet, but this is on our TODO list;</li>\n<li>Give up and go for a proof based on completeness of a calculus for first order logic.</li>\n</ol>\n<p>Is there anything that can be done regarding point 1.? Perhaps is it possible to axiomatize some definitions so as to encode ∃ and ∀ on types?<br>\nWe are quite unsure about this, and we think that HOL isn't even expressive enough for such axioms.<br>\nIs there perhaps another way of stating this proof which does not involve explicit quantification over types?</p>",
+        "id": 369958309,
+        "sender_full_name": "Ghilain Bergeron",
+        "timestamp": 1687854215
+    },
+    {
+        "content": "<p>Hi Ghilain, It is correct that you cannot quantify over types inside of HOL terms. In a different context, Andreas Lochbihler discusses different alternatives to this limitation (<a href=\"http://www.andreas-lochbihler.de/pub/lochbihler14iw.pdf\">http://www.andreas-lochbihler.de/pub/lochbihler14iw.pdf</a>, Section 6.2), including hard-coding the types of interest, or working with a universal domain (your point 3). The solution he opts for is to use a codatatype to represent the existentially quantified type. I'm not sure  though what this would correspond to in your setting.</p>",
+        "id": 369970548,
+        "sender_full_name": "Dmitriy Traytel",
+        "timestamp": 1687856433
+    },
+    {
+        "content": "<p>I don't really know very much about logic, or set theory, or type theory, but I do think that this is a common problem in HOL when one wants to define things such as semantic entailment. Hopefully somebody else who has faced these issues before can say something more about this. I do think that even in more powerful logics (like those used by Coq and Lean) one can run into similar levels due to universe levels, but I don't really know much about that.</p>\n<p>One approach that sometimes works is to define your thing by quantifying not over all models of <em>any</em> type, but over all models of some <em>specific</em> type that is \"big enough\" and then, later, proving that this more restricted predicate implies the more general one for an arbitrary type. Or, in your case, probably the reverse: if there exists <em>any</em> model, then there also exists a model of the type that you chose in the definition.</p>\n<p>Again, I don't know much about logic, but my guess would be that there is some kind of a-priori bound for how \"big\" the smallest model can (depending on the cardinality of the variable and constant symbols), or some kind of explicit construction for a model. I somehow vaguely remember something about Herbrand models? Aren't those even countable? In that case you could just hard-code the <code>'m</code> in your definition to a Herbrand universe (or <code>nat</code>, but that is probably less convenient).</p>\n<p>You might think that writing that the theorem that the existence of any model implies your (now much more restricted) <code>sat</code> predicate would again require quantifying over types, but it doesn't really, because in that case you only have universal quantification at the outermost level, which is okay in Isabelle/HOL through its ad-hoc polymorphism. The statement, with schematic type and term variables for emphasis, would look something like this: <code>is_model_of (?M :: ('?f, '?p, '?m) model) ?T ⟹ sat ?T</code></p>",
+        "id": 369972280,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1687856715
+    },
+    {
+        "content": "<p>Also, just in case you're not aware, there are already Isabelle/HOL formalisations of first-order logic in the AFP, including completeness. Not sure about compactness, but e.g. grepping for <code>herbrand</code> gives some results, but I don't know enough about logic to really see whether they are relevant to what you're doing.</p>\n<p>In any case, if you <em>can</em>, I'd suggest you build on top of an existing formalisation to increase reusability instead of making an entirely new formalisation of first-order logic.</p>",
+        "id": 369973855,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1687856992
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"232736\">Manuel Eberl</span> <a href=\"#narrow/stream/238552-Beginner-Questions/topic/Compactness.20proof.20and.20model.20theory/near/369973855\">said</a>:</p>\n<blockquote>\n<p>Also, just in case you're not aware, there are already Isabelle/HOL formalisations of first-order logic in the AFP, including completeness. Not sure about compactness, but e.g. grepping for <code>herbrand</code> gives some results, but I don't know enough about logic to really see whether they are relevant to what you're doing.</p>\n<p>In any case, if you <em>can</em>, I'd suggest you build on top of an existing formalisation to increase reusability instead of making an entirely new formalisation of first-order logic.</p>\n</blockquote>\n<p>That's right. <br>\nThe 4th point would make use of some already formalized proofs of completeness for first order logic in the AFP.<br>\nAs far as my understanding goes, compactness should follow from completeness.</p>\n<p>However, we were initially going for the proof of compactness using ultraproducts, which as far as I'm aware does not exist in the AFP.<br>\nWe were still reusing parts of some entries though!<br>\nSome refactoring is needed anyway in my theory, I guess it would be a good time to use the entry <code>FOL_Fitting</code> for example (well, unless we have to scrap the entire proof anyway).</p>",
+        "id": 369976064,
+        "sender_full_name": "Ghilain Bergeron",
+        "timestamp": 1687857414
+    },
+    {
+        "content": "<p>I'll have to understand and see for the other suggestions.</p>\n<blockquote>\n<p>One approach that sometimes works is to define your thing by quantifying not over all models of any type, but over all models of some specific type that is \"big enough\" and then, later, proving that this more restricted predicate implies the more general one for an arbitrary type. Or, in your case, probably the reverse: if there exists any model, then there also exists a model of the type that you chose in the definition.</p>\n</blockquote>\n<p>I think this is basically what we are trying to achieve with the 3rd point. <br>\nNot sure how far it'll go nor if it actually works at all.</p>\n<blockquote>\n<p>Again, I don't know much about logic, but my guess would be that there is some kind of a-priori bound for how \"big\" the smallest model can (depending on the cardinality of the variable and constant symbols), or some kind of explicit construction for a model. I somehow vaguely remember something about Herbrand models? Aren't those even countable? In that case you could just hard-code the <code>'m</code> in your definition to a Herbrand universe (or <code>nat</code>, but that is probably less convenient).</p>\n</blockquote>\n<p>The problem we faced with requiring the domain of models to be countable is that the restriction is too big on what we can express.<br>\nMore specifically, since we make use of equivalence classes on functions (in the proof of Łoś' theorem), we would need to further restrict the domain of indices to be finite. <br>\nThis doesn't seem to be such a big restriction, but this has as a consequence that in the proof of compactness, the set containing all finite subsets of <code>T</code> must be finite, which means that <code>T</code> must be finite.<br>\nHence, the proof does not really make sense anymore.</p>\n<blockquote>\n<p>In a different context, Andreas Lochbihler discusses different alternatives to this limitation (<a href=\"http://www.andreas-lochbihler.de/pub/lochbihler14iw.pdf\">http://www.andreas-lochbihler.de/pub/lochbihler14iw.pdf</a>, Section 6.2), including hard-coding the types of interest, or working with a universal domain (your point 3). The solution he opts for is to use a codatatype to represent the existentially quantified type. I'm not sure though what this would correspond to in your setting.</p>\n</blockquote>\n<p>Thanks! I'll have a read and see if I can extract some precious knowledge out of it.</p>\n<blockquote>\n<p>You might think that writing that the theorem that the existence of any model implies your (now much more restricted) <code>sat</code> predicate would again require quantifying over types, but it doesn't really, because in that case you only have universal quantification at the outermost level, which is okay in Isabelle/HOL through its ad-hoc polymorphism. The statement, with schematic type and term variables for emphasis, would look something like this: <code>is_model_of (?M :: ('?f, '?p, '?m) model) ?T ⟹ sat ?T</code></p>\n</blockquote>\n<p>Mmmh, I don't really understand where this idea is going.<br>\nDo you mind expanding a bit on it?</p>",
+        "id": 369979638,
+        "sender_full_name": "Ghilain Bergeron",
+        "timestamp": 1687858040
+    },
+    {
+        "content": "<p>Okay, so the idea would be to do something like</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">definition</span><span class=\"w\"> </span><span class=\"n\">sat</span><span class=\"w\"> </span><span class=\"o\">::</span><span class=\"w\"> </span><span class=\"s\">\"formula ⇒ bool\"</span><span class=\"w\"> </span><span class=\"kp\">where</span><span class=\"w\"> </span><span class=\"s\">\"sat (φ :: ('v,'c) formula) = (∃M :: ('v,'c) std_model. is_model φ M)\"</span>\n</code></pre></div>\n<p>where <code>'v</code> and <code>'c</code> are the types of the variables/constant symbols and <code>std_model</code> is some type that you defined in terms of <code>'v</code> and <code>'c</code> that is ‘big enough’ so that you can construct a model for any satisfiable formula with variables/constants of that size in it.</p>\n<p>Clearly you can prove that if <code>sat φ</code> holds for some formula φ then there exists some type τ such that φ has a model of type τ. That's follows trivially from the definition of <code>sat</code>. The way to phrase this theorem in Isabelle would be</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">lemma</span><span class=\"w\"> </span><span class=\"n\">satD</span><span class=\"o\">:</span><span class=\"w\"> </span><span class=\"s\">\"sat (φ :: ('v,'c) formula) ⟹ ∃(M :: ('v,'c) std_model). is_model φ M\"</span>\n</code></pre></div>\n<p>The trickier part is to also prove the ‘converse’: if there is a model of some type τ then <code>sat</code> also holds:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">lemma</span><span class=\"w\"> </span><span class=\"n\">satI</span><span class=\"o\">:</span><span class=\"w\"> </span><span class=\"s\">\"is_model (φ :: ('v,'c) formula) (M :: 'm) ⟹ sat φ\"</span>\n</code></pre></div>",
+        "id": 369980533,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1687858196
+    },
+    {
+        "content": "<p>Oh alright I see. Thanks!</p>",
+        "id": 369981420,
+        "sender_full_name": "Ghilain Bergeron",
+        "timestamp": 1687858340
+    },
+    {
+        "content": "<p>That's just a sketch of course, but I hope you get what I mean.</p>",
+        "id": 369981790,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1687858408
+    },
+    {
+        "content": "<p>Yep I got it!</p>",
+        "id": 369982164,
+        "sender_full_name": "Ghilain Bergeron",
+        "timestamp": 1687858460
+    },
+    {
+        "content": "<p>How you define this <code>std_model</code> is of course the tricky question. But I guess that whatever it is that you're doing, you're probably going to prove somewhere that if there is <em>some</em> model for a formula, then there is also some kind of convenient ‘standard’ model. And then the structure of that standard model basically tells you what the <code>std_model</code> type should look like.</p>",
+        "id": 369982369,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1687858496
+    },
+    {
+        "content": "<p>I checked out a proof of compactness in HOL Light a bit ago (not based on ultraproducts though), and they were mentioning \"canonical models\".<br>\nI still haven't yet researched about those, but I think this should be close to what you describe.</p>",
+        "id": 369982923,
+        "sender_full_name": "Ghilain Bergeron",
+        "timestamp": 1687858587
+    },
+    {
+        "content": "<p>The existence of the algebraic closure is a similar example. There is no way to write down ‘every field has an algebraic closure’ in Isabelle/HOL in the \"straightforward\" way because you can't existentially quantify over types. But since the proof works by <em>constructing</em> a an algebraic closure for the type (I forgot how, probably some quotient over some multivariate polynomials over that field or whatever) you can just define something like <code>'a alg_closure = 'a mpoly set</code> or whatever and then you just prove that \"if I have a field of type <code>'a</code>, then this function gives me a field of type <code>'a alg_closure</code> that is an algebraic closure of the original field\"</p>",
+        "id": 369983367,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1687858663
+    },
+    {
+        "content": "<p>Similarly, I once had a student who was proving a statement on groups by induction, and the problem was that in the induction step he had to go from the group <code>G</code> to a quotient group <code>G/H</code>, which doesn't work because you cannot change the type over the thing you're doing induction on from <code>'a</code> to <code>'a set</code>.</p>\n<p>I think what he ended up doing was to just use the choice operator to pick arbitrary ‘canonical’ representatives for each equivalence class in <code>G/H</code> and defined a group isomorphic go <code>G/H</code> on those instead. Then he could apply the induction hypothesis to that group instead and then pull the result through the isomorphism again to get it for <code>G/H</code> like he wanted.</p>",
+        "id": 369984463,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1687858847
+    },
+    {
+        "content": "<p>At the end of the day I think most of these \"type quantification problems\" in HOL can be reduced simply to \"cardinality problems\". That is, instead of quantifying over <em>all</em> types just choose one fixed type that is guaranteed to be big enough for everything you want to do. And then just use isomorphism as needed to go in and out of that type. A bit hacky, but it works.</p>",
+        "id": 369985017,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1687858935
+    },
+    {
+        "content": "<p>Quite unnatural to state and hacky yeah, but if I can keep what I've been working over the last month (instead of starting again from scratch) then I'm quite happy if it has the potential to work!</p>",
+        "id": 369985871,
+        "sender_full_name": "Ghilain Bergeron",
+        "timestamp": 1687859077
+    },
+    {
+        "content": "<p>Thanks a lot!</p>",
+        "id": 369985959,
+        "sender_full_name": "Ghilain Bergeron",
+        "timestamp": 1687859095
+    },
+    {
+        "content": "<p>Just for completeness: there is a proof of compactness of FOL (or rather clausal logic, which we use in that entry) in the Ordered_Resolution_Prover (theory Inference_System) entry. It is based on completeness, and not on ultraproducts.</p>",
+        "id": 369988467,
+        "sender_full_name": "Dmitriy Traytel",
+        "timestamp": 1687859525
+    },
+    {
+        "content": "<p>Unfortunately it is only for unordered ground resolution... :(</p>",
+        "id": 369991436,
+        "sender_full_name": "Ghilain Bergeron",
+        "timestamp": 1687859992
+    },
+    {
+        "content": "<p>Oh no sorry, misunderstood the comment above!</p>",
+        "id": 369991658,
+        "sender_full_name": "Ghilain Bergeron",
+        "timestamp": 1687860028
+    },
+    {
+        "content": "<p>We'll have to check how to instantiate the locale containing this theorem though, and if it is possible for non-ground clausal logic.</p>",
+        "id": 369992313,
+        "sender_full_name": "Ghilain Bergeron",
+        "timestamp": 1687860141
+    }
+]

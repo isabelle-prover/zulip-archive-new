@@ -1,0 +1,84 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Solving a type class constraint · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Solving.20a.20type.20class.20constraint.html">[isabelle] Solving a type class constraint</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294278931"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Solving%20a%20type%20class%20constraint/near/294278931" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Solving.20a.20type.20class.20constraint.html#294278931">(Aug 19 2022 at 14:34)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+This works exactly as expected. Thanks!</p>
+<p>Lars</p>
+
+
+
+<a name="294281307"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Solving%20a%20type%20class%20constraint/near/294281307" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Solving.20a.20type.20class.20constraint.html#294281307">(Aug 19 2022 at 14:47)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+Hello,</p>
+<p>I'm trying to produce well-sorted terms in Isabelle/ML. Basically, I <br>
+ have a predicate "P" of type "'a" with some sort constraint, and I want <br>
+ to apply it to some polymorphic constant. Consider this small Isar <br>
+ snippet:</p>
+<p>class foo<br>
+ consts<br>
+   P :: "'a::foo ⇒ bool"<br>
+   opt :: "'a option"</p>
+<p>instantiation option :: (foo) foo<br>
+ begin<br>
+   instance ..<br>
+ end</p>
+<p>declare [[show_sorts]]</p>
+<p>ML_val{* @{term "P opt"} *}</p>
+<p>As is obvious from the output, type inference instantiates P's type to</p>
+<p>'a∷foo option ⇒ bool</p>
+<p>The important bit here is that it slapped a "foo" constraint on the <br>
+ type variable.</p>
+<p>However, it is not obvious to me how to do the same thing in ML. I <br>
+ mean, it's trivial to construct a well-typed term for "P opt":</p>
+<p>ML{*<br>
+   fun mk_P t = Const (@{const_name P}, fastype_of t --&gt; @{typ bool}) $ <br>
+ t;<br>
+   val t = mk_P @{term opt};<br>
+   val ct = cterm_of @{theory} t;<br>
+ *}</p>
+<p>... but the sort constraint is missing on the instantiated type of "P".</p>
+<p>A very "hackish" approximation for this problem is to go through <br>
+ "fastype_of t" and replace all sort constraints by "[foo]", because I <br>
+ can (sort of) assume that all my instantiations for "foo" only require <br>
+ "foo" for the type variables. I feel that there ought to be a better <br>
+ solution, though.</p>
+<p>Why do I even need well-sorted terms? I have rules which look like <br>
+ this:</p>
+<p>P x ⟹ P (Some x)</p>
+<p>and I cannot apply them unless the sorts line up.</p>
+<p>(In my formalization, the type constructor is not "option", but "fun", <br>
+ but the idea is the same.)</p>
+<p>Cheers<br>
+ Lars</p>
+
+
+
+<a name="294281534"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Solving%20a%20type%20class%20constraint/near/294281534" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Solving.20a.20type.20class.20constraint.html#294281534">(Aug 19 2022 at 14:48)</a>:</h4>
+<p>From: Dmitriy Traytel &lt;<a href="mailto:traytel@in.tum.de">traytel@in.tum.de</a>&gt;<br>
+Sounds to me like you just would want to use the type inference itself:</p>
+<p>ML{*<br>
+   fun mk_P t = Const (@{const_name P}, dummyT) $ t |&gt; Syntax.check_term <br>
+@{context};<br>
+   val t = mk_P (Const (@{const_name opt}, dummyT));<br>
+   val ct = cterm_of @{theory} t;<br>
+*}</p>
+<p>You can refine the "dummyT"s if the type that you get is too general.</p>
+<p>Hope that helps,<br>
+Dmitriy</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

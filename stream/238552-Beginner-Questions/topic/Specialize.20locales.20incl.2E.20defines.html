@@ -1,0 +1,76 @@
+<html>
+<head><meta charset="utf-8"><title>Specialize locales incl. defines · Beginner Questions · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/index.html">Beginner Questions</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Specialize.20locales.20incl.2E.20defines.html">Specialize locales incl. defines</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="261411502"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Specialize%20locales%20incl.%20defines/near/261411502" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Robert Soeldner <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Specialize.20locales.20incl.2E.20defines.html#261411502">(Nov 14 2021 at 11:01)</a>:</h4>
+<p>In my theory, I work with partial functions. To prevent writing <code>the</code> in some code (readability), I experimented with using <code>defines</code> to make use of total and partial functions.<br>
+This approach worked quite well, but now I encountered a problem when trying to specialize a locale. The following example shows such a case:</p>
+<div class="codehilite"><pre><span></span><code>abbreviation totalize :: &quot;(&#39;a ⇀ &#39;b) ⇒ &#39;a ⇒ &#39;b&quot; where
+&quot;totalize f a ≡ the (f a)&quot;
+
+locale A =
+  fixes a :: &quot;&#39;a set&quot;
+  assumes &quot;finite a&quot;
+
+locale B =
+  A: A a +
+  B: A b for a :: &quot;&#39;a set&quot; and b :: &quot;&#39;b set&quot; +
+fixes
+  f  :: &quot;&#39;a ⇀ &#39;b&quot; and
+  f&#39; :: &quot;&#39;a ⇒ &#39;b&quot;
+defines
+  f_def: &quot;f&#39; ≡ totalize f&quot;
+
+locale C = B a b &quot;λe. if e ∈ a then Some e else None&quot; id
+  for a b
+</code></pre></div>
+<p>Here, <code>locale C</code> is rejected with the following error message:</p>
+<div class="codehilite"><pre><span></span><code>Bad head of lhs: existing constant &quot;id&quot;
+The error(s) above occurred in definition:
+&quot;id ≡ λaa. totalize (If (aa ∈ a) (Some aa)) None&quot;
+</code></pre></div>
+<p>The same "problem"\limitation was reported in 2015 <a href="https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2015-August/msg00030.html">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2015-August/msg00030.html</a><br>
+Is there any known workaround?</p>
+
+
+
+<a name="261425067"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Specialize%20locales%20incl.%20defines/near/261425067" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Wolfgang Jeltsch <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Specialize.20locales.20incl.2E.20defines.html#261425067">(Nov 14 2021 at 16:18)</a>:</h4>
+<p>I don’t know understand right now what the precise problem is, let alone whether there’s a workaround for it, but I would argue that generally <code>id</code> doesn’t fulfill the relevant axiom anyhow.</p>
+<p>The representation of the partial function as a total function must use <code>the None</code> as the result for all arguments that don’t belong to the domain. However, <code>id</code> uses the arguments as the results. The point is that you’re not free to choose what to return for arguments outside the domain. While you don’t know what value <code>the None</code> really is, you’re still forced to pick this particular, unknown value.</p>
+<p>This restriction is important: If you were free to let the total function have any results for the arguments outside the domain, for example, by replacing the <code>defines</code> declaration with a <code>fixes</code> declaration that just insists that the partial and total versions coincide on the domain, then, by choosing different results for the same arguments outside the domain, you could distinguish different interpretations that should morally be the same.</p>
+<p>Therefore, my suggestion is: Just use <code>totalize</code> in the declaration of <code>C</code> as well.</p>
+
+
+
+<a name="261428400"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Specialize%20locales%20incl.%20defines/near/261428400" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Robert Soeldner <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Specialize.20locales.20incl.2E.20defines.html#261428400">(Nov 14 2021 at 17:30)</a>:</h4>
+<p>Thank you Wolfgang for your support :)</p>
+<p>The problem still remains:</p>
+<div class="codehilite"><pre><span></span><code>locale C = B a b &quot;λe. if e ∈ a then Some e else None&quot; &quot;totalize (λe. if e ∈ a then Some e else None)&quot;
+  for a b
+</code></pre></div>
+<p>will result in the following error:</p>
+<div class="codehilite"><pre><span></span><code>Bad head of lhs: &quot;λaa. totalize (If (aa ∈ a) (Some aa)) None&quot;
+The error(s) above occurred in definition:
+&quot;λaa. totalize (If (aa ∈ a) (Some aa)) None ≡ λaa. totalize (If (aa ∈ a) (Some aa)) None&quot;
+</code></pre></div>
+
+
+
+<a name="261429102"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Specialize%20locales%20incl.%20defines/near/261429102" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Wolfgang Jeltsch <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Specialize.20locales.20incl.2E.20defines.html#261429102">(Nov 14 2021 at 17:43)</a>:</h4>
+<p>Weird. It seems as if <code>totalize</code> is applied to a partial application of <code>If</code> instead of the function it is actually applied to, as if the <code>totalized</code> is pushed under the <code>λ</code>.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

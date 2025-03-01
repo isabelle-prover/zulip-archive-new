@@ -1,0 +1,74 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Wrong semantics for fmul_add in afp/IEEE_Float... · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Wrong.20semantics.20for.20fmul_add.20in.20afp.2FIEEE_Float.2E.2E.2E.html">[isabelle] Wrong semantics for fmul_add in afp/IEEE_Float...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="259564620"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Wrong%20semantics%20for%20fmul_add%20in%20afp/IEEE_Float.../near/259564620" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Wrong.20semantics.20for.20fmul_add.20in.20afp.2FIEEE_Float.2E.2E.2E.html#259564620">(Oct 29 2021 at 18:23)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:lammich@in.tum.de">lammich@in.tum.de</a>&gt;<br>
+Hi List (cc Fabian who's to hg-blame for this),</p>
+<p>when trying to prove properties of the IEEE fused-multiply-add<br>
+operation as formalized in the AFP entry IEEE_Floating_Point, I came<br>
+across an oddity in the corner <br>
+case of rounding to -\infinity, where a positive actual result<br>
+(resulting from non-negative operands) gets rounded down to zero. <br>
+In this case, the formalized operation returns -0, but I believe it<br>
+must be 0 (and so does Intel's AVX512  _mm_fmadd_round_sd instruction).</p>
+<p>I'm writing this lengthy mail, as the formalization looks like this<br>
+behaviour has been built in on purpose. The relevant code in IEEE.thy<br>
+is:</p>
+<p>float_round mode<br>
+                (if (r1 = 0) ∧ (r2 = 0) ∧ (signP = sign z) then<br>
+                   signP = 1<br>
+                 else mode = To_ninfinity) (r1 + r2))</p>
+<p>This will explicitly select a negative zero for To_ninfinity rounding<br>
+mode!</p>
+<p>Any comments? <br>
+What was the intention behind this? <br>
+Am I (and Intel-AVX) interpreting the standard wrongly? Or should I try<br>
+to fix this?</p>
+
+
+
+<a name="275832073"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Wrong%20semantics%20for%20fmul_add%20in%20afp/IEEE_Float.../near/275832073" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Wrong.20semantics.20for.20fmul_add.20in.20afp.2FIEEE_Float.2E.2E.2E.html#275832073">(Mar 18 2022 at 16:57)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:lammich@in.tum.de">lammich@in.tum.de</a>&gt;<br>
+Hi Fabian,</p>
+<p>I have now fixed the issue.</p>
+<p>I have also built an executable result checker, which will check the <br>
+semantics against a proposed result. With this, the fixed semantics (see <br>
+attached) now passes the IBM fpgen test suite <br>
+(<a href="https://research.ibm.com/haifa/projects/verification/fpgen/ieeets.shtml">https://research.ibm.com/haifa/projects/verification/fpgen/ieeets.shtml</a>) <br>
+and coincides with the output of AVX512f, and std::fma in C++ (however <br>
+that gets translated on my laptop ;) ). I have also tested the <br>
++,-,/,*,sqrt operations, which also pass fpgen.</p>
+<p>Shall I commit a patch to afp-devel?<br>
+<a href="/user_uploads/14278/6ZSwIVjf-sFg8WEKE6KyZJLQ/IEEE.thy">IEEE.thy</a></p>
+
+
+
+<a name="275856038"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Wrong%20semantics%20for%20fmul_add%20in%20afp/IEEE_Float.../near/275856038" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Wrong.20semantics.20for.20fmul_add.20in.20afp.2FIEEE_Float.2E.2E.2E.html#275856038">(Mar 18 2022 at 20:07)</a>:</h4>
+<p>From: Fabian Immler &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;</p>
+<blockquote>
+<p>On 18. Mar 2022, at 17:54, Peter Lammich &lt;<a href="mailto:lammich@in.tum.de">lammich@in.tum.de</a>&gt; wrote:</p>
+<p>Hi Fabian,</p>
+<p>I have now fixed the issue.</p>
+<p>I have also built an executable result checker, which will check the semantics against a proposed result. With this, the fixed semantics (see attached) now passes the IBM fpgen test suite (<a href="https://research.ibm.com/haifa/projects/verification/fpgen/ieeets.shtml">https://research.ibm.com/haifa/projects/verification/fpgen/ieeets.shtml</a> &lt;<a href="https://research.ibm.com/haifa/projects/verification/fpgen/ieeets.shtml">https://research.ibm.com/haifa/projects/verification/fpgen/ieeets.shtml</a>&gt;) and coincides with the output of AVX512f, and std::fma in C++ (however that gets translated on my laptop ;) ). I have also tested the +,-,/,*,sqrt operations, which also pass fpgen.</p>
+<p>Nice!<br>
+Shall I commit a patch to afp-devel?</p>
+<p>Yes, looks good to me.</p>
+</blockquote>
+<p>Best wishes,<br>
+Fabian</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

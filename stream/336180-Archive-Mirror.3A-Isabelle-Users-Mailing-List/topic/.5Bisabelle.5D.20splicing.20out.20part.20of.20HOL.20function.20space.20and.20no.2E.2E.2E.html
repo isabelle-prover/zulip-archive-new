@@ -1,0 +1,90 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] splicing out part of HOL function space and no... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20splicing.20out.20part.20of.20HOL.20function.20space.20and.20no.2E.2E.2E.html">[isabelle] splicing out part of HOL function space and no...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294050216"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20splicing%20out%20part%20of%20HOL%20function%20space%20and%20no.../near/294050216" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20splicing.20out.20part.20of.20HOL.20function.20space.20and.20no.2E.2E.2E.html#294050216">(Aug 18 2022 at 10:38)</a>:</h4>
+<p>From: Dimitrios Vytiniotis &lt;<a href="mailto:dimitriv@cis.upenn.edu">dimitriv@cis.upenn.edu</a>&gt;<br>
+Dear all,<br>
+I have come accross the following situation. I have a formalization of<br>
+parametricity for an extension of System F in Isabelle/HOL, where types<br>
+are interpreted as relations between terms. We have:</p>
+<p>types rel  = "(tm×tm) set"<br>
+consts Interpret :: "ty =&gt; substitution =&gt; rel"</p>
+<p>And Interpret takes a type (ty) and an environment (substitution) and<br>
+returns a relation (rel). Its definition is just a recdef.</p>
+<p>[Please excuse my dependent types notation below but that's the way I<br>
+started thinking about it.] What I want to do is the following.<br>
+Given a type for kinds:</p>
+<p>datatype kind = Star | Fun kind kind</p>
+<p>I want to define a <em>type</em> that I call rel(k) so that:<br>
+  rel(Star)      = rel<br>
+  rel(Fun k1 k2) = rel(k1) =&gt; rel(k2)</p>
+<p>That is, I want "rel(Fun k1 k2)" to mean the set of all HOL functions<br>
+from "rel(k1)" to "rel(k2)". And finally I want Interpret to have<br>
+the pseudo-type:</p>
+<p>Interpret :: (k:kind) =&gt; ty =&gt; substitution =&gt; rel(k)</p>
+<p>So, modulo dependent types notation, what I really really want<br>
+is temporarily go to some common type that I can give to the<br>
+"rel(k)" above, call it  GeneralizedRel, so that Interpret returns one<br>
+of these. So the real type of Interpret would be:<br>
+   kind =&gt; ty =&gt; substitution =&gt; GeneralizedRel<br>
+and I would hopefully be able to prove the extra dependencies with<br>
+the help of some lemmas.</p>
+<p>Is is known how can one do something like that in Isabelle/HOL? I am not<br>
+particularly attached to the style of definitions (recursive functions<br>
+vs. inductive relations) so any suggestions and ideas are very<br>
+welcome.</p>
+<p>Thanks!<br>
+--dimitris</p>
+
+
+
+<a name="294050228"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20splicing%20out%20part%20of%20HOL%20function%20space%20and%20no.../near/294050228" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20splicing.20out.20part.20of.20HOL.20function.20space.20and.20no.2E.2E.2E.html#294050228">(Aug 18 2022 at 10:38)</a>:</h4>
+<p>From: Steven Obua &lt;<a href="mailto:obua@in.tum.de">obua@in.tum.de</a>&gt;<br>
+I don't think what you want is possible in Isabelle/HOL.</p>
+<p>Nevertheless, a workaround could be to take the type GeneralizedRel as <br>
+the type of all Zermelo-Fraenkel sets,<br>
+which is available in Isabelle/HOL in the theory HOL/ZF/MainZF:</p>
+<hr>
+<p>theory recty<br>
+imports "~~/src/HOL/ZF/MainZF"<br>
+begin</p>
+<p>typedecl tm</p>
+<p>axioms tm_representable: "\&lt;exists&gt; f z. (UNIV :: tm set) = image f <br>
+(explode z)"</p>
+<p>definition<br>
+  "TM = (SOME z. (\&lt;exists&gt; f. (UNIV :: tm set) = image f (explode z)))"</p>
+<p>definition<br>
+  "TM_rep = (SOME f. inj_on f (explode TM) \&lt;and&gt; (UNIV :: tm set) = <br>
+image f (explode TM))"</p>
+<p>lemma "inj_on TM_rep (explode TM)"<br>
+  sorry</p>
+<p>lemma "(UNIV :: tm set) = image TM_rep (explode TM)"<br>
+  sorry</p>
+<p>datatype kind = Star | F kind kind</p>
+<p>fun rel :: "kind \&lt;Rightarrow&gt; ZF"<br>
+where<br>
+  "rel Star = CartProd TM TM"<br>
+| "rel (F a b) = Fun (rel a) (rel b)"</p>
+<p>end</p>
+<hr>
+<p>Here the axiom tm_representable is something which you could probably <br>
+show for your terms (your terms should be countable?)</p>
+<p>Of course, you would not exactly be working in pure type theory anymore :-)</p>
+<p>The above is just a rough scetch, should you consider this option don't <br>
+hesitate to contact me with any further comments/questions.</p>
+<p>Steven</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

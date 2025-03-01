@@ -1,0 +1,165 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] nonterminating? &#x27;auto&#x27; with standard HOL simp ... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20nonterminating.3F.20.27auto.27.20with.20standard.20HOL.20simp.20.2E.2E.2E.html">[isabelle] nonterminating? &#x27;auto&#x27; with standard HOL simp ...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294710446"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20nonterminating%3F%20%27auto%27%20with%20standard%20HOL%20simp%20.../near/294710446" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20nonterminating.3F.20.27auto.27.20with.20standard.20HOL.20simp.20.2E.2E.2E.html#294710446">(Aug 22 2022 at 15:26)</a>:</h4>
+<p>From: Bertram Felgenhauer via Cl-isabelle-users &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Hi,</p>
+<p>I have a looping 'auto' command in the following theory, for a fairly<br>
+simple goal (indicated by the fact that the proof can be completed<br>
+using 'standard; simp'). I don't know why this is happening, can anyone<br>
+figure out what's going on here?</p>
+<p>This affects Isabelle2016-1 and c5b19f997214.</p>
+<p>Cheers,</p>
+<p>Bertram</p>
+<p>theory Loop<br>
+  imports Main<br>
+begin</p>
+<p>definition refined :: "'a list ⇒ 'b list ⇒ bool" where<br>
+  "refined ss ts ⟷ length ts = length ss ∧<br>
+    (∀i j. i &lt; length ss ∧ j &lt; length ts ∧ ss ! i = ss ! j ⟶ ts ! i = ts ! j)"</p>
+<p>definition imbalance :: "'a list ⇒ nat" where<br>
+  "imbalance xs = card { i. i &lt; length xs ∧ (∀j. j &lt; length xs ∧ xs ! i = xs ! j ⟶ i ≤ j) }"</p>
+<p>lemma refined_imbalance_mono:<br>
+  "refined ss ts ⟹ imbalance ss ≥ imbalance ts"<br>
+  (* apply (auto simp: refined_def imbalance_def intro: card_mono) (* desired proof *) *)<br>
+  unfolding refined_def imbalance_def<br>
+  apply (intro card_mono)<br>
+   apply simp<br>
+  apply auto  (* loops? *)<br>
+  (* the proof can be completed by the following two commands: *)<br>
+  apply standard<br>
+  apply simp<br>
+  done</p>
+<p>end</p>
+
+
+
+<a name="294711571"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20nonterminating%3F%20%27auto%27%20with%20standard%20HOL%20simp%20.../near/294711571" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20nonterminating.3F.20.27auto.27.20with.20standard.20HOL.20simp.20.2E.2E.2E.html#294711571">(Aug 22 2022 at 15:32)</a>:</h4>
+<p>From: Bertram Felgenhauer via Cl-isabelle-users &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Replying to myself:<br>
+I tried to reduce the example, and ended up with the following statement<br>
+that causes the simplifier to loop for a trivial goal (solvable by .):</p>
+<p>notepad begin<br>
+  fix P :: "'a ⇒ bool" and f :: "'a ⇒ 'b"<br>
+  assume "P j ⟹ f i = f j" for i j<br>
+  then have "P j ⟹ f i = f j" for i j<br>
+  apply (simp only: )<br>
+end</p>
+<p>I'm still not sure how to read the resulting simplifier trace, but it's<br>
+definitely looping. If I do understand it correctly, the simplifier<br>
+turns the premise into a rewrite rule</p>
+<p>P ?j1 ⟹ f i ≡ f ?j1 </p>
+<p>which it then applies to the given P j to obtain f i ≡ f j, and then<br>
+f j ≡ f j over and over again. The rewrite rule</p>
+<p>P ?j3 ⟹ f ?i3 = f ?j3 ≡ True</p>
+<p>that would solve the goal never gets a chance to fire, apparently,<br>
+perhaps because of the meta level equality?</p>
+<p>Cheers,</p>
+<p>Bertram</p>
+
+
+
+<a name="294711587"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20nonterminating%3F%20%27auto%27%20with%20standard%20HOL%20simp%20.../near/294711587" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20nonterminating.3F.20.27auto.27.20with.20standard.20HOL.20simp.20.2E.2E.2E.html#294711587">(Aug 22 2022 at 15:32)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+Your analysis is correct. The simplifier gets into a loop because the rules you <br>
+have given it allow it to. The simpifier follows a certain fixed strategy and <br>
+does not try to detect nontermination if it involves more than one rule.</p>
+<p>Tobias<br>
+<a href="/user_uploads/14278/ygCZrnW6odncz38IaMYxM4x6/smime.p7s">smime.p7s</a></p>
+
+
+
+<a name="294711612"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20nonterminating%3F%20%27auto%27%20with%20standard%20HOL%20simp%20.../near/294711612" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20nonterminating.3F.20.27auto.27.20with.20standard.20HOL.20simp.20.2E.2E.2E.html#294711612">(Aug 22 2022 at 15:32)</a>:</h4>
+<p>From: Bertram Felgenhauer via Cl-isabelle-users &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Tobias Nipkow wrote:<br>
+That's a bit unsatisfying. Since those rewrite rules arise from the<br>
+premises I guess my only option is to hide the problematic equalities<br>
+from the simplifier? At least for my original theory, this works:</p>
+<p>definition "hide_eq ss i j ⟷ ss ! i = ss ! j"</p>
+<p>lemma refined_imbalance_mono:<br>
+  "refined ss ts ⟹ imbalance ss ≥ imbalance ts"<br>
+  by (auto simp: refined_def imbalance_def hide_eq_def[symmetric]<br>
+    intro: card_mono)</p>
+<p>It feels like a dirty trick though.</p>
+<p>Cheers,</p>
+<p>Bertram</p>
+
+
+
+<a name="294711700"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20nonterminating%3F%20%27auto%27%20with%20standard%20HOL%20simp%20.../near/294711700" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20nonterminating.3F.20.27auto.27.20with.20standard.20HOL.20simp.20.2E.2E.2E.html#294711700">(Aug 22 2022 at 15:33)</a>:</h4>
+<p>From: <a href="mailto:Thomas.Sewell@data61.csiro.au">Thomas.Sewell@data61.csiro.au</a><br>
+Hi Bertram.</p>
+<p>I had a look at your problem as well.</p>
+<p>It is a common difficulty that the simplifier will use premises of the <br>
+form "forall x. P x --&gt; x = ..." as<br>
+conditional rewrite rules, and they frequently apply far too easily, <br>
+leading to indefinite recursion or<br>
+to looping.</p>
+<p>The version in your notepad happens because the rewrite rule, together <br>
+with the extra assumption "P j",<br>
+can be used to rewrite "f x" into "f j" for any x, including x=j. The <br>
+simplifier doesn't note this is a loop<br>
+because it doesn't know until it recurses that the only solution to "P <br>
+?x" requires ?x=j.</p>
+<p>Sometimes you can work you way through these via apply (simp(no_asm_use))<br>
+or apply (simp(no_asm_simp)). That requires a long proof, however, <br>
+rather than an easy proof with auto.</p>
+<p>One option is to control the use of quantifiers a bit more by providing <br>
+classical rules instead.<br>
+Here's a proof which works by providing rules for your "refined" predicate:</p>
+<p>lemma refined_length_eq:<br>
+   "refined ss ts ⟹ length ts = length ss"<br>
+   by (simp add: refined_def)</p>
+<p>lemma list_eq_refinedD:<br>
+   "ss ! i = ss ! j ⟹ refined ss ts ⟹ i &lt; length ss ⟹ j &lt; length ss<br>
+     ⟹ ts ! i = ts ! j"<br>
+   unfolding refined_def<br>
+   by metis</p>
+<p>lemma refined_imbalance_mono:<br>
+   "refined ss ts ⟹ imbalance ss ≥ imbalance ts"<br>
+   (* apply (auto simp: refined_def imbalance_def intro: card_mono) (* <br>
+desired proof *) *)<br>
+   unfolding imbalance_def<br>
+   apply (auto intro!: card_mono simp: refined_length_eq dest: <br>
+list_eq_refinedD)</p>
+<p>It took me a couple of rounds to get it to work with standard auto. You <br>
+can also try fastforce,<br>
+which is a bit more aggressive, or turn up auto's search depth<br>
+   e.g. (auto 4 4 intro: card_mono simp: refined_length_eq dest: <br>
+refined_eq_imp)</p>
+<p>Perhaps that helps?</p>
+<p>Cheers,<br>
+     Thomas.</p>
+
+
+
+<a name="294711747"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20nonterminating%3F%20%27auto%27%20with%20standard%20HOL%20simp%20.../near/294711747" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20nonterminating.3F.20.27auto.27.20with.20standard.20HOL.20simp.20.2E.2E.2E.html#294711747">(Aug 22 2022 at 15:33)</a>:</h4>
+<p>From: Bertram Felgenhauer via Cl-isabelle-users &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Hi Thomas,</p>
+<blockquote>
+<p>I had a look at your problem as well.</p>
+</blockquote>
+<p>Thanks a lot! The idea of using derived properties instead of the<br>
+full definition looks like a natural and fairly general way of<br>
+avoiding exposing the simplifier to harmful simplification rules.</p>
+<p>Cheers,</p>
+<p>Bertram</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

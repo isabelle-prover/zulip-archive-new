@@ -1,0 +1,554 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] induction over mutually-inductively-defined pr... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20induction.20over.20mutually-inductively-defined.20pr.2E.2E.2E.html">[isabelle] induction over mutually-inductively-defined pr...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294147473"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20induction%20over%20mutually-inductively-defined%20pr.../near/294147473" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20induction.20over.20mutually-inductively-defined.20pr.2E.2E.2E.html#294147473">(Aug 18 2022 at 18:40)</a>:</h4>
+<p>From: John Wickerson &lt;<a href="mailto:jpw48@cam.ac.uk">jpw48@cam.ac.uk</a>&gt;<br>
+Hello,</p>
+<p>I have a whole bunch of mutually-inductively-defined datatypes, functions and predicates in my theory, and I'm having difficulty doing structural and rule induction over them.</p>
+<p>At the end of this email is my (slightly condensed) theory file. Apologies for not creating a minimal example exhibiting my problem -- I thought it better to leave the theory file mostly as-is, to ensure that your solutions apply to my real script and not just to some minimal example.</p>
+<p>The problem is the last line ... </p>
+<blockquote>
+<p>proof(induct rule: prov_dia_prov_col.induct)</p>
+</blockquote>
+<p>... which gives an error ("Proof command failed"), despite my goal being of the required form "?P ?a \&lt;and&gt; ?Q ?A". My question is: How can I give Isabelle hints to help it work out how to apply the given induction rule? </p>
+<p>Many thanks,<br>
+John</p>
+<p>------------8&lt;-------------</p>
+<p>theory Ribbons imports Main</p>
+<p>begin</p>
+<p>typedecl bool_exp<br>
+consts Not :: "bool_exp \&lt;Rightarrow&gt; bool_exp"<br>
+consts rd_be :: "bool_exp \&lt;Rightarrow&gt; string set"</p>
+<p>typedecl assertion<br>
+consts Emp :: "assertion"<br>
+consts Pure :: "bool_exp \&lt;Rightarrow&gt; assertion"</p>
+<p>axiomatization<br>
+  Star :: "assertion \&lt;Rightarrow&gt; assertion \&lt;Rightarrow&gt; assertion"<br>
+where star_comm: "Star p q = Star q p"<br>
+  and star_assoc: "Star (Star p q) r = Star p (Star q r)"<br>
+  and star_emp: "Star p Emp = p"<br>
+  and emp_star: "Star Emp p = p"</p>
+<p>consts Exists :: "string \&lt;Rightarrow&gt; assertion \&lt;Rightarrow&gt; assertion"</p>
+<p>axiomatization <br>
+  rd_ass :: "assertion \&lt;Rightarrow&gt; string set"<br>
+where rd_emp: "rd_ass Emp = {}"<br>
+  and rd_star: "rd_ass (Star p q) = rd_ass p \&lt;union&gt; rd_ass q"<br>
+  and rd_exists: "rd_ass (Exists x p) = rd_ass p"</p>
+<p>typedecl atomic<br>
+consts rd_atm :: "atomic \&lt;Rightarrow&gt; string set"<br>
+consts wr_atm :: "atomic \&lt;Rightarrow&gt; string set"</p>
+<p>datatype command =<br>
+  Atomic "atomic"<br>
+| If "bool_exp" "command list" "command list"<br>
+| While "bool_exp" "command list"</p>
+<p>fun<br>
+  interleave_coms :: "(command list \&lt;times&gt; command list) \&lt;Rightarrow&gt; command list set"<br>
+where<br>
+  "interleave_coms ([], C2) = {C2}"<br>
+| "interleave_coms (C1, []) = {C1}"<br>
+| "interleave_coms (c1#C1, c2#C2)<br>
+  = {c1#C | C. C \&lt;in&gt; interleave_coms(C1, c2#C2)}<br>
+  \&lt;union&gt; {c2#C | C. C \&lt;in&gt; interleave_coms(c1#C1, C2)}"</p>
+<p>inductive<br>
+  prov_com :: "assertion \&lt;times&gt; command \&lt;times&gt; assertion \&lt;Rightarrow&gt; bool"<br>
+and<br>
+  prov_comlist :: "assertion \&lt;times&gt; command list \&lt;times&gt; assertion \&lt;Rightarrow&gt; bool"<br>
+where<br>
+  exists: <br>
+  "prov_com (p, c, q) <br>
+  \&lt;Longrightarrow&gt; prov_com (Exists x p, c, Exists x q)"<br>
+| ifcom: <br>
+  "\&lt;lbrakk&gt;prov_comlist (Star (Pure b) p, C1, q); <br>
+  prov_comlist (Star (Pure (Not b)) p, C2, q)\&lt;rbrakk&gt; <br>
+  \&lt;Longrightarrow&gt; prov_com (p, If b C1 C2, q)"<br>
+| while: <br>
+  "prov_comlist (Star (Pure b) p, C, p) <br>
+  \&lt;Longrightarrow&gt; prov_com (p, While b C, Star (Pure (Not b)) p)" <br>
+| frame: <br>
+  "\&lt;lbrakk&gt;prov_com (p, c, q); wr_com(c) \&lt;inter&gt; rd_ass(r) = {}\&lt;rbrakk&gt; <br>
+  \&lt;Longrightarrow&gt; prov_com (Star p r, c, Star q r)"<br>
+| skip: <br>
+  "prov_comlist(p, [], p)"<br>
+| seq: <br>
+  "\&lt;lbrakk&gt;prov_com (p, c, q); prov_comlist (q, C, r)\&lt;rbrakk&gt; <br>
+  \&lt;Longrightarrow&gt; prov_comlist (p, c#C, r)"</p>
+<p>datatype face =<br>
+  Ribbon "assertion"<br>
+| Exists_int "string" "face list"</p>
+<p>type_synonym interface = "face list"</p>
+<p>fun<br>
+  ass_face :: "face \&lt;Rightarrow&gt; assertion"<br>
+and<br>
+  ass :: "interface \&lt;Rightarrow&gt; assertion"<br>
+where<br>
+  "ass_face (Ribbon p) = p"<br>
+| "ass_face (Exists_int x P) = Exists x (ass P)"<br>
+| "ass [] = Emp"<br>
+| "ass (f#P) = Star (ass_face f) (ass P)"</p>
+<p>datatype column =<br>
+  Blank "interface"<br>
+| Basic "interface" "command" "interface"<br>
+| VComp_dia "column list" "column list"<br>
+| Exists_dia "string" "column list"<br>
+| If_dia "interface" "bool_exp" "column list" "column list" "interface"<br>
+| While_dia "interface" "bool_exp" "column list" "interface"</p>
+<p>type_synonym diagram = "column list"</p>
+<p>fun<br>
+  top :: "diagram \&lt;Rightarrow&gt; interface"<br>
+and<br>
+  top_col :: "column \&lt;Rightarrow&gt; interface"<br>
+where<br>
+  "top_col (Blank P) = P"<br>
+| "top_col (Basic P c Q) = P"<br>
+| "top_col (VComp_dia A B) = top A"<br>
+| "top_col (Exists_dia x A) = [Exists_int x (top A)]"<br>
+| "top_col (If_dia P b A B Q) = P"<br>
+| "top_col (While_dia P b A Q) = P"<br>
+| "top [] = []"<br>
+| "top (a # A) = (top_col a) @ (top A)"</p>
+<p>fun<br>
+  bot :: "diagram \&lt;Rightarrow&gt; interface"<br>
+and<br>
+  bot_col :: "column \&lt;Rightarrow&gt; interface"<br>
+where<br>
+  "bot_col (Blank P) = P"<br>
+| "bot_col (Basic P c Q) = Q"<br>
+| "bot_col (VComp_dia A B) = bot B"<br>
+| "bot_col (Exists_dia x A) = [Exists_int x (bot A)]"<br>
+| "bot_col (If_dia P b A B Q) = Q"<br>
+| "bot_col (While_dia P b A Q) = Q"<br>
+| "bot [] = []"<br>
+| "bot (a # A) = (bot_col a) @ (bot A)"</p>
+<p>fun<br>
+  coms :: "diagram \&lt;Rightarrow&gt; command list set"<br>
+and<br>
+  coms_col :: "column \&lt;Rightarrow&gt; command list set"<br>
+where<br>
+  "coms_col (Blank P) = {}"<br>
+| "coms_col (Basic P c Q) = {[c]}"<br>
+| "coms_col (VComp_dia A B) <br>
+  = {C @ C' | C C'. C \&lt;in&gt; coms A \&lt;and&gt; C' \&lt;in&gt; coms B}"<br>
+| "coms_col (Exists_dia x A) = coms A"<br>
+| "coms_col (If_dia P b A B Q) <br>
+  = { [If b C C'] | C C'. C \&lt;in&gt; coms A \&lt;and&gt; C' \&lt;in&gt; coms B}"<br>
+| "coms_col (While_dia P b A Q) = { [While b C] | C. C \&lt;in&gt; coms A}"<br>
+| "coms [] = {}"<br>
+| "coms (a # A) <br>
+  = \&lt;Union&gt;{interleave_coms (C, C') | C C'. C \&lt;in&gt; coms_col a \&lt;and&gt; C' \&lt;in&gt; coms A}"</p>
+<p>consts <br>
+  disj_col_dia :: "column \&lt;Rightarrow&gt; diagram \&lt;Rightarrow&gt; bool"</p>
+<p>inductive<br>
+  prov_dia :: "diagram \&lt;Rightarrow&gt; bool"<br>
+and<br>
+  prov_col :: "column \&lt;Rightarrow&gt; bool"<br>
+where<br>
+  Blank: <br>
+  "prov_col (Blank P)"<br>
+| Basic: <br>
+  "prov_com (ass P, c, ass Q) \&lt;Longrightarrow&gt; prov_col (Basic P c Q)"<br>
+| Exists: <br>
+  "prov_dia A \&lt;Longrightarrow&gt; prov_col (Exists_dia x A)"<br>
+| VComp: <br>
+  "\&lt;lbrakk&gt;prov_dia A; prov_dia B; bot A = top B\&lt;rbrakk&gt; \&lt;Longrightarrow&gt; prov_col (VComp_dia A B)"<br>
+| If: <br>
+  "\&lt;lbrakk&gt;prov_dia A; prov_dia B; top A = (Ribbon (Pure b)) # P; <br>
+  top B = (Ribbon (Pure (Not b))) # P; bot A = Q; bot B = Q\&lt;rbrakk&gt; <br>
+  \&lt;Longrightarrow&gt; prov_col (If_dia P b A B Q)"<br>
+| While: <br>
+  "\&lt;lbrakk&gt;prov_dia A; top A = (Ribbon(Pure b)) # P; <br>
+  bot A = P; Q = (Ribbon(Pure (Not b))) # P\&lt;rbrakk&gt; <br>
+  \&lt;Longrightarrow&gt; prov_col (While_dia P b A Q)"<br>
+| Nil: <br>
+  "prov_dia []"<br>
+| Cons:<br>
+  "\&lt;lbrakk&gt;prov_col a; prov_dia A; disj_col_dia a A\&lt;rbrakk&gt; <br>
+  \&lt;Longrightarrow&gt; prov_dia (a # A)"</p>
+<p>datatype chain = <br>
+  cNil "assertion"<br>
+| cCons "assertion" "command" "chain"</p>
+<p>fun <br>
+  seq_chains :: "chain \&lt;times&gt; chain \&lt;Rightarrow&gt; chain"<br>
+where<br>
+  "seq_chains (cNil _, G') = G'"<br>
+| "seq_chains (cCons p c G, G') = cCons p c (seq_chains (G, G'))"</p>
+<p>fun<br>
+  pre :: "chain \&lt;Rightarrow&gt; assertion"<br>
+where<br>
+  "pre(cNil p) = p"<br>
+| "pre(cCons p c G) = p"</p>
+<p>fun <br>
+  post :: "chain \&lt;Rightarrow&gt; assertion"<br>
+where<br>
+  "post(cNil p) = p"<br>
+| "post(cCons p c G) = post G"</p>
+<p>fun<br>
+  comlist :: "chain \&lt;Rightarrow&gt; command list"<br>
+where<br>
+  "comlist(cNil p) = []"<br>
+| "comlist(cCons p c G) = c # (comlist G)"</p>
+<p>fun<br>
+  ass_map :: "(assertion \&lt;Rightarrow&gt; assertion) \&lt;Rightarrow&gt; chain \&lt;Rightarrow&gt; chain"<br>
+where<br>
+  "ass_map f (cNil p) = cNil (f p)"<br>
+| "ass_map f (cCons p c G) = cCons (f p) c (ass_map f G)"</p>
+<p>function<br>
+  interleave_chains :: "(chain \&lt;times&gt; chain) \&lt;Rightarrow&gt; chain set"<br>
+where<br>
+  "interleave_chains (cNil p, G) = {ass_map (\&lt;lambda&gt;q. Star p q) G}"<br>
+| "interleave_chains (G, cNil p) = {ass_map (\&lt;lambda&gt;q. Star q p) G}"<br>
+| "interleave_chains (cCons p1 c1 G1, cCons p2 c2 G2)<br>
+  = {cCons (Star p1 p2) c1 G | G. <br>
+      G \&lt;in&gt; interleave_chains(G1, cCons p2 c2 G2)}<br>
+  \&lt;union&gt; {cCons (Star p1 p2) c2 G | G. <br>
+      G \&lt;in&gt; interleave_chains(cCons p1 c1 G1, G2)}"<br>
+by pat_completeness auto<br>
+termination by lexicographic_order</p>
+<p>lemma chainpair_induction [case_names Nil_Cons Cons_Nil Cons_Cons]:<br>
+  assumes "\&lt;And&gt;p1 G2. \&lt;Phi&gt; (cNil p1) G2"<br>
+  assumes "\&lt;And&gt;p2 G1. \&lt;Phi&gt; G1 (cNil p2)"<br>
+  assumes "\&lt;And&gt;p1 p2 c1 c2 G1 G2.<br>
+  \&lt;lbrakk&gt;\&lt;Phi&gt; G1 (cCons p2 c2 G2); \&lt;Phi&gt; (cCons p1 c1 G1) G2\&lt;rbrakk&gt; <br>
+  \&lt;Longrightarrow&gt; \&lt;Phi&gt; (cCons p1 c1 G1) (cCons p2 c2 G2)"<br>
+  shows "\&lt;Phi&gt; G1 G2"<br>
+using assms<br>
+by induction_schema (pat_completeness, lexicographic_order)</p>
+<p>consts disj_chain :: "chain \&lt;Rightarrow&gt; chain \&lt;Rightarrow&gt; bool"</p>
+<p>inductive<br>
+  prov_chain :: "chain \&lt;Rightarrow&gt; bool"<br>
+where<br>
+  skip: "prov_chain(cNil p)"<br>
+| seq: "\&lt;lbrakk&gt;prov_com(p, c, pre G); prov_chain G\&lt;rbrakk&gt; <br>
+  \&lt;Longrightarrow&gt; prov_chain(cCons p c G)" </p>
+<p>fun<br>
+  chains :: "diagram \&lt;Rightarrow&gt; chain set"<br>
+and<br>
+  chains_col :: "column \&lt;Rightarrow&gt; chain set"<br>
+where<br>
+  "chains_col (Blank P) = {cNil (ass P)}"<br>
+| "chains_col (Basic P c Q) = {cCons (ass P) c (cNil (ass Q))}"<br>
+| "chains_col (VComp_dia A B) = {seq_chains (G1, G2) <br>
+  | G1 G2. G1 \&lt;in&gt; chains A \&lt;and&gt; G2 \&lt;in&gt; chains B \&lt;and&gt; post G1 = pre G2}"<br>
+| "chains_col (Exists_dia x A) = {ass_map (Exists x) G <br>
+  | G. G \&lt;in&gt; chains A}"<br>
+| "chains_col (If_dia P b A B Q) = <br>
+  {cCons (ass P) (If b (comlist G1) (comlist G2)) (cNil (ass Q)) <br>
+  | G1 G2. G1 \&lt;in&gt; chains A \&lt;and&gt; G2 \&lt;in&gt; chains B <br>
+    \&lt;and&gt; pre G1 = Star (Pure b) (ass P) <br>
+    \&lt;and&gt; pre G2 = Star (Pure (Not b)) (ass P) <br>
+    \&lt;and&gt; post G1 = ass Q \&lt;and&gt; post G2 = ass Q }"<br>
+| "chains_col (While_dia P b A Q) = <br>
+  { cCons (ass P) (While b (comlist G)) (cNil (ass Q)) <br>
+  | G. G \&lt;in&gt; chains A \&lt;and&gt; post G = ass P<br>
+    \&lt;and&gt; pre G = Star (Pure b) (ass P) <br>
+    \&lt;and&gt; ass Q = Star (Pure (Not b)) (ass P) }"<br>
+| "chains [] = {}"<br>
+| "chains (a # A) = \&lt;Union&gt; {interleave_chains (G1, G2) <br>
+  | G1 G2. G1 \&lt;in&gt; chains_col a \&lt;and&gt; G2 \&lt;in&gt; chains A \&lt;and&gt; disj_chain G1 G2}"</p>
+<p>lemma soundness_part_one:<br>
+  fixes a and A<br>
+  shows "(prov_col a \&lt;longrightarrow&gt; (\&lt;forall&gt;G \&lt;in&gt; chains_col a. prov_chain G)) \&lt;and&gt; (prov_dia A \&lt;longrightarrow&gt; (\&lt;forall&gt;G \&lt;in&gt; chains A. prov_chain G))"<br>
+proof(induct rule: prov_dia_prov_col.induct)</p>
+
+
+
+<a name="294147516"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20induction%20over%20mutually-inductively-defined%20pr.../near/294147516" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20induction.20over.20mutually-inductively-defined.20pr.2E.2E.2E.html#294147516">(Aug 18 2022 at 18:40)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+You have given the two conjuncts in the wrong order. Swap them and it works.</p>
+<p>Tobias</p>
+
+
+
+<a name="294147524"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20induction%20over%20mutually-inductively-defined%20pr.../near/294147524" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20induction.20over.20mutually-inductively-defined.20pr.2E.2E.2E.html#294147524">(Aug 18 2022 at 18:40)</a>:</h4>
+<p>From: John Wickerson &lt;<a href="mailto:jpw48@cam.ac.uk">jpw48@cam.ac.uk</a>&gt;<br>
+Thanks Christian. With a little more fiddling, I have found the following to be roughly equivalent. One can either use the *.induct rule, like so (I previously had the conjuncts the wrong way round):</p>
+<p>lemma soundness_part_one:<br>
+  shows "(prov_dia A \&lt;longrightarrow&gt; (\&lt;forall&gt;G \&lt;in&gt; chains A. prov_chain G)) \&lt;and&gt; (prov_col a \&lt;longrightarrow&gt; (\&lt;forall&gt;G \&lt;in&gt; chains_col a. prov_chain G))" <br>
+proof(induct rule: prov_dia_prov_col.induct)</p>
+<p>or the *.inducts rule, like so:</p>
+<p>lemma soundness_part_one:<br>
+  shows "(prov_dia A \&lt;Longrightarrow&gt; (\&lt;forall&gt;G \&lt;in&gt; chains A. prov_chain G))" <br>
+  and "(prov_col a \&lt;Longrightarrow&gt; (\&lt;forall&gt;G \&lt;in&gt; chains_col a. prov_chain G))" <br>
+proof(induct rule: prov_dia_prov_col.inducts)</p>
+<p>Thanks for your help!</p>
+<p>john</p>
+
+
+
+<a name="294147541"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20induction%20over%20mutually-inductively-defined%20pr.../near/294147541" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20induction.20over.20mutually-inductively-defined.20pr.2E.2E.2E.html#294147541">(Aug 18 2022 at 18:40)</a>:</h4>
+<p>From: Lars Noschinski &lt;<a href="mailto:noschinl@in.tum.de">noschinl@in.tum.de</a>&gt;<br>
+$ISABELLE_HOME/src/HOL/Induct/Common_Patterns.thy, I guess.</p>
+<p>-- Lars</p>
+
+
+
+<a name="294147559"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20induction%20over%20mutually-inductively-defined%20pr.../near/294147559" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20induction.20over.20mutually-inductively-defined.20pr.2E.2E.2E.html#294147559">(Aug 18 2022 at 18:41)</a>:</h4>
+<p>From: Christian Urban &lt;<a href="mailto:urbanc@in.tum.de">urbanc@in.tum.de</a>&gt;<br>
+Yes, exactly! Christian</p>
+<p>Lars Noschinski writes:</p>
+<blockquote>
+<p>On 08.11.2011 17:45, Christian Urban wrote:</p>
+<blockquote>
+<p>There used to be an example theory in the Isabelle<br>
+distribution which explains all bells and whistles of the<br>
+induct-method, but I cannot find it at the moment. Maybe others<br>
+can point to it.</p>
+</blockquote>
+<p>$ISABELLE_HOME/src/HOL/Induct/Common_Patterns.thy, I guess.</p>
+<p>-- Lars</p>
+</blockquote>
+
+
+
+<a name="294147580"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20induction%20over%20mutually-inductively-defined%20pr.../near/294147580" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20induction.20over.20mutually-inductively-defined.20pr.2E.2E.2E.html#294147580">(Aug 18 2022 at 18:41)</a>:</h4>
+<p>From: Christian Urban &lt;<a href="mailto:urbanc@in.tum.de">urbanc@in.tum.de</a>&gt;<br>
+Hi John,</p>
+<p>Just one minor point. The second version with *.inducts<br>
+has the slight advantage to be already "rule format" <br>
+ready to be used by other automated tools. The one<br>
+with induct is still in "object format" and would need<br>
+some further processing to be usable with for example, simp<br>
+or auto. Generally the rule of thumb should be to state<br>
+lemmas in terms of \&lt;And&gt; and ==&gt;, instead of \&lt;and&gt; <br>
+and --&gt;. This allows for more automation by Isabelle <br>
+and for cleaner proofs in Isar.</p>
+<p>Best wishes,<br>
+Christian</p>
+<p>John Wickerson writes:</p>
+<blockquote>
+<p>Thanks Christian. With a little more fiddling, I have found the following to be roughly equivalent. One can either use the *.induct rule, like so (I previously had the conjuncts the wrong way round):</p>
+<p>lemma soundness_part_one:<br>
+  shows "(prov_dia A \&lt;longrightarrow&gt; (\&lt;forall&gt;G \&lt;in&gt; chains A. prov_chain G)) \&lt;and&gt; (prov_col a \&lt;longrightarrow&gt; (\&lt;forall&gt;G \&lt;in&gt; chains_col a. prov_chain G))" <br>
+proof(induct rule: prov_dia_prov_col.induct)</p>
+<p>or the *.inducts rule, like so:</p>
+<p>lemma soundness_part_one:<br>
+  shows "(prov_dia A \&lt;Longrightarrow&gt; (\&lt;forall&gt;G \&lt;in&gt; chains A. prov_chain G))" <br>
+  and "(prov_col a \&lt;Longrightarrow&gt; (\&lt;forall&gt;G \&lt;in&gt; chains_col a. prov_chain G))" <br>
+proof(induct rule: prov_dia_prov_col.inducts)</p>
+<p>Thanks for your help!</p>
+<p>john<br>
+</p>
+</blockquote>
+<blockquote>
+<p>On 8 Nov 2011, at 16:45, Christian Urban wrote:</p>
+<blockquote>
+<p>Hi John,</p>
+<p>Mutual inductions can be a bit fiddly. Therefore inductive, <br>
+datatype and other tools provide an "*.inducts" rule. This<br>
+rule is essentially the projection of the "*.induct" rule.<br>
+(So no need to state the rule using conjunctions.)  With this <br>
+the induct method can more easily figure out which induction <br>
+to perform. There used to be an example theory in the Isabelle <br>
+distribution which explains all bells and whistles of the <br>
+induct-method, but I cannot find it at the moment. Maybe others <br>
+can point to it. Below is a theory that should work in your example.</p>
+<p>Hope this helps,<br>
+Christian</p>
+<p>&lt;Ribbons.thy&gt;</p>
+<p>John Wickerson writes:</p>
+<blockquote>
+<p>Hello,</p>
+<p>I have a whole bunch of mutually-inductively-defined datatypes, functions and predicates in my theory, and I'm having difficulty doing structural and rule induction over them.</p>
+<p>At the end of this email is my (slightly condensed) theory file. Apologies for not creating a minimal example exhibiting my problem -- I thought it better to leave the theory file mostly as-is, to ensure that your solutions apply to my real script and not just to some minimal example.</p>
+<p>The problem is the last line ... </p>
+<blockquote>
+<p>proof(induct rule: prov_dia_prov_col.induct)</p>
+</blockquote>
+<p>... which gives an error ("Proof command failed"), despite my goal being of the required form "?P ?a \&lt;and&gt; ?Q ?A". My question is: How can I give Isabelle hints to help it work out how to apply the given induction rule? </p>
+<p>Many thanks,<br>
+John</p>
+<p>------------8&lt;-------------</p>
+<p>theory Ribbons imports Main</p>
+<p>begin</p>
+<p>typedecl bool_exp<br>
+consts Not :: "bool_exp \&lt;Rightarrow&gt; bool_exp"<br>
+consts rd_be :: "bool_exp \&lt;Rightarrow&gt; string set"</p>
+<p>typedecl assertion<br>
+consts Emp :: "assertion"<br>
+consts Pure :: "bool_exp \&lt;Rightarrow&gt; assertion"</p>
+<p>axiomatization<br>
+ Star :: "assertion \&lt;Rightarrow&gt; assertion \&lt;Rightarrow&gt; assertion"<br>
+where star_comm: "Star p q = Star q p"<br>
+ and star_assoc: "Star (Star p q) r = Star p (Star q r)"<br>
+ and star_emp: "Star p Emp = p"<br>
+ and emp_star: "Star Emp p = p"</p>
+<p>consts Exists :: "string \&lt;Rightarrow&gt; assertion \&lt;Rightarrow&gt; assertion"</p>
+<p>axiomatization <br>
+ rd_ass :: "assertion \&lt;Rightarrow&gt; string set"<br>
+where rd_emp: "rd_ass Emp = {}"<br>
+ and rd_star: "rd_ass (Star p q) = rd_ass p \&lt;union&gt; rd_ass q"<br>
+ and rd_exists: "rd_ass (Exists x p) = rd_ass p"</p>
+<p>typedecl atomic<br>
+consts rd_atm :: "atomic \&lt;Rightarrow&gt; string set"<br>
+consts wr_atm :: "atomic \&lt;Rightarrow&gt; string set"</p>
+<p>datatype command =<br>
+ Atomic "atomic"<br>
+| If "bool_exp" "command list" "command list"<br>
+| While "bool_exp" "command list"</p>
+<p>fun<br>
+ interleave_coms :: "(command list \&lt;times&gt; command list) \&lt;Rightarrow&gt; command list set"<br>
+where<br>
+ "interleave_coms ([], C2) = {C2}"<br>
+| "interleave_coms (C1, []) = {C1}"<br>
+| "interleave_coms (c1#C1, c2#C2)<br>
+ = {c1#C | C. C \&lt;in&gt; interleave_coms(C1, c2#C2)}<br>
+ \&lt;union&gt; {c2#C | C. C \&lt;in&gt; interleave_coms(c1#C1, C2)}"</p>
+<p>inductive<br>
+ prov_com :: "assertion \&lt;times&gt; command \&lt;times&gt; assertion \&lt;Rightarrow&gt; bool"<br>
+and<br>
+ prov_comlist :: "assertion \&lt;times&gt; command list \&lt;times&gt; assertion \&lt;Rightarrow&gt; bool"<br>
+where<br>
+ exists: <br>
+ "prov_com (p, c, q) <br>
+ \&lt;Longrightarrow&gt; prov_com (Exists x p, c, Exists x q)"<br>
+| ifcom: <br>
+ "\&lt;lbrakk&gt;prov_comlist (Star (Pure b) p, C1, q); <br>
+ prov_comlist (Star (Pure (Not b)) p, C2, q)\&lt;rbrakk&gt; <br>
+ \&lt;Longrightarrow&gt; prov_com (p, If b C1 C2, q)"<br>
+| while: <br>
+ "prov_comlist (Star (Pure b) p, C, p) <br>
+ \&lt;Longrightarrow&gt; prov_com (p, While b C, Star (Pure (Not b)) p)" <br>
+| frame: <br>
+ "\&lt;lbrakk&gt;prov_com (p, c, q); wr_com(c) \&lt;inter&gt; rd_ass(r) = {}\&lt;rbrakk&gt; <br>
+ \&lt;Longrightarrow&gt; prov_com (Star p r, c, Star q r)"<br>
+| skip: <br>
+ "prov_comlist(p, [], p)"<br>
+| seq: <br>
+ "\&lt;lbrakk&gt;prov_com (p, c, q); prov_comlist (q, C, r)\&lt;rbrakk&gt; <br>
+ \&lt;Longrightarrow&gt; prov_comlist (p, c#C, r)"</p>
+<p>datatype face =<br>
+ Ribbon "assertion"<br>
+| Exists_int "string" "face list"</p>
+<p>type_synonym interface = "face list"</p>
+<p>fun<br>
+ ass_face :: "face \&lt;Rightarrow&gt; assertion"<br>
+and<br>
+ ass :: "interface \&lt;Rightarrow&gt; assertion"<br>
+where<br>
+ "ass_face (Ribbon p) = p"<br>
+| "ass_face (Exists_int x P) = Exists x (ass P)"<br>
+| "ass [] = Emp"<br>
+| "ass (f#P) = Star (ass_face f) (ass P)"</p>
+<p>datatype column =<br>
+ Blank "interface"<br>
+| Basic "interface" "command" "interface"<br>
+| VComp_dia "column list" "column list"<br>
+| Exists_dia "string" "column list"<br>
+| If_dia "interface" "bool_exp" "column list" "column list" "interface"<br>
+| While_dia "interface" "bool_exp" "column list" "interface"</p>
+<p>type_synonym diagram = "column list"</p>
+<p>fun<br>
+ top :: "diagram \&lt;Rightarrow&gt; interface"<br>
+and<br>
+ top_col :: "column \&lt;Rightarrow&gt; interface"<br>
+where<br>
+ "top_col (Blank P) = P"<br>
+| "top_col (Basic P c Q) = P"<br>
+| "top_col (VComp_dia A B) = top A"<br>
+| "top_col (Exists_dia x A) = [Exists_int x (top A)]"<br>
+| "top_col (If_dia P b A B Q) = P"<br>
+| "top_col (While_dia P b A Q) = P"<br>
+| "top [] = []"<br>
+| "top (a # A) = (top_col a) @ (top A)"</p>
+<p>fun<br>
+ bot :: "diagram \&lt;Rightarrow&gt; interface"<br>
+and<br>
+ bot_col :: "column \&lt;Rightarrow&gt; interface"<br>
+where<br>
+ "bot_col (Blank P) = P"<br>
+| "bot_col (Basic P c Q) = Q"<br>
+| "bot_col (VComp_dia A B) = bot B"<br>
+| "bot_col (Exists_dia x A) = [Exists_int x (bot A)]"<br>
+| "bot_col (If_dia P b A B Q) = Q"<br>
+| "bot_col (While_dia P b A Q) = Q"<br>
+| "bot [] = []"<br>
+| "bot (a # A) = (bot_col a) @ (bot A)"</p>
+<p>fun<br>
+ coms :: "diagram \&lt;Rightarrow&gt; command list set"<br>
+and<br>
+ coms_col :: "column \&lt;Rightarrow&gt; command list set"<br>
+where<br>
+ "coms_col (Blank P) = {}"<br>
+| "coms_col (Basic P c Q) = {[c]}"<br>
+| "coms_col (VComp_dia A B) <br>
+ = {C @ C' | C C'. C \&lt;in&gt; coms A \&lt;and&gt; C' \&lt;in&gt; coms B}"<br>
+| "coms_col (Exists_dia x A) = coms A"<br>
+| "coms_col (If_dia P b A B Q) <br>
+ = { [If b C C'] | C C'. C \&lt;in&gt; coms A \&lt;and&gt; C' \&lt;in&gt; coms B}"<br>
+| "coms_col (While_dia P b A Q) = { [While b C] | C. C \&lt;in&gt; coms A}"<br>
+| "coms [] = {}"<br>
+| "coms (a # A) <br>
+ = \&lt;Union&gt;{interleave_coms (C, C') | C C'. C \&lt;in&gt; coms_col a \&lt;and&gt; C' \&lt;in&gt; coms A}"</p>
+<p>consts <br>
+ disj_col_dia :: "column \&lt;Rightarrow&gt; diagram \&lt;Rightarrow&gt; bool"</p>
+<p>inductive<br>
+ prov_dia :: "diagram \&lt;Rightarrow&gt; bool"<br>
+and<br>
+ prov_col :: "column \&lt;Rightarrow&gt; bool"<br>
+where<br>
+ Blank: <br>
+ "prov_col (Blank P)"<br>
+| Basic: <br>
+ "prov_com (ass P, c, ass Q) \&lt;Longrightarrow&gt; prov_col (Basic P c Q)"<br>
+| Exists: <br>
+ "prov_dia A \&lt;Longrightarrow&gt; prov_col (Exists_dia x A)"<br>
+| VComp: <br>
+ "\&lt;lbrakk&gt;prov_dia A; prov_dia B; bot A = top B\&lt;rbrakk&gt; \&lt;Longrightarrow&gt; prov_col (VComp_dia A B)"<br>
+| If: <br>
+ "\&lt;lbrakk&gt;prov_dia A; prov_dia B; top A = (Ribbon (Pure b)) # P; <br>
+ top B = (Ribbon (Pure (Not b))) # P; bot A = Q; bot B = Q\&lt;rbrakk&gt; <br>
+ \&lt;Longrightarrow&gt; prov_col (If_dia P b A B Q)"<br>
+| While: <br>
+ "\&lt;lbrakk&gt;prov_dia A; top A = (Ribbon(Pure b)) # P; <br>
+ bot A = P; Q = (Ribbon(Pure (Not b))) # P\&lt;rbrakk&gt; <br>
+ \&lt;Longrightarrow&gt; prov_col (While_dia P b A Q)"<br>
+| Nil: <br>
+ "prov_dia []"<br>
+| Cons:<br>
+ "\&lt;lbrakk&gt;prov_col a; prov_dia A; disj_col_dia a A\&lt;rbrakk&gt; <br>
+ \&lt;Longrightarrow&gt; prov_dia (a # A)"</p>
+<p>datatype chain = <br>
+ cNil "assertion"<br>
+| cCons "assertion" "command" "chain"</p>
+<p>fun <br>
+ seq_chains :: "chain \&lt;times&gt; chain \&lt;Rightarrow&gt; chain"<br>
+where<br>
+ "seq_chains (cNil _, G') = G'"<br>
+| "seq_chains (cCons p c G, G') = cCons p c (seq_chains (G, G'))"</p>
+<p>fun<br>
+ pre :: "chain \&lt;Rightarrow&gt; assertion"<br>
+where<br>
+ "pre(cNil p) = p"<br>
+| "pre(cCons p c G) = p"</p>
+<p>fun <br>
+ post :: "chain \&lt;Rightarrow&gt; assertion"<br>
+where<br>
+ "post(cNil p) = p"<br>
+| "post(cCons p c G) = post G"</p>
+<p>fun<br>
+ comlist :: "chain \&lt;Rightarrow&gt; command list"<br>
+where<br>
+ "comlist(cNil p) = []"<br>
+| "comlist(cCons p c G) =<br>
+[message truncated]</p>
+</blockquote>
+</blockquote>
+</blockquote>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

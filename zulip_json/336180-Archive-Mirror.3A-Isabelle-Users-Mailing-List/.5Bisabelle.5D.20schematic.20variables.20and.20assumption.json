@@ -1,0 +1,32 @@
+[
+    {
+        "content": "<p>From: Viorel Preoteasa &lt;<a href=\"mailto:viorel.preoteasa@abo.fi\">viorel.preoteasa@abo.fi</a>&gt;<br>\nHello,</p>\n<p>I have the following lemma:</p>\n<p>lemma \"(¬ (∀ x . P x)) ⟹ (∃ x . ¬ P x)\"<br>\napply (rule exI)<br>\napply (rule notI)<br>\napply (erule notE)<br>\napply (rule allI)<br>\napply assumption</p>\n<p>After the the rule \"apply (rule allI)\" the goal becomes:<br>\n⋀x. P ?x ⟹ P x</p>\n<p>I do not understand why \"apply assumption\" fail at this point.<br>\nI would expect that ?x is unified with x and the proof succeed.</p>\n<p>Best regards,</p>\n<p>Viorel Preoteasa</p>",
+        "id": 294157184,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660851689
+    },
+    {
+        "content": "<p>From: Lawrence Paulson &lt;<a href=\"mailto:lp15@cam.ac.uk\">lp15@cam.ac.uk</a>&gt;<br>\nSuch a step would not be sound. You can only unify ?x with terms containing no bound variables. Variable capture is never allowed.</p>\n<p>Your example is quite tricky to prove in a natural deduction calculus. Of course, it's trivial if you use automation.</p>\n<p>Larry Paulson</p>",
+        "id": 294157188,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660851695
+    },
+    {
+        "content": "<p>From: Alfio Martini &lt;<a href=\"mailto:alfio.martini@acm.org\">alfio.martini@acm.org</a>&gt;<br>\nDear Viorel,</p>\n<p>If I am not wrong, this is a classical conjecture. Here goes a<br>\npossible proof:</p>\n<p>lemma \"(¬ (∀ x . P x)) ⟹ (∃ x . ¬ P x)\"<br>\n    apply (rule ccontr)<br>\n    apply (erule notE)<br>\n    apply (rule allI)<br>\n    apply (rule ccontr)<br>\n    apply (erule notE)<br>\n    apply (rule exI)<br>\n    apply (assumption)<br>\ndone</p>\n<p>Best!</p>",
+        "id": 294157229,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660851720
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nWe've been an the same point just yesterday in our Isabelle tutorial at <br>\nParis Sud point, but nobody could give me the proof on the spot.  See <br>\n<a href=\"http://www.lri.fr/~wenzel/Isabelle_Orsay_2012/Calculation.thy\">http://www.lri.fr/~wenzel/Isabelle_Orsay_2012/Calculation.thy</a> Exercise (2) <br>\nabout the Drinker's principle.</p>\n<p>The idea was to play with proof structure and automated tools to bridge <br>\nthe gaps, and show the possibilities and limitations of this approach. <br>\nThe question of the assignment \"Do you believe the proof?\" (a skeleton <br>\ninvolving 3 \"blast\" steps) was answered negatively by everybody. <br>\nAfterwards I've made a fully explicit Isar proof, and managed to convince <br>\nat least half of the audience that this is correct classical nonsense.</p>\n<p>To complete my own exercise from yesterday, here is now de_Morgan as above <br>\n(using the more generic rule classical instead of ccontr) together with <br>\nthe explicit version of the Drinker's principle:</p>\n<p>lemma de_Morgan:<br>\n   assumes \"¬ (∀x. P x)\"<br>\n   shows \"∃x. ¬ P x\"<br>\nproof (rule classical)<br>\n   assume \"¬ (∃x. ¬ P x)\"<br>\n   have \"∀x. P x\"<br>\n   proof<br>\n     fix x show \"P x\"<br>\n     proof (rule classical)<br>\n       assume \"¬ P x\"<br>\n       then have \"∃x. ¬ P x\" ..<br>\n       with <code>¬ (∃x. ¬ P x)</code> show ?thesis ..<br>\n     qed<br>\n   qed<br>\n   with <code>¬ (∀x. P x)</code> show ?thesis ..<br>\nqed</p>\n<p>theorem \"∃a. drunk a ⟶ (∀x. drunk x)\"<br>\nproof cases<br>\n   assume \"∀x. drunk x\"<br>\n   fix a<br>\n   have \"drunk a ⟶ (∀x. drunk x)\"<br>\n     using <code>∀x. drunk x</code> ..<br>\n   then show ?thesis ..<br>\nnext<br>\n   assume \"¬ (∀x. drunk x)\"<br>\n   then have \"∃a. ¬ drunk a\" by (rule de_Morgan)<br>\n   then obtain a where \"¬ drunk a\" ..<br>\n   have \"drunk a ⟶ (∀x. drunk x)\"<br>\n   proof<br>\n     assume \"drunk a\"<br>\n     with <code>¬ drunk a</code> show \"∀x. drunk x\" by contradiction<br>\n   qed<br>\n   then show ?thesis ..<br>\nqed</p>\n<p>For demonstration purposes in such Pure examples, I usually refer to <br>\nprevious facts literally with <code>prop</code>, to avoid the Spaghetti tendency of <br>\nnamed references like <em>, <strong>, </strong></em> or 1, 2, 3 etc.</p>\n<p>Makarius</p>",
+        "id": 294157439,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660851807
+    },
+    {
+        "content": "<p>From: Alfio Martini &lt;<a href=\"mailto:alfio.martini@acm.org\">alfio.martini@acm.org</a>&gt;<br>\nDear Makarius,</p>\n<p>The corresponding Isar proof I had done, which follows the procedural one<br>\nbelow was this one:</p>\n<p>lemma<br>\nassumes p: \"(¬ (∀ x . P x))\"<br>\nshows \"(∃ x . ¬ P x)\"<br>\n  proof (rule ccontr)<br>\n     assume h1: \"¬ (∃x. ¬ P x)\"<br>\n     have  \"∀x. P x\"<br>\n       proof (rule allI)<br>\n         fix x0<br>\n         show \"P x0\"<br>\n           proof (rule ccontr)<br>\n             assume \"¬ P x0\"<br>\n             from this have \"∃ x. ¬P x\" by (rule exI)<br>\n             with h1 show False by (rule notE)<br>\n          qed<br>\n       qed<br>\n     with p show False by (rule notE)<br>\n  qed</p>\n<p>But since I am still learning Isar, it does not look as elegant as yours!</p>\n<p>best!</p>",
+        "id": 294157449,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660851812
+    }
+]

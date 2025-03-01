@@ -1,0 +1,146 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] SELECT_GOAL and schematic variables · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20SELECT_GOAL.20and.20schematic.20variables.html">[isabelle] SELECT_GOAL and schematic variables</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294236956"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20SELECT_GOAL%20and%20schematic%20variables/near/294236956" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20SELECT_GOAL.20and.20schematic.20variables.html#294236956">(Aug 19 2022 at 10:33)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:lammich@in.tum.de">lammich@in.tum.de</a>&gt;<br>
+Hi all,</p>
+<p>I recently spotted down a problem with SELECT_GOAL and schematic<br>
+variables. If new schematic variables are produced in the proof of the<br>
+selected goal, their names may clash with existing schematics in the<br>
+outer proof state, resulting in unexpected error messages:</p>
+<p>inductive P for x where I: "P x"<br>
+  lemma J: "P (\&lt;lambda&gt;_. R)" by (rule I)</p>
+<p>schematic_lemma "\&lt;And&gt;a. P (?R a) \&lt;or&gt; P (?R)" "TERM ?R3"<br>
+    apply -<br>
+    apply (tactic {* SELECT_GOAL (<br>
+      rtac @{thm disjI2} 1 THEN rtac @{thm J} 1 <br>
+      (<em>THEN PRIMITIVE zero_var_indexes</em>)<br>
+      THEN print_tac "Proof state after inner tactic"<br>
+      ) 1<br>
+      *})</p>
+<p>*** exception TYPE raised (line 109 of "envir.ML"):<br>
+*** Variable "?R3" has two distinct types<br>
+*** 'c<br>
+*** 'd</p>
+<p>What happened here is that the tactic inside SELECT_GOAL produced the<br>
+proof state: "\&lt;And&gt;a b. P ?R3 \&lt;or&gt; P (\&lt;lambda&gt;_. ?R3)"<br>
+And when retrofitting this into the outer proof state, ?R3 happens to<br>
+clash with the ?R3 there.</p>
+<p>Moreover, if one directly changes schematic variables that occur in the<br>
+selected goal, like the "zero_var_indexes" does in the commented out<br>
+line of the example, the unifier runs havoc and produces errors like:</p>
+<p>*** mk_ff_list<br>
+*** At command "apply" (line 9 of<br>
+"/home/lammich/lehre/praktWS1112/cava/Libs/Refine/Autoref/Scratch.thy")</p>
+<p>(I also got some exceptions about "Var name confusion" from the unifier,<br>
+that I cannot reproduce any more)</p>
+<p>These observations result in two main questions:</p>
+<p>1. What are the conventions that tactics must stick to when<br>
+instantiating schematic variables? E.g. is it ok to do <br>
+  PRIMITIVE zero_var_indexes or not?</p>
+<p>2. Is SELECT_GOAL implemented correctly and was never supposed to <br>
+    work with schematics, or should it be fixed?</p>
+<p>Regards and thanks for any comments/workarounds on this,<br>
+  Peter</p>
+
+
+
+<a name="294237518"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20SELECT_GOAL%20and%20schematic%20variables/near/294237518" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20SELECT_GOAL.20and.20schematic.20variables.html#294237518">(Aug 19 2022 at 10:37)</a>:</h4>
+<p>From: Lawrence Paulson &lt;<a href="mailto:lp15@cam.ac.uk">lp15@cam.ac.uk</a>&gt;<br>
+I'm afraid that I really can't answer this question without a time machine.</p>
+<p>In the early days, I must have introduced SELECT_GOAL in the context of some specific application where it worked fine. Then it got put in the standard libraries of tacticals and more or less forgotten. I know that a lot of derivations that involve new variables in sub-proofs can go wrong as you describe. The usual method of getting around such problems was to freeze variables prior to applying the tactic, thawing them afterwards. That was a hack, but it generally worked. My impression is that Makarius has replaced such trickery by more robust methods, but it's possible that quite a lot about old code is still there and running. I'm not sure about the current best practice for dealing with this sort of situation.</p>
+<p>Larry Paulson</p>
+
+
+
+<a name="294237526"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20SELECT_GOAL%20and%20schematic%20variables/near/294237526" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20SELECT_GOAL.20and.20schematic.20variables.html#294237526">(Aug 19 2022 at 10:37)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:lammich@in.tum.de">lammich@in.tum.de</a>&gt;<br>
+Unfortunately, this problem does not only affect the (admittedly<br>
+low-level) SELECT_GOAL, but also high-level proof scripts, as the<br>
+following example demonstrates:</p>
+<p>inductive P for x where I: "P x"<br>
+  lemma J: "P (\&lt;lambda&gt;_. R)" by (rule I)</p>
+<p>schematic_lemma "\&lt;And&gt;a b. P (?R a) \&lt;or&gt; P (?R)" "TERM ?R4"<br>
+    apply (rule disjI2, rule J) []<br>
+*** exception TYPE raised (line 109 of "envir.ML"):<br>
+*** Variable "?R4" has two distinct types<br>
+*** 'c<br>
+*** 'd</p>
+<p>note that everything works fine without the [].</p>
+
+
+
+<a name="294237542"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20SELECT_GOAL%20and%20schematic%20variables/near/294237542" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20SELECT_GOAL.20and.20schematic.20variables.html#294237542">(Aug 19 2022 at 10:37)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On Fri, 22 Mar 2013, Lawrence Paulson wrote:</p>
+<blockquote>
+<p>I'm afraid that I really can't answer this question without a time <br>
+machine.</p>
+</blockquote>
+<p>In principle the time machine is Mercurial, but it also takes time to <br>
+study our immense history that has accumulated since changeset 0 from <br>
+Sep-16 12:20:38 1993 (and more years of unwritten history before that).</p>
+<blockquote>
+<p>The usual method of getting around such problems was to freeze variables <br>
+prior to applying the tactic, thawing them afterwards. That was a hack, <br>
+but it generally worked. My impression is that Makarius has replaced <br>
+such trickery by more robust methods, but it's possible that quite a lot <br>
+about old code is still there and running. I'm not sure about the <br>
+current best practice for dealing with this sort of situation.</p>
+</blockquote>
+<p>The ancient freeze_thaw and freeze_thaw_robust (which were actually both <br>
+fragile) have evolved over a long way to become the current FOCUS <br>
+combinators, which are also mentioned in the "implementation" manual.</p>
+<p>This Isar technology for structured tactic programming is useful in many <br>
+situations, but it does not really cover the schematic goal approach that <br>
+Peter appears to use a lot.  In fact, the continued retreat of genuine <br>
+logic-programming with schematic variables in Isabelle tactics over the <br>
+years had paved the way for these more recent high-level tacticals.</p>
+<p>Readers of the old "intro" manual by Larry might remember the final Prolog <br>
+example.  Such techniques are now extremely rare, so it is no surprise <br>
+that certain tools choke.</p>
+<p>(I will have a close look later at what is actually happening here, when I <br>
+have catched up with various other open threads.)</p>
+<p>Makarius</p>
+
+
+
+<a name="294240369"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20SELECT_GOAL%20and%20schematic%20variables/near/294240369" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20SELECT_GOAL.20and.20schematic.20variables.html#294240369">(Aug 19 2022 at 10:58)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+I've had a first round of studying 10-15 years of Isabelle source history <br>
+yesterday.</p>
+<p>SELECT_GOAL and Subgoal.FOCUS represent different strands of tradition, <br>
+only the latter (much younger) uses high-end Isar infrastructure -- <br>
+context import/export operations that vaguely resemble old "freeze_thaw" <br>
+by Larry.</p>
+<p>SELECT_GOAL is also used for the "[...]" notation for Isar proof methods.</p>
+<p>SELECT_GOAL was good old code by Larry in the nostalgic style of 1980-ies <br>
+Isabelle until 31-Aug-2001. Then Stefan Berghofer "Tidied function <br>
+SELECT_GOAL".  I think before and after the behaviour wrt. newly invented <br>
+schematic was the same as it is still now.  Much later I merely modified <br>
+its internal terminology and general setup to make it look more like <br>
+Subgoal.FOCUS, e.g. using certain "extract" and "retrofit" operations.</p>
+<p>Beyond historical anecdotes, I have made one round of experiments to see <br>
+if SELECT_GOAL can be converged a bit more towards the way how the (very <br>
+sophisticated) Subgoal.FOCUS works, but it breaks various classic tactics. <br>
+Reasons still need to be explored, I can say more after the next round of <br>
+investigation.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

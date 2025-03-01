@@ -1,0 +1,156 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Pairs and automation · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Pairs.20and.20automation.html">[isabelle] Pairs and automation</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294233268"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Pairs%20and%20automation/near/294233268" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Pairs.20and.20automation.html#294233268">(Aug 19 2022 at 10:05)</a>:</h4>
+<p>From: Christian Urban &lt;<a href="mailto:christian.urban@kcl.ac.uk">christian.urban@kcl.ac.uk</a>&gt;<br>
+Dear Isabelle-Wizards,</p>
+<p>I have a theory where I need to define functions<br>
+over tuples, say this contrived one</p>
+<p>fun test where<br>
+  "test (a, b) = False"</p>
+<p>Now I like to prove lemmas like</p>
+<p>lemma "test x ==&gt; P"<br>
+apply(case_tac x)<br>
+apply(simp) <br>
+done</p>
+<p>As can be seen this can be proved, but needs the explicit <br>
+case_tac in order to make Isabelle aware the x is in fact <br>
+a pair.</p>
+<p>Is there a way I can make Isabelle figure this out automatically?</p>
+<p>If I had a !!-quantifier around x, then this seems<br>
+to do the job:</p>
+<p>lemma "!!x. test x ==&gt; P"<br>
+apply(simp add: split_paired_all)<br>
+done</p>
+<p>I toyed with definitions like</p>
+<p>fun test2<br>
+where<br>
+  "test2 x = (let (a, b) = x in False)"</p>
+<p>lemma "test2 x ==&gt; P"<br>
+apply(simp)<br>
+done</p>
+<p>But I am wondering whether there is some other magic that<br>
+lets my problem go away (automatically). Does anybody else<br>
+encountered this problem?</p>
+<p>Best wishes,<br>
+Christian</p>
+
+
+
+<a name="294233278"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Pairs%20and%20automation/near/294233278" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Pairs.20and.20automation.html#294233278">(Aug 19 2022 at 10:05)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Christian,</p>
+<p>You could prove split rules for your functions, similar to prod.splits:</p>
+<p>lemma test_split:<br>
+   "!!x. P (test x) = (!a b. x = (a, b) --&gt; P (test (a, b)))"<br>
+   "!!x. P (test x) = (~ (∃a b. x = (a, b) &amp; ~ P (test (a, b))))"<br>
+by(simp_all add: split_paired_all)</p>
+<p>lemma "test x ==&gt; P"<br>
+apply(simp split: test_split)<br>
+done</p>
+<p>But these split rules are aggressive, they split the parameter for every <br>
+occurrence of test. And they make the simplifier loop if the rhs <br>
+occurrence of test does not get simplified away (there's less danger if <br>
+you replace the "test (a, b)" on the rhs with the rhs of the function <br>
+definition, but then the theorems are less canoncial). Fortunately, the <br>
+simplifier tries split rules after applying its simplification steps, so <br>
+this should normally work.</p>
+<p>Andreas</p>
+
+
+
+<a name="294233460"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Pairs%20and%20automation/near/294233460" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Pairs.20and.20automation.html#294233460">(Aug 19 2022 at 10:07)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear Christian,</p>
+<p>Let's pick a different example:</p>
+<p>fun test where "test (a, b) = (a * a = b + 4)"</p>
+<p>Then, the split lemma should split the x parameter and do the rewrite <br>
+with test.simps in one step:</p>
+<p>lemma test_split:<br>
+   "!!x. P (test x) = (!a b. x = (a, b) --&gt; P (a * a = b + 4))"<br>
+   "!!x. P (test x) = (~ (?a b. x = (a, b) &amp; ~ P (a * a = b + 4)))"</p>
+<p>The first form splits x if "test x" occurs in the conclusion of a goal, <br>
+the second does so if "test x" occurs in one of the assumptions. The <br>
+format of split rules is a bit non-intuitive.</p>
+<p>I do not know how well the split rules work if you have a recursive call <br>
+to test on the rhs, as I am no expert on how exactly the splitter works. <br>
+However, I would expect that the same rules as for the simplifier apply, <br>
+i.e., if the recursive call is hidden under another operator with a <br>
+suitable congruence rule, you're safe - otherwise, it will loop.</p>
+<p>Best wishes<br>
+Andreas</p>
+
+
+
+<a name="294233469"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Pairs%20and%20automation/near/294233469" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Pairs.20and.20automation.html#294233469">(Aug 19 2022 at 10:07)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+Am 12/02/2013 08:39, schrieb Andreas Lochbihler:</p>
+<blockquote>
+<p>I do not know how well the split rules work if you have a recursive call to test<br>
+on the rhs, as I am no expert on how exactly the splitter works. However, I<br>
+would expect that the same rules as for the simplifier apply, i.e., if the<br>
+recursive call is hidden under another operator with a suitable congruence rule,<br>
+you're safe - otherwise, it will loop.</p>
+</blockquote>
+<p>The splitter ignores congruence rules.</p>
+<p>Tobias</p>
+<blockquote>
+<p>Best wishes<br>
+Andreas</p>
+<p>On 02/11/2013 06:55 PM, Christian Urban wrote:</p>
+<blockquote>
+<p>Dear Andreas,</p>
+<p>Thanks a lot for the answer!</p>
+<blockquote>
+<p>there's less danger if<br>
+you replace the "test (a, b)" on the rhs with the rhs of the function<br>
+definition, but then the theorems are less canoncial</p>
+</blockquote>
+<p>I am not sure I understand this. Do you mean I should<br>
+instead of proving</p>
+<p>lemma test_split:<br>
+    "!!x. P (test x) = (!a b. x = (a, b) --&gt; P (test (a, b)))"</p>
+<p>I should prove something like</p>
+<p>lemma test_split:<br>
+    "!!x. P (test x) = (!a b. x = (a, b) --&gt; P (rhs (a, b)))"</p>
+<p>where rhs is the "expanded" version of the rhs of the function.<br>
+But how would that work if the function is defined by<br>
+fun via pattern matching. Then I would get some big<br>
+case-expression on the right. Is this what you had in mind?</p>
+<p>Also one more question: I can see the purpose of the<br>
+theorem above, but when is the following used?</p>
+<p>"!!x. P (test x) = (~ (∃a b. x = (a, b) &amp; ~ P (test (a, b))))"</p>
+<p>Best wishes and thanks a lot again!<br>
+Christian<br>
+</p>
+</blockquote>
+<p>On Monday, February 11, 2013 at 16:54:34 (+0100), Andreas Lochbihler wrote:</p>
+<blockquote>
+<blockquote>
+<p>But these split rules are aggressive, they split the parameter for every<br>
+occurrence of test. And they make the simplifier loop if the rhs<br>
+occurrence of test does not get simplified away (there's less danger if<br>
+you replace the "test (a, b)" on the rhs with the rhs of the function<br>
+definition, but then the theorems are less canoncial). Fortunately, the<br>
+simplifier tries split rules after applying its simplification steps, so<br>
+this should normally work.</p>
+</blockquote>
+</blockquote>
+</blockquote>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,97 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Question concerning HOAS · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Question.20concerning.20HOAS.html">[isabelle] Question concerning HOAS</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294136668"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Question%20concerning%20HOAS/near/294136668" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Question.20concerning.20HOAS.html#294136668">(Aug 18 2022 at 17:42)</a>:</h4>
+<p>From: Thomas Göthel &lt;<a href="mailto:tgoethel@cs.tu-berlin.de">tgoethel@cs.tu-berlin.de</a>&gt;<br>
+Dear Isabelle-Community!</p>
+<p>Given the following definition of a tree:</p>
+<p>datatype myTree =<br>
+   leaf<br>
+| bin_node "myTree" "myTree"<br>
+| inf_node "nat =&gt; myTree"</p>
+<p>I would like to prove that trees are acyclic. But I do not even have an <br>
+idea how to prove the following lemma</p>
+<p>lemma "t n \&lt;noteq&gt; bin_node T (inf_node t)"</p>
+<p>I would greatly appreciate any hints!</p>
+<p>Best regards,<br>
+Thomas</p>
+
+
+
+<a name="294136677"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Question%20concerning%20HOAS/near/294136677" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Question.20concerning.20HOAS.html#294136677">(Aug 18 2022 at 17:42)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@kit.edu">andreas.lochbihler@kit.edu</a>&gt;<br>
+Dear Thomas,</p>
+<p>support for infinitely branching trees is a bit weak in the datatype package. <br>
+(For finitely branching datatypes, the datatype package provides a size function <br>
+which is typically used to show lemmas like these. Your infinitely branching <br>
+tree however does not have such a size function). The easiest way I know of is <br>
+to define the subterm relation by hand and prove that it is well-founded:</p>
+<p>inductive_set tree_subterm :: "(myTree * myTree) set"<br>
+where<br>
+   "(l, bin_node l r) : tree_subterm"<br>
+| "(r, bin_node l r) : tree_subterm"<br>
+| "(f n, inf_node f) : tree_subterm"</p>
+<p>inductive_simps tree_subterm_simps [iff]:<br>
+   "(t, leaf) : tree_subterm"<br>
+   "(t, bin_node l r) : tree_subterm"<br>
+   "(t, inf_node f) : tree_subterm"</p>
+<p>lemma wf_tree_subterm: "wf tree_subterm"<br>
+unfolding wf_def<br>
+apply clarify<br>
+apply(induct_tac x)<br>
+apply blast+<br>
+done</p>
+<p>Your inequality is then an easy consequence:</p>
+<p>lemma "t n \&lt;noteq&gt; bin_node T (inf_node t)"<br>
+proof<br>
+   assume "t n = bin_node T (inf_node t)"<br>
+   moreover<br>
+   have "(t n, bin_node T (inf_node t)) : tree_subterm^+"<br>
+     by(blast intro: trancl.intros)<br>
+   moreover have "acyclic tree_subterm" by(rule wf_acyclic wf_tree_subterm)+<br>
+   ultimately show False by(simp add: acyclic_def)<br>
+qed</p>
+<p>Well-foundedness of the subterm relation will also help you a lot when you try <br>
+to prove termination for functions defined with the function package. Alex might <br>
+be able to tell you more about how to set it up such that the function package <br>
+can use wf_tree_subterm.</p>
+<p>Hope this helps,<br>
+Andreas</p>
+<p>Thomas Göthel schrieb:</p>
+
+
+
+<a name="294136716"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Question%20concerning%20HOAS/near/294136716" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Question.20concerning.20HOAS.html#294136716">(Aug 18 2022 at 17:42)</a>:</h4>
+<p>From: Alexander Krauss &lt;<a href="mailto:krauss@in.tum.de">krauss@in.tum.de</a>&gt;<br>
+It won't use it automatically, since automated termination proving is <br>
+based on measure functions into natural numbers only. However, you can <br>
+use such a subterm relation in manual termination proofs, e.g., using <br>
+the "relation" method.</p>
+<p>Alex</p>
+
+
+
+<a name="294136870"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Question%20concerning%20HOAS/near/294136870" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Question.20concerning.20HOAS.html#294136870">(Aug 18 2022 at 17:43)</a>:</h4>
+<p>From: Thomas Göthel &lt;<a href="mailto:tgoethel@cs.tu-berlin.de">tgoethel@cs.tu-berlin.de</a>&gt;<br>
+Thank you very much!</p>
+<p>The idea of using well-founded relations helped me a lot in this and in <br>
+further cases. :-)</p>
+<p>Best regards,<br>
+Thomas</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

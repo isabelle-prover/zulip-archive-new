@@ -1,0 +1,335 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Annotations in Simpl · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Annotations.20in.20Simpl.html">[isabelle] Annotations in Simpl</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294219132"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Annotations%20in%20Simpl/near/294219132" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Annotations.20in.20Simpl.html#294219132">(Aug 19 2022 at 08:08)</a>:</h4>
+<p>From: Lars Noschinski &lt;<a href="mailto:noschinl@in.tum.de">noschinl@in.tum.de</a>&gt;<br>
+Hi everyone,</p>
+<p>I am working on formalizing some algorithms using Simpl from the AFP.<br>
+Is there some lightweight way (in a procedures definition) to annotate a <br>
+loop with the property that a variable stays unchanged? For procedures, <br>
+there is the may-not-modify-globals syntax; but a similar thing does not <br>
+seem to exist for loops (and it is not clear, how this would fit in). At <br>
+the moment, I am using the ANNO command for this purpose:</p>
+<p>procedures mult1 (n :: nat, m :: nat | r :: nat)<br>
+"<br>
+   ANNO τ.<br>
+   {τ}<br>
+     ´r :== (0 :: nat) ;;<br>
+     WHILE ´n ≠ 0<br>
+     INV ⦃ ´m = ⇗τ⇖m ∧ ´m * ⇗τ⇖n = ´r + ´m * ´n  ⦄<br>
+     DO<br>
+       ´r :== ´r + ´m ;;<br>
+       ´n :== ´n - 1<br>
+       OD<br>
+   ⦃ ´r = ⇗τ⇖m * ⇗τ⇖n ⦄<br>
+"</p>
+<p>lemma (in mult1_impl) mult1:<br>
+   "∀m n. Γ ⊢ ⦃´m = m ∧ ´n = n⦄ ´r :== PROC mult1(´m, ´n) ⦃´r = m * n⦄"<br>
+   apply vcg<br>
+   apply (simp_all add: mult_Suc_right[symmetric])<br>
+   done</p>
+<p>Here I need a full write down a full specification already in the <br>
+procedure definition. This is particularly annoying for ANNO statements <br>
+deeper in the procedure definition.</p>
+<p>The only other solution I have found would be adding the invariants only <br>
+in the proof:</p>
+<p>procedures mult2 (n :: nat, m :: nat | r :: nat)<br>
+"<br>
+   ´r :== (0 :: nat) ;;<br>
+   WHILE ´n ≠ 0<br>
+   DO<br>
+     ´r :== ´r + ´m ;;<br>
+     ´n :== ´n - 1<br>
+   OD<br>
+"</p>
+<p>lemma (in mult2_impl) mult2:<br>
+   "∀m n. Γ ⊢ ⦃´m = m ∧ ´n = n⦄ ´r :== PROC mult2(´m, ´n) ⦃´r = m * n⦄"<br>
+   apply vcg_step<br>
+   apply (hoare_rule HoarePartial.Seq)<br>
+    defer<br>
+    apply (hoare_rule I="⦃ ´m = m ∧ ´m * n = ´r + ´m * ´n  ⦄" in<br>
+      HoarePartial.reannotateWhileNoGuard)<br>
+    apply vcg<br>
+    apply (simp_all add: mult_Suc_right[symmetric])<br>
+   apply vcg<br>
+   apply simp<br>
+   done</p>
+<p>Here, it is harder to see which invariants are actually used for which <br>
+loop (and I can only use the full vcg after I reached the loop), so I <br>
+would like to know about nicer solutions (if there are any).</p>
+<p>-- Lars</p>
+
+
+
+<a name="294219171"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Annotations%20in%20Simpl/near/294219171" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Annotations.20in.20Simpl.html#294219171">(Aug 19 2022 at 08:08)</a>:</h4>
+<p>From: Gerwin Klein &lt;<a href="mailto:gerwin.klein@nicta.com.au">gerwin.klein@nicta.com.au</a>&gt;<br>
+Hi Lars,</p>
+<p>This is what we used for the kernel proof. It doesn't look nice and has the disadvantages you explain. It does have the advantage that you can pick different invariants/annotations for each proof about that function.</p>
+<p>Slight side rant: It's strange that Hoare logic insists that one would only ever prove one property about a function, have one invariant, and one annotation that fits them all. In theory this is all equivalent and there is a "complete specification", but in practise that is not how things are proved or should be proved. </p>
+<p>Just think about what we do for functional programs in Isabelle. Nothing is more cumbersome and useless than having to state one lemma that says everything about one function.</p>
+<p>From that point of view, I'm fairly convinced that annotations and invariants belong with the proof, not with the program (or everything belongs with the program). It would be nice to have a better notation for connecting them, though.</p>
+<p>Cheers,<br>
+Gerwin</p>
+
+
+
+<a name="294219187"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Annotations%20in%20Simpl/near/294219187" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Annotations.20in.20Simpl.html#294219187">(Aug 19 2022 at 08:08)</a>:</h4>
+<p>From: Thomas Sewell &lt;<a href="mailto:Thomas.Sewell@nicta.com.au">Thomas.Sewell@nicta.com.au</a>&gt;<br>
+Hi Lars.</p>
+<p>You may not necessarily need to single-step the vcg. Have a look at <br>
+whileAnno_def: "whileAnno b I V c == While b c". Since this is full <br>
+equality, you can add or remove annotations with fold/unfold if this is <br>
+useful.</p>
+<p>The annotations are really just hints to the vcg, not elements of the <br>
+syntax or semantics of SIMPL.</p>
+<p>So, one thing you could do is annotate the loops with names, and then <br>
+substitute them on the spot.</p>
+<p>definition "name_loop v = UNIV"</p>
+<p>(in proc defn):<br>
+"</p>
+<p>WHILE ´n ≠ 0<br>
+      INV name_loop ''foo''<br>
+      DO ... OD</p>
+<p>"</p>
+<p>lemma annotate_named_loop:<br>
+   "whileAnno b (name_loop v) V c = whileAnno b I V c"<br>
+   by (simp add: whileAnno_def)</p>
+<p>(in unfolding)<br>
+apply (simp add: annotate_named_loop[where name="''foo''" and I="..."])</p>
+<p>Not a lot nicer, but maybe a bit less fiddly.</p>
+<p>I guess it would be nicer if SIMPL provided a facility by which you <br>
+could add such invariant declarations/redeclarations into the context <br>
+and have the vcg notice them as necessary. There might even be a way to <br>
+do this already, though I can't think what it would be.</p>
+<p>Yours,<br>
+     Thomas.</p>
+
+
+
+<a name="294219230"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Annotations%20in%20Simpl/near/294219230" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Annotations.20in.20Simpl.html#294219230">(Aug 19 2022 at 08:09)</a>:</h4>
+<p>From: Lars Noschinski &lt;<a href="mailto:noschinl@in.tum.de">noschinl@in.tum.de</a>&gt;<br>
+Hi,</p>
+<p>On 10.07.2012 03:27, Thomas Sewell wrote:</p>
+<blockquote>
+<p>You may not necessarily need to single-step the vcg. Have a look at<br>
+whileAnno_def: "whileAnno b I V c == While b c". Since this is full<br>
+equality, you can add or remove annotations with fold/unfold if this is<br>
+useful.<br>
+[...]<br>
+definition "name_loop v = UNIV"<br>
+[...]<br>
+lemma annotate_named_loop:<br>
+"whileAnno b (name_loop v) V c = whileAnno b I V c"<br>
+by (simp add: whileAnno_def)<br>
+[...]<br>
+(in unfolding)<br>
+apply (simp add: annotate_named_loop[where name="''foo''" and I="..."])<br>
+[...]</p>
+</blockquote>
+<p>thank you both for your answers! This renaming indeed provides a less <br>
+fiddly solution (somehow I did not think about using the simplifier on <br>
+Simpl programs ...).</p>
+<p>-- Lars</p>
+
+
+
+<a name="294219246"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Annotations%20in%20Simpl/near/294219246" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Annotations.20in.20Simpl.html#294219246">(Aug 19 2022 at 08:09)</a>:</h4>
+<p>From: Lars Noschinski &lt;<a href="mailto:noschinl@in.tum.de">noschinl@in.tum.de</a>&gt;<br>
+Actually, this fails if the invariant needs to meta-quantified variables <br>
+-- I don't think we have a substitution variant of (rule_tac x=... in ...).</p>
+<p>-- Lars</p>
+
+
+
+<a name="294219254"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Annotations%20in%20Simpl/near/294219254" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Annotations.20in.20Simpl.html#294219254">(Aug 19 2022 at 08:09)</a>:</h4>
+<p>From: John Wickerson &lt;<a href="mailto:jpw48@cam.ac.uk">jpw48@cam.ac.uk</a>&gt;</p>
+<blockquote>
+<p>Slight side rant: It's strange that Hoare logic insists that one would only ever prove one property about a function, have one invariant, and one annotation that fits them all. In theory this is all equivalent and there is a "complete specification", but in practise that is not how things are proved or should be proved. </p>
+</blockquote>
+<p>I think it's fine in Hoare logic to prove multiple properties of a function C, like {P1}C{Q1} and {P2}C{Q2}. The point of the rules of conjunction</p>
+<p>{P1}C{Q1}  {P2}C{Q2}</p>
+<hr>
+<p>{P1∧P2}C{Q1∧Q2}</p>
+<p>and disjunction</p>
+<p>{P1}C{Q1}  {P2}C{Q2}</p>
+<hr>
+<p>{P1∨P2}C{Q1∨Q2}</p>
+<p>are to allow these multiple properties to be combined. But in the "proof outline" representation of a Hoare logic proof, where the program text is interspersed with assertions, you can't really represent this without writing out the program text multiple times, which is a hassle.</p>
+<p>John</p>
+
+
+
+<a name="294219262"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Annotations%20in%20Simpl/near/294219262" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Annotations.20in.20Simpl.html#294219262">(Aug 19 2022 at 08:09)</a>:</h4>
+<p>From: Lukas Bulwahn &lt;<a href="mailto:bulwahn@in.tum.de">bulwahn@in.tum.de</a>&gt;<br>
+This observation motivated me back in 2007 to NOT define a Hoare logic <br>
+for Imperative-HOL, but to do all the case studies just with a simple <br>
+predicate capturing the operational semantics. Composition of facts of <br>
+the same program therefore does not even require any special rule and <br>
+use of object connectives, but can be done with resolution, e.g. the OF <br>
+attribute.</p>
+<p>As that was so non-standard, other people seem to have defined a Hoare <br>
+logic for Imperative-HOL nevertheless.</p>
+<p>I tried to prove properties of the imperative programs separately.<br>
+In my case studies, the properties of the functions relied heavily one <br>
+on the previous one, which required me to re-state properties again and <br>
+again.</p>
+<p>The solution I then came up with is still quite adhoc: I came up with <br>
+richer induction rules to obtain already proved facts in the context <br>
+with names.</p>
+<p>With the infrastructure at the moment, I think proving all the facts at <br>
+once would have been simpler in my case.<br>
+The most difficult case study, the imperative unification algorithm, is <br>
+still managable by proving all properties at once, and the most <br>
+reasoning of the different properties overlap in various places in the <br>
+proof.</p>
+<p>Kernel functions in seL4 have probably a different flavor.</p>
+<p>Lukas</p>
+
+
+
+<a name="294219274"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Annotations%20in%20Simpl/near/294219274" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Annotations.20in.20Simpl.html#294219274">(Aug 19 2022 at 08:09)</a>:</h4>
+<p>From: Gerwin Klein &lt;<a href="mailto:gerwin.klein@nicta.com.au">gerwin.klein@nicta.com.au</a>&gt;<br>
+On 10/07/2012, at 6:26 PM, John Wickerson wrote:</p>
+<blockquote>
+<blockquote>
+<p>Slight side rant: It's strange that Hoare logic insists that one would only ever prove one property about a function, have one invariant, and one annotation that fits them all. In theory this is all equivalent and there is a "complete specification", but in practise that is not how things are proved or should be proved. </p>
+</blockquote>
+<p>I think it's fine in Hoare logic to prove multiple properties of a function C, like {P1}C{Q1} and {P2}C{Q2}. The point of the rules of conjunction</p>
+<p>{P1}C{Q1}  {P2}C{Q2}</p>
+<hr>
+<p>{P1∧P2}C{Q1∧Q2}</p>
+<p>and disjunction</p>
+<p>{P1}C{Q1}  {P2}C{Q2}</p>
+<hr>
+<p>{P1∨P2}C{Q1∨Q2}</p>
+<p>are to allow these multiple properties to be combined.</p>
+</blockquote>
+<p>Sure. Maybe I should clarify: I'm not objecting to Hoare logic as such, it's perfectly capable of showing multiple independent properties about a program (that's what we've used in the seL4 proofs I was mentioning, precisely with rules as above). I'm objecting to how it is usually used and presented, and to what tools in turn usually imply for your workflow.</p>
+<p>The fact that there is precisely one specification statement and one invariant that you can annotate for each procedure/loop in usual tools and presentations is the problem. This is hard to avoid if these annotations go into the program, because it is awkward to differentiate between multiple proofs in one invariant annotation (possible, but very annoying). </p>
+<blockquote>
+<p>But in the "proof outline" representation of a Hoare logic proof, where the program text is interspersed with assertions, you can't really represent this without writing out the program text multiple times, which is a hassle.</p>
+</blockquote>
+<p>That is the direction I meant, only that this is already the case with just invariants (which will need to be provided somehow, at least if there is automation/vcg support in some form). It is perfectly possible to mention these annotations in the proof only, and I'm arguing that this is where they belong.</p>
+<p>Cheers,<br>
+Gerwin</p>
+
+
+
+<a name="294219342"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Annotations%20in%20Simpl/near/294219342" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Annotations.20in.20Simpl.html#294219342">(Aug 19 2022 at 08:10)</a>:</h4>
+<p>From: Gerwin Klein &lt;<a href="mailto:gerwin.klein@nicta.com.au">gerwin.klein@nicta.com.au</a>&gt;<br>
+On 10/07/2012, at 6:53 PM, Lukas Bulwahn wrote:</p>
+<blockquote>
+<p>On 07/10/2012 01:09 AM, Gerwin Klein wrote:</p>
+<blockquote>
+<p>This is what we used for the kernel proof. It doesn't look nice and has the disadvantages you explain. It does have the advantage that you can pick different invariants/annotations for each proof about that function.</p>
+<p>Slight side rant: It's strange that Hoare logic insists that one would only ever prove one property about a function, have one invariant, and one annotation that fits them all. In theory this is all equivalent and there is a "complete specification", but in practise that is not how things are proved or should be proved.</p>
+<p>Just think about what we do for functional programs in Isabelle. Nothing is more cumbersome and useless than having to state one lemma that says everything about one function.<br>
+This observation motivated me back in 2007 to NOT define a Hoare logic for Imperative-HOL, but to do all the case studies just with a simple predicate capturing the operational semantics. Composition of facts of the same program therefore does not even require any special rule and use of object connectives, but can be done with resolution, e.g. the OF attribute.</p>
+</blockquote>
+<p>As that was so non-standard, other people seem to have defined a Hoare logic for Imperative-HOL nevertheless.</p>
+<p>I tried to prove properties of the imperative programs separately.</p>
+</blockquote>
+<p>I'd argue that Hoare logic or not is a separate issue from proving properties separately or not. Any combination of these is possible. It's just that most Hoare logic frameworks practically force you in one direction (and they shouldn't).</p>
+<blockquote>
+<p>In my case studies, the properties of the functions relied heavily one on the previous one, which required me to re-state properties again and again.</p>
+</blockquote>
+<p>We have seen some of that effect in our proofs as well, but not everywhere. Some loops for instance need a fairly complex invariant just to be able to say anything about them, and in this case it can be easier to get the strongest statement you can come up with and be done with it. This can be awkward to use, because you will either get a fairly large precondition with many cases or one that is fairly strong and may be harder to establish than necessary, but it may still be worth it overall. </p>
+<p>On the other hand, depending on the use context you might just be interested in the fact that a certain function doesn't change certain parts of the state. This can be a completely automatic proof where you don't even have to state the specification, because a tool can figure it out for you. But if you are only allowed to have precisely one specification per function, you can't make use of such simple automatic side proofs.</p>
+<p>In the functional world, the first case is similar to a complex recursion that you may only want to go through once with a specific complex induction, strong induction hypothesis etc. You can be better off proving everything you'll ever need about that function in one go. The second case are the many simple, small functions that make up the bulk of the program. For these you want nice, clean simp and other rules to set up automation.</p>
+<p>The point is, you should have the choice to do what fits best.</p>
+<p>Cheers,<br>
+Gerwin</p>
+
+
+
+<a name="294219352"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Annotations%20in%20Simpl/near/294219352" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Annotations.20in.20Simpl.html#294219352">(Aug 19 2022 at 08:10)</a>:</h4>
+<p>From: Lars Noschinski &lt;<a href="mailto:noschinl@in.tum.de">noschinl@in.tum.de</a>&gt;<br>
+I guess, Simpl accounts for this case with the _modifies specifications?</p>
+<p>-- Lars</p>
+
+
+
+<a name="294219367"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Annotations%20in%20Simpl/near/294219367" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Annotations.20in.20Simpl.html#294219367">(Aug 19 2022 at 08:10)</a>:</h4>
+<p>From: Lars Noschinski &lt;<a href="mailto:noschinl@in.tum.de">noschinl@in.tum.de</a>&gt;<br>
+It turns out that this is fairly easy to implement:</p>
+<p>fun eqsubst_inst_tac ctxt occL insts thm =<br>
+     Subgoal.FOCUS (fn {context=ctxt,...} =&gt; let<br>
+       val thm' = thm |&gt; Rule_Insts.read_instantiate ctxt insts<br>
+     in EqSubst.eqsubst_tac ctxt occL [thm'] 1 end) ctxt</p>
+<p>fun subst_method inst_tac tac =<br>
+     Args.goal_spec --<br>
+     Scan.lift (Scan.optional (Args.parens (Scan.repeat Parse.nat)) [0]) --<br>
+     Scan.optional (Scan.lift<br>
+       (Parse.and_list1 (Args.var -- (Args.$$$ "=" |-- Parse.!!! <br>
+Args.name_source)) --|<br>
+         Args.$$$ "in")) [] --<br>
+     Attrib.thms &gt;&gt;<br>
+     (fn (((quant, occL), insts), thms) =&gt; fn ctxt =&gt; METHOD (fn facts =&gt;<br>
+       if null insts then quant (Method.insert_tac facts THEN' tac ctxt <br>
+occL thms)<br>
+       else<br>
+         (case thms of<br>
+           [thm] =&gt; quant (Method.insert_tac facts THEN' inst_tac ctxt <br>
+occL insts thm)<br>
+         | _ =&gt; error "Cannot have instantiations with multiple rules")));</p>
+<p>val eqsubst_inst_meth = subst_method<br>
+     eqsubst_inst_tac EqSubst.eqsubst_tac</p>
+<p>So now I can do:</p>
+<p>lemma (in mult3_impl) mult3:<br>
+   "∀m n. Γ ⊢ ⦃´m = m ∧ ´n = n⦄ ´r :== PROC mult3(´m, ´n) ⦃´r = m * n⦄"<br>
+   apply vcg_step<br>
+   apply (subst_tac I="⦃ ´m = m ∧ ´m * n = ´r + ´m * ´n  ⦄" in<br>
+     annotate_named_loop[where name="''mult3_loop''"])</p>
+
+
+
+<a name="294219381"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Annotations%20in%20Simpl/near/294219381" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Annotations.20in.20Simpl.html#294219381">(Aug 19 2022 at 08:10)</a>:</h4>
+<p>From: Gerwin Klein &lt;<a href="mailto:gerwin.klein@nicta.com.au">gerwin.klein@nicta.com.au</a>&gt;<br>
+Yes, Simpl does, and a few other frameworks have the same special case, because it occurs so often that it can't be ignored. There is nothing in between, though. If your memory model has separate heap framing conditions, you're already out of luck.</p>
+<p>Simpl can easily be extended to allow the vcg to use an arbitrary lemma as spec for a function to get all that (not sure if we've pushed that change to the AFP yet -- we should). With that, there is only the problem of nice syntax for annotations left.</p>
+<p>Cheers,<br>
+Gerwin</p>
+
+
+
+<a name="294219502"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Annotations%20in%20Simpl/near/294219502" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Annotations.20in.20Simpl.html#294219502">(Aug 19 2022 at 08:11)</a>:</h4>
+<p>From: Lars Noschinski &lt;<a href="mailto:noschinl@in.tum.de">noschinl@in.tum.de</a>&gt;<br>
+[...]</p>
+<p>I've refined this now to a specialized tactic, so I can just write</p>
+<p>apply (anno_loop_tac my_named_loop="{...}").</p>
+<p>Now this aspect feels quite natural.</p>
+<p>-- Lars</p>
+
+
+
+<a name="294219508"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Annotations%20in%20Simpl/near/294219508" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Annotations.20in.20Simpl.html#294219508">(Aug 19 2022 at 08:11)</a>:</h4>
+<p>From: Gerwin Klein &lt;<a href="mailto:gerwin.klein@nicta.com.au">gerwin.klein@nicta.com.au</a>&gt;<br>
+That does indeed look quite nice. Would you be happy to include your tactic in the AFP Simpl entry?</p>
+<p>Gerwin</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

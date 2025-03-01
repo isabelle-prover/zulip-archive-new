@@ -1,0 +1,44 @@
+[
+    {
+        "content": "<p>From: Brian Huffman &lt;<a href=\"mailto:brianh@cs.pdx.edu\">brianh@cs.pdx.edu</a>&gt;<br>\nCertainly, using the HOLCF continuous function type should allow you  <br>\nto define datatypes with continuations, just like you would define  <br>\nthem in Haskell or ML. The domain package currently allows you to use  <br>\nindirect recursion with the continuous function space; for example,  <br>\nyou can declare types like this:</p>\n<p>domain 'a foo = Foo \"(foo -&gt; 'a) -&gt; 'a\" | Bar 'a</p>\n<p>Currently, support for indirect recursion is rather limited (you can't  <br>\nuse indirect recursion with arbitrary type constructors, due to  <br>\nsoundness concerns), and the domain package doesn't give you a very  <br>\nuseful induction rule for such types. But I am working on some big  <br>\nimprovements; the support for indirect recursion should get much  <br>\nbetter within the next few months.</p>\n<ul>\n<li>Brian</li>\n</ul>\n<p>Quoting Tobias Nipkow &lt;<a href=\"mailto:nipkow@in.tum.de\">nipkow@in.tum.de</a>&gt;:</p>",
+        "id": 294073498,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660828008
+    },
+    {
+        "content": "<p>From: Brian Huffman &lt;<a href=\"mailto:brianh@cs.pdx.edu\">brianh@cs.pdx.edu</a>&gt;<br>\nUnfortunately, code generation does not currently work for HOLCF definitions.</p>\n<p>This is also on our to-do list. I plan to bring this up at the next  <br>\nIsabelle developer's meeting this summer, if it hasn't been dealt with  <br>\nbefore then. Implementing it will take some coordinated effort between  <br>\nthe HOLCF people (mainly me) and the code generation people (mainly  <br>\nFlorian Haftmann).</p>\n<p>Of course, if users are clamoring for this new feature, it might  <br>\nencourage us to implement it sooner...</p>\n<ul>\n<li>Brian</li>\n</ul>\n<p>Quoting Jeremy Siek &lt;<a href=\"mailto:jeremy.siek@gmail.com\">jeremy.siek@gmail.com</a>&gt;:</p>",
+        "id": 294073525,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660828019
+    },
+    {
+        "content": "<p>From: Jeremy Siek &lt;<a href=\"mailto:jeremy.siek@gmail.com\">jeremy.siek@gmail.com</a>&gt;<br>\nGood to hear.</p>\n<p>Does the code generation support work for HOLCF fixrec<br>\ndefinitions?</p>\n<p>Cheers,<br>\nJeremy</p>",
+        "id": 294073531,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660828021
+    },
+    {
+        "content": "<p>From: Thomas Sewell &lt;<a href=\"mailto:Thomas.Sewell@nicta.com.au\">Thomas.Sewell@nicta.com.au</a>&gt;<br>\nLet me point out that you don't necessarily need to move<br>\nto a partial logic like HOLCF to deal with a partial function.<br>\nYou just need to introduce partiality explicitly.</p>\n<p>For instance, consider a simple recursive interpreter<br>\nwhich may fail to terminate if the program it is interpreting<br>\nfails to terminate. Specifying the big-step semantics is a<br>\nproblem in Isabelle/HOL because there may not be any. But<br>\nspecifying a small-step semantics is easy. We model the outcome<br>\nas a trace (nat =&gt; step) of steps taken.</p>\n<p>datatype lang = Emit string | Loop \"lang list\"</p>\n<p>datatype step = Emitted string | Looped | Terminated</p>\n<p>function<br>\n  interpLang :: \"lang list =&gt; nat =&gt; step\"<br>\nwhere<br>\n  \"interpLang [] n = Terminated\"<br>\n| \"interpLang (Emit string # xs) 0 = Emitted string\"<br>\n| \"interpLang (Loop xs # ys) 0 = Looped\"<br>\n| \"interpLang (Emit string # xs) (Suc n) = interpLang xs n\"<br>\n| \"interpLang (Loop xs # ys) (Suc n) = interpLang (xs @ Loop xs # ys) n\"<br>\n  apply simp_all<br>\n  apply pat_completeness<br>\n  done</p>\n<p>termination interpLang<br>\n  by lexicographic_order</p>\n<p>I hope this example works in the latest Isabelle. Everything here is <br>\nperfectly<br>\nwell-defined. We can look at the trace the interpreter generates with:</p>\n<p>value \"map (interpLang [Loop [Emit ''foo'']]) [0 ..&lt; 10]\"</p>\n<p>Of course, we're a long way from an elegantly stated continuation-passing<br>\ninterpreter for a significant language, but I think it ought to be possible.<br>\nYou should also be able to develop a (partial) big-step semantics once <br>\nyou've<br>\nused this kind of approach to define something.</p>\n<p>I don't know how this compares to just using HOLCF.</p>\n<p>Yours,<br>\n    Thomas.</p>",
+        "id": 294073564,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660828034
+    },
+    {
+        "content": "<p>From: Jeremy Siek &lt;<a href=\"mailto:jeremy.siek@gmail.com\">jeremy.siek@gmail.com</a>&gt;<br>\nHi Thomas,</p>\n<p>I started out very much along the lines you suggest, using<br>\na counter to force the interpreter to terminate. This works<br>\nquite well in dealing with the partiality of the interpreter.</p>\n<p>fun eval :: \"nat \\&lt;Rightarrow&gt; expr \\&lt;Rightarrow&gt; expr result\" where<br>\n   \"eval 0 e = TimeOut\"<br>\n| \"eval (Suc n) (Const c) = Result (Const c)\"<br>\n| \"eval (Suc n) (Y T1 T2) = Result (Y T1 T2)\"<br>\n| \"eval (Suc n) (Lam x T e) = Result (Lam x T e)\"<br>\n| \"eval (Suc n) (App e\\&lt;^isub&gt;1 e\\&lt;^isub&gt;2) =<br>\n     (v\\&lt;^isub&gt;1 := eval n e\\&lt;^isub&gt;1; v\\&lt;^isub&gt;2 := eval n e\\&lt;^isub&gt;2;<br>\n      case v\\&lt;^isub&gt;1 of<br>\n        Lam x T e \\&lt;Rightarrow&gt; eval n ([x\\&lt;rightarrow&gt;v\\&lt;^isub&gt;2]e)<br>\n      | Y T\\&lt;^isub&gt;1 T\\&lt;^isub&gt;2 \\&lt;Rightarrow&gt;<br>\n         (let x = Suc (max_list (FV_list v\\&lt;^isub&gt;2)) in<br>\n          eval n (App v\\&lt;^isub&gt;2 (\\&lt;lambda&gt; x:T\\&lt;^isub&gt;1. App (App (Y  <br>\nT\\&lt;^isub&gt;1 T\\&lt;^isub&gt;2) v\\&lt;^isub&gt;2) (Var x))))<br>\n      | Const c \\&lt;Rightarrow&gt; \\&lt;delta&gt; c v\\&lt;^isub&gt;2<br>\n      | _ \\&lt;Rightarrow&gt; Wrong)\"</p>\n<p>This counter trick can also be applied to a big-step semantics  <br>\nexpressed as<br>\nan inductively defined relation. However, the above functional variation<br>\nis nicer because one can use monads to avoid the explicit treatment  <br>\nof errors<br>\nand timeouts.</p>\n<p>However, when I got to the point of adding first-class continuations<br>\nto the language being interpreted, I ran into a different problem.<br>\nI needed to add a new constructor \"Cont\" to the expr datatype<br>\nthat stores a HOL function, but this isn't allowed in HOL.</p>\n<p>datatype expr =  Var name | Const const<br>\n   | Lam name ty expr | App expr expr | Y ty ty<br>\n   | Cont \"expr =&gt; expr result\"  (* problem! *)</p>\n<p>This is allowed in HOLCF, though after spending a couple hours with  <br>\nHOLCF<br>\nI'm realizing that it has a significant learning curve and is quite  <br>\nrough around<br>\nthe edges.</p>\n<p>Of course, this problem goes away with a small-step semantics or  <br>\nabstract<br>\nmachine because the continuation can be concretely represented by its<br>\nown datatype.</p>\n<p>Cheers,<br>\nJeremy</p>",
+        "id": 294073602,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660828051
+    },
+    {
+        "content": "<p>From: Jeremy Siek &lt;<a href=\"mailto:jeremy.siek@gmail.com\">jeremy.siek@gmail.com</a>&gt;<br>\nLately I've been investigating writing interpreters in Isabelle/HOL and<br>\nran into a problem when trying to support first-class continuations. The<br>\ntypical approach when writing an interpreter in ML or Haskell is to<br>\nwrite the interpreter in continuation passing style (or monadic style)<br>\nand to embed the continuations as functions in the value (or expression)<br>\ndatatype. Of course, in Isabelle/HOL this is not possible.</p>\n<p>Using alternative approaches, such as SOS or abstract machines, this is not<br>\na problem because continuations are represented explicitly as data.</p>\n<p>At this point I'm thinking that one can't write an interpreter in Isabelle<br>\nthat supports first-class continuations, but perhaps I'm overlooking something?</p>\n<p>Cheers,<br>\nJeremy</p>",
+        "id": 294074598,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660828364
+    },
+    {
+        "content": "<p>From: Tobias Nipkow &lt;<a href=\"mailto:nipkow@in.tum.de\">nipkow@in.tum.de</a>&gt;<br>\nNot in HOL (or other logics of total functions), but in the extension<br>\nHOLCF, which supports a separate type of continuous functions. I am not<br>\nsure if HOLCF has been used for this purpose before.</p>\n<p>Tobias</p>\n<p>Jeremy Siek schrieb:</p>",
+        "id": 294074764,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660828431
+    }
+]

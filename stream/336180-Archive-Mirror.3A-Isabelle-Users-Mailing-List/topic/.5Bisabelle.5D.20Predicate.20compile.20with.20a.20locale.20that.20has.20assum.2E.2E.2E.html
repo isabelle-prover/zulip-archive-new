@@ -1,0 +1,82 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Predicate compile with a locale that has assum... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Predicate.20compile.20with.20a.20locale.20that.20has.20assum.2E.2E.2E.html">[isabelle] Predicate compile with a locale that has assum...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294719539"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Predicate%20compile%20with%20a%20locale%20that%20has%20assum.../near/294719539" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Predicate.20compile.20with.20a.20locale.20that.20has.20assum.2E.2E.2E.html#294719539">(Aug 22 2022 at 16:04)</a>:</h4>
+<p>From: Mark Wassell &lt;<a href="mailto:mpwassell@gmail.com">mpwassell@gmail.com</a>&gt;<br>
+Hello,</p>
+<p>I am having a problem invoking code_pred on an inductive predicate that is<br>
+ultimately defined in a locale that has an assumption.</p>
+<p>I am following the steps outlined in a previous post on this [1] but my<br>
+locale has an assumption so I don't know if defining this is at all<br>
+possible.</p>
+<p>Cheers</p>
+<p>Mark</p>
+<p>[1]<br>
+<a href="https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2017-January/msg00064.html">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2017-January/msg00064.html</a></p>
+<p>locale mylocale =<br>
+  fixes P :: "'a set ⇒ bool"<br>
+  assumes "P {}"<br>
+begin</p>
+<p>inductive test :: "'a ⇒ 'a ⇒ bool" where<br>
+  "P {a,b} ⟹ test a b" (*|<br>
+  "test a b ⟹ P {a,b,c}  ⟹ test a c" *)<br>
+end</p>
+<p>definition "foo P = mylocale.test P"</p>
+<p>lemma [code_pred_intro]:<br>
+  "mylocale P ⟹ P {a,b} ⟹ foo P a b"<br>
+  unfolding foo_def using mylocale.test.intros by metis</p>
+<p>code_pred foo unfolding foo_def<br>
+proof -<br>
+  assume a1: "mylocale.test x xa xb" and "(⋀P a b. x = P ⟹ xa = a ⟹ xb = b<br>
+⟹ mylocale P ⟹ P {a, b} ⟹ thesis)"<br>
+  show thesis using mylocale.test.cases[of x xa xb thesis,OF _ a1] (* Seem<br>
+to have the right bits, in particular 'mylocale P', but in the wrong<br>
+'order' *)<br>
+  oops</p>
+
+
+
+<a name="294719645"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Predicate%20compile%20with%20a%20locale%20that%20has%20assum.../near/294719645" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Predicate.20compile.20with.20a.20locale.20that.20has.20assum.2E.2E.2E.html#294719645">(Aug 22 2022 at 16:05)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear Mark,</p>
+<p>This is not going to work in this way. In principle, if you could phrase the locale <br>
+assumptions as an executable test, then it would work, but every call to the inductive <br>
+predicate would re-evaluate this test, and this can get pretty computationally expensive <br>
+if you have a recursive inductive predicate.</p>
+<p>What I would recommend is that you only make it executable for interpretations that have <br>
+discharged the assumptions. For example:</p>
+<p>locale mylocale =<br>
+   fixes P :: "'a set ⇒ bool"<br>
+   assumes "P {}"<br>
+begin</p>
+<p>inductive test :: "'a ⇒ 'a ⇒ bool" where<br>
+   "P {a,b} ⟹ test a b" (*|<br>
+   "test a b ⟹ P {a,b,c}  ⟹ test a c" *)</p>
+<p>end</p>
+<p>consts P :: "nat set ⇒ bool"</p>
+<p>global_interpretation foo: mylocale P<br>
+   defines foo_test = "foo.test"<br>
+   sorry</p>
+<p>declare foo.test.intros [code_pred_intro]</p>
+<p>code_pred foo_test by(rule foo.test.cases)</p>
+<p>This works if there are only a few interpretations of your locale. If you have many of <br>
+them, it might be useful to restructure your locale hierarchy such that you can move the <br>
+definition to a place without assumptions. (In all my years of using Isabelle, I've never <br>
+seen an inductive definition for which you needed a locale assumption to prove its <br>
+consistency, i.e., monotonicity of the associated functional.)</p>
+<p>Andreas</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

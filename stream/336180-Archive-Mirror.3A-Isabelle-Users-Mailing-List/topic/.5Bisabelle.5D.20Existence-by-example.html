@@ -1,0 +1,255 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Existence-by-example · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Existence-by-example.html">[isabelle] Existence-by-example</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294822985"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Existence-by-example/near/294822985" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Existence-by-example.html#294822985">(Aug 23 2022 at 08:24)</a>:</h4>
+<p>From: "John F. Hughes" &lt;<a href="mailto:jfh@cs.brown.edu">jfh@cs.brown.edu</a>&gt;<br>
+Suppose I want to prove something like "in a group where the order of every<br>
+element divides 3, there's an involution with only the identity element as<br>
+a fixed point". As a mathematician, I just say "Consider the involution x<br>
+-&gt; x^2; that'll all you need!"</p>
+<p>Similarly, if I want to prove that there are three distinct natural numbers<br>
+whose product is 12, I say "Well, 1 *  2 *  6 = 12" (or perhaps I use 1 * 3</p>
+<ul>
+<li>4...both work!).</li>
+</ul>
+<p>Is there an idiomatic way to do such a proof in isabelle, i.e., to fill in</p>
+<p>lemma tiny: "∃ (k::nat) (m::nat) (p::nat) . k<em>m</em>p = 12 ∧ k ≠ m ∧ k ≠ p ∧ m<br>
+≠ p"<br>
+proof -<br>
+  ???</p>
+<p>[I should probably mention that Sledgehammer claims to have a proof, but<br>
+I'm not -- as you might have guessed! -- interested in this particular<br>
+fact, but rather in how to say to Isabelle, "Look! It's right here!" ]</p>
+<p>The proof suggested is "(metis (no_types, lifting) add_right_imp_eq<br>
+numeral_Bit0 numeral_Bit1 one_eq_numeral_iff semiring_norm(83)<br>
+semiring_norm(86) semiring_normalization_rules(25)<br>
+semiring_normalization_rules(4)) (671 ms)" which hardly gives me an idiom<br>
+for such proofs.</p>
+<p>--John</p>
+
+
+
+<a name="294823007"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Existence-by-example/near/294823007" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Existence-by-example.html#294823007">(Aug 23 2022 at 08:24)</a>:</h4>
+<p>From: Mark Wassell &lt;<a href="mailto:mpwassell@gmail.com">mpwassell@gmail.com</a>&gt;<br>
+Hi,</p>
+<p>I can provide a few ways of doing this. The key to all of them is to<br>
+replace the dash following 'proof' with a proof method.</p>
+<p>First, if you give the proof method rule+ then Isabelle will pick<br>
+appropriate rule automatically [1] and do this multiple times. Here the<br>
+rule it applies is exI which will unpack the existentials. This will then<br>
+leave you with 2 things to prove.</p>
+<ol>
+<li>?k * ?m2 * ?p4 = 12</li>
+<li>?k ≠ ?m2 ∧ ?k ≠ ?p4 ∧ ?m2 ≠ ?p4</li>
+</ol>
+<p>You can plug anything you like into the ? variables and so the proof is:</p>
+<p>lemma tiny: "∃ (k::nat) (m::nat) (p::nat) . k<em>m</em>p = 12 ∧ k ≠ m ∧ k ≠ p ∧ m<br>
+≠ p"<br>
+proof(rule+)<br>
+  show "1 * (2::nat) * 6 = 12"  by simp<br>
+  show "1 ≠ (2::nat) ∧ 1 ≠ (6::nat) ∧ 2 ≠  (6::nat)" by simp<br>
+qed</p>
+<p>The fly in the ointment is that you have to add the type annotations to the<br>
+numeric constants as these are overloaded constants. I don't know if there<br>
+is a nice way to tell Isabelle that you want fix all numeric constants to<br>
+be nats within your proof or a part of your theory.</p>
+<p>The second is a variant of the above but here you specify the actual<br>
+constant for each application of exI. This will give you the one line proof<br>
+of:<br>
+by(rule exI[where x=1],rule exI[where x=2], rule exI[where x=6], simp+)</p>
+<p>It's interesting here that I didn't need to include the type annotation.<br>
+Also it would be nice if Isabelle was able to let you specify that you want<br>
+exI to be mapped over a list of literals [1,2,6]. One way to get around<br>
+this for your case is to include:</p>
+<p>lemma exI3: "P x y z ⟹ ∃x y z. P x y z" by auto</p>
+<p>and then you can do<br>
+by(rule exI3[of _ 1 2 6],auto)</p>
+<p>Cheers</p>
+<p>Mark</p>
+<p>[1] Isar Reference Manual - page 6.4.2</p>
+
+
+
+<a name="294823020"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Existence-by-example/near/294823020" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Existence-by-example.html#294823020">(Aug 23 2022 at 08:24)</a>:</h4>
+<p>From: Lawrence Paulson &lt;<a href="mailto:lp15@cam.ac.uk">lp15@cam.ac.uk</a>&gt;<br>
+I prefer this style when there are existential quantifiers to instantiate:</p>
+<p>lemma tiny: "∃ (k::nat) (m::nat) (p::nat) . k<em>m</em>p = 12 ∧ k ≠ m ∧ k ≠ p ∧ m ≠ p"<br>
+proof -<br>
+  have "1 * 3 * 4 = (12::nat)"<br>
+    by auto<br>
+  then show ?thesis<br>
+    using numeral_eq_iff one_eq_numeral_iff by blast<br>
+qed</p>
+<p>Larry Paulson</p>
+
+
+
+<a name="294823041"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Existence-by-example/near/294823041" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Existence-by-example.html#294823041">(Aug 23 2022 at 08:24)</a>:</h4>
+<p>From: "John F. Hughes" &lt;<a href="mailto:jfh@cs.brown.edu">jfh@cs.brown.edu</a>&gt;<br>
+Thanks to one and all for these useful approaches. I've used Larry's and it<br>
+got me where I needed to go, and pretty readably. :)</p>
+
+
+
+<a name="294823108"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Existence-by-example/near/294823108" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Existence-by-example.html#294823108">(Aug 23 2022 at 08:25)</a>:</h4>
+<p>From: Pedro Sánchez Terraf &lt;<a href="mailto:sterraf@famaf.unc.edu.ar">sterraf@famaf.unc.edu.ar</a>&gt;<br>
+El 9/2/20 a las 05:15, Mark Wassell escribió:<br>
+Hello,</p>
+<p>I have some related question, especially concerning the "plug anything" <br>
+part.</p>
+<p>Sometimes I have to prove a result like</p>
+<p>"∃x. P x ∧ Q x",</p>
+<p>and I intend to use a lemma that states</p>
+<p>lemma A: "∃x. R x".</p>
+<p>Moreover, I know that any such x (satisfying R) will work for me. Also, <br>
+it turns out that in my example it is better to prove "P x" first and <br>
+then use this to prove "Q x".</p>
+<p>I would like to be able to write a proof that looks like this:</p>
+<p>lemma "∃x. P x ∧ Q x"proof (rule) (* goals here: P ?x &amp;&amp;&amp; Q ?x *) obtain <br>
+x where "R x" using A by blast then show "P x" &lt;proof&gt; then show "Q x" <br>
+&lt;proof&gt; qed</p>
+<p>This won't work (neither of the show commands) because I have an <br>
+obtained parameter in the conclusion. Nevertheless it looks like a sound <br>
+proof method, because I'm proving an existential.</p>
+<p>I know this kind of a "feature request"; I wanted to know if there is <br>
+some way to write proofs like this, or if someone actually considered <br>
+this might be useful.</p>
+<p>PST.-<br>
+<a href="http://cs.famaf.unc.edu.ar/~pedro/home_en">cs.famaf.unc.edu.ar/~pedro/home_en</a> <br>
+&lt;<a href="https://cs.famaf.unc.edu.ar/~pedro/home_en.html">https://cs.famaf.unc.edu.ar/~pedro/home_en.html</a>&gt;</p>
+
+
+
+<a name="294823128"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Existence-by-example/near/294823128" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Existence-by-example.html#294823128">(Aug 23 2022 at 08:25)</a>:</h4>
+<p>From: Frédéric Boulanger &lt;<a href="mailto:frederic.boulanger@lri.fr">frederic.boulanger@lri.fr</a>&gt;<br>
+What about this:</p>
+<p>lemma ‹∃k m p. k<em>m</em>p = (12::nat) ∧ k≠m ∧ k≠p ∧ m≠p›<br>
+proof -<br>
+  have ‹1<em>3</em>4 = (12::nat)› by simp<br>
+  moreover have ‹1≠(3::nat)› by simp<br>
+  moreover have ‹1≠(4::nat)› by simp<br>
+  moreover have ‹3≠(4::nat)› by simp<br>
+  ultimately show ?thesis by blast<br>
+qed</p>
+<p>or even shorter:</p>
+<p>lemma ‹∃k m p. k<em>m</em>p = (12::nat) ∧ k≠m ∧ k≠p ∧ m≠p›<br>
+proof -<br>
+  have ‹1<em>3</em>4 = (12::nat)› by simp<br>
+  moreover have ‹1≠(3::nat) ∧ 1≠(4::nat) ∧ 3≠(4::nat)› by simp<br>
+  ultimately show ?thesis by blast<br>
+qed</p>
+<p>Some similar proof patterns are given in section 4.2.1 (page 45) of Programming and proving in Isabelle/HOL.</p>
+<p>Frédéric</p>
+<p>Frédéric Boulanger<br>
+CentraleSupélec - Département Informatique  Laboratoire de Recherche en Informatique<br>
+3 rue Joliot-Curie, 91192 Gif-sur-Yvette cedex  Bât 650 Ada Lovelace, Université Paris Sud, 91405 Orsay Cedex France<br>
++33 [0]1 69 85 14 84</p>
+
+
+
+<a name="294823166"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Existence-by-example/near/294823166" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Existence-by-example.html#294823166">(Aug 23 2022 at 08:25)</a>:</h4>
+<p>From: Lawrence Paulson &lt;<a href="mailto:lp15@cam.ac.uk">lp15@cam.ac.uk</a>&gt;<br>
+You seem to be saying that you know that R(x) implies P(x) and that P(x) implies Q(x), in both cases for all x. Prove those two implications, and if you have also proved "∃x. R x", then "∃x. P x ∧ Q x" should be provable automatically provided P, Q and R aren't too complicated. And if they are, you could introduce abbreviations for them.</p>
+<p>Larry Paulson</p>
+
+
+
+<a name="294823215"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Existence-by-example/near/294823215" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Existence-by-example.html#294823215">(Aug 23 2022 at 08:25)</a>:</h4>
+<p>From: Pedro Sánchez Terraf &lt;<a href="mailto:sterraf@famaf.unc.edu.ar">sterraf@famaf.unc.edu.ar</a>&gt;<br>
+El 10/2/20 a las 08:18, Lawrence Paulson escribió:<br>
+Thank you very much; I understand this technique. The way I thought <br>
+about this was to introduce the existential at the very end:</p>
+<p>lemma<br>
+   assumes "∃x. R x"<br>
+   shows "∃x. P x ∧ Q x"<br>
+proof -<br>
+   obtain x where "R x" using A by blast<br>
+   then<br>
+   have "P x" &lt;proof&gt;<br>
+   moreover from this<br>
+   have "Q x" &lt;proof&gt;<br>
+   ultimately<br>
+   show ?thesis by auto (* or something *)<br>
+qed</p>
+<p>The reason I asked is that the implication P(x)==&gt;Q(x) usually depends <br>
+on too much information local to the lemma, and putting that in a <br>
+separate result would sometimes obfuscate the proof document. Also, when <br>
+the overall argument has some length, the cumulative approach <br>
+"moreover... ultimately" also seems impractical. Alternatively, I could <br>
+label the relevant facts and use them afterwards, but I want to avoid <br>
+cross-referencing and repetition as much as possible.</p>
+<p>Thanks again.</p>
+<p>PST.-<br>
+<a href="http://cs.famaf.unc.edu.ar/~pedro/home_en">cs.famaf.unc.edu.ar/~pedro/home_en</a> <br>
+&lt;<a href="https://cs.famaf.unc.edu.ar/~pedro/home_en.html">https://cs.famaf.unc.edu.ar/~pedro/home_en.html</a>&gt;</p>
+
+
+
+<a name="294823229"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Existence-by-example/near/294823229" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Existence-by-example.html#294823229">(Aug 23 2022 at 08:26)</a>:</h4>
+<p>From: Akihisa Yamada &lt;<a href="mailto:akihisayamada@nii.ac.jp">akihisayamada@nii.ac.jp</a>&gt;<br>
+Hello,</p>
+<blockquote>
+<p>Thank you very much; I understand this technique. The way I thought <br>
+about this was to introduce the existential at the very end:</p>
+</blockquote>
+<p>it doesn't have to be very end, but after the relevant "obtain". This <br>
+might look better:</p>
+<p>lemma<br>
+   shows "∃x::'a. P x ∧ Q x"<br>
+proof -<br>
+   obtain x ::'a where x: "R x" sorry<br>
+   show ?thesis<br>
+   proof (intro exI conjI)<br>
+    show "P x" using x sorry<br>
+    show "Q x" using x sorry<br>
+   qed<br>
+qed</p>
+<p>Best,<br>
+Akihisa</p>
+<blockquote>
+<p>lemma<br>
+   assumes "∃x. R x"<br>
+   shows "∃x. P x ∧ Q x"<br>
+proof -<br>
+   obtain x where "R x" using A by blast<br>
+   then<br>
+   have "P x" &lt;proof&gt;<br>
+   moreover from this<br>
+   have "Q x" &lt;proof&gt;<br>
+   ultimately<br>
+   show ?thesis by auto (* or something *)<br>
+qed</p>
+<p>The reason I asked is that the implication P(x)==&gt;Q(x) usually depends <br>
+on too much information local to the lemma, and putting that in a <br>
+separate result would sometimes obfuscate the proof document. Also, when <br>
+the overall argument has some length, the cumulative approach <br>
+"moreover... ultimately" also seems impractical. Alternatively, I could <br>
+label the relevant facts and use them afterwards, but I want to avoid <br>
+cross-referencing and repetition as much as possible.</p>
+<p>Thanks again.</p>
+<p>PST.-<br>
+<a href="http://cs.famaf.unc.edu.ar/~pedro/home_en">cs.famaf.unc.edu.ar/~pedro/home_en</a> <br>
+&lt;<a href="https://cs.famaf.unc.edu.ar/~pedro/home_en.html">https://cs.famaf.unc.edu.ar/~pedro/home_en.html</a>&gt;</p>
+</blockquote>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

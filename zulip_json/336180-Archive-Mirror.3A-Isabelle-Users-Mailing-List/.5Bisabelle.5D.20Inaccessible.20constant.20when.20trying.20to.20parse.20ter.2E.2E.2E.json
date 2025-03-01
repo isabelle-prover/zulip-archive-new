@@ -1,0 +1,32 @@
+[
+    {
+        "content": "<p>From: Peter Lammich &lt;<a href=\"mailto:lammich@in.tum.de\">lammich@in.tum.de</a>&gt;<br>\nHi,</p>\n<p>I'm trying to parse a term that I read from a cartouche, which is<br>\ncontained in another term. For that, I Syntax.read_term the content of<br>\nthe cartouche inside a parse_translation. However, inside an experiment<br>\nenvironment, this will yield \"inaccessible constant\" errors. What is<br>\ngoing wrong here?<br>\nI attached a boiled-down example, with my test-cases. The last test-<br>\ncase fails.</p>\n<p>Thanks in advance for any help or hints (being completely lost here),<br>\n  Peter</p>\n<hr>\n<p>syntax \"_Tag\" :: \"logic\" (\"\\&lt;^tag&gt;\")</p>\n<p>parse_translation ‹<br>\n    [(@{syntax_const \"_Tag\"}, fn ctxt =&gt; fn _ =&gt; <br>\n      Syntax.read_term ctxt \"hd\"<br>\n    )]<br>\n  ›</p>\n<p>(* In my real example, the \"hd\" is a string parsed from <br>\n    a cartouche argument. I have to interpret this string as a term <br>\n    in the context where the outer <br>\n    term, containing the cartouche, appears.<br>\n  *)</p>\n<p>term ‹\\&lt;^tag&gt;›<br>\n  (* Fine *)<br>\n<br>\n  locale foo begin<br>\n    definition hd where \"hd = 1\"<br>\n<br>\n    term ‹\\&lt;^tag&gt;›<br>\n    (* Fine *)<br>\n  end<br>\n<br>\n  experiment<br>\n  begin<br>\n    definition hd where \"hd = 1\"<br>\n<br>\n    ML_val ‹Syntax.read_term @{context} \"hd\"›<br>\n    (* Fine *)<br>\n<br>\n    term ‹\\&lt;^tag&gt;›<br>\n    (* Inaccessible constant: \"Scratch.experiment8356112.hd\" *)<br>\n  end</p>",
+        "id": 294747443,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661194084
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nparse_translation operates on certain parse trees that happen to re-use<br>\ndatatype term, but are quite different from what you get from<br>\nSyntax.read_term.</p>\n<p>In other words, this is a semantic type-error. You cannot place a<br>\nfully-typed term into the concrete syntax tree and expect it to survive<br>\nthe subsequent stages of processing the input.</p>\n<p>Just the usual questions: What are you trying to achieve? What is the<br>\napplication behind it? (It might help to construct further<br>\ncounter-examples to this approach.)</p>\n<p>Makarius</p>",
+        "id": 294747470,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661194100
+    },
+    {
+        "content": "<p>From: Peter Lammich &lt;<a href=\"mailto:lammich@in.tum.de\">lammich@in.tum.de</a>&gt;<br>\nHi Makarius,</p>\n<p>thanks for the quick answer, at least I'm starting to understand what<br>\nis going on there now.</p>\n<blockquote>\n<p>In other words, this is a semantic type-error. You cannot place a<br>\nfully-typed term into the concrete syntax tree and expect it to<br>\nsurvive<br>\nthe subsequent stages of processing the input.</p>\n<p>Just the usual questions: What are you trying to achieve? What is the<br>\napplication behind it? (It might help to construct further<br>\ncounter-examples to this approach.)</p>\n</blockquote>\n<p>I am implementing a parser for some custom syntax.<br>\nIt takes a string (and position), and constructs <br>\na fully-typed Isabelle term. E.g.</p>\n<p>parse \"x=5\" --&gt; \"define ''x'' (5::int)\" :: term</p>\n<p>where \"define\" is a constant that is \"hardcoded\" into the parser, i.e.,<br>\nit uses @{const_name define}.</p>\n<p>I extended this to reflect Isabelle constants into the custom syntax,<br>\ne.g.</p>\n<p>definition \"f = ...\"</p>\n<p>parse @{context} \"f(5)\" --&gt; \"f (5::int)\" :: term</p>\n<p>where f is whatever Isabelle would make of term \"f\" in @{context}. I'm<br>\nusing Syntax.read_term for this.</p>\n<p>Up to this point, I believe (hope), everything is well-defined.</p>\n<p>Now I want to embed the custom syntax into Isabelle's term syntax using<br>\nan antiquotation. Following the example for strings from<br>\nCartouche_Examples, I did it via a parse_translation, causing the<br>\nsemantic type mismatch that you pointed out.</p>\n<p>I see that there is an ambiguity in what I want to achieve, e.g., in</p>\n<p>term ‹λf. \\&lt;^tag&gt;‹ f(5) ››</p>\n<p>it is no longer clear to what \"f\" refers. However, for my application,<br>\nboth resolutions (f refers to \"f\" in the context in which whole term is<br>\nparsed OR f refers to the bound variable) would work, but I don't know<br>\nhow to achieve any of these.</p>",
+        "id": 294747474,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661194102
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nI have studied the sources of<br>\n$ISABELLE_HOME/src/Pure/Syntax/syntax_phases.ML a bit: the subsequent<br>\nmark_term function should protect a given term reasonably well from<br>\nsubsequent syntax processing:</p>\n<p>fun mark_term (Const (c, T)) = Const (Lexicon.mark_const c, T)<br>\n    | mark_term (Free (x, T)) = Const (Lexicon.mark_fixed x, T)<br>\n    | mark_term (t $ u) = mark_term t $ mark_term u<br>\n    | mark_term (Abs (x, T, b)) = Abs (x, T, mark_term b)<br>\n    | mark_term a = a;</p>\n<p>Included is the full example, even with some abstractions.</p>\n<p>Makarius<br>\n<a href=\"/user_uploads/14278/VTdO8eV1VQVZZcEwVdFhTYcF/Scratch.thy\">Scratch.thy</a></p>",
+        "id": 294747558,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661194140
+    },
+    {
+        "content": "<p>From: Peter Lammich &lt;<a href=\"mailto:lammich@in.tum.de\">lammich@in.tum.de</a>&gt;<br>\nThanks a lot,</p>\n<p>I built it into my parser, and it works like a charm!</p>",
+        "id": 294747576,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661194145
+    }
+]

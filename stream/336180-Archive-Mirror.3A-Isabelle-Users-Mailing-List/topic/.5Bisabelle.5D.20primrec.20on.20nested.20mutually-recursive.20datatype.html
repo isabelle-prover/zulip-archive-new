@@ -1,0 +1,178 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] primrec on nested mutually-recursive datatype · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20primrec.20on.20nested.20mutually-recursive.20datatype.html">[isabelle] primrec on nested mutually-recursive datatype</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="293899581"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20primrec%20on%20nested%20mutually-recursive%20datatype/near/293899581" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20primrec.20on.20nested.20mutually-recursive.20datatype.html#293899581">(Aug 17 2022 at 13:45)</a>:</h4>
+<p>From: Greg Bronevetsky &lt;<a href="mailto:greg@bronevetsky.com">greg@bronevetsky.com</a>&gt;<br>
+I'm trying to do use primrec to define a function that is applied to a <br>
+nested mutually-recursive datatype. The relevant portion of the datatype <br>
+definition is below:<br>
+datatype<br>
+  AppSrcStmt =<br>
+    skip |<br>
+    while PvtAddr "AppSrcOp list"<br>
+and<br>
+  AppSrcOp = opTriple "FuncMark * TypeMark * AppSrcStmt"</p>
+<p>The primrec in question is a measure function on this datatype, defined <br>
+as follows:<br>
+consts AppSrcStmtSize :: "AppSrcStmt =&gt; nat"<br>
+       AppSrcOpSize :: "AppSrcOp =&gt; nat"<br>
+       AppSrcOpListSize :: "(AppSrcOp list) =&gt; nat"</p>
+<p>primrec<br>
+  "AppSrcOpSize (opTriple asOp) = (AppSrcStmtSize (snd (snd asOp)))"</p>
+<p>"AppSrcOpListSize [] = 0"<br>
+  "AppSrcOpListSize (asOp # opList) = (AppSrcOpSize asOp)"</p>
+<p>"AppSrcStmtSize skip = 1"<br>
+  "AppSrcStmtSize (while pv aW) = 1 + (AppSrcOpListSize aW)"</p>
+<p>Unfortunately, I get the following error:<br>
+*** Constant to be defined occurs on rhs<br>
+*** The error(s) above occurred in definition <br>
+"AppSrcStmtSize_AppSrcStmt_def":<br>
+***   "AppSrcStmtSize ==<br>
+***    AppSrcStmt_AppSrcOp_rec_1 (1::nat) (%(pv::nat) aW::AppSrcOp list. <br>
+op + (1::nat))<br>
+***     (%(asOp::nat * nat * AppSrcStmt) asOpa::unit. AppSrcStmtSize <br>
+(snd (snd asOp))) (0::nat)<br>
+***     (%(asOp::AppSrcOp) (opList::AppSrcOp list) (asOpa::nat) <br>
+opLista::nat. asOpa) arbitrary arbitrary"<br>
+*** At command "primrec".</p>
+<p>I think I'm following the directions from section 3.4 of the tutorial <br>
+but I apparenly I'm missing something. Any thoughts on what the problem <br>
+might be?</p>
+
+
+
+<a name="293899606"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20primrec%20on%20nested%20mutually-recursive%20datatype/near/293899606" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20primrec.20on.20nested.20mutually-recursive.20datatype.html#293899606">(Aug 17 2022 at 13:45)</a>:</h4>
+<p>From: Stefan Berghofer &lt;<a href="mailto:berghofe@in.tum.de">berghofe@in.tum.de</a>&gt;<br>
+Greg Bronevetsky wrote:<br>
+Dear Greg,</p>
+<p>the problem is that not only the list datatype, but also the triple type<br>
+is unfolded (into two pair types). As a consequence, you need two more<br>
+size functions, one on type "FuncMark * TypeMark * AppSrcStmt" and one<br>
+on type "FuncMark * TypeMark * AppSrcStmt". The following definition should<br>
+work:</p>
+<p>consts<br>
+   AppSrcStmtSize :: "AppSrcStmt =&gt; nat"<br>
+   AppSrcOpSize :: "AppSrcOp =&gt; nat"<br>
+   AppSrcOpListSize :: "(AppSrcOp list) =&gt; nat"<br>
+   AppSrcOpTripleSize :: "FuncMark * TypeMark * AppSrcStmt =&gt; nat"<br>
+   AppSrcOpPairSize :: "TypeMark * AppSrcStmt =&gt; nat"</p>
+<p>primrec<br>
+  "AppSrcOpSize (opTriple asOp) = AppSrcOpTripleSize asOp"</p>
+<p>"AppSrcOpTripleSize (x, y) = AppSrcOpPairSize y"</p>
+<p>"AppSrcOpPairSize (x, y) = AppSrcStmtSize y"</p>
+<p>"AppSrcOpListSize [] = 0"<br>
+  "AppSrcOpListSize (asOp # opList) = (AppSrcOpSize asOp)"</p>
+<p>"AppSrcStmtSize skip = 1"<br>
+  "AppSrcStmtSize (while pv aW) = 1 + (AppSrcOpListSize aW)"</p>
+<p>See also the theorems AppSrcStmt_AppSrcOp.size provided by the datatype<br>
+package, which follow a similar scheme.</p>
+<p>Greetings,<br>
+Stefan</p>
+
+
+
+<a name="293899616"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20primrec%20on%20nested%20mutually-recursive%20datatype/near/293899616" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20primrec.20on.20nested.20mutually-recursive.20datatype.html#293899616">(Aug 17 2022 at 13:45)</a>:</h4>
+<p>From: Greg Bronevetsky &lt;<a href="mailto:greg@bronevetsky.com">greg@bronevetsky.com</a>&gt;<br>
+Thank you. What you suggests works. However, when I apply it to my full <br>
+example I'm still getting errors. The problem is that my language has if <br>
+statements as well as while statements. Adding them to my type <br>
+definition, produces the following:<br>
+ AppSrcStmt =<br>
+   skip |<br>
+   ifStmt PvtAddr "AppSrcOp list" "AppSrcOp list"<br>
+   while PvtAddr "AppSrcOp list"<br>
+and<br>
+ AppSrcOp = opTriple "FuncMark * TypeMark * AppSrcStmt"</p>
+<p>I then use the following definition of the size funciton (directly <br>
+derived from your email):<br>
+consts<br>
+  AppSrcStmtSize :: "AppSrcStmt =&gt; nat"<br>
+  AppSrcOpSize :: "AppSrcOp =&gt; nat"<br>
+  AppSrcOpListSize :: "(AppSrcOp list) =&gt; nat"<br>
+  AppSrcOpTripleSize :: "FuncMark * TypeMark * AppSrcStmt =&gt; nat"<br>
+  AppSrcOpPairSize :: "TypeMark * AppSrcStmt =&gt; nat"</p>
+<p>primrec<br>
+ "AppSrcOpSize (opTriple asOp) = AppSrcOpTripleSize asOp"</p>
+<p>"AppSrcOpTripleSize (x, y) = AppSrcOpPairSize y"</p>
+<p>"AppSrcOpPairSize (x, y) = AppSrcStmtSize y"</p>
+<p>"AppSrcOpListSize [] = 0"<br>
+ "AppSrcOpListSize (asOp # opList) = (AppSrcOpSize asOp) + <br>
+(AppSrcOpListSize opList)"</p>
+<p>"AppSrcStmtSize skip = 1"<br>
+ "AppSrcStmtSize (ifStmt pv aTrue aFalse) = 1 + (AppSrcOpListSize aTrue) </p>
+<ul>
+<li>(AppSrcOpListSize aFalse)"<br>
+ "AppSrcStmtSize (while pv aW) = 1 + (AppSrcOpListSize aW)"</li>
+</ul>
+<p>When I do this, I get the following error:<br>
+*** Primrec definition error:<br>
+*** inconsistent functions for datatype "List.list"<br>
+*** in<br>
+*** "AppSrcStmtSize (ifStmt pv aTrue aFalse) = 1 + AppSrcOpListSize aTrue"<br>
+*** At command "primrec".</p>
+<p>After playing around with it, I see that the problem comes from the fact <br>
+that AppSrcOpListSize appears on the right hand side of AppSrcStmtSize <br>
+in three spots. If I comment out any two of the references to <br>
+AppSrcOpListSize then the definition goes through without a problem. <br>
+However, if there is more than one such reference, I get the above <br>
+error. Any ideas?</p>
+
+
+
+<a name="293899630"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20primrec%20on%20nested%20mutually-recursive%20datatype/near/293899630" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20primrec.20on.20nested.20mutually-recursive.20datatype.html#293899630">(Aug 17 2022 at 13:45)</a>:</h4>
+<p>From: Stefan Berghofer &lt;<a href="mailto:berghofe@in.tum.de">berghofe@in.tum.de</a>&gt;<br>
+Greg Bronevetsky wrote:<br>
+The problem is that each occurrence of "AppSrcOp list" is unfolded.<br>
+Consequently, you have to give a separate size function for each of<br>
+these occurrences, even though they happen to behave in the same way.<br>
+The following definition should work:</p>
+<p>consts<br>
+  AppSrcStmtSize :: "AppSrcStmt =&gt; nat"<br>
+  AppSrcOpSize :: "AppSrcOp =&gt; nat"<br>
+  AppSrcOpListSize1 :: "(AppSrcOp list) =&gt; nat"<br>
+  AppSrcOpListSize2 :: "(AppSrcOp list) =&gt; nat"<br>
+  AppSrcOpListSize3 :: "(AppSrcOp list) =&gt; nat"<br>
+  AppSrcOpTripleSize :: "FuncMark * TypeMark * AppSrcStmt =&gt; nat"<br>
+  AppSrcOpPairSize :: "TypeMark * AppSrcStmt =&gt; nat"</p>
+<p>primrec<br>
+"AppSrcOpSize (opTriple asOp) = AppSrcOpTripleSize asOp"</p>
+<p>"AppSrcOpTripleSize (x, y) = AppSrcOpPairSize y"</p>
+<p>"AppSrcOpPairSize (x, y) = AppSrcStmtSize y"</p>
+<p>"AppSrcOpListSize1 [] = 0"<br>
+"AppSrcOpListSize1 (asOp # opList) = (AppSrcOpSize asOp) + (AppSrcOpListSize1 opList)"</p>
+<p>"AppSrcOpListSize2 [] = 0"<br>
+"AppSrcOpListSize2 (asOp # opList) = (AppSrcOpSize asOp) + (AppSrcOpListSize2 opList)"</p>
+<p>"AppSrcOpListSize3 [] = 0"<br>
+"AppSrcOpListSize3 (asOp # opList) = (AppSrcOpSize asOp) + (AppSrcOpListSize3 opList)"</p>
+<p>"AppSrcStmtSize skip = 1"<br>
+"AppSrcStmtSize (ifStmt pv aTrue aFalse) = 1 + (AppSrcOpListSize1 aTrue) + (AppSrcOpListSize2 aFalse)"<br>
+"AppSrcStmtSize (while pv aW) = 1 + (AppSrcOpListSize3 aW)"</p>
+<p>Again, a quick look at the theorems AppSrcStmt_AppSrcOp.size reveals<br>
+how the scheme works.</p>
+<p>Greetings,<br>
+Stefan</p>
+
+
+
+<a name="293899631"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20primrec%20on%20nested%20mutually-recursive%20datatype/near/293899631" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20primrec.20on.20nested.20mutually-recursive.20datatype.html#293899631">(Aug 17 2022 at 13:45)</a>:</h4>
+<p>From: Greg Bronevetsky &lt;<a href="mailto:greg@bronevetsky.com">greg@bronevetsky.com</a>&gt;<br>
+Ah, that worked! One final question then. You suggested that I look at <br>
+the theorem AppSrcStmt_AppSrcOp.size. How do I do that?</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

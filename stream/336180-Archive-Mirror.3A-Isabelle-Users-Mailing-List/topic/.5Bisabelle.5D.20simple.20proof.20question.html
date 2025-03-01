@@ -1,0 +1,188 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] simple proof question · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20simple.20proof.20question.html">[isabelle] simple proof question</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294114099"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20simple%20proof%20question/near/294114099" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20simple.20proof.20question.html#294114099">(Aug 18 2022 at 15:48)</a>:</h4>
+<p>From: Ian Lynagh &lt;<a href="mailto:igloo@earth.li">igloo@earth.li</a>&gt;<br>
+Hi all,</p>
+<p>I'm trying to write a simple proof in Isabelle, but I'm a little lost. I<br>
+wonder if anyone can help me please? I've attached the script I have so<br>
+far.</p>
+<p>At the point at which I am stuck, I have<br>
+    using this:<br>
+        (EBool bool_, t) : STyping<br>
+and I want to show that "t = TBool", which must be true as<br>
+    STypingBool: "forall (b :: bool) ==&gt; STyping (EBool b, TBool)"<br>
+is the only constructor matching that pattern. My best guess was<br>
+    proof (cases this)<br>
+but that says<br>
+    *** empty result sequence -- proof command failed<br>
+    *** At command "proof".<br>
+Can anyone give me a pointer in the right direction please?</p>
+<p>I'm also not sure why I can't do<br>
+    apply simpl<br>
+immediately after<br>
+    case EBool<br>
+? My goal here was to try to get "principalType (EBool bool)" to reduce.</p>
+<p>Finally, I'd also be very interested to know if the general structure<br>
+looks sensible, or if there would be a more sensible way to write this<br>
+sort of proof.</p>
+<p>Thanks<br>
+Ian<br>
+<a href="/user_uploads/14278/JLgP7Vjfmf_Zsk0To323h1N1/simple.thy">simple.thy</a></p>
+
+
+
+<a name="294114148"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20simple%20proof%20question/near/294114148" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20simple.20proof.20question.html#294114148">(Aug 18 2022 at 15:49)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+Ian Lynagh schrieb:</p>
+<blockquote>
+<p>Hi all,</p>
+<p>I'm trying to write a simple proof in Isabelle, but I'm a little lost. I<br>
+wonder if anyone can help me please? I've attached the script I have so<br>
+far.</p>
+<p>At the point at which I am stuck, I have<br>
+    using this:<br>
+        (EBool bool_, t) : STyping<br>
+and I want to show that "t = TBool", which must be true as<br>
+    STypingBool: "forall (b :: bool) ==&gt; STyping (EBool b, TBool)"</p>
+</blockquote>
+<p>For a start, your "forall (b :: bool) ==&gt;" is a bit weird. Isabelle<br>
+accepted it but had to interpret "forall" as a free function variable to<br>
+make sense of it. Probably not what you meant. Note that "forall" is not<br>
+ Isabelle speak, and that outermost universal quantifiers can and should<br>
+be dropped. Just write "STyping (EBool b, TBool)".</p>
+<p>Now the proof.</p>
+<blockquote>
+<p>is the only constructor matching that pattern. My best guess was<br>
+    proof (cases this)</p>
+</blockquote>
+<p>You cannot do a case distintinction on a theorem ("this") but only on a<br>
+term. This suggests</p>
+<p>proof (cases t)</p>
+<p>Although this step works, it does not get you anywhere. Before you start<br>
+the whole proof you should deduce some elimination rules that allow you<br>
+to move from "(EBool b, t) : STyping" to "t = TBool". This can be done<br>
+automatically:</p>
+<p>inductive_cases STypingE[elim!]:<br>
+  "STyping (EBool b, t)"</p>
+<p>The resulting lemma STypingE is what you need. The magic "[elim!]" tells<br>
+auto and blast and friends to apply this rule eagerly. Now your proof<br>
+should just be</p>
+<p>from this have "t = TBool" by auto</p>
+<p>Important: you will have to extend STypingE with other cases, at least</p>
+<p>inductive_cases STypingE[elim!]:<br>
+  "STyping (EBool b, t)"<br>
+  "STyping (EInt n, t)"</p>
+<p>Tobias</p>
+<blockquote>
+<p>but that says<br>
+    *** empty result sequence -- proof command failed<br>
+    *** At command "proof".<br>
+Can anyone give me a pointer in the right direction please?</p>
+<p>I'm also not sure why I can't do<br>
+    apply simpl<br>
+immediately after<br>
+    case EBool<br>
+? My goal here was to try to get "principalType (EBool bool)" to reduce.</p>
+<p>Finally, I'd also be very interested to know if the general structure<br>
+looks sensible, or if there would be a more sensible way to write this<br>
+sort of proof.</p>
+<p>Thanks<br>
+Ian</p>
+</blockquote>
+
+
+
+<a name="294114190"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20simple%20proof%20question/near/294114190" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20simple.20proof.20question.html#294114190">(Aug 18 2022 at 15:49)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+My mistake: I didn't run it. Your mistake: you had phrased the theorem<br>
+as "... : STyping" but the rules as "STyping ...". Don't mix the two<br>
+notations, it complicates your life. Either set or predicate. And if<br>
+predicate, then it is usually better to curry it.</p>
+<p>Concerning your overall proof strategy, I recommend rule induction on<br>
+STyping:</p>
+<p>proof(induct rule: STyping.induct)</p>
+<p>That takes care of all the case distinctins you were going to do by hand.</p>
+<p>Tobias</p>
+<p>Ian Lynagh schrieb:</p>
+
+
+
+<a name="294114367"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20simple%20proof%20question/near/294114367" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20simple.20proof.20question.html#294114367">(Aug 18 2022 at 15:50)</a>:</h4>
+<p>From: Ian Lynagh &lt;<a href="mailto:igloo@earth.li">igloo@earth.li</a>&gt;<br>
+Hi Tobias,</p>
+<p>On Fri, Aug 13, 2010 at 09:42:23AM +0200, Tobias Nipkow wrote:</p>
+<blockquote>
+<p>outermost universal quantifiers can and should<br>
+be dropped. Just write "STyping (EBool b, TBool)".</p>
+</blockquote>
+<p>Aha, thanks!</p>
+<blockquote>
+<p>inductive_cases STypingE[elim!]:<br>
+  "STyping (EBool b, t)"</p>
+<p>The resulting lemma STypingE is what you need. The magic "[elim!]" tells<br>
+auto and blast and friends to apply this rule eagerly. Now your proof<br>
+should just be</p>
+<p>from this have "t = TBool" by auto</p>
+</blockquote>
+<p>Do you mean like this?:</p>
+<p>lemma "((e, t) \&lt;in&gt; STyping) ==&gt; (principalType e = Some t)"<br>
+proof (induct e)<br>
+    case EBool<br>
+        from this have "t = TBool" by auto</p>
+<p>If so, the "by auto" fails with:</p>
+<p>*** Failed to finish proof<br>
+    *** At command "by".</p>
+<p>Thanks<br>
+Ian</p>
+
+
+
+<a name="294114388"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20simple%20proof%20question/near/294114388" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20simple.20proof.20question.html#294114388">(Aug 18 2022 at 15:50)</a>:</h4>
+<p>From: Ian Lynagh &lt;<a href="mailto:igloo@earth.li">igloo@earth.li</a>&gt;<br>
+On Fri, Aug 13, 2010 at 01:37:12PM +0200, Tobias Nipkow wrote:</p>
+<blockquote>
+<p>My mistake: I didn't run it. Your mistake: you had phrased the theorem<br>
+as "... : STyping" but the rules as "STyping ...". Don't mix the two<br>
+notations, it complicates your life. Either set or predicate.</p>
+</blockquote>
+<p>Aha, thanks!</p>
+<blockquote>
+<p>Concerning your overall proof strategy, I recommend rule induction on<br>
+STyping:</p>
+<p>proof(induct rule: STyping.induct)</p>
+<p>That takes care of all the case distinctins you were going to do by hand.</p>
+</blockquote>
+<p>Hmm, that gives me:</p>
+<ol>
+<li>!!b. principalType e = Some t</li>
+</ol>
+<p>which doesn't look provable to me. And there's also:</p>
+<ol start="3">
+<li>!!guard exprTrue ta exprFalse.<br>
+       [| STyping (guard, TBool); principalType e = Some t;<br>
+          STyping (exprTrue, ta); principalType e = Some t;<br>
+          STyping (exprFalse, ta); principalType e = Some t |]<br>
+       ==&gt; principalType e = Some t</li>
+</ol>
+<p>but the t's shouldn't all be the same.</p>
+<p>Thanks<br>
+Ian</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

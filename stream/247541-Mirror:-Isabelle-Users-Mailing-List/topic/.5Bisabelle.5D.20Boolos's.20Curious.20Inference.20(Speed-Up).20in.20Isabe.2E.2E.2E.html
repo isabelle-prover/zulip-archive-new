@@ -1,0 +1,102 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Boolos&#x27;s Curious Inference (Speed-Up) in Isabe... · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Boolos&#x27;s.20Curious.20Inference.20(Speed-Up).20in.20Isabe.2E.2E.2E.html">[isabelle] Boolos&#x27;s Curious Inference (Speed-Up) in Isabe...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="225815625"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Boolos%27s%20Curious%20Inference%20%28Speed-Up%29%20in%20Isabe.../near/225815625" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Boolos&#x27;s.20Curious.20Inference.20(Speed-Up).20in.20Isabe.2E.2E.2E.html#225815625">(Feb 10 2021 at 10:10)</a>:</h4>
+<p>From: Jeffrey Ketland &lt;<a href="mailto:jeffreyketland@gmail.com">jeffreyketland@gmail.com</a>&gt;<br>
+I thought I might pass on this Isabelle/HOL formalization of Boolos’s "curious inference” to Isabelle users.</p>
+<p>In 1987, George Boolos gave an inference I, which is valid in first-order logic, but he noted that its shortest derivation, for the system he considered, is gigantc — e.g., it has at least 2^{2^{2^{…..^2}…..}}} symbols, where there are 65,536 iterations of exponentiation. The inference I is:</p>
+<p>A1: "F(x, e) = s(e)"<br>
+    A2: "F(e, s(y)) = s(s(F(e, y)))"<br>
+    A3: "F(s(x), s(y)) = F(x, F(s(x), y))"<br>
+    A4: "D(e)"<br>
+    A5: "D(x) ⟶ D(s(x))”<br>
+    ----------------------<br>
+   Therefore: "D(F(s(s(s(s(e)))), s(s(s(s(e))))))”</p>
+<p>Though this is formalized, one might think of “e” as 1, and “s” as the successor operation, and “F” as an Ackermann-like function which grows very rapidly. Then A4 and A5 say that the set denoted by “D” is inductive. We want to prove that the number F(s(s(s(s(e)))), s(s(s(s(e))))) is in the set D. However, this number is gigantic, and the size of the required derivation in then gigantic too. Roughly, the first-order derivation has to reduce the term "F(s(s(s(s(e)))), s(s(s(s(e)))))” to a successor term (a numeral),</p>
+<p>F(s(s(s(s(e)))), s(s(s(s(e))))) = s(s(s( ….. (s (e))….)))</p>
+<p>But this is going to require a gigantic number of s’s! At least an exponential stack of 2, of height 65,536.<br>
+Boolos pointed out that there is a reasonably short second-order logic derivation, which would fit in a few pages, if fully formalized. This is an example of “speed-up”, an idea first noticed by Kurt Gödel in 1936. <br>
+Boolos called this a “curious inference”.</p>
+<p>[1] Boolos, G. 1987: “A Curious Inference”. Journal of Philosophical Logic.<br>
+<a href="https://www.jstor.org/stable/30226368?seq=1#metadata_info_tab_contents">https://www.jstor.org/stable/30226368?seq=1#metadata_info_tab_contents</a></p>
+<p>I decided to see if I can put this into Isabelle/HOL and see if it can find the second-order derivation, so long as I used the right definitions. The main definition needed is: <br>
+   "N = {x. (∀Y. (induct Y ⟶ x ∈ Y))}”,<br>
+where a set is called “inductive” if it contains e and is closed under s. So, N is “the intersection of all inductive sets”. The main idea of the second-order proof is to show, by a double induction, that if x and y are in N, then F(x, y) is also in N. It’s easy to show s(s(s(s(e)))) is in N. So, we conclude F(s(s(s(s(e)))), s(s(s(s(e))))) is also in N. And since it’s easy to show, by induction, that N is a subset of D, it follows that F(s(s(s(s(e)))), s(s(s(s(e))))) is in D, which is the conclusion. <br>
+With some definitions and some coaxing, Isabelle finds the component derivations. <br>
+I used 14 lemmas to get the final conclusion.</p>
+<p>I didn’t realise this until yesterday, but I noticed the Boolos inference has also been put into MIZAR and OMEGA in 2007,</p>
+<p>[2] Benzmüller, C. &amp; Brown, C. 2007: “The curious inference of Boolos in MIZAR and OMEGA”, <br>
+In Roman Matuszewski &amp; Anna Zalewska (eds.), From Insight to Proof -- Festschrift in Honour of Andrzej Trybulec. The University of Bialystok, Poland. pp. 299-388 (2007)<br>
+<a href="http://mizar.org/trybulec65/20.pdf">http://mizar.org/trybulec65/20.pdf</a></p>
+<p>Since the Isabelle/HOL proof sketch is pretty short, I thought I’d post it here.</p>
+<p>—————<br>
+theory Boolos imports Main<br>
+begin<br>
+text ‹Boolos's inference›<br>
+locale bool_ax =<br>
+  fixes F :: "'a × 'a ⇒ 'a"<br>
+  fixes s :: "'a ⇒ 'a"<br>
+  fixes D :: "'a ⇒ bool"<br>
+  fixes e :: "'a"<br>
+  assumes A1: "F(x, e) = s(e)"<br>
+  and A2: "F(e, s(y)) = s(s(F(e, y)))"<br>
+  and A3: "F(s(x), s(y)) = F(x, F(s(x), y))"<br>
+  and A4: "D(e)"<br>
+  and A5: "D(x) ⟶ D(s(x))"<br>
+context bool_ax<br>
+begin<br>
+definition (in bool_ax) induct :: "'a set ⇒ bool" <br>
+  where "induct X ≡ e ∈ X ∧ (∀x. (x ∈ X ⟶ s(x) ∈ X))"<br>
+definition (in bool_ax) N :: "'a set"<br>
+  where "N = {x. (∀Y. (induct Y ⟶ x ∈ Y))}"<br>
+definition (in bool_ax) P1 :: "'a  ⇒ 'a ⇒ bool"<br>
+  where "P1 x y ≡ F(x,y) ∈ N"<br>
+definition (in bool_ax) P2 :: "'a ⇒ bool"<br>
+  where "P2 x ≡ N ⊆ {y. P1 x y}"</p>
+<p>lemma lem1: "induct X ⟶ N ⊆ X" using N_def by auto<br>
+lemma lem2: "induct N" by (simp add: N_def induct_def)<br>
+lemma lem3: "induct {x. D(x)}" using A4 A5 induct_def by auto<br>
+lemma lem4: "s(s(s(s(e)))) ∈ N" using induct_def lem2 by auto</p>
+<p>lemma lem5: "P1 e e" using A1 P1_def induct_def lem2 by auto<br>
+lemma lem6: "P1 e x ⟶ P1 e (s(x))" using A2 P1_def induct_def lem2 by auto<br>
+lemma lem7: "induct {x. P1 e x}" using induct_def lem5 lem6 by auto</p>
+<p>lemma lem8: "P1 (s(x)) e" using A1 P1_def induct_def lem2 by auto<br>
+lemma lem9: "P2 e" by (simp add: P2_def lem1 lem7)<br>
+lemma lem10: "P2 x ⟶ (∀y. (P1 (s(x)) y ⟶ P1 (s(x)) (s(y))))" using A3 P1_def P2_def by auto<br>
+lemma lem11: "P2 x ⟶ P2 (s(x))" using P2_def induct_def lem1 lem8 lem10 by auto<br>
+lemma lem12: "induct {x. P2 x}" using induct_def lem9 lem11 by auto</p>
+<p>lemma lem13: "x ∈ N ∧ y ∈ N ⟶ F(x,y) ∈ N" using N_def P1_def P2_def lem12 by auto</p>
+<p>lemma lem14: "D(F(s(s(s(s(e)))), s(s(s(s(e))))))" using N_def lem3 lem4 lem13 by auto</p>
+<p>end</p>
+<p>Best regards, Jeff Ketland</p>
+<p>————————<br>
+Dr Jeffrey Ketland<br>
+Institute of Philosophy<br>
+University of Warsaw<br>
+<a href="mailto:jeffreyketland@gmail.com">jeffreyketland@gmail.com</a></p>
+
+
+
+<a name="225836583"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Boolos%27s%20Curious%20Inference%20%28Speed-Up%29%20in%20Isabe.../near/225836583" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Boolos&#x27;s.20Curious.20Inference.20(Speed-Up).20in.20Isabe.2E.2E.2E.html#225836583">(Feb 10 2021 at 13:40)</a>:</h4>
+<p>From: Jakub Kądziołka &lt;<a href="mailto:kuba@kadziolka.net">kuba@kadziolka.net</a>&gt;<br>
+You might want to consider publishing it in the AFP:<br>
+<a href="https://www.isa-afp.org/">https://www.isa-afp.org/</a></p>
+<p>The submission process is quite straightforward, and that way others<br>
+will be able to find your formalization much easier.</p>
+<p>Regards,<br>
+Jakub Kądziołka</p>
+
+
+
+<hr><p>Last updated: Jul 15 2022 at 23:21 UTC</p>
+</html>

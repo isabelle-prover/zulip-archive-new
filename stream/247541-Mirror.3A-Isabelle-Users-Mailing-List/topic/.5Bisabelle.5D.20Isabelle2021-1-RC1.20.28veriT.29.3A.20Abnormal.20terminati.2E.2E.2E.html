@@ -1,0 +1,154 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Isabelle2021-1-RC1 (veriT): Abnormal terminati... · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2021-1-RC1.20.28veriT.29.3A.20Abnormal.20terminati.2E.2E.2E.html">[isabelle] Isabelle2021-1-RC1 (veriT): Abnormal terminati...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="260570133"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2021-1-RC1%20%28veriT%29%3A%20Abnormal%20terminati.../near/260570133" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2021-1-RC1.20.28veriT.29.3A.20Abnormal.20terminati.2E.2E.2E.html#260570133">(Nov 07 2021 at 12:04)</a>:</h4>
+<p>From: "Eugene W. Stark" &lt;<a href="mailto:isabelle-users@starkeffect.com">isabelle-users@starkeffect.com</a>&gt;<br>
+Running Isabelle2021-1-RC1 on Ubuntu 20.04, when using Sledgehammer I now frequently see output like<br>
+the following:</p>
+<blockquote>
+<p>"cvc4": Timed out <br>
+"verit": Prover error:<br>
+Abnormal termination with exit code 14 <br>
+"z3": Timed out <br>
+"e": Timed out <br>
+"spass": Timed out <br>
+"vampire": Timed out <br>
+"zipperposition": Timed out</p>
+</blockquote>
+<p>The "Abnormal termination" message for verit seems to be new with recent Isabelle release candidates.<br>
+The "exit code 14" looks suspiciously like it really means "signal 14" (i.e. SIGALRM).<br>
+I looked in the veriT sources and I see (in src/src/utils/veriT-signal.c):</p>
+<blockquote>
+<p>#ifdef CAPTURE_SIGNALS<br>
+static void<br>
+veriT_signal_handle(int signum)<br>
+{<br>
+  unsigned i;<br>
+  for (i = 0; i &lt; stack_size(veriT_sigfun_stack); i++)<br>
+      stack_get(veriT_sigfun_stack, i)();<br>
+  switch (signum) {<br>
+      case SIGINT:<br>
+          if (veriT_print_report) {<br>
+              stats_fprint_formats(stdout);<br>
+              stats_fprint(stdout);<br>
+              fflush(stdout);<br>
+          }<br>
+          break;<br>
+      case SIGILL: fprintf(stderr, "Illegal Instruction\n"); break;<br>
+      case SIGFPE: fprintf(stderr, "Floating point exception\n"); break;<br>
+      case SIGSEGV: fprintf(stderr, "Invalid memory reference\n"); break;<br>
+      case SIGPIPE: fprintf(stderr, "Broken pipe\n"); break;<br>
+      case SIGALRM:<br>
+          fprintf(stderr, "Time limit exceeded\n");<br>
+          if (veriT_print_report) {<br>
+              stats_fprint_formats(stdout);<br>
+              stats_fprint(stdout);<br>
+              fflush(stdout);<br>
+          }</p>
+<p>break;<br>
+      case SIGXCPU:<br>
+          fprintf(stderr, "CPU time limit exceeded\n");<br>
+          if (veriT_print_report) {<br>
+              stats_fprint_formats(stdout);<br>
+              stats_fprint(stdout);<br>
+              fflush(stdout);<br>
+          }</p>
+<p>break;<br>
+  }</p>
+<p>_exit(signum);<br>
+}<br>
+#endif</p>
+</blockquote>
+<p>The handler exits with the signal number as the exit status, so that supports my theory.<br>
+Looking further in the same file, I see:</p>
+<blockquote>
+<p>void<br>
+veriT_signal_init(void)<br>
+{<br>
+#ifdef CAPTURE_SIGNALS<br>
+  stack_INIT(veriT_sigfun_stack);<br>
+  memset(&amp;new_act, 0, sizeof(new_act)); /* memset necessaire pour flags=0 */<br>
+  new_act.sa_handler = veriT_signal_handle;<br>
+  sigemptyset(&amp;new_act.sa_mask);<br>
+  sigaddset(&amp;new_act.sa_mask, SIGINT);<br>
+  sigaddset(&amp;new_act.sa_mask, SIGQUIT);<br>
+  sigaddset(&amp;new_act.sa_mask, SIGILL);<br>
+  sigaddset(&amp;new_act.sa_mask, SIGABRT);<br>
+  sigaddset(&amp;new_act.sa_mask, SIGFPE);<br>
+  sigaddset(&amp;new_act.sa_mask, SIGSEGV);<br>
+  sigaddset(&amp;new_act.sa_mask, SIGPIPE);<br>
+  sigaddset(&amp;new_act.sa_mask, SIGTERM);<br>
+  sigaction(SIGINT, &amp;new_act, &amp;old);<br>
+  sigaction(SIGQUIT, &amp;new_act, &amp;old);<br>
+  sigaction(SIGILL, &amp;new_act, &amp;old);<br>
+  sigaction(SIGABRT, &amp;new_act, &amp;old);<br>
+  sigaction(SIGFPE, &amp;new_act, &amp;old);<br>
+  sigaction(SIGSEGV, &amp;new_act, &amp;old);<br>
+  sigaction(SIGPIPE, &amp;new_act, &amp;old);<br>
+  sigaction(SIGTERM, &amp;new_act, &amp;old);<br>
+  sigaction(SIGXCPU, &amp;new_act, &amp;old);<br>
+  sigaction(SIGALRM, &amp;new_act, &amp;old);<br>
+#endif<br>
+}</p>
+<p>void<br>
+veriT_signal_done(void)<br>
+{<br>
+#ifdef CAPTURE_SIGNALS<br>
+  new_act.sa_handler = SIG_DFL;<br>
+  sigaction(SIGINT, &amp;new_act, &amp;old);<br>
+  sigaction(SIGQUIT, &amp;new_act, &amp;old);<br>
+  sigaction(SIGILL, &amp;new_act, &amp;old);<br>
+  sigaction(SIGABRT, &amp;new_act, &amp;old);<br>
+  sigaction(SIGFPE, &amp;new_act, &amp;old);<br>
+  sigaction(SIGSEGV, &amp;new_act, &amp;old);<br>
+  sigaction(SIGPIPE, &amp;new_act, &amp;old);<br>
+  sigaction(SIGTERM, &amp;new_act, &amp;old);<br>
+  sigaction(SIGXCPU, &amp;new_act, &amp;old);<br>
+  stack_free(veriT_sigfun_stack);<br>
+#endif<br>
+}</p>
+</blockquote>
+<p>I wonder why the handler for SIGALRM is not treated the same as the others here?  It doesn't seem<br>
+right, especially given that they are freeing something that is used in the handler.  A possible<br>
+mechanism for the observed behavior is that veriT is attempting to terminate, it uninstalls the<br>
+handlers, except for the SIGALRM handler, and then receives a SIGALRM, causing the handler to be<br>
+invoked and _exit() to be called with argument SIGALRM (== 14).</p>
+<p>I suppose it might be that the authors wanted to leave the alarm handler in place so that SIGALRM<br>
+would still cause veriT to exit even if it is the process of already trying to exit.  But then<br>
+there is at least a race here between normal termination and the SIGALRM, and it also possibly<br>
+indicates a deadlock or something else that is slowing down termination once all the handlers<br>
+have been uninstalled.</p>
+
+
+
+<a name="260591862"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2021-1-RC1%20%28veriT%29%3A%20Abnormal%20terminati.../near/260591862" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2021-1-RC1.20.28veriT.29.3A.20Abnormal.20terminati.2E.2E.2E.html#260591862">(Nov 07 2021 at 19:40)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+The veriT guys have done something about it for Isabelle2021-1-RC2. Maybe that<br>
+is already sufficient, and covers all your very detailed observations.</p>
+<p>Makarius</p>
+
+
+
+<a name="260636038"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2021-1-RC1%20%28veriT%29%3A%20Abnormal%20terminati.../near/260636038" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2021-1-RC1.20.28veriT.29.3A.20Abnormal.20terminati.2E.2E.2E.html#260636038">(Nov 08 2021 at 10:02)</a>:</h4>
+<p>From: Martin Desharnais &lt;<a href="mailto:martin.desharnais@posteo.de">martin.desharnais@posteo.de</a>&gt;<br>
+Hi Eugene,</p>
+<p>thank you very much for this detailed report!</p>
+<p>As Makarius wrote on 2021-11-07, the abnormal termination was noticed <br>
+some time ago and the veriT team recently released version 2021.06.1-rmx <br>
+with the following change.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

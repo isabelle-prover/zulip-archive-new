@@ -1,0 +1,284 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Programatically get &quot;this&quot; · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Programatically.20get.20.22this.22.html">[isabelle] Programatically get &quot;this&quot;</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294750494"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Programatically%20get%20%22this%22/near/294750494" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Programatically.20get.20.22this.22.html#294750494">(Aug 22 2022 at 19:07)</a>:</h4>
+<p>From: Joshua Chen &lt;<a href="mailto:joshua.chen@uibk.ac.at">joshua.chen@uibk.ac.at</a>&gt;<br>
+Dear all, is there a canonical way in Isabelle/ML to get the value of <br>
+the Isar fact "this"? I'm currently using</p>
+<p>let<br>
+   val fs = Proof_Context.facts_of @{context}<br>
+in<br>
+   Facts.lookup (Context.Proof @{context}) fs "local.this"<br>
+end</p>
+<p>but am unsure if there are more direct ways.</p>
+<p>Thanks,<br>
+Josh</p>
+
+
+
+<a name="294750660"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Programatically%20get%20%22this%22/near/294750660" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Programatically.20get.20.22this.22.html#294750660">(Aug 22 2022 at 19:08)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On 07/02/2019 16:55, Joshua Chen wrote:</p>
+<blockquote>
+<p>Dear all, is there a canonical way in Isabelle/ML to get the value of<br>
+the Isar fact "this"?</p>
+</blockquote>
+<p>It depends what you mean precisely, and what your application actually is.</p>
+<blockquote>
+<p>I'm currently using<br>
+let<br>
+  val fs = Proof_Context.facts_of @{context}<br>
+in<br>
+  Facts.lookup (Context.Proof @{context}) fs "local.this"<br>
+end</p>
+<p>but am unsure if there are more direct ways.</p>
+</blockquote>
+<p>Since you are using the compile-time @{context}, i.e. a constant, the<br>
+example is equivalent to:</p>
+<p>ML_val ‹<br>
+    @{thm this}<br>
+  ›</p>
+<p>So when experimenting with ML inside Isar, it is better to bind some<br>
+initial constants like this:</p>
+<p>ML_val ‹<br>
+    val ctxt = @{context};</p>
+<p>...<br>
+  ›</p>
+<p>Later on, ctxt can be abstracted as arguments of a function, while the<br>
+body "..." remains unchanged.</p>
+<p>Moreover, string literals of guessed internal names should be avoided:<br>
+such names change routinely over the years of continued Isabelle<br>
+development. (In particular, the "local" prefix is an odd artifact that<br>
+should disappear eventually.)</p>
+<p>So here is my version of your initial example, following these principles:</p>
+<p>notepad<br>
+begin<br>
+  assume a: A<br>
+  ML_val ‹<br>
+    val ctxt = @{context};</p>
+<p>val this_name =<br>
+      Name_Space.full_name (Proof_Context.naming_of ctxt) (<a href="http://Binding.name">Binding.name</a><br>
+Auto_Bind.thisN);<br>
+    val this = #thms (the (Proof_Context.lookup_fact ctxt this_name));<br>
+  ›<br>
+end</p>
+<p>Nonetheless, it is unlikely that you actually need that in the<br>
+application. The "this" entry in the facts space is merely for end-users<br>
+writing Isar proof texts. Tools normally access specifically the some<br>
+internal slots of the proof engine.</p>
+<p>A proof method gets the used facts (formerly "this") in the proof as<br>
+main argument. Nothing special to do: merely need to omit the<br>
+SIMPLE_METHOD wrapper.</p>
+<p>A proof command can access the full Proof.state and retrieve this<br>
+information from it via Proof.goal: the ML_val command includes some<br>
+special tricks to support this in experiments:</p>
+<p>notepad<br>
+begin<br>
+  assume A<br>
+  from this have B<br>
+    ML_val ‹<br>
+      val using_this = #facts @{Isar.goal};<br>
+    ›<br>
+    sorry<br>
+end</p>
+<p>An example for this in production is the 'sledgehammer' command: it uses<br>
+Proof.goal to get to the "chained facts", i.e. the former "this" that is<br>
+relevant for the pending goal.</p>
+<p>Makarius</p>
+
+
+
+<a name="294750677"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Programatically%20get%20%22this%22/near/294750677" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Programatically.20get.20.22this.22.html#294750677">(Aug 22 2022 at 19:08)</a>:</h4>
+<p>From: Joshua Chen &lt;<a href="mailto:joshua.chen@uibk.ac.at">joshua.chen@uibk.ac.at</a>&gt;</p>
+<blockquote>
+<p>Since you are using the compile-time @{context}, i.e. a constant, the<br>
+example is equivalent to:</p>
+<p>ML_val ‹<br>
+     @{thm this}<br>
+   ›</p>
+<p>So when experimenting with ML inside Isar, it is better to bind some<br>
+initial constants like this:</p>
+<p>ML_val ‹<br>
+     val ctxt = @{context};</p>
+<p>...<br>
+   ›</p>
+<p>Later on, ctxt can be abstracted as arguments of a function, while the<br>
+body "..." remains unchanged.</p>
+</blockquote>
+<p>I picked up on this soon after, but I do find I often forget this..</p>
+<p>Thanks very much for the pointers! As a beginner, it's often unclear <br>
+which of the multiple similarly plausible-sounding functions I should <br>
+use to accomplish what I want, so I greatly appreciate the advice.</p>
+<blockquote>
+<p>It depends what you mean precisely, and what your application actually is.</p>
+</blockquote>
+<p>I'm implementing syntax parse rules for Isabelle/HoTT that should <br>
+automatically fill in object-level type information for terms, so that <br>
+end users can leave some type information implicit for the logic to <br>
+infer. For instance, given that one has proved/assumed facts "f: A -&gt; B" <br>
+and "g: B -&gt; C" visible in the current proof context, one should be able <br>
+to write 'show "g o f"' and have the logic fill in the domain type to <br>
+give "compose A g f".</p>
+<p>It seems to me that I do need direct access to the fact space since this <br>
+is a translation issue, in particular one that occurs before any proof <br>
+methods/commands are called. Though again, I'm not 100% sure about this.</p>
+<p>Best,<br>
+Josh</p>
+
+
+
+<a name="294750693"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Programatically%20get%20%22this%22/near/294750693" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Programatically.20get.20.22this.22.html#294750693">(Aug 22 2022 at 19:08)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On 10/02/2019 18:53, Joshua Chen wrote:</p>
+<blockquote>
+<p>As a beginner, it's often unclear<br>
+which of the multiple similarly plausible-sounding functions I should<br>
+use to accomplish what I want, so I greatly appreciate the advice.</p>
+</blockquote>
+<p>The usual strategy is two-fold:</p>
+<p>* look at the text of the definitions of things, using the Prover IDE</p>
+<p>* look at the context of applications, and try to figure out typical uses</p>
+<p>Moreover it is often helpful to study documentation or ask on the<br>
+mailing list.</p>
+<blockquote>
+<p>I'm implementing syntax parse rules for Isabelle/HoTT that should<br>
+automatically fill in object-level type information for terms, so that<br>
+end users can leave some type information implicit for the logic to<br>
+infer. For instance, given that one has proved/assumed facts "f: A -&gt; B"<br>
+and "g: B -&gt; C" visible in the current proof context, one should be able<br>
+to write 'show "g o f"' and have the logic fill in the domain type to<br>
+give "compose A g f".</p>
+<p>It seems to me that I do need direct access to the fact space since this<br>
+is a translation issue, in particular one that occurs before any proof<br>
+methods/commands are called. Though again, I'm not 100% sure about this.</p>
+</blockquote>
+<p>Tools normally do not look at the fact name space, it is mainly for<br>
+end-users and thus somewhat accidental what it contains and what it<br>
+omits (e.g. unnamed facts don't show up).</p>
+<p>A more robust scheme works via declarations of facts to tool-specific<br>
+parts of the context.</p>
+<p>For example, Isabelle/ZF has a "TC" declaration attribute, which<br>
+maintains context data as defined in $ISABELLE_HOME/src/ZF/Tools/typechk.ML</p>
+<p>It is also possible to use the Isar command 'named_theorems' and thus<br>
+bypass the details of handwritten context-data. E.g. search<br>
+named_theorems and Named_Theorems.get in .thy and .ML files to get some<br>
+ideas.</p>
+<p>Thus your language will require explicit hints in the text, e.g.</p>
+<p>assume a[TC]: A<br>
+  have b[TC]: B</p>
+<p>This is more robust than magic operations on the fact name space, but<br>
+also a bit awkward. Several people who are building non-HOL object<br>
+logics have pointed this out in the past few months.  There is some<br>
+concrete chance that something will happen soon, shortly before or after<br>
+the Isabelle2019 release.</p>
+<p>Makarius</p>
+
+
+
+<a name="294750700"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Programatically%20get%20%22this%22/near/294750700" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Programatically.20get.20.22this.22.html#294750700">(Aug 22 2022 at 19:08)</a>:</h4>
+<p>From: Joshua Chen &lt;<a href="mailto:joshua.chen@uibk.ac.at">joshua.chen@uibk.ac.at</a>&gt;</p>
+<blockquote>
+<p>The usual strategy is two-fold:</p>
+</blockquote>
+<p>This is what I have been doing intermittently over the past year and a <br>
+half ;) I do think the contributors are doing a heroic job of <br>
+maintenance and development, but it is indeed a less-than-optimal state <br>
+of affairs that Isabelle/ML is not yet very well-documented (even the <br>
+incomplete Cookbook is already fairly out-of-date). I'd like to help out <br>
+with that at some point after I learn things better for myself.</p>
+<blockquote>
+<p>For example, Isabelle/ZF has a "TC" declaration attribute, which<br>
+maintains context data as defined in $ISABELLE_HOME/src/ZF/Tools/typechk.ML</p>
+<p>It is also possible to use the Isar command 'named_theorems' and thus<br>
+bypass the details of handwritten context-data. E.g. search<br>
+named_theorems and Named_Theorems.get in .thy and .ML files to get some<br>
+ideas.<br>
+Great, this is also an approach I considered and will look into!</p>
+</blockquote>
+<blockquote>
+<p>Thus your language will require explicit hints in the text, e.g.</p>
+<p>assume a[TC]: A<br>
+   have b[TC]: B</p>
+<p>This is more robust than magic operations on the fact name space, but<br>
+also a bit awkward. Several people who are building non-HOL object<br>
+logics have pointed this out in the past few months.  There is some<br>
+concrete chance that something will happen soon, shortly before or after<br>
+the Isabelle2019 release.<br>
+Indeed this is a little annoying, I look forward to possible <br>
+developments on this!</p>
+</blockquote>
+<p>Best,<br>
+Josh</p>
+
+
+
+<a name="294750712"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Programatically%20get%20%22this%22/near/294750712" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Programatically.20get.20.22this.22.html#294750712">(Aug 22 2022 at 19:08)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+As the Prover IDE supports more and more Isabelle/ML development, that<br>
+interactive environment becomes an important source of implicit<br>
+information. Just a few years ago, reading Isabelle/ML sources required<br>
+much more arcane knowledge.</p>
+<p>E.g. you can open $ISABELLE_HOME/src/Pure/ROOT.ML and browse through (a<br>
+copy of) Isabelle/Pure within itself, with full annotations provided by<br>
+the Poly/ML compiler.</p>
+<p>You can also browse through $ISABELLE_HOME/src/Doc/Implementation and<br>
+its chapters as theory sources.</p>
+<p>Browsing through Isabelle/ML tools is more awkward: it requires to start<br>
+from Pure (e.g. "isabelle jedit -l Pure") and wait a long time until its<br>
+Main.thy material is loaded.</p>
+<p>Makarius</p>
+
+
+
+<a name="294750777"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Programatically%20get%20%22this%22/near/294750777" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Programatically.20get.20.22this.22.html#294750777">(Aug 22 2022 at 19:09)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+The space of named facts is mainly for the end-user, by there is an <br>
+alternative view of all facts that are literally accessible in the <br>
+current context. This is used e.g. for the backquote/cartouche notation <br>
+of facts or the "fact" proof method.</p>
+<p>Here is an example to access this "cloud" of literal facts of the context:</p>
+<p>ML ‹<br>
+   val literal_facts = Proof_Context.facts_of #&gt; Facts.props;<br>
+›</p>
+<p>notepad<br>
+begin<br>
+   {<br>
+     fix x y z :: nat<br>
+     {<br>
+       assume "x = y"<br>
+       assume "y = z"<br>
+       from ‹x = y› and ‹y = z› have "x = z" by (rule trans)<br>
+       moreover from ‹x = z› have "z = x" by (rule sym)<br>
+       print_facts<br>
+       ML_val ‹literal_facts \&lt;^context&gt;›<br>
+       moreover note calculation<br>
+     }<br>
+     print_facts<br>
+     ML_val ‹literal_facts \&lt;^context&gt;›<br>
+   }<br>
+   print_facts<br>
+   ML_val ‹literal_facts \&lt;^context&gt;›<br>
+end</p>
+<p>You could try to use that by default, potentially with a declaration <br>
+attribute to suppress unwanted literal facts.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

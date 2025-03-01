@@ -1,0 +1,99 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Simplification in locales · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Simplification.20in.20locales.html">[isabelle] Simplification in locales</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294062905"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Simplification%20in%20locales/near/294062905" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Simplification.20in.20locales.html#294062905">(Aug 18 2022 at 12:06)</a>:</h4>
+<p>From: John Matthews &lt;<a href="mailto:matthews@galois.com">matthews@galois.com</a>&gt;<br>
+I'm running into some behavior of locales that seems to violate  <br>
+"locality". I'm using Isabelle2008. If I define the following locale</p>
+<p>locale l =<br>
+  fixes x :: nat<br>
+begin</p>
+<p>definition<br>
+   f :: "nat =&gt; nat" where<br>
+"f y = x + y"</p>
+<p>end</p>
+<p>and then try to simplify the following (unprovable) lemma using the  <br>
+definition of f:</p>
+<p>lemma (in l)<br>
+  "f y = 2 * y"<br>
+apply (simp add: f_def)</p>
+<p>then I get the subgoal "x = y", as expected. If, however, I add a  <br>
+hypothesis about x to the lemma and try to simplify it again:</p>
+<p>lemma (in l)<br>
+  "x = y ==&gt; f y = 2 * y"<br>
+apply (simp add: f_def)</p>
+<p>then I'd expect the lemma to be provable, but instead I get the  <br>
+following subgoal:</p>
+<p>1.  x = y ==&gt; l.f y y = 2 * y</p>
+<p>Eliminating the locale l and replacing "fixes x :: nat" with "consts  <br>
+x :: nat" causes the lemma to be provable, so it seems that the  <br>
+abstraction of a locale as a local theory is being violated somehow.</p>
+<p>Thanks,<br>
+-john</p>
+
+
+
+<a name="294062942"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Simplification%20in%20locales/near/294062942" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Simplification.20in.20locales.html#294062942">(Aug 18 2022 at 12:06)</a>:</h4>
+<p>From: Brian Huffman &lt;<a href="mailto:brianh@cs.pdx.edu">brianh@cs.pdx.edu</a>&gt;<br>
+Quoting John Matthews &lt;<a href="mailto:matthews@galois.com">matthews@galois.com</a>&gt;:</p>
+<blockquote>
+<p>I'm running into some behavior of locales that seems to violate<br>
+"locality". I'm using Isabelle2008. If I define the following locale</p>
+<p>locale l =<br>
+ fixes x :: nat<br>
+begin</p>
+<p>definition<br>
+  f :: "nat =&gt; nat" where<br>
+"f y = x + y"</p>
+<p>end<br>
+...<br>
+If, however, I add a<br>
+hypothesis about x to the lemma and try to simplify it again:</p>
+<p>lemma (in l)<br>
+ "x = y ==&gt; f y = 2 * y"<br>
+apply (simp add: f_def)</p>
+<p>then I'd expect the lemma to be provable, but instead I get the<br>
+following subgoal:</p>
+<ol>
+<li>x = y ==&gt; l.f y y = 2 * y</li>
+</ol>
+</blockquote>
+<p>I think I understand what is going on here. When you define the  <br>
+constant f inside the locale l, it defines a global constant named  <br>
+"l.f", which has extra parameters corresponding to the locale fixes.</p>
+<p>Within the context of locale l, when you write "f", this is really  <br>
+just an abbreviation for "l.f x". So your lemma is really equivalent to:</p>
+<p>lemma (in l) "x = y ==&gt; l.f x y = 2 * y"</p>
+<p>The simplifier then happily rewrites x to y in the conclusion:</p>
+<ol>
+<li>x = y ==&gt; l.f y y = 2 * y</li>
+</ol>
+<blockquote>
+<p>Eliminating the locale l and replacing "fixes x :: nat" with "consts x<br>
+:: nat" causes the lemma to be provable, so it seems that the<br>
+abstraction of a locale as a local theory is being violated somehow.</p>
+</blockquote>
+<p>I agree that the locale abstraction is being violated in this case.  <br>
+Even if locale-defined constants are implemented as abbreviations,  <br>
+this should not be apparent to the user. Here's my idea for a possible  <br>
+remedy: Within the locale, the simplifier should use a congruence rule  <br>
+that prevents the implicit parameters from being rewritten:</p>
+<p>lemma f_cong [cong]: "y = z ==&gt; l.f x y = l.f x z"</p>
+<ul>
+<li>Brian</li>
+</ul>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,32 @@
+[
+    {
+        "content": "<p>From: Joachim Breitner &lt;<a href=\"mailto:breitner@kit.edu\">breitner@kit.edu</a>&gt;<br>\nHi,</p>\n<p>I have another Isabelle/ML beginner’s question, and hope to get some<br>\nhelp with a tricky point.</p>\n<p>My goal is to program some automation around inductive predicate and<br>\ninductive proofs. At some point, I have theorems which match precisely<br>\nthe assumption of the induct theorem of an inductive predicate. I.e.</p>\n<p>foo.induct:<br>\n          \"!! P a b.<br>\n           foo a b ==&gt;<br>\n           (!! x y. Q1 y x ==&gt; Q2 y x ==&gt; P x y) ==&gt; <br>\n           (!! x y z. foo x y ==&gt; P x z ==&gt; P y z) ==&gt; <br>\n           P a b\"<br>\n        hyp1: \"(!! x y. Q1 y x ==&gt; Q2 y x ==&gt; some_P x y)\"<br>\n        hyp2: \"(!! x y z. foo x y ==&gt; some_P x z ==&gt; some_P y z)\"</p>\n<p>what is the proper way to obtain</p>\n<p>some_P: \"!! a b . foo a b ==&gt; some_P a b\"</p>\n<p>from this?</p>\n<p>Naively, I would expect something like foo.induct[meta_OF _ hyp1 hyp2]<br>\nto exist, but could not find such a thing.</p>\n<p>It would of course work with the equivalent of</p>\n<p>lemma some_P: \"!! a b . foo a b ==&gt; some_P a b\"<br>\n          apply (rule foo.induct)<br>\n          apply assumption<br>\n          apply (rule hyp1)<br>\n          apply assumption<br>\n          apply assumption<br>\n          apply (rule hyp2)<br>\n          apply assumption<br>\n          apply assumption<br>\n          done</p>\n<p>but that seems far too fragile (i.e. how many assumptions? What if the<br>\nthere are multiple unifiers along the way, before the next assumption<br>\ndetermines the choice?) when a direct unification of the non-atomic<br>\nterms appears to be so much more reliable and predictable.</p>\n<p>Thanks,<br>\nJoachim<br>\n<a href=\"/user_uploads/14278/fZesSqxIjlkND-maDT56cxBr/signature.asc\">signature.asc</a></p>",
+        "id": 294323374,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660927686
+    },
+    {
+        "content": "<p>From: Dmitriy Traytel &lt;<a href=\"mailto:traytel@in.tum.de\">traytel@in.tum.de</a>&gt;<br>\nHi Joachim,</p>\n<p>in my experience, a backwards proof (your apply script) is usually less <br>\nfragile than a forward proof (meta_OF if existed).</p>\n<p>Finding out \"How many assumptions?\" is easy (or even not necessary): <br>\nrtac hyp1 THEN_ALL_NEW atac</p>\n<p>To avoid HO problems, you will probably find the need to instantiate P <br>\nfrom foo.induct with some_P (look for usages of Drule.instantiate' and <br>\nfriends in src/HOL/Tools to see some examples).</p>\n<p>Hope that helps,<br>\nDmitriy</p>",
+        "id": 294323385,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660927692
+    },
+    {
+        "content": "<p>From: Thomas Sewell &lt;<a href=\"mailto:thomas.sewell@nicta.com.au\">thomas.sewell@nicta.com.au</a>&gt;<br>\nIf you really need to use it, there is a primitive compose operation<br>\nwhich is available via compose_tac, Thm.bicompose etc in the ML sources.<br>\nThis avoids some of the normal automation done around the meta-operators.</p>\n<p>This can be used in your case, e.g:</p>\n<p>ML_val {*<br>\nval foo_induct = Thm.assume @{cprop \"!! P a b.<br>\n            foo a b ==&gt;<br>\n            (!! x y. Q1 y x ==&gt; Q2 y x ==&gt; P x y) ==&gt;<br>\n            (!! x y z. foo x y ==&gt; P x z ==&gt; P y z) ==&gt;<br>\n            P a b\"}<br>\nval hyp1 = Thm.assume @{cprop \"(!! x y. Q1 y x ==&gt; Q2 y x ==&gt; some_P x y)\"}<br>\nval it = Thm.bicompose {flatten = false, incremented = false, match = false}<br>\n     (false, hyp1, 0)<br>\n     2<br>\n     @{thm foo_induct}<br>\n   |&gt; Seq.list_of<br>\n*}</p>\n<p>(I tried to do this using the structured mechanisms to create<br>\nfoo_induct, hyp1 etc, and then Isabelle really wanted to export hyp1 as<br>\n\"Q1 ?y ?x ==&gt; Q2 ?y ?x ==&gt; some_P x y\" which won't work with bicompose.)</p>\n<p>I'm not sure if the result is exactly what you want, but maybe it helps.</p>\n<p>Cheers,<br>\n     Thomas.</p>\n<hr>\n<p>The information in this e-mail may be confidential and subject to legal professional privilege and/or copyright. National ICT Australia Limited accepts no liability for any damage caused by this email or its attachments.</p>",
+        "id": 294323468,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660927735
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nThis belongs to the \"do not try it at home\" category.  The COMP family <br>\nwith its many options and modes is sometimes given as secret advice, but <br>\nit requires a lot of thinking around it to get it really right.  It is <br>\neasier to stick to the normal way of things around the RS/OF family.</p>\n<p>Note that in most situations COMP_INCR or INCR_COMP is actually needed <br>\ninstead of COMP without the increment mode.</p>\n<p>Makarius</p>\n<hr>\n<p><a href=\"http://stop-ttip.org\">http://stop-ttip.org</a>  1,122,353 people so far</p>\n<hr>",
+        "id": 294323502,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660927747
+    },
+    {
+        "content": "<p>From: Joachim Breitner &lt;<a href=\"mailto:breitner@kit.edu\">breitner@kit.edu</a>&gt;<br>\nHi List,</p>\n<p>not sure if it is any better from the point of view of someone who has<br>\nexperience with ML, but I found this idiom to be quite useful to<br>\ndischarge assumptions in thm, when I know that the thms in hyp_thms<br>\nmatch its assumptions up to unification:</p>\n<p>val thm' = rule_by_tactic ctxt (EVERY1 (map (single #&gt; solve_tac) hyp_thms)) thm</p>\n<p>Maybe this will finally quench my putative thirst for a META_OF :-)</p>\n<p>Greetings,<br>\nJoachim<br>\n<a href=\"/user_uploads/14278/WGsEKw4iaQnwOcxMchjtqXxF/signature.asc\">signature.asc</a></p>",
+        "id": 294327421,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660929054
+    }
+]

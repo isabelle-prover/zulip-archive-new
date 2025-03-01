@@ -1,0 +1,259 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Lifting and datatypes with dead arguments · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Lifting.20and.20datatypes.20with.20dead.20arguments.html">[isabelle] Lifting and datatypes with dead arguments</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294708896"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Lifting%20and%20datatypes%20with%20dead%20arguments/near/294708896" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Lifting.20and.20datatypes.20with.20dead.20arguments.html#294708896">(Aug 22 2022 at 15:18)</a>:</h4>
+<p>From: Joshua Schneider &lt;<a href="mailto:dev@jshs.de">dev@jshs.de</a>&gt;<br>
+Dear list,</p>
+<p>I have this datatype, which is some kind of generalised tree:</p>
+<p>datatype 'a T = L | N "'a ⇒ 'a T"</p>
+<p>I would like to combine it with a quotient and then lift properties to<br>
+the combined type. Because 'a is dead, the datatype package won't define<br>
+a relator or do any of the setup for lifting/transfer.</p>
+<p>If I define the "obvious" relator</p>
+<p>inductive rel_T :: "('a ⇒ 'b ⇒ bool) ⇒ 'a T ⇒ 'b T ⇒ bool"<br>
+      for R<br>
+      where<br>
+        "rel_T R L L"<br>
+      | "rel_fun R (rel_T R) f g ⟹ rel_T R (N f) (N g)"</p>
+<p>and similarly a map function, it seems like quotients should be<br>
+preserved. However, proving some of the relator properties directly by<br>
+induction over T and rel_T is rather difficult, and I have not fully<br>
+succeeded with the quotient map rule.</p>
+<p>Could this even work? Is there a more general theory for lifting through<br>
+datatypes than what is provided by BNFs? It would be particularly nice<br>
+if I could use somehow that the function type itself preserves<br>
+quotients.</p>
+<p>Best,<br>
+Joshua</p>
+
+
+
+<a name="294708915"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Lifting%20and%20datatypes%20with%20dead%20arguments/near/294708915" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Lifting.20and.20datatypes.20with.20dead.20arguments.html#294708915">(Aug 22 2022 at 15:18)</a>:</h4>
+<p>From: Andrei Popescu &lt;<a href="mailto:A.Popescu@mdx.ac.uk">A.Popescu@mdx.ac.uk</a>&gt;<br>
+Hi Joshua,</p>
+<p>When we designed the BNF package, we mainly cared about preserving BNFs (which are covariant functors) across (co)datatype fixpoints.</p>
+<p>So, for now we decided to "kill" all contravariant arguments.</p>
+<p>For your case, one can prove</p>
+<p>lemma Quotient_T[quot_map]:<br>
+assumes "Quotient R Abs Rep T"<br>
+shows "Quotient (rel_T R) (map_T Rep) (map_T Abs) (rel_T T)"</p>
+<p>with the following definition of map_T:</p>
+<p>primrec map_T :: "('a ⇒ 'b) ⇒ 'b T ⇒ 'a T"<br>
+  where<br>
+   "map_T u L = L"<br>
+  |"map_T u (N f) = N (map_T u o f o u)"</p>
+<p>Below is the proof (very unpolished, due to lack of time). Hopefully, in the future we'll automate such proofs for BNFs.</p>
+<p>All the best,</p>
+<p>Andrei</p>
+<p>datatype 'a T = L | N "'a ⇒ 'a T"</p>
+<p>inductive rel_T :: "('a ⇒ 'b ⇒ bool) ⇒ 'a T ⇒ 'b T ⇒ bool"<br>
+for R<br>
+where<br>
+ "rel_T R L L"<br>
+| "rel_fun R (rel_T R) f g ⟹ rel_T R (N f) (N g)"</p>
+<p>primrec map_T :: "('a ⇒ 'b) ⇒ 'b T ⇒ 'a T"<br>
+  where<br>
+   "map_T u L = L"<br>
+  |"map_T u (N f) = N (map_T u o f o u)"</p>
+<p>lemma T_map_id[simp]: "map_T id t = t"<br>
+  by (induct t) auto</p>
+<p>lemma T_map_o: "map_T (g o f) t = map_T f (map_T g t)"<br>
+  by (induct t) auto</p>
+<p>lemma symp_rel_T:<br>
+assumes "Quotient R Abs Rep T"<br>
+shows "symp (rel_T R)"<br>
+unfolding symp_def proof safe<br>
+  fix t t' assume "rel_T R t t'" thus "rel_T R t' t"<br>
+    apply induct apply(auto intro!: rel_T.intros simp: rel_fun_def)<br>
+      using assms<br>
+      by (meson Quotient_part_equivp part_equivp_symp)<br>
+  qed</p>
+<p>lemma transp_rel_T:<br>
+assumes "Quotient R Abs Rep T"<br>
+shows "transp (rel_T R)"<br>
+unfolding transp_def proof safe<br>
+  fix t t' t'' assume "rel_T R t t'" "rel_T R t' t''"<br>
+  thus "rel_T R t t''"<br>
+    apply (induction arbitrary: t'')<br>
+     apply(auto intro!: rel_T.intros simp: rel_fun_def)<br>
+      apply(case_tac t'', auto elim!: rel_T.cases simp: rel_fun_def)<br>
+    by (metis Quotient_refl1 assms rel_T.intros(2) rel_funI)<br>
+qed</p>
+<p>lemma Quotient_rel_map_T:<br>
+assumes "Quotient R Abs Rep T"<br>
+shows "rel_T R t t' ⟷ (rel_T R t t ∧ rel_T R t' t' ∧ map_T Rep t = map_T Rep t')"<br>
+proof(induction t arbitrary: t')<br>
+  case (L t')<br>
+  thus ?case by (auto intro!: rel_T.intros elim!: rel_T.cases)<br>
+next<br>
+  case (N f t') note i = N<br>
+  show ?case proof(cases t')<br>
+    case L thus ?thesis by (auto elim!: rel_T.cases)<br>
+  next<br>
+    case (N f') note t' = N<br>
+    show ?thesis unfolding t' proof safe<br>
+      assume ff': "rel_T R (N f) (N f')"<br>
+      show "rel_T R (N f) (N f)" proof(intro rel_T.intros rel_funI)<br>
+        fix a b assume R: "R a b"<br>
+        hence "rel_T R (f a) (f a)" "rel_T R (f b) (f b)" "map_T Rep (f a) = map_T Rep (f b)"<br>
+        apply (metis T.distinct(1) T.inject apply_rsp assms ff' i rangeI rel_T.simps)<br>
+        apply (metis Quotient_refl2 T.distinct(1) T.inject R apply_rsp assms ff' i rangeI rel_T.simps)<br>
+        by (metis Quotient_refl2 T.distinct(2) T.inject R assms ff' i rangeI rel_T.simps rel_fun_def)<br>
+        thus "rel_T R (f a) (f b)" using i unfolding image_def by auto<br>
+      qed<br>
+      show "rel_T R (N f') (N f')" proof(intro rel_T.intros rel_funI)<br>
+        fix a b assume R: "R a b"<br>
+        hence "rel_T R (f a) (f a)" "rel_T R (f b) (f b)" "map_T Rep (f a) = map_T Rep (f b)"<br>
+        apply (metis T.distinct(1) T.inject apply_rsp assms ff' i rangeI rel_T.simps)<br>
+        apply (metis Quotient_refl2 T.distinct(1) T.inject R apply_rsp assms ff' i rangeI rel_T.simps)<br>
+        by (metis Quotient_refl2 T.distinct(2) T.inject R assms ff' i rangeI rel_T.simps rel_fun_def)<br>
+        hence "rel_T R (f a) (f b)" using i unfolding image_def by auto<br>
+        moreover have "rel_T R (f a) (f' b)"<br>
+        by (metis R T.distinct(2) T.inject apply_rsp assms ff' rel_T.simps)<br>
+        moreover have "rel_T R (f' a) (f b)"<br>
+        by (metis R T.distinct(1) T.inject apply_rsp assms ff' rel_T.simps symp_def symp_rel_T)<br>
+        ultimately show "rel_T R (f' a) (f' b)"<br>
+        using symp_rel_T[OF assms] transp_rel_T[OF assms]<br>
+        by (meson sympE transpE)<br>
+      qed<br>
+      {fix a have "map_T Rep (f (Rep a)) = map_T Rep (f' (Rep a))"<br>
+       using i[of "f (Rep a)" "f' (Rep a)"] ff'<br>
+       by simp (metis Quotient_rel_rep T.inject assms rel_T.simps rel_funD)<br>
+      }<br>
+      thus "map_T Rep (N f) = map_T Rep (N f')" by (auto simp: fun_eq_iff)<br>
+    next<br>
+      assume 0: "rel_T R (N f) (N f)" and 1: "rel_T R (N f') (N f')" and 2: "map_T Rep (N f) = map_T Rep (N f')"<br>
+      show "rel_T R (N f) (N f')" proof(intro rel_T.intros rel_funI)<br>
+        fix a b assume R: "R a b"<br>
+        hence 3: "R a a ∧ R b b ∧ Abs a = Abs b" using assms unfolding Quotient_def by blast<br>
+        have "R a (Rep (Abs a))"<br>
+        by (smt "3" Quotient_abs_rep Quotient_rel Quotient_rel_rep assms)<br>
+        hence A: "rel_T R (f a) (f (Rep (Abs a)))"<br>
+        by (metis "0" T.distinct(2) T.inject apply_rsp assms rel_T.simps)<br>
+        have "map_T Rep (f (Rep (Abs a))) = map_T Rep (f' (Rep (Abs b)))"<br>
+        using 2 3 by (auto simp: fun_eq_iff)<br>
+        moreover have "rel_T R (f (Rep (Abs a))) (f (Rep (Abs a)))"<br>
+        using A i by blast<br>
+        moreover have "rel_T R (f' (Rep (Abs b))) (f' (Rep (Abs b)))"<br>
+        by (metis "1" T.distinct(1) T.inject apply_rsp'' assms rel_T.cases)<br>
+        ultimately have AB: "rel_T R (f (Rep (Abs a))) (f' (Rep (Abs b)))"<br>
+        using i[of "f (Rep (Abs a))" "f' (Rep (Abs b))"] by blast<br>
+        have "R b (Rep (Abs b))"<br>
+        by (smt "3" Quotient_abs_rep Quotient_rel Quotient_rel_rep assms)<br>
+        hence B: "rel_T R (f' b) (f' (Rep (Abs b)))"<br>
+        by (metis 1 T.distinct(2) T.inject apply_rsp assms rel_T.simps)<br>
+        from A B AB show "rel_T R (f a) (f' b)" using symp_rel_T[OF assms] transp_rel_T[OF assms]<br>
+        by (meson sympE transpE)<br>
+      qed<br>
+    qed<br>
+  qed<br>
+qed</p>
+<p>lemma Quotient_rel_map_T2:<br>
+assumes  "Quotient R Abs Rep T"<br>
+shows "rel_T R (map_T Abs t) (map_T Abs t)"<br>
+  apply(induct t)<br>
+  by (auto intro!: rel_T.intros simp: rel_fun_def T_map_o[symmetric] image_def Quotient_rel[OF assms])<br>
+     (metis Quotient_rel assms)</p>
+<p>lemma Quotient_T[quot_map]:<br>
+assumes "Quotient R Abs Rep T"<br>
+shows "Quotient (rel_T R) (map_T Rep) (map_T Abs) (rel_T T)"<br>
+unfolding Quotient_def proof (intro conjI)<br>
+  have [simp]: "Abs o Rep = id" using assms unfolding Quotient_def o_def id_def by auto<br>
+  show "∀ t. map_T Rep (map_T Abs t) = t"<br>
+  using assms unfolding Quotient_def T_map_o[symmetric] by simp<br>
+next<br>
+  show "∀ t. rel_T R (map_T Abs t) (map_T Abs t)"<br>
+  using  Quotient_rel_map_T2[OF assms] by auto<br>
+next<br>
+  show "∀r s. rel_T R r s = (rel_T R r r ∧ rel_T R s s ∧ map_T Rep r = map_T Rep s)"<br>
+  using  Quotient_rel_map_T[OF assms] by blast<br>
+next<br>
+  show "rel_T T = (λt t'. rel_T R t t ∧ map_T Rep t = t')" proof(intro ext)<br>
+    fix t t' show "rel_T T t t' ⟷ rel_T R t t ∧ map_T Rep t = t'"<br>
+    proof(induct t arbitrary: t')<br>
+      case L<br>
+      thus ?case by (auto intro!: rel_T.intros elim!: rel_T.cases)<br>
+    next<br>
+      case (N f t')<br>
+      {fix t t' assume "∀x y. R x y ⟶ rel_T R (f x) (f y)" and "T t t'"<br>
+       hence "rel_T T (f t) (map_T Rep (f (Rep t')))"<br>
+       using N.hyps[of "f t" "map_T Rep (f (Rep t'))"] using Quotient_rel_map_T[OF assms]<br>
+       by (smt Quotient_abs_rep Quotient_cr_rel Quotient_rel Quotient_rel_rep assms rangeI)<br>
+      }<br>
+      thus ?case apply(cases t') apply (auto intro!: rel_T.intros ext elim!: rel_T.cases simp: rel_fun_def)<br>
+      apply (smt N.hyps Quotient_refl1 Quotient_refl2 Quotient_rel_abs Quotient_rel_map_T Quotient_to_transfer assms rangeI)<br>
+      by (metis N.hyps Quotient_alt_def4 assms rangeI)<br>
+    qed<br>
+  qed<br>
+qed</p>
+
+
+
+<a name="294708988"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Lifting%20and%20datatypes%20with%20dead%20arguments/near/294708988" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Lifting.20and.20datatypes.20with.20dead.20arguments.html#294708988">(Aug 22 2022 at 15:18)</a>:</h4>
+<p>From: Joshua Schneider &lt;<a href="mailto:dev@jshs.de">dev@jshs.de</a>&gt;<br>
+Hi Andrei,</p>
+<p>Thank you for working through the proof! It seems like the transfer of the<br>
+equivalence relation is the trickiest part, which was the missing piece in<br>
+my own attempt at proving this.</p>
+<p>I would also like to generalise the quotient mapping to arbitrary nested<br>
+BNFs, but I don't see how that would work based on your solution.</p>
+<p>I recently talked to Andreas Lochbihler about the problem, and he suggested<br>
+a fixed-point induction. I have now implemented that idea (see attached<br>
+theory), using a version of the Quotient predicate which is restricted to<br>
+some subset of the abstract type. I think that it is promising, because the<br>
+core of the proof is compositional with respect to the functor structure.<br>
+I have not tried to scale it to larger examples, though.</p>
+<p>Do you think that this is a worthwhile path towards automation, or do you<br>
+have something different in mind?</p>
+<p>Cheers,<br>
+Joshua<br>
+<a href="/user_uploads/14278/XAwxfm5M1Ijq5QB3JY-6eCZf/Inductive_Quotients.thy">Inductive_Quotients.thy</a></p>
+
+
+
+<a name="294709012"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Lifting%20and%20datatypes%20with%20dead%20arguments/near/294709012" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Lifting.20and.20datatypes.20with.20dead.20arguments.html#294709012">(Aug 22 2022 at 15:19)</a>:</h4>
+<p>From: Andrei Popescu &lt;<a href="mailto:A.Popescu@mdx.ac.uk">A.Popescu@mdx.ac.uk</a>&gt;<br>
+Hi Joshua,</p>
+<p>Thanks for the theory file. You are up to some very nice and useful results.  :-)</p>
+<p>However, to approach the case of arbitrary (nested) datatypes, I don't think fixpoint induction</p>
+<p>for constructors is very helpful. Over the last few years, we have built powerful abstractions</p>
+<p>that you can use here: Given a BNF ('a,'b) F, there is a generic way to construct its datatype BNF,</p>
+<p>'a D, and its codatatype BNF, 'a C, i.e., such that:</p>
+<p>(1) ('a, 'a D) F is isomorphic to 'a D,</p>
+<p>(2) ('a, 'a C) F is isomorphic to 'a C,</p>
+<p>(3) suitable (co)induction and (co)recursion principles hold for these.</p>
+<p>Our main motivation behind BNFs was to provide enough structure for being able to construct</p>
+<p>'a D and 'a C abstractly (without caring about how the underlying F looks like). Note that this</p>
+<p>situation covers the nested case, since F can be any BNF.</p>
+<p>The familiar high-level case distinction, induction, recursion etc. made available to the users is</p>
+<p>essentially implemented as "syntactic sugar" on top of these abstract constructions (performed</p>
+<p>for n mutually (co)recursive fixpoint equations like the above). This is all described in our paper:</p>
+<p><a href="http://andreipopescu.uk/pdf/LICS2012.pdf">http://andreipopescu.uk/pdf/LICS2012.pdf</a></p>
+<p>So, IMO, the best^[*] way to go is:</p>
+<p>--(1) Prove the quotient theorem under abstract assumptions, using BNFs and their fixpoints.</p>
+<p>You will see that the abstract induction theorem encodes your fixpoint "apply_T_ctors" induction</p>
+<p>as structural induction, so you will not need a generalized quotient predicate.</p>
+<p>--(2) Then either manually instantiate to particular (co)datatypes of interest (it is very easy!),</p>
+<p>or, more ambitiously, automate the instantiation in Isabelle/ML.</p>
+<p>If you are interested in going on this path (perhaps after having consulted the above paper), I</p>
+<p>can set up for you a theory file with the relevant structure for pursuing point (1).</p>
+<p>Best regards,</p>
+<p>Andrei</p>
+<p>PS. By "best," I mean "most interesting scientifically and most useful for Isabelle."</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

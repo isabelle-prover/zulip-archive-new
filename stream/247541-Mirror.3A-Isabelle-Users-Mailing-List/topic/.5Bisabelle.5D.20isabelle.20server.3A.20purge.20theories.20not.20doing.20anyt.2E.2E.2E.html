@@ -1,0 +1,95 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] isabelle server: purge theories not doing anyt... · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20isabelle.20server.3A.20purge.20theories.20not.20doing.20anyt.2E.2E.2E.html">[isabelle] isabelle server: purge theories not doing anyt...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="303232012"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20isabelle%20server%3A%20purge%20theories%20not%20doing%20anyt.../near/303232012" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20isabelle.20server.3A.20purge.20theories.20not.20doing.20anyt.2E.2E.2E.html#303232012">(Oct 10 2022 at 10:14)</a>:</h4>
+<p>From: pdevant &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Hi,<br>
+I am experimenting with the isabelle server and came across a problem with the<br>
+purge_theories command.</p>
+<p>Given: A basic theory with a trivial lemma in it like this:</p>
+<p>lemma test: "true = true"<br>
+sledgehammer<br>
+sorry</p>
+<p>The Goal is to make isabelle server run sledgehammer and then insert the found<br>
+solution.<br>
+By using isabelle server together with start_session and use_theories i am<br>
+already able to get the proof  and insert it using my own script.<br>
+Then i want to run sledgehammer again by executing use_theories in the same<br>
+way on the same theory file that now looks like this:</p>
+<p>lemma test: "true = true"<br>
+by simp<br>
+sledgehammer<br>
+sorry</p>
+<p>I would expect isabelle server to say something like "bad context" or "no<br>
+subgoals to solve". But what actually happens is that it prints the exact same<br>
+sledgehammer output again. After carefully reading the documentation i found<br>
+out that in order to actually update the theory, that isabelle server<br>
+processes, you need to run "purge_theories" before executing "use_theories" a<br>
+second time. However this does not affect the outcome, although the server<br>
+confirms that it did the purge.</p>
+<p>{'purged': [{'node_name': '&lt;REMOVED&gt;/tests/ressources/prove/testfile3.thy',<br>
+'theory_name': 'Draft.testfile3'}], 'retained': []}</p>
+<p>Is there anything i am missing? Did I missinterpret the documentation? Or is<br>
+this a bug?</p>
+<p>Best regards,<br>
+Pascal</p>
+
+
+
+<a name="304474365"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20isabelle%20server%3A%20purge%20theories%20not%20doing%20anyt.../near/304474365" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20isabelle.20server.3A.20purge.20theories.20not.20doing.20anyt.2E.2E.2E.html#304474365">(Oct 17 2022 at 14:26)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+I have spent a few days investigating the situation, and producing a few <br>
+last-minute changes for the headless PIDE session, which is behind e.g. <br>
+"isabelle server" and "isabelle dump".</p>
+<p>The result is now <br>
+<a href="https://isabelle.sketis.net/repos/isabelle-release/rev/14cf5a50c1e9">https://isabelle.sketis.net/repos/isabelle-release/rev/14cf5a50c1e9</a> which has <br>
+the following update on Isabelle2022/NEWS:</p>
+<ul>
+<li>
+<p>The headless PIDE session now supports adhoc editing of theories via<br>
+repeated "use_theories" on changed files. This functionality was<br>
+originally intended (e.g. see Isabelle2018), but it got lost due to<br>
+later improvements of "isabelle dump". Now it should work again, e.g. as<br>
+follows for "isabelle server &amp;" and "isabelle client":</p>
+<p>session_start {"session": "HOL", "options": <br>
+["headless_consolidate_delay=0.5", "headless_prune_delay=5"]}<br>
+ use_theories {"session_id": "...", "theories": ["/home/makarius/tmp/Test"]}<br>
+ use_theories {"session_id": "...", "theories": ["/home/makarius/tmp/Test"]}<br>
+ purge_theories {"session_id":"...", "all": true}<br>
+ session_stop {"session_id": "..."}<br>
+ shutdown</p>
+</li>
+</ul>
+<p>The next release candidate Isabelle2022-RC4 will appear within 1-2 days. You <br>
+can either wait and hope for the best, or try out the above repository version <br>
+in the meantime: it is relatively simple to build as explained in <br>
+<a href="https://isabelle.sketis.net/repos/isabelle-release/file/tip/README_REPOSITORY">https://isabelle.sketis.net/repos/isabelle-release/file/tip/README_REPOSITORY</a> <br>
+-- but you need to clone <a href="https://isabelle.sketis.net/repos/isabelle-release">https://isabelle.sketis.net/repos/isabelle-release</a></p>
+<p>The final release of Isabelle2022 will appear 1 week later. It will remain <br>
+unchanged until the next release after it (approx. Sep-2023).</p>
+<p>Makarius</p>
+
+
+
+<a name="304683281"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20isabelle%20server%3A%20purge%20theories%20not%20doing%20anyt.../near/304683281" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20isabelle.20server.3A.20purge.20theories.20not.20doing.20anyt.2E.2E.2E.html#304683281">(Oct 18 2022 at 13:54)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+That was only 1 day, and only 1 week left for last-minute final testing.</p>
+<p>See <a href="https://isabelle.sketis.net/website-Isabelle2022-RC4">https://isabelle.sketis.net/website-Isabelle2022-RC4</a> and <br>
+<a href="https://isabelle-dev.sketis.net/phame/post/view/58/release_candidates_for_isabelle2022/">https://isabelle-dev.sketis.net/phame/post/view/58/release_candidates_for_isabelle2022/</a></p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

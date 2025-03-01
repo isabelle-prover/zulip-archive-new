@@ -1,0 +1,214 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Quickcheck reports an incorrect counterexample · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Quickcheck.20reports.20an.20incorrect.20counterexample.html">[isabelle] Quickcheck reports an incorrect counterexample</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="234046736"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Quickcheck%20reports%20an%20incorrect%20counterexample/near/234046736" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Quickcheck.20reports.20an.20incorrect.20counterexample.html#234046736">(Apr 11 2021 at 13:56)</a>:</h4>
+<p>From: "Eugene W. Stark" &lt;<a href="mailto:isabelle-users@starkeffect.com">isabelle-users@starkeffect.com</a>&gt;<br>
+For lemma BAD below (theory also attached), Quickcheck reports an incorrect counterexample.<br>
+X = Var 0 and Y = Var 1 are not consistent with the hypothesis Src X = Var x ∧ Src Y = Var x.</p>
+<p>A checked proof of the supposedly incorrect lemma is given.</p>
+<p>- Gene Stark</p>
+<hr>
+<p>theory Barf<br>
+imports Main<br>
+begin</p>
+<p>datatype lambda =<br>
+    Nil<br>
+  | Var nat<br>
+  | Lam lambda<br>
+  | App lambda lambda<br>
+  | App' lambda lambda</p>
+<p>fun Ide<br>
+  where "Ide Nil = False"<br>
+      | "Ide (Var i) = True"<br>
+      | "Ide (Lam M) = Ide M"<br>
+      | "Ide (App X Y) = (Ide X ∧ Ide Y)"<br>
+      | "Ide (App' X Y) = False"</p>
+<p>fun raise<br>
+  where "raise Nil = Nil"<br>
+      | "raise (Var i) = Var (Suc i)"<br>
+      | "raise (Lam M) = Lam (raise M)"<br>
+      | "raise (App M N) = App (raise M) (raise N)"<br>
+      | "raise (App' M N) = App' (raise M) (raise N)"</p>
+<p>fun subst<br>
+  where "subst X Nil = Nil"<br>
+      | "subst X (Var 0) = X"<br>
+      | "subst X (Var i) = Var i"<br>
+      | "subst X (Lam M) = Lam (subst (raise X) M)"<br>
+      | "subst X (App M N) = App (subst X M) (subst X N)"<br>
+      | "subst X (App' M N) = App' (subst X M) (subst X N)"</p>
+<p>fun Src<br>
+  where "Src Nil = Nil"<br>
+      | "Src (Var i) = Var i"<br>
+      | "Src (Lam M) = Lam (Src M)"<br>
+      | "Src (App M N) = App (Src M) (Src N)"<br>
+      | "Src (App' M N) = App (Src M) (Src N)"</p>
+<p>abbreviation Coinitial<br>
+  where "Coinitial X Y ≡ Src X = Src Y"</p>
+<p>fun resid<br>
+  where "resid (Var i) (Var i') = (if i = i' then Var i else Nil)"<br>
+      | "resid (Lam M) (Lam M') = (if Coinitial M M' then Nil else Lam (resid M M'))"<br>
+      | "resid (App M N) (App M' N') = (if Coinitial M M' ∧ Coinitial N N'<br>
+                                        then App (resid M M') (resid N N') else Nil)"<br>
+      | "resid (App M N) (App' M' N') = (if Coinitial M M' ∧ Coinitial N N'<br>
+                                         then subst (resid M M') (resid N N') else Nil)"<br>
+      | "resid (App' M N) (App' M' N') = (if Coinitial M M' ∧ Coinitial N N'<br>
+                                         then subst (resid M M') (resid N N') else Nil)"<br>
+      | "resid (App' M N) (App M' N') = (if Coinitial M M' ∧ Coinitial N N'<br>
+                                         then App' (resid M M') (resid N N') else Nil)"<br>
+      | "resid _ _ = Nil"</p>
+<p>lemma BAD:<br>
+  shows "⋀x. Ide (Var x) ⟹ ∀X Y. Src X = Var x ∧ Src Y = Var x ⟶ resid X Y ≠ Nil"<br>
+  (*<br>
+     proof (prove)<br>
+     goal (1 subgoal):</p>
+<p>1. ⋀x. Ide (Var x) ⟹ ∀X Y. Src X = Var x ∧ Src Y = Var x ⟶ resid X Y ≠ lambda.Nil<br>
+     Auto Quickcheck found a counterexample:<br>
+       x = 0<br>
+       X = Var 0<br>
+       Y = Var 1<br>
+   *)<br>
+  proof -<br>
+    fix x<br>
+    show "∀X Y. Src X = Var x ∧ Src Y = Var x ⟶ resid X Y ≠ Nil"<br>
+    proof (intro allI impI, elim conjE)<br>
+      fix X Y<br>
+      assume X: "Src X = Var x" and Y: "Src Y = Var x"<br>
+      show "resid X Y ≠ Nil"<br>
+        using X Y<br>
+        apply (cases X)<br>
+            apply auto<br>
+        apply (cases Y)<br>
+        by auto<br>
+    qed<br>
+  qed</p>
+<p>end<br>
+<a href="/user_uploads/14278/mlIuBWY8McCaLbe6d1k5MqFI/Barf.thy">Barf.thy</a></p>
+
+
+
+<a name="234127173"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Quickcheck%20reports%20an%20incorrect%20counterexample/near/234127173" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Quickcheck.20reports.20an.20incorrect.20counterexample.html#234127173">(Apr 12 2021 at 09:15)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+Eugene,</p>
+<p>Thanks for this curious example. It looks like there is a bug in the treatment <br>
+of (outermost) universal quantifiers as opposed to free variables. When you <br>
+remove the !!x, the problem goes away. It seems nobody ever noticed because most <br>
+of the time one drops these outermost universals.</p>
+<p>Tobias</p>
+<p>On 11/04/2021 15:55, Eugene W. Stark wrote:</p>
+<blockquote>
+<p>For lemma BAD below (theory also attached), Quickcheck reports an incorrect counterexample.<br>
+X = Var 0 and Y = Var 1 are not consistent with the hypothesis Src X = Var x ∧ Src Y = Var x.</p>
+<p>A checked proof of the supposedly incorrect lemma is given.</p>
+<p>- Gene Stark</p>
+<hr>
+<p>theory Barf<br>
+imports Main<br>
+begin</p>
+<p>datatype lambda =<br>
+     Nil<br>
+   | Var nat<br>
+   | Lam lambda<br>
+   | App lambda lambda<br>
+   | App' lambda lambda</p>
+<p>fun Ide<br>
+   where "Ide Nil = False"<br>
+       | "Ide (Var i) = True"<br>
+       | "Ide (Lam M) = Ide M"<br>
+       | "Ide (App X Y) = (Ide X ∧ Ide Y)"<br>
+       | "Ide (App' X Y) = False"</p>
+<p>fun raise<br>
+   where "raise Nil = Nil"<br>
+       | "raise (Var i) = Var (Suc i)"<br>
+       | "raise (Lam M) = Lam (raise M)"<br>
+       | "raise (App M N) = App (raise M) (raise N)"<br>
+       | "raise (App' M N) = App' (raise M) (raise N)"</p>
+<p>fun subst<br>
+   where "subst X Nil = Nil"<br>
+       | "subst X (Var 0) = X"<br>
+       | "subst X (Var i) = Var i"<br>
+       | "subst X (Lam M) = Lam (subst (raise X) M)"<br>
+       | "subst X (App M N) = App (subst X M) (subst X N)"<br>
+       | "subst X (App' M N) = App' (subst X M) (subst X N)"</p>
+<p>fun Src<br>
+   where "Src Nil = Nil"<br>
+       | "Src (Var i) = Var i"<br>
+       | "Src (Lam M) = Lam (Src M)"<br>
+       | "Src (App M N) = App (Src M) (Src N)"<br>
+       | "Src (App' M N) = App (Src M) (Src N)"</p>
+<p>abbreviation Coinitial<br>
+   where "Coinitial X Y ≡ Src X = Src Y"</p>
+<p>fun resid<br>
+   where "resid (Var i) (Var i') = (if i = i' then Var i else Nil)"<br>
+       | "resid (Lam M) (Lam M') = (if Coinitial M M' then Nil else Lam (resid M M'))"<br>
+       | "resid (App M N) (App M' N') = (if Coinitial M M' ∧ Coinitial N N'<br>
+                                         then App (resid M M') (resid N <br>
+N') else Nil)"<br>
+       | "resid (App M N) (App' M' N') = (if Coinitial M M' ∧ <br>
+Coinitial N N'<br>
+                                          then subst (resid M M') (resid N N') else Nil)"<br>
+       | "resid (App' M N) (App' M' N') = (if Coinitial M M' ∧ <br>
+Coinitial N N'<br>
+                                          then subst (resid M M') (resid N N') else Nil)"<br>
+       | "resid (App' M N) (App M' N') = (if Coinitial M M' ∧ <br>
+Coinitial N N'<br>
+                                          then App' (resid M M') (resid <br>
+N N') else Nil)"<br>
+       | "resid _ _ = Nil"</p>
+<p>lemma BAD:<br>
+   shows "⋀x. Ide (Var x) ⟹ ∀X Y. Src X = Var <br>
+x ∧ Src Y = Var x ⟶ resid X Y ≠ Nil"<br>
+   (*<br>
+      proof (prove)<br>
+      goal (1 subgoal):<br>
+       1. ⋀x. Ide (Var x) ⟹ ∀X Y. Src X = Var <br>
+x ∧ Src Y = Var x ⟶ resid X Y ≠ lambda.Nil<br>
+      Auto Quickcheck found a counterexample:<br>
+        x = 0<br>
+        X = Var 0<br>
+        Y = Var 1<br>
+    *)<br>
+   proof -<br>
+     fix x<br>
+     show "∀X Y. Src X = Var x ∧ Src Y = Var x ⟶ resid X Y ≠ Nil"<br>
+     proof (intro allI impI, elim conjE)<br>
+       fix X Y<br>
+       assume X: "Src X = Var x" and Y: "Src Y = Var x"<br>
+       show "resid X Y ≠ Nil"<br>
+         using X Y<br>
+         apply (cases X)<br>
+             apply auto<br>
+         apply (cases Y)<br>
+         by auto<br>
+     qed<br>
+   qed</p>
+<p>end</p>
+<p><a href="/user_uploads/14278/bsrxATkl7cuglp9nGPsUYJka/smime.p7s">smime.p7s</a></p>
+</blockquote>
+
+
+
+<a name="234796639"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Quickcheck%20reports%20an%20incorrect%20counterexample/near/234796639" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Quickcheck.20reports.20an.20incorrect.20counterexample.html#234796639">(Apr 16 2021 at 05:28)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi all,</p>
+<p>this is due to an erroneous handling of variable names in the quickcheck<br>
+framework, which will disappear in the next Isabelle release.</p>
+<p>See also <a href="https://isabelle.in.tum.de/repos/isabelle/rev/ed5226fdf89d">https://isabelle.in.tum.de/repos/isabelle/rev/ed5226fdf89d</a></p>
+<p>Cheers,<br>
+    Florian<br>
+<a href="/user_uploads/14278/-0IisdyG44DqEPbOUSR10PyP/OpenPGP_signature">OpenPGP_signature</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

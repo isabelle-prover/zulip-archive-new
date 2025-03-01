@@ -1,0 +1,140 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Setup termination prover for finitely branchin... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Setup.20termination.20prover.20for.20finitely.20branchin.2E.2E.2E.html">[isabelle] Setup termination prover for finitely branchin...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294660068"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Setup%20termination%20prover%20for%20finitely%20branchin.../near/294660068" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Setup.20termination.20prover.20for.20finitely.20branchin.2E.2E.2E.html#294660068">(Aug 22 2022 at 11:59)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:eberlm@in.tum.de">eberlm@in.tum.de</a>&gt;<br>
+No idea about why what you are doing does not work, but the following<br>
+does work:</p>
+<p>lemma le_setsum_nat [termination_simp]:<br>
+  assumes "finite A" "x ∈ A"<br>
+  shows   "f (g x) ≤ (∑x∈A. f (g x) :: nat)"<br>
+proof -<br>
+  have "f (g x) = (∑x∈{x}. f (g x))" by simp<br>
+  also from assms have "… ≤ (∑x∈A. f (g x))" by (intro setsum_mono2) auto<br>
+  finally show ?thesis by simp<br>
+qed</p>
+<p>Note that it doesn't work if you replace "f (g x)" with just "f x".<br>
+Unification problem, perhaps?</p>
+<p>Cheers,</p>
+<p>Manuel</p>
+
+
+
+<a name="294660090"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Setup%20termination%20prover%20for%20finitely%20branchin.../near/294660090" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Setup.20termination.20prover.20for.20finitely.20branchin.2E.2E.2E.html#294660090">(Aug 22 2022 at 11:59)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Manuel,</p>
+<p>Thanks for the suggestion, your rule does suffice to prove the termination of my given <br>
+example. It differs from the existing estimation rules in that the left hand side of the <br>
+conclusion must be exactly of the summation form. The existing rules encode a transitivity <br>
+step</p>
+<p>"[| y &lt;= f (g x); f (g x) &lt;= (∑x∈A. f (g x)) |] ==&gt; y &lt;= (∑x∈A. f (g x))"</p>
+<p>and this is what introduces the schematic variable ?x in the assumptions which cause all <br>
+the trouble. And in general, this transitivity step is indeed needed (and your rule fails <br>
+there). For example, if the recursion in the datatype goes through another type.</p>
+<p>datatype (plugins del: size) 'a tree2 = Leaf2 | Node2 'a "char ⇒ 'a tree2 × 'a"</p>
+<p>instantiation tree2 :: (type) size begin<br>
+primrec size_tree2 :: "'a tree2 ⇒ nat"<br>
+where<br>
+   "size_tree2 Leaf2 = 0"<br>
+| "size_tree2 (Node2 x ts) =<br>
+    Suc (setsum (Suc ∘ fst ∘ (map_prod size_tree2 id ∘ ts)) UNIV)"<br>
+instance ..<br>
+end</p>
+<p>fun zip_prod where "zip_prod f g (x, y) (u, v) = (f x u, g y v)"</p>
+<p>fun zip_tree2 :: "'a tree2 ⇒ 'b tree2 ⇒ ('a × 'b) tree2"<br>
+where<br>
+   "zip_tree2 (Node2 x ts) (Node2 y ts') =<br>
+    Node2 (x, y) (λz. zip_prod zip_tree2 Pair (ts z) (ts' z))"<br>
+| "zip_tree2 _ _ = Leaf2"</p>
+<p>Do you think one can generalise your rule in a way such that it still works with <br>
+lexicographic_order?</p>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<a name="294661383"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Setup%20termination%20prover%20for%20finitely%20branchin.../near/294661383" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Setup.20termination.20prover.20for.20finitely.20branchin.2E.2E.2E.html#294661383">(Aug 22 2022 at 12:07)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear experts of the simplifier and/or the function package,</p>
+<p>For a datatype of finitely branching trees, I would like to setup the terminiation prover <br>
+of the function package such that it can automatically prove termination of my recursive <br>
+functions. My problem is that I cannot mimick the setup for other datatypes like lists and <br>
+I am running out of ideas how this can be fit into lexicographic order.</p>
+<p>Here is my usecase and the analysis of the problem. The datatype tree recurses through the <br>
+function type, but the domain of the functions is finite. Thus, it is possible to define a <br>
+size function, although this must be done manually in Isabelle2015 (using setsum for <br>
+summing the sizes of the subtrees).</p>
+<p>datatype (plugins del: size) 'a tree = Leaf | Node 'a "char ⇒ 'a tree"</p>
+<p>instantiation tree :: (type) size begin<br>
+primrec size_tree :: "'a tree ⇒ nat" where<br>
+   "size_tree Leaf = 0"<br>
+| "size_tree (Node x ts) = Suc (setsum (size_tree ∘ ts) UNIV)"<br>
+instance ..<br>
+end</p>
+<p>Now, I would like lexicographic_order to prove termination of a function definition such <br>
+as the following:</p>
+<p>fun zip_tree :: "'a tree ⇒ 'b tree ⇒ ('a × 'b) tree"<br>
+where<br>
+   "zip_tree (Node x ts) (Node y ts') = Node (x, y) (λz. zip_tree (ts z) (ts' z))"<br>
+| "zip_tree _ _ = Leaf"</p>
+<p>Without further setup, the termination proof fails because the proof tactic cannot solve <br>
+goals such as the following.</p>
+<ol>
+<li>⋀ts' xa. size (ts' xa) &lt; Suc (∑x∈UNIV. size (ts' x))</li>
+</ol>
+<p>For recursion through lists, there is a custom setup, namely the theorems <br>
+size_list_estimation and size_list_estimation' which are declared as [termination_simp].</p>
+<p>thm size_list_estimation'   ⟦?x ∈ set ?xs; ?y ≤ ?f ?x⟧ ⟹ ?y ≤ size_list ?f ?xs</p>
+<p>Now I tried to mimick this setup for the setsum operator:</p>
+<p>lemma setsum_estimation'[termination_simp]:<br>
+   "(y :: nat) ≤ f x ⟹ finite (UNIV :: 'a set) ⟹ y ≤ setsum f (UNIV :: 'a set)"</p>
+<p>From what I could see from the code, these *_estimation rules work as follows:</p>
+<ul>
+<li>
+<p>lexicographic_order internally uses the proof method (auto simp add: termination_simp)<br>
+to solve the goals, that is, the termination proof are solved mostly by conditional rewriting.</p>
+</li>
+<li>
+<p>In particular, termination_simp contains the rule ?m ≤ ?n ⟹ ?m &lt; Suc ?n, so the above <br>
+subgoal 1. can be solved if the simplifier can prove "size (ts' xa) &lt;= (∑x∈UNIV. size (ts' <br>
+x))". And this is where *_estimation' triggers.</p>
+</li>
+</ul>
+<p>Unfortunately, the simplifier does not like setsum_estimation' as much as it likes <br>
+size_list_estimation'. Both rules contain the free variable ?x in the assumptions that is <br>
+not bound by the conclusion, so trouble is to be expected.</p>
+<p>In the case of size_list_estimation', the first premise <code>?x : set ?xs</code> instantiates the ?x <br>
+because the termination goal typically contains an assumption <code>x : set xs</code> due to a <br>
+congrence rule (and the simplifier calls the HOL unsafe solver, which instantiates the <br>
+variable as a matching assumption is available). Thus, the second assumption <code>?y &lt;= ?f ?x</code> <br>
+no longer contains schematic variables and the simplifier can usually discharge the goal.</p>
+<p>In case of setsum_estimation', there is no such first premise that could instantiate ?x <br>
+(because the corresponding assumption would be "?x : UNIV" which holds trivially). Thus, <br>
+the recursive invocation of the simplifier is left with a goal such as</p>
+<p>"!!x. f x &lt;= f (?x x)"</p>
+<p>Simplification fails (because there is no suitable solver) and thus it cannot prove <br>
+termination.</p>
+<p>If I add a solver to the simpset which applies the rule "order_refl", then the termination <br>
+proof succeeds. Yet, my feeling says that such a solver is not a good idea in general, <br>
+because it will instantiate variables too aggressively. So this looks like a hack that is <br>
+better avoided.</p>
+<p>Are there ideas for a better size function or a better setup for termination_simp? Has <br>
+anyone else run into this problem before?</p>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,144 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Problem with simplifier trace (part 2) · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problem.20with.20simplifier.20trace.20.28part.202.29.html">[isabelle] Problem with simplifier trace (part 2)</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294075106"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problem%20with%20simplifier%20trace%20%28part%202%29/near/294075106" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problem.20with.20simplifier.20trace.20.28part.202.29.html#294075106">(Aug 18 2022 at 13:15)</a>:</h4>
+<p>From: Christoph Feller &lt;<a href="mailto:c_feller@informatik.uni-kl.de">c_feller@informatik.uni-kl.de</a>&gt;<br>
+Hallo,</p>
+<p>I got the same problem as before just at another place. This time I<br>
+supply an actual subtrace. This part gets repeated over and over.<br>
+Simplifier depth is set to 3. Why do I think this trace is strange?<br>
+Well the simplifier tries to use the rule in the first line/block (of<br>
+the trace). So it has to show both assumption. It instantiates ?s1 and<br>
+?st with the same value and then finds that it can simplify the second<br>
+assumption to False (see line/block six). But then the trace continues<br>
+with "succeeded", with no indication why it succeeded and I don't want<br>
+it to - but I've no way to find the reason for this success.</p>
+<p>By the way, if I delete st_in_st_not_ref (see line/block five) from<br>
+the simpset the simplifier doesn't loop.</p>
+<p>Can anyone make sense of this?</p>
+<p>[1]Applying instance of rewrite rule "local.P.st_in_st_stypv":<br>
+[| ?st1 st_in_prog P; (?s1, ?st1) : st_in_st |] ==&gt;<br>
+Concrete_AST_w_st.stypv P ?s1 ?v1 == Concrete_AST_w_st.stypv P ?st1<br>
+?v1</p>
+<p>[1]Trying to rewrite:<br>
+[| ?st1 st_in_prog P; ([n] v := T Unary unary_op exp, ?st1) : st_in_st|]<br>
+==&gt; Concrete_AST_w_st.stypv P [n] v := T Unary unary_op exp v ==<br>
+Concrete_AST_w_st.stypv P ?st1 v</p>
+<p>[2]SIMPLIFIER INVOKED ON THE FOLLOWING TERM:<br>
+?st1 st_in_prog P</p>
+<p>[2]SIMPLIFIER INVOKED ON THE FOLLOWING TERM:<br>
+([n] v := T Unary unary_op exp, [n] v := T Unary unary_op exp) : st_in_st</p>
+<p>[2]Applying instance of rewrite rule "local.P.st_in_st_not_ref":<br>
+(?st1, ?st1) : st_in_st == False</p>
+<p>[2]Rewriting:<br>
+([n] v := T Unary unary_op exp, [n] v := T Unary unary_op exp) :<br>
+st_in_st == False</p>
+<p>[1]SUCCEEDED<br>
+Concrete_AST_w_st.stypv P [n] v := T Unary unary_op exp v ==<br>
+Concrete_AST_w_st.stypv P [n] v := T Unary unary_op exp v</p>
+<p>Thanks,</p>
+<p>Christoph Feller</p>
+
+
+
+<a name="294075622"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problem%20with%20simplifier%20trace%20%28part%202%29/near/294075622" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problem.20with.20simplifier.20trace.20.28part.202.29.html#294075622">(Aug 18 2022 at 13:19)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+I suspect the problem is here:</p>
+<blockquote>
+<p>[1]Trying to rewrite:<br>
+[| ?st1 st_in_prog P; ([n] v := T Unary unary_op exp, ?st1) : st_in_st|]<br>
+==&gt; Concrete_AST_w_st.stypv P [n] v := T Unary unary_op exp v ==<br>
+Concrete_AST_w_st.stypv P ?st1 v</p>
+</blockquote>
+<p>You have a premise with an uninstantiated higher-order variable. The<br>
+simplifier probably managed to instantiate ?st1 with something that<br>
+returns False, eg %_ _. False.</p>
+<p>The simplifier is not predictable on rules with higher-order variables<br>
+in the premises that are not in the conclusion. You have given it the<br>
+license to replace such variables with anything...</p>
+<p>Tobias</p>
+<p>Christoph Feller schrieb:</p>
+<blockquote>
+<p>Hallo,</p>
+<p>I got the same problem as before just at another place. This time I<br>
+supply an actual subtrace. This part gets repeated over and over.<br>
+Simplifier depth is set to 3. Why do I think this trace is strange?<br>
+Well the simplifier tries to use the rule in the first line/block (of<br>
+the trace). So it has to show both assumption. It instantiates ?s1 and<br>
+?st with the same value and then finds that it can simplify the second<br>
+assumption to False (see line/block six). But then the trace continues<br>
+with "succeeded", with no indication why it succeeded and I don't want<br>
+it to - but I've no way to find the reason for this success.</p>
+<p>By the way, if I delete st_in_st_not_ref (see line/block five) from<br>
+the simpset the simplifier doesn't loop.</p>
+<p>Can anyone make sense of this?</p>
+<p>[1]Applying instance of rewrite rule "local.P.st_in_st_stypv":<br>
+[| ?st1 st_in_prog P; (?s1, ?st1) : st_in_st |] ==&gt;<br>
+Concrete_AST_w_st.stypv P ?s1 ?v1 == Concrete_AST_w_st.stypv P ?st1<br>
+?v1</p>
+<p>[1]Trying to rewrite:<br>
+[| ?st1 st_in_prog P; ([n] v := T Unary unary_op exp, ?st1) : st_in_st|]<br>
+==&gt; Concrete_AST_w_st.stypv P [n] v := T Unary unary_op exp v ==<br>
+Concrete_AST_w_st.stypv P ?st1 v</p>
+<p>[2]SIMPLIFIER INVOKED ON THE FOLLOWING TERM:<br>
+?st1 st_in_prog P</p>
+<p>[2]SIMPLIFIER INVOKED ON THE FOLLOWING TERM:<br>
+([n] v := T Unary unary_op exp, [n] v := T Unary unary_op exp) : st_in_st</p>
+<p>[2]Applying instance of rewrite rule "local.P.st_in_st_not_ref":<br>
+(?st1, ?st1) : st_in_st == False</p>
+<p>[2]Rewriting:<br>
+([n] v := T Unary unary_op exp, [n] v := T Unary unary_op exp) :<br>
+st_in_st == False</p>
+<p>[1]SUCCEEDED<br>
+Concrete_AST_w_st.stypv P [n] v := T Unary unary_op exp v ==<br>
+Concrete_AST_w_st.stypv P [n] v := T Unary unary_op exp v</p>
+<p>Thanks,</p>
+<p>Christoph Feller</p>
+</blockquote>
+
+
+
+<a name="294076477"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problem%20with%20simplifier%20trace%20%28part%202%29/near/294076477" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problem.20with.20simplifier.20trace.20.28part.202.29.html#294076477">(Aug 18 2022 at 13:24)</a>:</h4>
+<p>From: Christoph Feller &lt;<a href="mailto:c_feller@informatik.uni-kl.de">c_feller@informatik.uni-kl.de</a>&gt;<br>
+On Wed, Apr 1, 2009 at 11:20, Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt; wrote:</p>
+<blockquote>
+<p>I suspect the problem is here:</p>
+<blockquote>
+<p>[1]Trying to rewrite:<br>
+[| ?st1 st_in_prog P; ([n] v := T Unary unary_op exp, ?st1) : st_in_st|]<br>
+==&gt; Concrete_AST_w_st.stypv P [n] v := T Unary unary_op exp v ==<br>
+Concrete_AST_w_st.stypv P ?st1 v</p>
+</blockquote>
+<p>You have a premise with an uninstantiated higher-order variable. The<br>
+simplifier probably managed to instantiate ?st1 with something that<br>
+returns False, eg %_ _. False.</p>
+</blockquote>
+<p>I just used infix notation for st_in_prog which I shouldn't have done<br>
+as it's obviously quite misleading. It should be:</p>
+<p>[1]Trying to rewrite:<br>
+[| st_in_prog P ?st1; ([n] v := T Unary unary_op exp, ?st1) : st_in_st|]<br>
+==&gt; Concrete_AST_w_st.stypv P [n] v := T Unary unary_op exp v ==<br>
+Concrete_AST_w_st.stypv P ?st1 v</p>
+<p>where ?st1 is a statement i.e. a base value.</p>
+<blockquote>
+<p>[...]</p>
+</blockquote>
+<p>Under these circumstances I would conclude that at least the tracing<br>
+algorithm isn't as helpful as it should be. Am I right?</p>
+<p>Christoph</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

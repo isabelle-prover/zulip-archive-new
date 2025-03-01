@@ -1,0 +1,139 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Infinite variable chasing · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Infinite.20variable.20chasing.html">[isabelle] Infinite variable chasing</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294119183"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Infinite%20variable%20chasing/near/294119183" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Infinite.20variable.20chasing.html#294119183">(Aug 18 2022 at 16:14)</a>:</h4>
+<p>From: Michael Chan &lt;<a href="mailto:mchan@inf.ed.ac.uk">mchan@inf.ed.ac.uk</a>&gt;<br>
+Hello all,</p>
+<p>I'm having a problem with looking up the instantiation to a variable in <br>
+a matcher with Envir.lookup. The particular matcher is:</p>
+<p>ML{* fun rtac' rl i j st = (snd o Seq.chop j) (rtac rl i st) *}</p>
+<p>schematic_lemma<br>
+fixes g :: "nat =&gt; nat"<br>
+shows "((?f :: (?'a =&gt; ?'b) =&gt; ?'c) ?s = ?v) = (g a = x) &amp; Q ?f ?s ?v"<br>
+apply rule<br>
+apply(tactic {* rtac' refl 1 1712 *})</p>
+<p>goal (1 subgoal):</p>
+<p>1. Q (%a::?'a =&gt; nat. a (?f9 a)) (%b::?'a. g a) x<br>
+variables:<br>
+   a, x :: nat<br>
+   g :: nat =&gt; nat<br>
+   ?f9 :: (?'a =&gt; nat) =&gt; ?'a<br>
+   Q ::<br>
+     ((?'a =&gt; nat) =&gt; nat) =&gt; (?'a =&gt; nat) =&gt; nat =&gt; bool<br>
+type variables:<br>
+   ?'a :: type</p>
+<p>If I lookup the instantiation to the variable ?s in this particular <br>
+matcher, which here has the type ?'a =&gt; nat, I run into an infinite <br>
+recursion. The infinite recursion seems to be caused by an infinite <br>
+chasing of type variable assignment at Type.devar:</p>
+<p>(*chase variable assignments; if devar returns a type var then it must <br>
+be unassigned*)<br>
+fun devar tye (T as TVar v) =<br>
+       (case lookup tye v of<br>
+         SOME U =&gt; devar tye U<br>
+       | NONE =&gt; T)<br>
+   | devar _ T = T;</p>
+<p>Put simply, there's no variable assignment for it to be chased.</p>
+<p>In the implementation, Envir.lookup indirectly invokes Type.equal_type, <br>
+which checks over each type variable -- in this case, that's ?'a and <br>
+?'b. ?'b is fine, and only ?'a is problematic. Now let's look at the tye:</p>
+<p>val tye =<br>
+    Branch2<br>
+     (Branch2<br>
+       (Empty, (("'a", 0), (["HOL.type"], "?'a")),<br>
+        Empty),<br>
+      (("'b", 0), (["HOL.type"], "RealDef.real")),<br>
+      Branch2<br>
+       (Empty,<br>
+        (("'a", 1), (["HOL.type"], "RealDef.real")),<br>
+        Empty))<br>
+    : Type.tyenv</p>
+<p>If we call devar tye on (?'a, 0), we'll run into an infinite recursion <br>
+because lookup tye (TVar ("'a", 0), ["HOL.type"])) also gives (TVar <br>
+("'a", 0), ["HOL.type"])).</p>
+<p>Why isn't the variable chasing procedure given a maximum depth?</p>
+<p>Any help will be appreciated.</p>
+<p>Michael</p>
+
+
+
+<a name="294119217"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Infinite%20variable%20chasing/near/294119217" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Infinite.20variable.20chasing.html#294119217">(Aug 18 2022 at 16:14)</a>:</h4>
+<p>From: Alexander Krauss &lt;<a href="mailto:krauss@in.tum.de">krauss@in.tum.de</a>&gt;<br>
+Hi Michael,</p>
+<blockquote>
+<p>I'm having a problem with looking up the instantiation to a variable in <br>
+a matcher with Envir.lookup.</p>
+</blockquote>
+<p>I just looked at the code in envir.ML again, and there is a function <br>
+lookup', preceded by the following comment:</p>
+<p>(* When dealing with environments produced by matching instead *)<br>
+(* of unification, there is no need to chase assigned TVars.   *)<br>
+(* In this case, we can simply ignore the type substitution    *)<br>
+(* and use = instead of eq_type.                               *)</p>
+<p>Could this be the source of your problem? Since your problematic <br>
+substitution is generated by Unify.matchers (which wasn't clear from you <br>
+question), have you tried lookup' instead of lookup?</p>
+<p>Larry can maybe explain the details behind this...</p>
+<p>Alex</p>
+
+
+
+<a name="294119229"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Infinite%20variable%20chasing/near/294119229" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Infinite.20variable.20chasing.html#294119229">(Aug 18 2022 at 16:14)</a>:</h4>
+<p>From: Michael Chan &lt;<a href="mailto:mchan@inf.ed.ac.uk">mchan@inf.ed.ac.uk</a>&gt;</p>
+<blockquote>
+<p>Could this be the source of your problem? Since your problematic<br>
+substitution is generated by Unify.matchers (which wasn't clear from you<br>
+question), have you tried lookup' instead of lookup?<br>
+</p>
+</blockquote>
+<p>I shall share my finding here as well:</p>
+<p>An exception TYPE will be raised: Variable "?stuff" has two distinct<br>
+types. I think the problem there is that lookup' checks the type<br>
+variables using op = instead, which would match ?'a =&gt; ?'b with the<br>
+resulting type. I suspect lookup' can't handle schematic types. It'd <br>
+fail in cases in which Envir.lookup succeeds, e.g.:</p>
+<p>consts<br>
+g :: "'a =&gt; 'b"<br>
+a :: real<br>
+v :: real</p>
+<p>ML {*</p>
+<p>val trm1 = @{term_pat "(?f'::(?'a=&gt;?'b)=&gt;?'c) ?stuff = ?v"};</p>
+<p>val (_ $ (_ $ var) $ _) = trm1;</p>
+<p>val mtch_seq = let<br>
+   val init = Envir.empty 0<br>
+   val trm2 = @{term "g a = v"}<br>
+in<br>
+   Unify.matchers @{theory} [(trm1,trm2)]<br>
+end;</p>
+<p>val SOME (mtch,_) = nthseq 1711 mtch_seq;</p>
+<p>val tenv = Envir.term_env mtch;<br>
+val p = Term.dest_Var var;</p>
+<p>val inst = Envir.lookup' (tenv, p);</p>
+<p>*}</p>
+<blockquote>
+<p>Larry can maybe explain the details behind this...<br>
+</p>
+</blockquote>
+<p>That'd be great!</p>
+<p>Thanks<br>
+Michael</p>
+<blockquote>
+<p>Alex<br>
+</p>
+</blockquote>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

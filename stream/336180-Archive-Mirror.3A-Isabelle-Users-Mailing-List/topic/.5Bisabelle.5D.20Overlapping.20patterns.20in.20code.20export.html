@@ -1,0 +1,103 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Overlapping patterns in code export · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Overlapping.20patterns.20in.20code.20export.html">[isabelle] Overlapping patterns in code export</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294706578"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Overlapping%20patterns%20in%20code%20export/near/294706578" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Overlapping.20patterns.20in.20code.20export.html#294706578">(Aug 22 2022 at 15:07)</a>:</h4>
+<p>From: Sebastiaan Joosten &lt;<a href="mailto:sjcjoosten@gmail.com">sjcjoosten@gmail.com</a>&gt;<br>
+Hi Isabelle list,</p>
+<p>I'm getting a ghc warning of overlapping patterns, and I'm wondering whether that's intended behavior. The example uses "fun" (or equivalently: function with sequential), shown below.<br>
+I consider these options:</p>
+<ol>
+<li>Fun should not generate overlapping simp rules.</li>
+<li>Fun may generate overlapping simp rules, but the code export should not generate code for the overlapped ones (or avoid the overlap in another way, like by changing the pattern order).</li>
+<li>Code export may sometimes generate overlapping rules, this is intended behavior. In this case I need to disable some of Haskell's warnings on the generated files.</li>
+</ol>
+<p>I'd love to hear which is the case.</p>
+<p>Here is the example:</p>
+<p>theory Test imports Main begin</p>
+<p>fun foo where<br>
+  "foo (True, []) = True"<br>
+| "foo (False, [x]) = True"<br>
+| "foo _ = False"</p>
+<p>export_code foo in Haskell</p>
+<p>end</p>
+<p>Here is the relevant Haskell code:</p>
+<p>foo :: forall a. (Bool, [a]) -&gt; Bool;<br>
+foo (True, []) = True;<br>
+foo (False, [x]) = True;<br>
+foo (False, []) = False;<br>
+foo (False, v : vc : vd) = False;<br>
+foo (True, vb : vc) = False;<br>
+foo (v, vb : va : vd) = False; -- overlapped by the two patterns above</p>
+<p>Best,</p>
+<p>Sebastiaan</p>
+
+
+
+<a name="294706613"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Overlapping%20patterns%20in%20code%20export/near/294706613" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Overlapping.20patterns.20in.20code.20export.html#294706613">(Aug 22 2022 at 15:07)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Sebastiaan,</p>
+<p>The generated code indeed can contain overlapping rules and this is actually a feature of <br>
+the code generator. For example, this makes it possible to implement generic algorithms in <br>
+a modular way when data refinement in the code generator is used. In fact, the code <br>
+generator cannot decide in general whether a given pattern has been covered by all <br>
+previous equations, because it would have to know the semantics of the constructors, but <br>
+the modular architecture prevents that.</p>
+<p>The function package is also well-advised to generate overlapping simp rules. Perfect <br>
+minimisation is NP complete (Alex Krauss has a paper on that), so function definitions <br>
+would take much longer.</p>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<a name="294706632"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Overlapping%20patterns%20in%20code%20export/near/294706632" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Overlapping.20patterns.20in.20code.20export.html#294706632">(Aug 22 2022 at 15:07)</a>:</h4>
+<p>From: Sebastiaan Joosten &lt;<a href="mailto:sjcjoosten@gmail.com">sjcjoosten@gmail.com</a>&gt;<br>
+Hi Andreas,</p>
+<p>thank you for your response!</p>
+<p>it surprised me that Haskell's overlapping patterns warning had not hit me earlier. If the function package can be simplified such that it creates <em>more</em> overlapping rules, I may not have been as surprised, and I would be all for it.</p>
+<blockquote>
+<p>The function package is also well-advised to generate overlapping simp rules. Perfect minimisation is NP complete (Alex Krauss has a paper on that), so function definitions would take much longer.</p>
+</blockquote>
+<p>I don't agree with this reasoning: eagerly removing an overlapped simp rule is something else than perfect minimisation. The function package might annotate which simp rules are overlapped by all the earlier ones, such that the code generator only produces code for those that are non-overlapped. Alternatively, the function package might generate a code lemma that uses in-order if-then-else, also to avoid unnecessary blowup in code size, as illustrated by the following:</p>
+<p>fun foo where<br>
+ "foo [x] [] [] [] [] [] = True"<br>
+|"foo [] [x] [] [] [] [] = True"<br>
+|"foo [] [] [x] [] [] [] = True"<br>
+|"foo [] [] [] [x] [] [] = True"<br>
+|"foo [] [] [] [] [x] [] = True"<br>
+|"foo [] [] [] [] [] [x] = True"<br>
+|"foo _  _  _  _  _  _ = False"</p>
+<p>In any case, I suppose I should just suppress code-overlap warnings in Haskell for now.</p>
+<p>Best,</p>
+<p>Sebastiaan</p>
+
+
+
+<a name="294706680"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Overlapping%20patterns%20in%20code%20export/near/294706680" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Overlapping.20patterns.20in.20code.20export.html#294706680">(Aug 22 2022 at 15:07)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Sebastiaan,</p>
+<p>Indeed, it would be great if the sequential option in the function package produces less <br>
+redundant rules than it is doing now. In particular, as all those redundant cases show up <br>
+in the induction rule for the function, so if one uses this induction rule, one has to <br>
+prove a lot of redundant subgoals, too :-).</p>
+<p>If you have some time, feel free to look into the code. The pattern splitting is done in <br>
+src/HOL/Tools/Function/pattern_split.ML.</p>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

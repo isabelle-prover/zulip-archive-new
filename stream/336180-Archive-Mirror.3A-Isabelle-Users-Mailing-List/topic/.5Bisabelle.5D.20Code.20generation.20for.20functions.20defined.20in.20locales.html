@@ -1,0 +1,96 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Code generation for functions defined in locales · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20functions.20defined.20in.20locales.html">[isabelle] Code generation for functions defined in locales</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294075469"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20for%20functions%20defined%20in%20locales/near/294075469" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20functions.20defined.20in.20locales.html#294075469">(Aug 18 2022 at 13:18)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:peter.lammich@uni-muenster.de">peter.lammich@uni-muenster.de</a>&gt;<br>
+Hi all,</p>
+<p>I have a problem when I try to generate code from constants/functions<br>
+defined inside a locale that fixes some parameter of function type.</p>
+<p>Consider the following (synthetic) example:</p>
+<p>locale test =<br>
+  fixes a::"nat =&gt; nat"<br>
+begin<br>
+  fun test where<br>
+    "test [] = (0::nat)" |<br>
+    "test (x#xs) = a(x + test xs)"</p>
+<p>definition "c = a (7::nat)"<br>
+end</p>
+<p>(* Now I interpret this locale with some function: *)<br>
+definition "nf x = x"<br>
+interpretation t: test nf .</p>
+<p>(* And use the resulting instance in some further definitions*)<br>
+definition "some_fun l == t.c + t.test l"</p>
+<p>(* Now I want to generate code for some_fun: *)</p>
+<p>(* First try: *)<br>
+export_code some_fun in SML<br>
+*** No code equations for test.test, test.c<br>
+*** At command "export_code".</p>
+<p>(* Second try: *)<br>
+lemmas [code] = t.c_def t.test.simps<br>
+*** Partially applied constant on left hand side of equation<br>
+*** "test.c nf º<br>
+***  nf (number_nat_inst.number_of_nat<br>
+***       (Int.Bit1 (Int.Bit1 (Int.Bit1 Int.Pls))))"<br>
+*** At command "lemmas".</p>
+<p>(* Finally I had to manually insert new constants and adjust the lemmas<br>
+for the code-generator: *)<br>
+definition "t=t.test"<br>
+definition "c = t.c"</p>
+<p>lemmas [code] = t.test.simps[folded t_def]<br>
+lemmas [code] = t.c_def[folded c_def]</p>
+<p>lemmas [code unfold] = t_def[symmetric] c_def[symmetric]</p>
+<p>export_code some_fun in SML</p>
+<p>The final approach worked, but it is somewhat cumbersome to manually<br>
+insert constants for each definition and interpretation of the locale.<br>
+Is there a simpler (i.e. more automatic) way ?</p>
+<p>Regards + Many thanks in advance for any hints<br>
+  Peter</p>
+
+
+
+<a name="294075483"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20for%20functions%20defined%20in%20locales/near/294075483" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20functions.20defined.20in.20locales.html#294075483">(Aug 18 2022 at 13:18)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Peter,</p>
+<p>the bad news are that there is no direct way to accomplish code<br>
+generation from equations stemming from interpretation.  The good news<br>
+are that you can use the optional "where" part of interpretation to<br>
+manually accomplish this:</p>
+<p>locale test =<br>
+  fixes a :: "nat =&gt; nat"<br>
+begin</p>
+<p>primrec test where<br>
+    "test [] = (0::nat)" |<br>
+    "test (x#xs) = a(x + test xs)"</p>
+<p>definition "c = a (7::nat)"</p>
+<p>end</p>
+<p>definition "nf x = x"</p>
+<p>(* define constants corresponding to the local specifications *)<br>
+definition "t = test.test nf"<br>
+definition "c = test.c nf"</p>
+<p>interpretation t: test nf where<br>
+  (* give these as equations *)<br>
+  "test.test nf = t"<br>
+  and "test.c nf = c"<br>
+proof<br>
+qed (simp_all add: t_def c_def)</p>
+<p>lemmas [code] = t.c_def t.test.simps</p>
+<p>definition "some_fun l = t.c + t.test l"</p>
+<p>export_code some_fun in SML file -</p>
+<p>Hope this helps<br>
+    Florian<br>
+<a href="/user_uploads/14278/Wt4gMUJRX7pfjG_PYix6eD_J/signature.asc">signature.asc</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

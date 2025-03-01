@@ -1,0 +1,91 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Termination for ordinal-like datatypes · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Termination.20for.20ordinal-like.20datatypes.html">[isabelle] Termination for ordinal-like datatypes</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294282270"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Termination%20for%20ordinal-like%20datatypes/near/294282270" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Termination.20for.20ordinal-like.20datatypes.html#294282270">(Aug 19 2022 at 14:52)</a>:</h4>
+<p>From: Eddy Westbrook &lt;<a href="mailto:westbrook@kestrel.edu">westbrook@kestrel.edu</a>&gt;<br>
+Hi,</p>
+<p>I was wondering if someone could help me figure out an easy way to prove termination for functions over ordinal-like datatypes. What I mean by this is datatypes T where one of the constructors for T takes a function that returns type T. The classic one is the ordinals:</p>
+<p>datatype ord<br>
+  = Zero<br>
+  | Succ ord<br>
+  | Limit "(nat =&gt; ord)”</p>
+<p>My question is, what is the easiest and best way to write termination proofs for recursive functions over the type ord? Are there some mechanisms already available, or do I have to define my own inductive proposition or something similar? It looks like all the default mechanisms for proving termination rely on types that satisfy “size”, which ord does not because of the Limit constructor.</p>
+<p>For example, I want to define functions like these, which should be terminating:</p>
+<p>function ord_plus :: "ord =&gt; ord =&gt; ord"<br>
+where<br>
+  "ord_plus x Zero = x"<br>
+  | "ord_plus x (Succ y) = Succ (ord_plus x y)"<br>
+  | "ord_plus x (Limit f) = Limit (\&lt;lambda&gt; n . ord_plus x (f n))"<br>
+  by pat_completeness auto</p>
+<p>function ord_leq :: "ord ⇒ ord ⇒ bool"<br>
+where<br>
+  "ord_leq Zero x = True"<br>
+  | "ord_leq (Succ x) Zero = False" <br>
+  | "ord_leq (Succ x) (Succ y) = ord_leq x y"<br>
+  | "ord_leq (Succ x) (Limit f) = (\&lt;exists&gt; n. ord_leq (Succ x) (f n))"<br>
+  | "ord_leq (Limit f) y = (\&lt;forall&gt;n . ord_leq (f n) y)"<br>
+  by pat_completeness auto</p>
+<p>Thanks very much for any help or suggestions.<br>
+-Eddy</p>
+
+
+
+<a name="294282287"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Termination%20for%20ordinal-like%20datatypes/near/294282287" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Termination.20for.20ordinal-like.20datatypes.html#294282287">(Aug 19 2022 at 14:52)</a>:</h4>
+<p>From: René Thiemann &lt;<a href="mailto:rene.thiemann@uibk.ac.at">rene.thiemann@uibk.ac.at</a>&gt;<br>
+Dear Eddy,</p>
+<p>In your case (recursion via "nat =&gt; _") it might be best to use primrec instead of fun/function: </p>
+<p>primrec ord_plus :: "ord =&gt; ord =&gt; ord"<br>
+where<br>
+ "ord_plus x Zero = x"<br>
+ | "ord_plus x (Succ y) = Succ (ord_plus x y)"<br>
+ | "ord_plus x (Limit f) = Limit (λ n . ord_plus x (f n))"</p>
+<p>is accepted without having to prove anything.</p>
+<p>Hope this helps,<br>
+René</p>
+
+
+
+<a name="294282303"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Termination%20for%20ordinal-like%20datatypes/near/294282303" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Termination.20for.20ordinal-like.20datatypes.html#294282303">(Aug 19 2022 at 14:52)</a>:</h4>
+<p>From: Dmitriy Traytel &lt;<a href="mailto:traytel@in.tum.de">traytel@in.tum.de</a>&gt;<br>
+Hi Eddy,</p>
+<p>as René said, I also would use primrec wherever possible. However, if <br>
+you are bound to function you can prove termination by defining a <br>
+subterm relation and prove that it is wellfounded:</p>
+<p>definition "sub ≡ {(x, Succ x) | x. True} ∪ {(f n, Limit f) | n f. True}"</p>
+<p>lemma subI[intro]:<br>
+   "(x, Succ x) ∈ sub"<br>
+   "(f n, Limit f) ∈ sub"<br>
+   unfolding sub_def by blast+</p>
+<p>lemma wf_sub[simp]: "wf sub"<br>
+proof (rule wfUNIVI)<br>
+   fix P x<br>
+   assume "∀x. (∀y. (y, x) ∈ sub ⟶ P y) ⟶ P x"<br>
+   then show "P x" unfolding sub_def by (induct x) blast+<br>
+qed</p>
+<p>Both of your functions can be then proved terminating via</p>
+<p>termination by (relation "sub &lt;<em>lex</em>&gt; sub") auto</p>
+<p>Dmitriy</p>
+
+
+
+<a name="294282324"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Termination%20for%20ordinal-like%20datatypes/near/294282324" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Termination.20for.20ordinal-like.20datatypes.html#294282324">(Aug 19 2022 at 14:52)</a>:</h4>
+<p>From: Eddy Westbrook &lt;<a href="mailto:westbrook@kestrel.edu">westbrook@kestrel.edu</a>&gt;<br>
+Thanks so much for the replies; both were very helpful!</p>
+<p>-Eddy</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

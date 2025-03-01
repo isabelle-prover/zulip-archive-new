@@ -1,0 +1,103 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Strange/inconvenient behaviour of &quot;method+&quot; (r... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Strange.2Finconvenient.20behaviour.20of.20.22method.2B.22.20.28r.2E.2E.2E.html">[isabelle] Strange/inconvenient behaviour of &quot;method+&quot; (r...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294740128"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Strange/inconvenient%20behaviour%20of%20%22method%2B%22%20%28r.../near/294740128" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Strange.2Finconvenient.20behaviour.20of.20.22method.2B.22.20.28r.2E.2E.2E.html#294740128">(Aug 22 2022 at 18:00)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:lammich@in.tum.de">lammich@in.tum.de</a>&gt;<br>
+Hi all,</p>
+<p>During developing some Eisbach method, I recently encountered a very<br>
+inconvenient behaviour when chained facts are present.</p>
+<p>My Eisbach method has the general shape <br>
+    my_method = (rule rules | simp)+, <br>
+which seems quite natural to me. I always thought the semantics of this<br>
+is:<br>
+  "Try applying a rule, and if this does not succeed, simplify the<br>
+goal. Do this as long until neither applying a rule nor simplifying the<br>
+goal changes something"</p>
+<p>Now consider the following minimal example:</p>
+<p>notepad begin<br>
+  fix P Q assume R: "Q"<br>
+  have "P (True ∧ True)"<br>
+    using R<br>
+    apply (simp)+</p>
+<p>The apply step will loop forever! If I add an "apply -", i.e., <br>
+  apply - apply simp+<br>
+everything works as expected, and I get back the goal "Q ==&gt; P True". <br>
+Also, if I remove the "using R" statement, everything works as<br>
+expected. </p>
+<p>"apply my_method" has the same looping behaviour.</p>
+<p>However, if I write apply (-, simp+), as I could also do inside my<br>
+Eisbach method, it still loops.</p>
+<p>What is happening here, and how can I work around this "feature", to<br>
+get an Eisbach method that will not loop forever if chained facts are<br>
+present?</p>
+<p>Thanks in advance for any help or comments,<br>
+  Peter</p>
+
+
+
+<a name="294740322"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Strange/inconvenient%20behaviour%20of%20%22method%2B%22%20%28r.../near/294740322" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Strange.2Finconvenient.20behaviour.20of.20.22method.2B.22.20.28r.2E.2E.2E.html#294740322">(Aug 22 2022 at 18:01)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+As far as I can see on the spot, there is nothing special here, just<br>
+normal semantics of Isar proof methods: chained facts are always<br>
+inserted, even if there is a complex method expression.</p>
+<p>Aside: this is the deeper reason, why proper Isar proofs should say "by<br>
+rule simp" and not "by (rule, simp)" to make clear where facts are<br>
+included and where not (even if the facts are empty).</p>
+<p>For your Eisbach definition, you should get along with "use nothing in<br>
+simp". We specifically introduced the "use" method operator for that<br>
+situation, but it is generally useful to cleanup older tinkering with<br>
+chained facts.</p>
+<p>Makarius</p>
+
+
+
+<a name="294741102"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Strange/inconvenient%20behaviour%20of%20%22method%2B%22%20%28r.../near/294741102" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Strange.2Finconvenient.20behaviour.20of.20.22method.2B.22.20.28r.2E.2E.2E.html#294741102">(Aug 22 2022 at 18:06)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:lammich@in.tum.de">lammich@in.tum.de</a>&gt;<br>
+Hi Makarius,</p>
+<p>thanks for the pointer to the "use" method combinator. I now have</p>
+<p>use nothing in &lt; insert method_facts, (rule rules | simp)+ &gt;</p>
+<p>which seems to be the intended behaviour of my method, where chained<br>
+facts make no sense. However, I still want to write things like</p>
+<p>have ... using facts by my_method</p>
+<p>where facts just provide additional knowledge to be used by the<br>
+simplifier, but should have no special meaning for the "rule rules".<br>
+Note that rules is just a named_theorems collection here, and it makes<br>
+little sense to chain in facts specific to these rules.</p>
+<p>I'm not sure whether it would be better style to force the user to<br>
+inline any chained facts (and simply diverge if s*he forgets). <br>
+I.e. to write<br>
+  by - my_method</p>
+<p>and define my_method without a "use".</p>
+
+
+
+<a name="294741576"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Strange/inconvenient%20behaviour%20of%20%22method%2B%22%20%28r.../near/294741576" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Strange.2Finconvenient.20behaviour.20of.20.22method.2B.22.20.28r.2E.2E.2E.html#294741576">(Aug 22 2022 at 18:09)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+The last bit does not deserve the words "better style"; it looks more<br>
+like old-style facts tinkering for non-conformant proof tools.</p>
+<p>Just abstractly, a proper proof method needs to use the primary<br>
+"method_facts" argument in a sensible way: neither ignore it, nor cause<br>
+bad behaviour when chained facts are provided.</p>
+<p>You can also try an explicit facts argument for the Eisbach method<br>
+definition ("method test uses facts = ...") for the simp part.</p>
+<p>I wonder how expert users of Eisbach usually do method facts handling.<br>
+Actually, I still have this TODO item left-over from some years ago:<br>
+"Eisbach: check/clarify chained facts for method expression".</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

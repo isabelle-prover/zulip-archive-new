@@ -1,0 +1,87 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Correct handling of fixed and free variables · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Correct.20handling.20of.20fixed.20and.20free.20variables.html">[isabelle] Correct handling of fixed and free variables</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294243378"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Correct%20handling%20of%20fixed%20and%20free%20variables/near/294243378" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Correct.20handling.20of.20fixed.20and.20free.20variables.html#294243378">(Aug 19 2022 at 11:18)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+Dear list,</p>
+<p>I'm currently working on enhanced tracing capabilities in the<br>
+simplifier, and as such implement a capability to set "term<br>
+breakpoints". The idea is that the user can specify a term pattern, and<br>
+if that pattern occurs in a simplification step, certain actions are<br>
+triggered.</p>
+<p>To declare a breakpoint, I'd like to have a command (could also be an<br>
+attribute, but that is not important at this point) which works in proof<br>
+mode and parses a specified term and adds it to an internal data<br>
+structure. The usual use case could be something like</p>
+<p>have "...."<br>
+    using [[break_term "?x &gt; 0"]]</p>
+<p>The problem is how to parse the term. A naive use of <code>Syntax.read_term</code><br>
+fails because <code>?x</code> is an unknown schematic variable. On the other hand,<br>
+the @{cpat} antiquotation which seems like a good fit handles already<br>
+existing schematic variables not quite correctly:</p>
+<p>notepad<br>
+begin<br>
+  let ?x = 0<br>
+  ML_prf{*<br>
+    @{cpat "?x &gt; ?y"}<br>
+    (* produces:   <code>val it = "?y &lt; ?x": cterm</code> *)<br>
+    (* instead of: <code>val it = "?y &lt; 0": cterm</code>  *)<br>
+  *}<br>
+end</p>
+<p>To summarize the constraints: I'd like to have a <code>Proof.context</code>-aware<br>
+term parsing, which works correctly for existing schematic and locally<br>
+fixed variables. Lars Noschinski also pointed out that care needs to be<br>
+taken of these two different kinds of fixed variables:</p>
+<p>notepad begin<br>
+   { have P sorry } note A = this<br>
+   { fix P have P sorry } note B = this<br>
+end</p>
+<p>Regards<br>
+Lars</p>
+
+
+
+<a name="294243513"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Correct%20handling%20of%20fixed%20and%20free%20variables/near/294243513" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Correct.20handling.20of.20fixed.20and.20free.20variables.html#294243513">(Aug 19 2022 at 11:19)</a>:</h4>
+<p>From: Lars Noschinski &lt;<a href="mailto:noschinl@in.tum.de">noschinl@in.tum.de</a>&gt;<br>
+These are two separate issues: if we want to use schematic variables <br>
+as"holes" in the breakpoint, we need a method, whichv handles both bound <br>
+and unbound schematic variables.</p>
+<p>If on the other hand we want to use free variables for the holes then <br>
+there is this issue which variables are too be generalized.</p>
+<p>-- Lars</p>
+
+
+
+<a name="294243673"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Correct%20handling%20of%20fixed%20and%20free%20variables/near/294243673" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Correct.20handling.20of.20fixed.20and.20free.20variables.html#294243673">(Aug 19 2022 at 11:20)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+The usual way to do the latter is to specify the "eigen context" <br>
+excplicitly via some 'for' specification.</p>
+<p>The general scheme looks like this:</p>
+<p>foobar for x y z</p>
+<p>So you augment the local context by additional fixes, read/process foobar <br>
+(whatever that is exactly), and export the result into the original <br>
+context.  Thus there will be certain new schematic variables originating <br>
+from eigen-variables x y z.  This is similar to Pure quantification<br>
+!!x y z. foobar within the language of propositions, but works for <br>
+arbitrary things within some Proof.context.</p>
+<p>See for example the method "ind_cases" in Isabelle/HOL.  (Note that in <br>
+Isabelle/jEdit you can hover-click over some proof text that uses it, to <br>
+get quickly to the ML definition of it.  Or you say 'print_methods' and <br>
+hover-click over "ind_cases" in its output.)</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

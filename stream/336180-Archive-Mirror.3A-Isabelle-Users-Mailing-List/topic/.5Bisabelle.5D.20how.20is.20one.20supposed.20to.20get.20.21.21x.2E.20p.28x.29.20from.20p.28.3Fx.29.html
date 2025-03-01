@@ -1,0 +1,102 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] how is one supposed to get !!x. p(x) from p(?x) · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20how.20is.20one.20supposed.20to.20get.20.21.21x.2E.20p.28x.29.20from.20p.28.3Fx.29.html">[isabelle] how is one supposed to get !!x. p(x) from p(?x)</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294107822"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20how%20is%20one%20supposed%20to%20get%20%21%21x.%20p%28x%29%20from%20p%28%3Fx%29/near/294107822" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20how.20is.20one.20supposed.20to.20get.20.21.21x.2E.20p.28x.29.20from.20p.28.3Fx.29.html#294107822">(Aug 18 2022 at 15:16)</a>:</h4>
+<p>From: Andrei Borac &lt;<a href="mailto:zerosum42@gmail.com">zerosum42@gmail.com</a>&gt;<br>
+Ok, so I have a kind of "two-dimensional" induction that I'm trying to<br>
+do. Here is a stripped-down example that illustrates the difficulty:</p>
+<p>consts p :: "nat =&gt; nat =&gt; bool"</p>
+<p>lemma base: "(p 0 y)"<br>
+sorry (* lemma base: p 0 ?y *)</p>
+<p>lemma meta: "(p row col) ==&gt; (p (row + 1) any_col)"<br>
+sorry (* lemma meta: p ?row ?col ==&gt; p (?row + 1) ?any_col *)</p>
+<p>lemma half: "(!!col. (p row col)) ==&gt; (p (row + 1) any_col)"<br>
+sorry (* lemma half: (!!col. p ?row col) ==&gt; p (?row + 1) ?any_col *)</p>
+<p>lemma desired: "(p row col)"</p>
+<p>The base cases and inductive steps are simply "provided" using "sorry"<br>
+to keep the example simple. meta and half are basically the same thing<br>
+except in meta "col" is a meta-whatsitcalled or maybe<br>
+schematic-whatsitcalled. Now, after 3 hours of trial and error, I have<br>
+succeeded in providing the desired lemma:</p>
+<p>lemma helper: "!!row. (!!col. p row col) ==&gt; p (Suc row) col"<br>
+apply(drule half[where any_col=col])<br>
+apply(simp)<br>
+done (* lemma helper: (!!col. p ?row col) ==&gt; p (Suc ?row) ?col *)</p>
+<p>lemma desired: "(p row col)"<br>
+apply(induct row arbitrary: col)<br>
+apply(simp add: base)<br>
+apply(simp add: helper)<br>
+done (* lemma desired: p ?row ?col *)</p>
+<p>So, how is this kind of thing -supposed- to be done? Is there a way to<br>
+apply something in the main proof to get this done without a helper<br>
+lemma? I was thinking the obvious thing is change it to subgoal_tac,<br>
+but so far all my attempts have been unsuccessful. Plus, it seems like<br>
+there should be an even better way.</p>
+<p>Thanks,<br>
+-Andrei</p>
+
+
+
+<a name="294107931"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20how%20is%20one%20supposed%20to%20get%20%21%21x.%20p%28x%29%20from%20p%28%3Fx%29/near/294107931" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20how.20is.20one.20supposed.20to.20get.20.21.21x.2E.20p.28x.29.20from.20p.28.3Fx.29.html#294107931">(Aug 18 2022 at 15:17)</a>:</h4>
+<p>From: Andrei Borac &lt;<a href="mailto:zerosum42@gmail.com">zerosum42@gmail.com</a>&gt;<br>
+Ok, second attempt; I have found a more accurate way to represent the<br>
+problem. Sorry that the title is incorrect (it's p(some x) from !!x.<br>
+p(x)). Anyways, here is what is actually not working:</p>
+<p>consts f :: "nat list =&gt; nat =&gt; nat option"<br>
+consts g :: "nat list =&gt; nat =&gt; nat option"</p>
+<p>lemma False<br>
+apply(subgoal_tac "<br>
+!!context param value.<br>
+  [| !!param_any.<br>
+         f context param_any = Some value<br>
+             ==&gt; (case (g context param_any) of None =&gt; 0<br>
+                  | Some value_some =&gt; value_some) = value;<br>
+     g context param = None;<br>
+     f context param = Some value |]<br>
+  ==&gt; value = 0")<br>
+defer</p>
+<p>Resulting in the first subgoal:</p>
+<p>!!context param value.<br>
+       [| !!param_any.<br>
+             f context param_any = Some value<br>
+             ==&gt; (case g context param_any of None =&gt; 0 | Some<br>
+value_some =&gt; value_some) = value;<br>
+          g context param = None; f context param = Some value |]<br>
+       ==&gt; value = 0</p>
+<p>where all variables are green. Now it seems like setting "param_any"<br>
+to "param" should work. We know that "f" produced something and that<br>
+the case of "g" is None, so we should get value = 0, as required.<br>
+However, clarsimp will not do it (and I can't seem to be able to split<br>
+the option in my apply-style proof). What will work (or why can't it<br>
+work ...)?</p>
+<p>-Andrei</p>
+
+
+
+<a name="294107993"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20how%20is%20one%20supposed%20to%20get%20%21%21x.%20p%28x%29%20from%20p%28%3Fx%29/near/294107993" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20how.20is.20one.20supposed.20to.20get.20.21.21x.2E.20p.28x.29.20from.20p.28.3Fx.29.html#294107993">(Aug 18 2022 at 15:17)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+This is how you ca instantiate a !! hypothesis in apply style:</p>
+<p>apply(erule_tac x = "&lt;term&gt;" in meta_allE)</p>
+<p>Not pretty and not very stable under changes, but it works. I recommend<br>
+to use it only for finding a proof but rewrite it at the end (into a<br>
+structured proof).</p>
+<p>In your case there are alternatives: auto/fastsimp/force solve your goal<br>
+automatically; clarsimp is just too weak.</p>
+<p>Tobias</p>
+<p>Andrei Borac schrieb:</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

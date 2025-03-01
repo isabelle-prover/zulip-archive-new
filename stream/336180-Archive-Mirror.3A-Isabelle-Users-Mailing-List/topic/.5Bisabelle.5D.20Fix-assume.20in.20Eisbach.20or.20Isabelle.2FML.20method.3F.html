@@ -1,0 +1,116 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Fix-assume in Eisbach or Isabelle/ML method? · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Fix-assume.20in.20Eisbach.20or.20Isabelle.2FML.20method.3F.html">[isabelle] Fix-assume in Eisbach or Isabelle/ML method?</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294734632"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Fix-assume%20in%20Eisbach%20or%20Isabelle/ML%20method%3F/near/294734632" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Fix-assume.20in.20Eisbach.20or.20Isabelle.2FML.20method.3F.html#294734632">(Aug 22 2022 at 17:29)</a>:</h4>
+<p>From: Joshua Chen &lt;<a href="mailto:joshua.chen@uni-bonn.de">joshua.chen@uni-bonn.de</a>&gt;<br>
+Dear Eisbach/Isabelle/ML experts,</p>
+<p>I have a repetitive structured proof whose functionality I <br>
+would like to encapsulate as a method.<br>
+For example:</p>
+<p>notepad begin</p>
+<p>assume *: "&#928;x:A. &#928;y: B x. &#928;z: C x y. D x y <br>
+z : U"</p>
+<p>have 0: "A : U" using * by rule</p>
+<p>-- {* "B: A -&gt; U" abbreviates "!!x. x : A ==&gt; B x : U" *}<br>
+have 1: "B: A -&gt; U"<br>
+proof -<br>
+   fix x assume "x : A"<br>
+   with * have **: "&#928;y: B x. &#928;z: C x y. D x y z <br>
+: U" by rule<br>
+   then show "B x : U" by rule<br>
+qed</p>
+<p>have 2: "!!x. x : A ==&gt; C x : B x -&gt; U"<br>
+proof -<br>
+   fix x assume "x : A"<br>
+   with * have **: "&#928;y: B x. &#928;z: C x y. D x y z <br>
+: U" by rule<br>
+   fix y assume "y : B x"<br>
+   with ** have "&#928;z: C x y. D x y z : U" by rule<br>
+   then show "C x y : U" by rule<br>
+qed</p>
+<p>have 3: "!!x y. [| x : A; y : B x |] ==&gt; D x y : C x y -&gt; <br>
+U"<br>
+proof -<br>
+   fix x assume "x : A"<br>
+   with * have **: "&#928;y: B x. &#928;z: C x y. D x y z <br>
+: U" by rule<br>
+   fix y assume "y : B x"<br>
+   with ** have "&#928;z: C x y. D x y z : U" by rule<br>
+   then show "D x y: C x y -&gt; U" by rule<br>
+qed</p>
+<p>end</p>
+<p>In the above proofs, "rule" is applying one or the other <br>
+of two rules previously declared as [elim]:<br>
+Prod_form_cond1 [elim]: "!!A B. (&#928;x:A. B x : U) ==&gt; A <br>
+: U"<br>
+Prod_form_cond2 [elim]: "!!A B. (&#928;x:A. B x : U) ==&gt; <br>
+B: A -&gt; U"</p>
+<p>Given "&#928;x:T. S x : U", the basic proof pattern is <br>
+then:<br>
+Fix x, assume "x : T", and derive either "T: U" or "S x : <br>
+U" by rule. Recurse, essentially performing a <br>
+breadth-first search over a binary tree.</p>
+<p>I have tried and failed at automating this proof with <br>
+Eisbach, my difficulty is in getting it to perform the <br>
+"fix...assume" steps to instantiate a "scope" for the <br>
+variable and introduce the typing assumption.<br>
+Is there any method that emulates this? If not, how does <br>
+one go about implementing such functionality in an <br>
+Isabelle/ML tactic?</p>
+<p>Thanks very much! :)</p>
+
+
+
+<a name="294736683"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Fix-assume%20in%20Eisbach%20or%20Isabelle/ML%20method%3F/near/294736683" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Fix-assume.20in.20Eisbach.20or.20Isabelle.2FML.20method.3F.html#294736683">(Aug 22 2022 at 17:40)</a>:</h4>
+<p>From: <a href="mailto:Thomas.Sewell@data61.csiro.au">Thomas.Sewell@data61.csiro.au</a><br>
+There's some confusion here, I think.</p>
+<p>Eisbach is, to my understanding, mostly for scripting what can<br>
+be done at the method level (e.g. inside an apply (...)) step<br>
+rather than what can be done in a structured proof document<br>
+(e.g. the fix, assume statements of these proofs). So your<br>
+first step would be to "compress" these structured proofs<br>
+into unstructured ones.</p>
+<p>Re-reading the end of your message, I think it's pretty simple.<br>
+You can apply your 'elim' rules in unstructured style as<br>
+destruction rules, e.g. apply (drule Prod_form_cond1).</p>
+<p>Isabelle natively supports backtracking with ',', so the<br>
+below might just work.</p>
+<p>method try_solve = (assumption | (drule Prod_form_cond1 Prod_form_cond2, try_solve))</p>
+<p>I didn't actually test that though, try playing around with<br>
+similar things.</p>
+<p>Cheers,<br>
+    Thomas.</p>
+
+
+
+<a name="294737759"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Fix-assume%20in%20Eisbach%20or%20Isabelle/ML%20method%3F/near/294737759" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Fix-assume.20in.20Eisbach.20or.20Isabelle.2FML.20method.3F.html#294737759">(Aug 22 2022 at 17:46)</a>:</h4>
+<p>From: Joshua Chen &lt;<a href="mailto:joshua.chen@uni-bonn.de">joshua.chen@uni-bonn.de</a>&gt;<br>
+Thanks Thomas,</p>
+<p>I had indeed already tried what you suggest, using 'rule' <br>
+with the 'OF' attribute to pick up assumptions along the <br>
+way (as 'drule' doesn't do what I need it to in this <br>
+case).<br>
+This unguided search through assumptions resulted in <br>
+unifier mismatches, hence my wondering if there was a way <br>
+to direct the method to use particular assumptions.</p>
+<p>In the end I wrapped up the problematic steps in the 'try' <br>
+method provided by Eisbach_Tools and now my method works <br>
+exactly as intended :)</p>
+<p>Best wishes,<br>
+Josh</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

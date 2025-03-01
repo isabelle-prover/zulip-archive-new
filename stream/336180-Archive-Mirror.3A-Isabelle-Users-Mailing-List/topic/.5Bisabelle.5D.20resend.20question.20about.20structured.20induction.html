@@ -1,0 +1,285 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] resend question about structured induction · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20resend.20question.20about.20structured.20induction.html">[isabelle] resend question about structured induction</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294136559"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20resend%20question%20about%20structured%20induction/near/294136559" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20resend.20question.20about.20structured.20induction.html#294136559">(Aug 18 2022 at 17:41)</a>:</h4>
+<p>From: Randy Pollack &lt;<a href="mailto:rpollack@inf.ed.ac.uk">rpollack@inf.ed.ac.uk</a>&gt;<br>
+Sorry for just sending an incomplete message.</p>
+<p>In the following example (taken from<br>
+~~/src/HOL/Induct/Common_Patterns.thy) there is apparently unnecessary<br>
+duplication.</p>
+<p>lemma<br>
+ fixes n :: nat<br>
+ shows "P n" and "Q n"<br>
+proof (induct n)<br>
+ case 0 case 1<br>
+ show "P 0" sorry<br>
+next<br>
+ case 0 case 2<br>
+ show "Q 0" sorry<br>
+next<br>
+ case (Suc n) case 1<br>
+ note hyps = <code>P n</code> <code>Q n</code>              (<strong>** this line ... </strong>**)<br>
+ show "P (Suc n)" sorry<br>
+next<br>
+ case (Suc n) case 2<br>
+ note hyps = <code>P n</code> <code>Q n</code>              (<strong>** ... duplicated </strong>*)<br>
+ show "Q (Suc n)" sorry<br>
+qed</p>
+<p>I want to know how to avoid this duplication.  I have the common example</p>
+<p>lemma<br>
+assumes h:"inductiveR x" and j:"P x"<br>
+shows "Q1 x" and "Q2 x"<br>
+using h proof (induct)<br>
+  (case ...) case 1 have "P x0" by fact show "Q1 x0" ...<br>
+                case 2 have "P x0" by fact show "Q2 x0" ...</p>
+<p>I want to eliminate the duplication in the last two lines.</p>
+<p>In fact, playing with examples shows that</p>
+<p>lemma<br>
+assumes h:"inductiveR x" and j:"P x"<br>
+shows "Q1 x" and "Q2 x"<br>
+using h proof (induct)<br>
+  (case ...x0...)                  (<strong> the fact "P x0" is not known here </strong>)<br>
+         case 1 have j:"P x0" by fact<br>
+                    show "Q1 x0" proof (... j ...)<br>
+         case 2 show "Q2 x0" proof (... j ...)  (<strong> why is j in scope here? </strong>)</p>
+<p>works.  I don't understand the scoping of facts in this example.</p>
+<p>Thanks,<br>
+Randy</p>
+
+
+
+<a name="294136618"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20resend%20question%20about%20structured%20induction/near/294136618" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20resend.20question.20about.20structured.20induction.html#294136618">(Aug 18 2022 at 17:42)</a>:</h4>
+<p>From: Brian Huffman &lt;<a href="mailto:brianh@cs.pdx.edu">brianh@cs.pdx.edu</a>&gt;<br>
+On Sun, May 15, 2011 at 3:25 PM, Randy Pollack &lt;<a href="mailto:rpollack@inf.ed.ac.uk">rpollack@inf.ed.ac.uk</a>&gt; wrote:</p>
+<blockquote>
+<p>lemma<br>
+assumes h:"inductiveR x" and j:"P x"<br>
+shows "Q1 x" and "Q2 x"<br>
+using h proof (induct)<br>
+ (case ...) case 1 have "P x0" by fact show "Q1 x0" ...<br>
+               case 2 have "P x0" by fact show "Q2 x0" ...</p>
+<p>I want to eliminate the duplication in the last two lines.</p>
+</blockquote>
+<p>I think I understand your problem now. Did you mean to say, "using h j<br>
+proof (induct)" above?</p>
+<p>Here is another example adapted from HOL/Induct/Common_Patterns.thy;<br>
+I've added the extra assumption "C n" which is added to the inductive<br>
+hypothesis. At the point of "case (Suc n)", you might like to be able<br>
+to use the assumption "C (Suc n)" to derive some other facts, and use<br>
+those in both subcases 1 and 2. The problem is that the "case" command<br>
+does not assume "C (Suc n)" for you until you get all the way down to<br>
+the subcases.</p>
+<p>lemma<br>
+  fixes n :: nat<br>
+  assumes "C n"<br>
+  shows "A n ==&gt; P n"<br>
+    and "B n ==&gt; Q n"<br>
+using <code>C n</code> proof (induct n)<br>
+  case 0<br>
+  {<br>
+    case 1 note <code>A 0</code> show "P 0" sorry<br>
+  next<br>
+    case 2 note <code>B 0</code> show "Q 0" sorry<br>
+  }<br>
+next<br>
+  case (Suc n)<br>
+  note <code>A n ==&gt; C n ==&gt; P n</code><br>
+    and <code>B n ==&gt; C n ==&gt; Q n</code><br>
+  (<strong>* <code>C (Suc n)</code> has not been assumed yet at this point </strong>*)<br>
+  {<br>
+    case 1<br>
+    note <code>A (Suc n)</code> and <code>C (Suc n)</code><br>
+    show "P (Suc n)" sorry<br>
+  next<br>
+    case 2<br>
+    note <code>B (Suc n)</code> and <code>C (Suc n)</code><br>
+    show "Q (Suc n)" sorry<br>
+  }<br>
+qed</p>
+<p>I can think of two solutions, one of which you already discovered:</p>
+<blockquote>
+<p>In fact, playing with examples shows that</p>
+<p>lemma<br>
+assumes h:"inductiveR x" and j:"P x"<br>
+shows "Q1 x" and "Q2 x"<br>
+using h proof (induct)<br>
+ (case ...x0...)                  (<strong> the fact "P x0" is not known here </strong>)<br>
+        case 1 have j:"P x0" by fact<br>
+                   show "Q1 x0" proof (... j ...)<br>
+        case 2 show "Q2 x0" proof (... j ...)  (<strong> why is j in scope here? </strong>)</p>
+<p>works.  I don't understand the scoping of facts in this example.</p>
+</blockquote>
+<p>By omitting the "next" between subcases 1 and 2, Isabelle doesn't<br>
+reset the proof context, so "j" is still in scope. This technique<br>
+wouldn't work for my example above though, since when you use two<br>
+"case" commands without using "next" in between, you get a proof<br>
+context that is essentially the union of the two cases. Here the<br>
+second subcase fails because too many assumptions are in scope.</p>
+<p>lemma<br>
+  fixes n :: nat<br>
+  assumes "C n"<br>
+  shows "A n ==&gt; P n"<br>
+    and "B n ==&gt; Q n"<br>
+using <code>C n</code><br>
+proof (induct n)<br>
+  case (Suc n)<br>
+  case 1<br>
+    note <code>A (Suc n)</code> and <code>C (Suc n)</code><br>
+    show "P (Suc n)" sorry<br>
+  case 2<br>
+    note <code>C (Suc n)</code> and <code>C (Suc n)</code><br>
+    show "Q (Suc n)" (*** error because assumption <code>A (Suc n)</code> is<br>
+still in scope ***)</p>
+<p>Solution 2: If the "case" command doesn't make the necessary<br>
+assumptions early enough for you, you can always "assume" them<br>
+yourself, like this:</p>
+<p>lemma<br>
+  fixes n :: nat<br>
+  assumes "C n"<br>
+  shows "A n ==&gt; P n"<br>
+    and "B n ==&gt; Q n"<br>
+using <code>C n</code> proof (induct n)<br>
+  case 0<br>
+  {<br>
+    case 1 note <code>A 0</code> show "P 0" sorry<br>
+  next<br>
+    case 2 note <code>B 0</code> show "Q 0" sorry<br>
+  }<br>
+next<br>
+  case (Suc n)<br>
+  assume foo: "C (Suc n)"<br>
+  from foo have bar: ...<br>
+  {<br>
+    case 1<br>
+    note <code>A (Suc n)</code><br>
+    show "P (Suc n)" using bar sorry<br>
+  next<br>
+    case 2<br>
+    note <code>B (Suc n)</code><br>
+    show "Q (Suc n)" using bar sorry<br>
+  }<br>
+qed</p>
+<p>The validity of this might make a bit more sense if you remember that<br>
+the "case" command is essentially syntactic sugar for a bunch of "fix"<br>
+and "assume" commands. Whenever you do a "show" command, Isar only<br>
+requires that the assumptions in scope are a subset of the ones in the<br>
+goal you are trying to solve.</p>
+<p>Hope this helps,</p>
+<ul>
+<li>Brian</li>
+</ul>
+
+
+
+<a name="294136635"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20resend%20question%20about%20structured%20induction/near/294136635" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20resend.20question.20about.20structured.20induction.html#294136635">(Aug 18 2022 at 17:42)</a>:</h4>
+<p>From: Randy Pollack &lt;<a href="mailto:rpollack@inf.ed.ac.uk">rpollack@inf.ed.ac.uk</a>&gt;<br>
+Thanks Brian,</p>
+<p>You understood the question as I meant it.  I consider it a weakness<br>
+that the fact <code>C (Suc n)</code> is not in scope where it logically should<br>
+be.  Of the two solutions you suggest, the one I first discovered is<br>
+illogical, and the second one you point out is less comfortable for<br>
+the user because the assumption isn't checked by Isabelle at the point<br>
+it is introduced.  Due to the profusion of renamed variables under the<br>
+"case" it is easy to misstate such assumptions.</p>
+<p>Best,<br>
+Randy</p>
+
+
+
+<a name="294136771"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20resend%20question%20about%20structured%20induction/near/294136771" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20resend.20question.20about.20structured.20induction.html#294136771">(Aug 18 2022 at 17:42)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On Sun, 15 May 2011, Randy Pollack wrote:</p>
+<blockquote>
+<p>In the following example (taken from<br>
+~~/src/HOL/Induct/Common_Patterns.thy) there is apparently unnecessary<br>
+duplication.</p>
+<p>lemma<br>
+fixes n :: nat<br>
+shows "P n" and "Q n"<br>
+proof (induct n)<br>
+case 0 case 1<br>
+show "P 0" sorry<br>
+next<br>
+case 0 case 2<br>
+show "Q 0" sorry<br>
+next<br>
+case (Suc n) case 1<br>
+note hyps = <code>P n</code> <code>Q n</code>              (<strong>** this line ... </strong>**)<br>
+show "P (Suc n)" sorry<br>
+next<br>
+case (Suc n) case 2<br>
+note hyps = <code>P n</code> <code>Q n</code>              (<strong>** ... duplicated </strong>*)<br>
+show "Q (Suc n)" sorry<br>
+qed</p>
+<p>I want to know how to avoid this duplication.</p>
+</blockquote>
+<p>First of all, the boundaries of nested cases are determined by the <br>
+"induct" method.  Further refinement of this behaviour is on the TODO list <br>
+for several years, but that method has accumulated so many features <br>
+already, that it takes a long time to clear it out again.</p>
+<p>Given the current behaviour there are still many ways how to express the <br>
+proof.  The "Common_Patterns" are just some examples to explain the main <br>
+ideas.  E.g. the above duplication of "P n" and "Q n" as propositions can <br>
+be avoided by using the fact names produced by each case, i.e. "Suc", <br>
+"Suc.hyps", "Suc.prems".  You can also project from there using syntax <br>
+such as "Suc(2)" although such numbers make proofs a bit hard to read and <br>
+maintain.</p>
+<blockquote>
+<p>In fact, playing with examples shows that</p>
+<p>lemma<br>
+assumes h:"inductiveR x" and j:"P x"<br>
+shows "Q1 x" and "Q2 x"<br>
+using h proof (induct)<br>
+ (case ...x0...)                  (<strong> the fact "P x0" is not known here </strong>)<br>
+        case 1 have j:"P x0" by fact<br>
+                   show "Q1 x0" proof (... j ...)<br>
+        case 2 show "Q2 x0" proof (... j ...)  (<strong> why is j in scope here? </strong>)</p>
+<p>works.  I don't understand the scoping of facts in this example.</p>
+</blockquote>
+<p>This is another example why it is a bad idea to invent new Isar <br>
+indentation rules on the spot.  The indentation that is hard-wired into <br>
+Proof General is quite precise approximation of important semantic aspects <br>
+of the language.  In particular, the 'case' command merely augments the <br>
+context monotonically, without introducing any block structure on its own. <br>
+So no change of indentation here.</p>
+<p>I've also made a mistake many years ago in calling it 'case' in the first <br>
+place, which sounds too much like a rigid structure in corellation with <br>
+the goal state, which it isn't.</p>
+<p>To understand Isar block structure in general, you can always use { ... } <br>
+explicitly, but in practice it is usually suppressed due to the following <br>
+implicit principles -- using ( ... ) for the true internal parantheses <br>
+that do not have concrete syntax:</p>
+<p>(1) a proof body opens an extra pair of spare parentheses like this:</p>
+<p>(<br>
+        have A<br>
+        (<br>
+          proof method<br>
+            body<br>
+          qed method<br>
+        )<br>
+        )</p>
+<p>(2) concrete user commands are defined as follows:</p>
+<p>{    == ((<br>
+         }    == ))<br>
+         next == )(</p>
+<p>More precisely</p>
+<p>next == ) note nothing (</p>
+<p>which explains why you cannot push results over that boundary.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

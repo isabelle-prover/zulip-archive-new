@@ -1,0 +1,115 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Selecting from extended records · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Selecting.20from.20extended.20records.html">[isabelle] Selecting from extended records</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294320279"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Selecting%20from%20extended%20records/near/294320279" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Selecting.20from.20extended.20records.html#294320279">(Aug 19 2022 at 16:30)</a>:</h4>
+<p>From: Ferdinand Vesely &lt;<a href="mailto:csfvesely@swansea.ac.uk">csfvesely@swansea.ac.uk</a>&gt;<br>
+Dear mailing list,</p>
+<p>I'm trying to develop a theory using modular records built from smaller<br>
+records in an arbitrary way. That is, I don't want to have to commit to<br>
+the order right at the beginning by using the "+" notation for<br>
+extending records. This seems to be partly achievable but has<br>
+limitations in that, e.g., selectors are not applicable. For example, I<br>
+define the component records:</p>
+<p>record out = out :: string<br>
+  record env = env :: "(string * val) list"</p>
+<p>I can then define operations on these smaller records that carry over<br>
+to the bigger ones, e.g. a notion of composition:</p>
+<p>class composable = <br>
+    fixes compose :: "'a =&gt; 'a =&gt; 'a" (infix ";;" 60)</p>
+<p>instantiation unit :: composable<br>
+  begin<br>
+    definition compose_unit_def:<br>
+      "u1 ;; u2 = ()"<br>
+  ...</p>
+<p>instantiation out_ext :: (composable) composable<br>
+  begin<br>
+  definition compose_out_def: <br>
+    "r1 ;; r2 = <br>
+     (| out = (out r1) @ (out r2), ... = (out.more r1) ;; (out.more<br>
+  r2)  |)"<br>
+  ...</p>
+<p>instantiation env_ext :: (composable) composable<br>
+  begin<br>
+    definition compose_env_def:<br>
+      "r1 ;; r2 = ( <br>
+        if (env r1 = env r2) then<br>
+          (| env = env r2, ... |) = (env.more r1) ;; (env.more r2) |)<br>
+        else undefined)"<br>
+   ...</p>
+<p>Now I can have values of combined record types ("env out_ext" or "out<br>
+env_ext"), e.g.</p>
+<p>value "(| out = ''abc'', env = [ (''x'', v) ] |)"</p>
+<p>I can apply the overloaded operations to such values:</p>
+<p>value "(| env = [ (''x'', v) ], out = ''abc'' |) ;;<br>
+         ;; (| env = [ (''x'', v) ], out = ''def'' |)"</p>
+<p>and I can also select the first element:</p>
+<p>value "out (| out = ''abc'', env = [ (''x'', v) ] |)"</p>
+<p>However, since the selector for, e.g., env is only defined on "'a<br>
+env_scheme", I cannot apply it if env is not the first element in the<br>
+record:</p>
+<p>value "env (| out = ''abc'', env = [ (''x'', v) ] |)"</p>
+<p>Is there a way to select any element from such mix-and-match records?</p>
+<p>If this is currently not possible, is there an inherent limitation in<br>
+the underlying ML implementation of records? I've had a brief look at<br>
+"HOL/Tools/record.ML" but didn't have much time to dive into it yet.</p>
+<p>It is possible to define an overloaded selector using via type classes<br>
+(see attached theory), but this seems too much work.</p>
+<p>Alternatively, I think it would also be interesting to have a more<br>
+general record definition construct, such as:</p>
+<p>record out = ...<br>
+  record env = ...<br>
+  record big_record = out + env + ...</p>
+<p>which would have the effect of:</p>
+<p>record out = ...<br>
+  record env = out + ...<br>
+  record big_record = env + ...</p>
+<p>My example theory is attached.</p>
+<p>Kind regards,<br>
+Ferdinand<br>
+<a href="/user_uploads/14278/qFYo9vEti5XmBR9M-bsG-gIC/RecordsExample.thy">RecordsExample.thy</a></p>
+
+
+
+<a name="294320301"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Selecting%20from%20extended%20records/near/294320301" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Selecting.20from.20extended.20records.html#294320301">(Aug 19 2022 at 16:31)</a>:</h4>
+<p>From: Thomas Sewell &lt;<a href="mailto:thomas.sewell@nicta.com.au">thomas.sewell@nicta.com.au</a>&gt;<br>
+Hello Ferdinand.</p>
+<p>You have an interesting idea there. I have to warn you that interesting<br>
+ideas to improve the record package come up from time to time, and are<br>
+usually resolved to be too much work.</p>
+<p>It would be possible to use class-based polymorphism to allow all<br>
+accessors and updators to apply to all relevant record constructions no<br>
+matter what order they were constructed in. That would complicate the<br>
+formal definitions quite a bit, and the record package is already quite<br>
+complicated. There would also remain the fundamental limit that records<br>
+can only be constructed as a linear composition of record extensions,<br>
+whereas I think some users would like to be able to merge a binary pair<br>
+of record environments.</p>
+<p>It might be of interest to you to point out that Norbert Schirmer fought<br>
+with these restrictions a while ago, and came up with an approach in<br>
+which the record type, updators and accessors are simply introduced in a<br>
+locale. The locales can then be combined in any manner desired. The<br>
+final obligation (left until the proof is complete and assembled) is to<br>
+show that the hypothesised super-record, updators and accessors exists.<br>
+This only needs to be done once.</p>
+<p>I think that the code in the Isabelle repo in "src/HOL/Statespace/"<br>
+implements this, but I might be confused about that.</p>
+<p>Good luck!</p>
+<p>Cheers,<br>
+     Thomas.</p>
+<hr>
+<p>The information in this e-mail may be confidential and subject to legal professional privilege and/or copyright. National ICT Australia Limited accepts no liability for any damage caused by this email or its attachments.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

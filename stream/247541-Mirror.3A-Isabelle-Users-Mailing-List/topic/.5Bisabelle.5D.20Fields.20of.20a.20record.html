@@ -1,0 +1,67 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Fields of a record · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Fields.20of.20a.20record.html">[isabelle] Fields of a record</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="425831410"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Fields%20of%20a%20record/near/425831410" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Fields.20of.20a.20record.html#425831410">(Mar 11 2024 at 03:30)</a>:</h4>
+<p>From: Ian Hayes &lt;<a href="mailto:Ian.Hayes@uq.edu.au">Ian.Hayes@uq.edu.au</a>&gt;<br>
+We are trying to use/adapt the HOL/Hoare_Parallel theories, in <br>
+particular, RG_Syntax.<br>
+In those theories the state of a program is represented by a record.<br>
+A common requirement is for a relation that says that only the x field <br>
+of the state changes<br>
+i.e. all other fields remain the same.<br>
+If one only has two fields x and y, one can just explicitly say, y after <br>
+= y before,<br>
+but if there are many fields this become tedious.<br>
+Moreover we would like it to be generic and given an arbitrary record <br>
+type that has a field x<br>
+says that all fields other than x should be unchanged.<br>
+Or more generally, given a set of field names X, all fields other than <br>
+those in X do not change.</p>
+<p>Can anyone give us pointers as to how to approach this?<br>
+For example, do records have any way of getting the names of the fields <br>
+of a record?<br>
+Or the set of their accessor functions?</p>
+<p>Thanks in advance<br>
+Ian</p>
+
+
+
+<a name="425861629"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Fields%20of%20a%20record/near/425861629" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Fields.20of.20a.20record.html#425861629">(Mar 11 2024 at 08:51)</a>:</h4>
+<p>From: Thomas Sewell &lt;<a href="mailto:tals4@cam.ac.uk">tals4@cam.ac.uk</a>&gt;<br>
+Hi Ian.</p>
+<p>This issue has been seen before. I once considered defining some special syntax for equality modulo some fields, and decided it wasn't quite worth it. Here are some options to consider.</p>
+<p>You could phrase your property about r1 and r2 as "∃ x2. r2 = r1⦇ x := x2 ⦈" (ASCII "? x2. r2 = r1(| x := x2 |)" in case something is wrong with unicode).</p>
+<p>That existential form should work well if it ever ends up in your assumptions. Then r2 will be rewritten into an explicit update of r1 throughout your goal, and the equalities for other fields will be proven automatically.</p>
+<p>To prove this goal, or any other kind of record equality, as a conclusion, you might want to make use of the ".equality" theorem created by the record package, e.g. if your state record is called "state", have a look at "state.equality".</p>
+<p>For each field "x" of the record, the package creates an accessor constant (just called "x") and an updator called "x_update". If you want to try to define something generic for a list of field updates, you might want to try to define some combinator across the update functions.</p>
+<p>You can't enumerate all of the fields/accessors of a record as an Isabelle object, since they don't necessarily have the same type. You can fetch them all as syntax in ML code, if you want. Have a look at the interface in src/HOL/Tools/record.ML​ . I'm not sure how helpful that is, though.</p>
+<p>I hope at least one of those suggestions is useful.</p>
+<p>More broadly, I think that it's a bug that the record package defines an accessor constant with the same name as the field. We don't really want a collection of constants with names like "x" living in the global context and conflicting with variable names. I think that there should be a single constant defined with a name like "x_field", and both the accessor and updator syntax should derive from that. There are some other advantages to having a single field constant, for instance, various proofs about field updates want to use field access to pick the obvious witness value, but in the current setup this requires code or user input to relate "x_update" to "x".</p>
+<p>Good luck with it,<br>
+    Thomas.</p>
+
+
+
+<a name="425866929"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Fields%20of%20a%20record/near/425866929" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Fields.20of.20a.20record.html#425866929">(Mar 11 2024 at 09:19)</a>:</h4>
+<p>From: Alex Shkotin &lt;<a href="mailto:alex.shkotin@gmail.com">alex.shkotin@gmail.com</a>&gt;<br>
+Hi Ian</p>
+<p>Just in addition: consider using any kind of macro processing to simplify a<br>
+tedious work.</p>
+<p>Alex</p>
+<p>пн, 11 мар. 2024 г. в 06:30, Ian Hayes &lt;<a href="mailto:Ian.Hayes@uq.edu.au">Ian.Hayes@uq.edu.au</a>&gt;:</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

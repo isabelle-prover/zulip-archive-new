@@ -1,0 +1,112 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Proving termination of a recursive function · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proving.20termination.20of.20a.20recursive.20function.html">[isabelle] Proving termination of a recursive function</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294659624"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proving%20termination%20of%20a%20recursive%20function/near/294659624" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proving.20termination.20of.20a.20recursive.20function.html#294659624">(Aug 22 2022 at 11:57)</a>:</h4>
+<p>From: Michael Walker &lt;<a href="mailto:mike@barrucadu.co.uk">mike@barrucadu.co.uk</a>&gt;<br>
+Hi,</p>
+<p>I've been getting into Isabelle recently, and I have a problem with<br>
+function termination: I have a recursive data type, and a function<br>
+checking some property of it, but I'm not sure how to approach the<br>
+termination proof:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">theory</span> <span class="n">MinimalExample</span>
+<span class="kp">imports</span> <span class="n">Main</span> <span class="s">"~~/src/HOL/Library/FSet"</span> <span class="n">Map</span>
+<span class="k">begin</span>
+
+<span class="k">datatype</span> <span class="n">ThreadId</span> <span class="o">=</span> <span class="n">UserThread</span> <span class="n">nat</span>
+
+<span class="k">datatype</span> <span class="n">POR</span> <span class="o">=</span> <span class="n">POR</span> <span class="s">"ThreadId fset"</span> <span class="s">"ThreadId fset"</span> <span class="s">"ThreadId ⇀ POR"</span>
+
+<span class="kn">function</span>
+  <span class="n">por_well_formed</span> <span class="o">::</span> <span class="s">"POR ⇒ bool"</span>
+<span class="kp">where</span>
+  <span class="s">"por_well_formed por ⟷ (case por of (POR runnable todo done) ⇒</span>
+<span class="s">   ( todo |⊆| runnable</span>
+<span class="s">   ∧ dom done ⊆ fset runnable</span>
+<span class="s">   ∧ fset todo ∩ dom done = {})</span>
+<span class="s">   ∧ (∀ p ∈ ran done. por_well_formed p))"</span>
+<span class="k">by</span> <span class="n">auto</span>
+<span class="kn">termination</span> <span class="gr">sorry</span>
+
+<span class="k">end</span>
+</code></pre></div>
+<p>My informal termination argument goes like this: because POR is data,<br>
+not codata, there can't be an infinite sequence POR1 -&gt; POR2 -&gt; POR3<br>
+-&gt; ... (following the links in the map). This means that the recursive<br>
+case in por_well_formed will terminate. However, I'm not sure how to<br>
+formalise that.</p>
+<p>Any suggestions for this in particular, or termination proofs in<br>
+general, would be greatly appreciated.</p>
+
+
+
+<a name="294659684"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proving%20termination%20of%20a%20recursive%20function/near/294659684" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proving.20termination.20of.20a.20recursive.20function.html#294659684">(Aug 22 2022 at 11:57)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:eberlm@in.tum.de">eberlm@in.tum.de</a>&gt;<br>
+Just to document it for the mailing list: this question was also asked <br>
+in the #isabelle IRC channel on Freenode yesterday, and it received two <br>
+answers, one by someone called ‘int-e’ and one by me:</p>
+<p>int-e's answer was:</p>
+<p>termination<br>
+proof -<br>
+   let ?R = "{(y,POR runnable todo don) | runnable todo don y s. s ∈ range don ∧ y ∈ set_option s }"<br>
+   {<br>
+     fix P x<br>
+     assume *: "⋀x. (⋀y. (y, x) ∈ ?R ⟹ P y) ⟹ P x"<br>
+     have "P x"<br>
+       by (induct x rule: POR.induct) (auto intro: *)<br>
+   }<br>
+   then have "wf ?R" by (auto simp: wf_def)<br>
+   then show ?thesis<br>
+     by (relation ?R) (auto simp: ran_def image_def, metis)<br>
+qed</p>
+<p>It's really stupid because it's a bona fide inductive definition on the data type definition; morally it <em>is</em> primitive recursive. but the underlying well-founded relation on POR is not readily available; that's what I'm defining as ?R in the proof (or so I believe, I'd be happy to be shown wrong)</p>
+<p>My answer was:</p>
+<p>definition por_well_formed where "por_well_formed = rec_POR (λrunnable <br>
+todo done. todo |⊆| runnable ∧ dom done ⊆ fset runnable ∧ fset todo ∩ <br>
+dom done = {} ∧ (∀p ∈ ran done. snd p))" lemma por_well_formed_simps: <br>
+"por_well_formed (POR runnable todo done) ⟷ ( todo |⊆| runnable ∧ dom <br>
+done ⊆ fset runnable ∧ fset todo ∩ dom done = {}) ∧ (∀ p ∈ ran done. <br>
+por_well_formed p)" unfolding por_well_formed_def by (simp add: <br>
+dom_map_option ran_map_option o_def)</p>
+<p>int-e is correct, this is a primitively-recursive function, so the easiest way to define it is to define it as one.<br>
+The problem is that "primrec" is apparently not smart enough to figure out that your definition is primitively-recursive I just did it by hand and proved the "simp" rule separately afterwards</p>
+<p>Two more remarks:</p>
+<ol>
+<li>
+<p>your datatype is essentially an infinitely-branching tree, which means you can have potentially unbounded traversal paths in it, so there simply is no sensible "size" function for them, which makes proving termination more painful (although in this case, it can be done with relatively little effort, as shown by int-e)</p>
+</li>
+<li>
+<p>your function implicitly enforces the domain of "done" to be finite, so you could actually define a "size" function for this case, and it would be something "size (POR _ _ done) = 1 + Max (size ` ran done)". But you'd also have to add conj_cong as a fundef_cong rule or rewrite your definition with if _ then _ else in order to be able to use the fact that "done" has finite domain</p>
+</li>
+</ol>
+
+
+
+<a name="294659751"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proving%20termination%20of%20a%20recursive%20function/near/294659751" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proving.20termination.20of.20a.20recursive.20function.html#294659751">(Aug 22 2022 at 11:58)</a>:</h4>
+<p>From: Dmitriy Traytel &lt;<a href="mailto:traytel@inf.ethz.ch">traytel@inf.ethz.ch</a>&gt;<br>
+Primec supports a syntactic fragment where for nested recursion (here nesting through the function type and option) one has to use the corresponding map functions. For the function type this is “o” (which is allowed to be unfolded as well, see below) and for option this is map_option. So tuning the function’s specification a bit makes it accepted by primrec:</p>
+<p>primrec<br>
+ por_well_formed :: "POR ⇒ bool"<br>
+where<br>
+ "por_well_formed (POR runnable todo done) =<br>
+  ( todo |⊆| runnable<br>
+  ∧ dom done ⊆ fset runnable<br>
+  ∧ fset todo ∩ dom done = {}<br>
+  ∧ (∀ p. map_option por_well_formed (done p) ≠ Some False))”</p>
+<p>Then one can derive the original equation by (induct por) (auto simp: ran_def).</p>
+<p>Dmitriy</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

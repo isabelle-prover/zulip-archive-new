@@ -1,0 +1,44 @@
+[
+    {
+        "content": "<p>From: Andreas Lochbihler &lt;<a href=\"mailto:andreas.lochbihler@inf.ethz.ch\">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>\nDear all,</p>\n<p>I would like to report the exceptional behaviour of interpreting a locale inside another <br>\nlocale in Isabelle2013-1. If there is already a global interpretation of the same locale <br>\navailable, the interpretation inside the locale raises the exception DUP in table.ML. I <br>\nwould have expected that the round-up algorithm just ignores duplicate interpretations, as <br>\nit does for all other combinations of multiple interpretations in locales that I tested. <br>\nAre my expectations wrong, is this a bug or simply unsupported?</p>\n<p>Here's an example:</p>\n<p>locale foo</p>\n<p>interpretation foo .</p>\n<p>locale bar begin</p>\n<p>interpretation foo .</p>\n<p>*** exception DUP (\"<a href=\"http://Scratch.foo\">Scratch.foo</a>\", []) raised (line 358 of \"General/table.ML\")<br>\n*** At command \".\"</p>\n<p>Best,<br>\nAndreas</p>",
+        "id": 294256623,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660912827
+    },
+    {
+        "content": "<p>From: Clemens Ballarin &lt;<a href=\"mailto:ballarin@in.tum.de\">ballarin@in.tum.de</a>&gt;<br>\nThanks for reporting this.  The second interpretation should be ignored (as it will be at the global level), but apparently the code that should figure that out fails.  I did not implement interpretation in locales myself, but perhaps Florian can comment.  The stack trace is this:</p>\n<p>Exception trace - exception DUP (\"<a href=\"http://Scratch.foo\">Scratch.foo</a>\", []) raised (line 358 of \"General/table.ML\")<br>\nGeneric_Data().map(1)(1)<br>\nLocale.roundup(7)<br>\nLocale.add_registration(5)<br>\nLocal_Theory.map_first_lthy(1)-E<br>\nBasics.#&gt;(1)(1)<br>\nExpression.note_eqns_register(9)<br>\no(2)(1)<br>\nSeq.maps_results(2)(1)<br>\nSeq.append(2)copy(1)(1)<br>\nSeq.first_result(2)result(2)<br>\nSeq.first_result(2)<br>\nBasics.#&gt;(1)(1)<br>\nToplevel.end_proof(1)(1)(1)</p>\n<p>It looks like the data passed to roundup is inconsistent (or it's a plain bug in roundup, but that seem less likely since making the interpretation twice either in the global theory or the locale works).</p>\n<p>Unfortunately, there is another locale bug, the diagnostic command 'print_interps &lt;locale&gt;' doesn't seem to work anymore either, but I haven't had time to look into that yet.</p>\n<p>Clemens</p>",
+        "id": 294256785,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660912876
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nDo you have an example for that?  I did not find one looking 5min.</p>\n<p>We need to figure it if and what to do here concerning the Isabelle2013-2 <br>\nrelease, which is already the second attempt.  The release process needs <br>\nto terminate eventually.</p>\n<p>I will probably make Isabelle2013-2-RC2 in 48 hours.</p>\n<p>Makarius</p>",
+        "id": 294256797,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660912881
+    },
+    {
+        "content": "<p>From: Clemens Ballarin &lt;<a href=\"mailto:ballarin@in.tum.de\">ballarin@in.tum.de</a>&gt;<br>\nOn 25 November, 2013 21:57 CET, Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt; wrote: </p>\n<blockquote>\n<blockquote>\n<p>Unfortunately, there is another locale bug, the diagnostic command <br>\n'print_interps &lt;locale&gt;' doesn't seem to work anymore either, but I <br>\nhaven't had time to look into that yet.</p>\n</blockquote>\n<p>Do you have an example for that?  I did not find one looking 5min.</p>\n</blockquote>\n<p>locale foo begin<br>\nprint_interps foo<br>\nend</p>\n<p>should yield 'foo' not 'no interpretations'.  Likewise</p>\n<p>locale foo begin<br>\ninterpretation foo .<br>\nprint_interps foo<br>\nend</p>\n<p>which is equivalent.  (In the language of locales, entering a context is making an interpretation via an identity morphism.)</p>\n<blockquote>\n<p>We need to figure it if and what to do here concerning the Isabelle2013-2 <br>\nrelease, which is already the second attempt.  The release process needs <br>\nto terminate eventually.</p>\n</blockquote>\n<p>I don't think this is a recent regression and suggest to ignore the problem for the upcoming release.</p>\n<p>Clemens</p>",
+        "id": 294257187,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660912986
+    },
+    {
+        "content": "<p>From: Florian Haftmann &lt;<a href=\"mailto:florian.haftmann@informatik.tu-muenchen.de\">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>\nHi all,</p>\n<blockquote>\n<blockquote>\n<p>We need to figure it if and what to do here concerning the<br>\nIsabelle2013-2<br>\nrelease, which is already the second attempt.  The release process needs <br>\nto terminate eventually.</p>\n</blockquote>\n<p>I don't think this is a recent regression and suggest to ignore the problem for the upcoming release.</p>\n</blockquote>\n<p>Dito.  It is definitely not a regression.</p>\n<p>I will take care for this issue, though this might take a little time.</p>\n<p>Cheers,<br>\n    Florian<br>\n<a href=\"/user_uploads/14278/X8XgfSuPFhgbWb7plSBwX02G/signature.asc\">signature.asc</a></p>",
+        "id": 294257307,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660913035
+    },
+    {
+        "content": "<p>From: Florian Haftmann &lt;<a href=\"mailto:florian.haftmann@informatik.tu-muenchen.de\">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>\nHi Clemens,</p>\n<p>I have done an analysis, and it seems to me that the critical spot is</p>\n<blockquote>\n<p>fun init name thy =<br>\n  activate_all name thy Element.init (Morphism.transfer_morphism o Context.theory_of)<br>\n    (empty_idents, Context.Proof (Proof_Context.init_global thy))<br>\n  |-&gt; Idents.put |&gt; Context.proof_of;</p>\n</blockquote>\n<p>Using »empty_idents«, potentially pre-existing idents are chased away,<br>\nwhereas registrations are taken over from the initial background theory.</p>\n<p>This is no problem as long as<br>\na) no further registrations are added (as in »interpret«)<br>\nb) the resulting target context is not used to setup further<br>\ninterpretations (which would not occur prior to Isabelle2013-1)</p>\n<p>I suggest to maintain the set of identifiers from the initial context, e.g.</p>\n<blockquote>\n<p>fun init name thy =<br>\n  let<br>\n    val context = Context.Proof (Proof_Context.init_global thy);<br>\n    val marked = Idents.get context;<br>\n    val (marked', context') = activate_all name thy Element.init<br>\n      (Morphism.transfer_morphism o Context.theory_of) (empty_idents, context)<br>\n  in<br>\n    context'<br>\n    |&gt; Idents.put (merge_idents (marked, marked'))<br>\n    |&gt; Context.proof_of<br>\n  end;</p>\n</blockquote>\n<p>I have glimpsed this pattern from roundup itself.</p>\n<p>I did an experimental plausibility check which exhibited no problems.<br>\nThe only point of manual intervention is in</p>\n<p><a href=\"http://sourceforge.net/p/afp/code/ci/ecad5b18ca0edd5d3f3d257d56a1aff2b2ac0a1b/tree/thys/Launchbury/HSem.thy\">http://sourceforge.net/p/afp/code/ci/ecad5b18ca0edd5d3f3d257d56a1aff2b2ac0a1b/tree/thys/Launchbury/HSem.thy</a></p>\n<p>the »interpret subpcpo ?S by (rule subpcpo_fjc)«, which explicitly<br>\nrelied on re-interpretation of the fragment subpcpo_syn to obtain a<br>\nparticular specialized syntax; but this fragment is already shadowed by<br>\na global schematic interpretation »interpretation subpcpo_syn S for S.« in</p>\n<p><a href=\"http://sourceforge.net/p/afp/code/ci/ecad5b18ca0edd5d3f3d257d56a1aff2b2ac0a1b/tree/thys/Launchbury/HOLCF-Set.thy\">http://sourceforge.net/p/afp/code/ci/ecad5b18ca0edd5d3f3d257d56a1aff2b2ac0a1b/tree/thys/Launchbury/HOLCF-Set.thy</a></p>\n<p>(sorry for not giving direct links, but SF does not seem to support this).</p>\n<p>Touching such a fundamental thing, I would kindly ask for your opinion<br>\nwhether I should push this in that shape or you know about further<br>\nissues which have to be taken care of.</p>\n<p>Thanks and all the best,<br>\n    Florian<br>\n<a href=\"/user_uploads/14278/dFX6GaIWxMWORRMeGMJCj_tZ/signature.asc\">signature.asc</a></p>",
+        "id": 294259815,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660913957
+    },
+    {
+        "content": "<p>From: Clemens Ballarin &lt;<a href=\"mailto:ballarin@in.tum.de\">ballarin@in.tum.de</a>&gt;<br>\nHallo, Florian,</p>\n<p>thank you for the analysis.  I have looked at this more closely now and, yes, I believe this is the correct fix.  Please go ahead and push.</p>\n<p>Clemens</p>",
+        "id": 294260468,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660914183
+    }
+]

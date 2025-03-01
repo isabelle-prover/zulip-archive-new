@@ -1,0 +1,85 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Question about autoref · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Question.20about.20autoref.html">[isabelle] Question about autoref</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294700735"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Question%20about%20autoref/near/294700735" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Question.20about.20autoref.html#294700735">(Aug 22 2022 at 14:38)</a>:</h4>
+<p>From: Giuliano Losa &lt;<a href="mailto:giuliano@losa.fr">giuliano@losa.fr</a>&gt;<br>
+Hello,<br>
+I would like to use AFP/Collections, monadic refinement, and autoref to<br>
+generate code that computes the sum of all values in a map, as follows:</p>
+<p>theory Scratch<br>
+  imports Main "$AFP/Collections/Refine_Dflt"<br>
+begin</p>
+<p>definition test_spec :: "(nat ⇀ nat) ⇒ nat nres"<br>
+  where "test_spec m ≡ SPEC (λ n . n = (∑ x ∈ (dom m) . the (m x)))"</p>
+<p>definition test :: "(nat ⇀ nat) ⇒ nat nres"<br>
+  where "test m ≡ FOREACH (dom m) (λ x r . RETURN (the (m x)+r)) 0"</p>
+<p>lemma test_correct:<br>
+  assumes "finite (dom m)" shows "test m ≤ test_spec m"<br>
+  using assms unfolding test_def test_spec_def<br>
+  apply -<br>
+  apply (refine_vcg FOREACH_rule[where I="λit r . r = (∑ x ∈ (dom m -<br>
+it) . the (m x))"])<br>
+    apply (auto simp add:it_step_insert_iff)<br>
+  done</p>
+<p>schematic_goal test_impl:<br>
+  assumes [autoref_rules]: "(r,m)∈⟨nat_rel,nat_rel⟩dflt_rm_rel"<br>
+  shows "(RETURN ?c, test m) ∈ ⟨nat_rel⟩nres_rel"<br>
+  unfolding test_def<br>
+  apply (autoref_monadic(trace)) (* phase id_op fails *)<br>
+  oops<br>
+end</p>
+<p>I did not find any map-interface operation that corresponds to dom,<br>
+which probably explains why id_op fails. But, I do not see how to make<br>
+it work otherwise. Can anybody suggest how I could do this (I am using<br>
+Isabelle2016-1-RC2 and afp-devel)? Is iterating over a map with FOREACH<br>
+not supported by autoref?</p>
+<p>Thanks,<br>
+Giuliano<br>
+<a href="/user_uploads/14278/DOerXunCt4lBY73JgKxi_4ux/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294700752"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Question%20about%20autoref/near/294700752" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Question.20about.20autoref.html#294700752">(Aug 22 2022 at 14:38)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:lammich@in.tum.de">lammich@in.tum.de</a>&gt;<br>
+Hi Giuliano,</p>
+<p>you can iterate over the set of key-value pairs of a map, using<br>
+map_to_set. Find your modified example below.</p>
+<p>Best,<br>
+  Peter</p>
+<p>definition test_spec :: "(nat ⇀ nat) ⇒ nat nres"<br>
+  where "test_spec m ≡ SPEC (λ n . n = (∑ x ∈ (dom m) . the (m x)))"</p>
+<p>definition test :: "(nat ⇀ nat) ⇒ nat nres"<br>
+  where "test m ≡ FOREACH (map_to_set m) (λ (k,v) r . RETURN (v+r)) 0"</p>
+<p>lemma test_correct:<br>
+  assumes "finite (dom m)" shows "test m ≤ test_spec m"<br>
+  using assms unfolding test_def test_spec_def<br>
+  apply -<br>
+  apply (refine_vcg FOREACH_rule[where <br>
+          I="λit r . r = (∑ (k,v) ∈ (map_to_set m - it) . v)"])<br>
+  apply (auto simp add:it_step_insert_iff finite_map_to_set)<br>
+  apply (rule sum.reindex_cong[where l="λk. (k,the (m k))"])<br>
+  apply (auto simp: map_to_set_def)<br>
+  done</p>
+<p>schematic_goal test_impl:<br>
+  assumes [autoref_rules]: "(r,m)∈⟨nat_rel,nat_rel⟩dflt_rm_rel"<br>
+  shows "(RETURN ?c, test m) ∈ ⟨nat_rel⟩nres_rel"<br>
+  unfolding test_def<br>
+  (<em>supply [[autoref_trace_failed_id]]  (</em>enable id-op tracing*) *)<br>
+  apply (autoref_monadic(trace)) (* phase id_op fails *)<br>
+  done<br>
+end</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

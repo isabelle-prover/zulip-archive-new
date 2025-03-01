@@ -1,0 +1,300 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Code generation &amp; type classes - inefficient code · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20.26.20type.20classes.20-.20inefficient.20code.html">[isabelle] Code generation &amp; type classes - inefficient code</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294757327"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20%26%20type%20classes%20-%20inefficient%20code/near/294757327" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20.26.20type.20classes.20-.20inefficient.20code.html#294757327">(Aug 22 2022 at 19:54)</a>:</h4>
+<p>From: Dominique Unruh &lt;<a href="mailto:unruh@ut.ee">unruh@ut.ee</a>&gt;<br>
+Hello,</p>
+<p>Generation of ML code from Isabelle mimics type classes by passing <br>
+around explicit records containing the functions specific to the type class.</p>
+<p>E.g., you might get a function "inner_product A_ a b = map (#times A_) <br>
+(zip a b)" (roughly).</p>
+<p>This works well, however, I noticed that the resulting code can be very <br>
+inefficient because the same records are constructed over and over. For <br>
+example, the term "[enumhd,enumhd,enumhd,enumhd,enumhd,enumhd] :: <br>
+(bool<em>bool</em>bool<em>bool</em>bool) list" (where enumhd is some constant we <br>
+defined using typeclass enum, the details are immaterial here) generates <br>
+the code</p>
+<p>val code = [ enumhd<br>
+      (Enum.enum_prod Enum.enum_bool<br>
+        (Enum.enum_prod Enum.enum_bool<br>
+          (Enum.enum_prod Enum.enum_bool<br>
+            (Enum.enum_prod Enum.enum_bool Enum.enum_bool)))),</p>
+<p>... repeated six times ... ]</p>
+<p>(Demonstrated in the attached Scratch.thy)</p>
+<p>The effect of this is two-fold:</p>
+<p>* The generated code becomes much longer and thus compiles potentially<br>
+    very slowly (I had a term in my application that was ~2500 lines of<br>
+    code, and became ~150 lines after removing the repeated type class<br>
+    generation code. The 2500 lines took ~40-60 seconds to compile which<br>
+    means that a simple "by eval" takes that long.)</p>
+<p>* A runtime overhead is incurred. E.g., the Enum.enum_prod function<br>
+    above is internally producing products of lists over an over again.<br>
+    This could be prohibitive if the Enum.enum_prod (or similar) occurs<br>
+    in a function that is used in a loop.</p>
+<p>I would have expected code like this:</p>
+<p>val code = let val enum1 = (Enum.enum_prod Enum.enum_bool<br>
+            (Enum.enum_prod Enum.enum_bool<br>
+              (Enum.enum_prod Enum.enum_bool<br>
+                (Enum.enum_prod Enum.enum_bool Enum.enum_bool))))</p>
+<p>val enumhd1 = enumhd enum1</p>
+<p>in [enumhd1,enumhd1,enumhd1,enumhd1,enumhd1,enumhd1] end</p>
+<p>This would compute every class only once (and if enumhd creates <br>
+typeclasses, this would also be done only once during the computation of <br>
+enumhd1).</p>
+<p>(The general case would be: "f::args=&gt;result" becomes "fun f <br>
+&lt;typeclasses&gt; = let &lt;compute type classes and instantiate constants&gt; in <br>
+fn args =&gt; &lt;code&gt; end". This way, invoking "val f1 = f &lt;typeclasses&gt;" <br>
+already computes all recursively type classes, and then "f1 args" can be <br>
+used several times without recomputing the type classes.)</p>
+<p>My questions:</p>
+<p>* Is there a way to tell the code generator to do things more<br>
+    efficiently? (E.g., the way I described.)</p>
+<p>* Perhaps future versions of the code generator could do this? (I<br>
+    don't know if the code generator is still being developed.)</p>
+<p>Best wishes,<br>
+Dominique.<br>
+<a href="/user_uploads/14278/4yQo3xTPUSlhVGLHobK_1Ldi/Scratch.thy">Scratch.thy</a></p>
+
+
+
+<a name="294757401"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20%26%20type%20classes%20-%20inefficient%20code/near/294757401" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20.26.20type.20classes.20-.20inefficient.20code.html#294757401">(Aug 22 2022 at 19:55)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Dominique,</p>
+<p>Am 21.05.19 um 12:08 schrieb Dominique Unruh:</p>
+<blockquote>
+<p>Generation of ML code from Isabelle mimics type classes by passing<br>
+around explicit records containing the functions specific to the type<br>
+class.</p>
+<p>This works well, however, I noticed that the resulting code can be very<br>
+inefficient because the same records are constructed over and over.</p>
+</blockquote>
+<p>[...]</p>
+<blockquote>
+<p>My questions:</p>
+<p>* Is there a way to tell the code generator to do things more<br>
+   efficiently? (E.g., the way I described.)</p>
+</blockquote>
+<p>one approach is to provide explicit local definitions in code equations,<br>
+e. g.</p>
+<p>lemma [code]:<br>
+  ‹f x = let e = (enum :: …) in …›</p>
+<p>Another possibility is to provide monomorphic abbreviations, e. g.</p>
+<p>definition min_int :: ‹int =&gt; int =&gt; int›<br>
+  [code_abbrev]: "min_int = min"</p>
+<p>lemma [code]:<br>
+  "min_int k l = …"</p>
+<p>Or a combination of both.  It depends on the context what is actually<br>
+applicable.</p>
+<blockquote>
+<p>* Perhaps future versions of the code generator could do this? (I<br>
+   don't know if the code generator is still being developed.)</p>
+</blockquote>
+<p>Ocassionally there are still things happening.  But not with a big<br>
+agenda in mind.</p>
+<p>Hope this helps,<br>
+    Florian<br>
+<a href="/user_uploads/14278/JHXnvo-4L2qwwxVRNV62jkGp/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294757778"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20%26%20type%20classes%20-%20inefficient%20code/near/294757778" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20.26.20type.20classes.20-.20inefficient.20code.html#294757778">(Aug 22 2022 at 19:57)</a>:</h4>
+<p>From: Dominique Unruh &lt;<a href="mailto:unruh@ut.ee">unruh@ut.ee</a>&gt;<br>
+Hi Florian,</p>
+<p>thank you for your suggestions. Unfortunately, after a lot of <br>
+experiments I conclude that both approaches do not work in my case:</p>
+<blockquote>
+<p>lemma [code]:<br>
+   ‹f x = let e = (enum :: …) in …›</p>
+</blockquote>
+<p>I have written a conversation that does this automatically and added it <br>
+to the codegeneration preprocessor. While that works (meaning, the code <br>
+resulting code, by manual inspection, has less duplication), it does not <br>
+help if the subgoal that is to be solved by "by eval" is large and thus <br>
+contains a lot of recomputation of type classes. (In my case, the <br>
+subgoal is the result from running the simplifier and there is no way to <br>
+manually make a better subgoal.) I tried applying the aforementioned <br>
+conversion directly to the subgoal (via "apply (tactic ...)") but <br>
+applied to that eval just fails without error message (which is <br>
+surprising since the goal before conversion could be solved by eval, <br>
+albeit slowly). (I also tried "by normalization" which, to my surprise, <br>
+gives an exception related to the allocation of a string above the <br>
+maximum supported size.)</p>
+<blockquote>
+<p>definition min_int :: ‹int =&gt; int =&gt; int›<br>
+   [code_abbrev]: "min_int = min"</p>
+<p>lemma [code]:<br>
+   "min_int k l = …"<br>
+This approach does not work because there are a lot of different types <br>
+that occur. (I am working with typed matrices, so types would be, e.g., <br>
+"('a,'b) bounded" (standing for bounded operator) with 'a,'b ranging <br>
+over a number of different types like bit, bit<em>bit, bit</em>(bit*bit), <br>
+(bit<em>bit)</em>bit etc. even within a single calculation (tensor products are <br>
+involved).</p>
+</blockquote>
+<p>Overall, my conclusion is that I see nothing that can be done on the <br>
+user level. To the best of my understanding, a change in the serializer <br>
+would be the best solution (because an inspection of the thingol values <br>
+that are produced do not compute the type class instances, this happens <br>
+after serialization). I assume that these inefficiencies will crop up <br>
+whenever whenever the enum type class is used, although possibly not to <br>
+as extreme a degree as in my case. (It may be that most use cases will <br>
+therefore not suffer from this.)</p>
+<p>Best wishes,<br>
+Dominique.</p>
+<p>Best wishes,<br>
+Dominique.</p>
+<p>On 5/21/19 10:36 PM, Florian Haftmann wrote:</p>
+<blockquote>
+<p>Hi Dominique,</p>
+<p>Am 21.05.19 um 12:08 schrieb Dominique Unruh:</p>
+<blockquote>
+<p>Generation of ML code from Isabelle mimics type classes by passing<br>
+around explicit records containing the functions specific to the type<br>
+class.</p>
+<p>This works well, however, I noticed that the resulting code can be very<br>
+inefficient because the same records are constructed over and over.<br>
+[...]</p>
+</blockquote>
+<blockquote>
+<p>My questions:</p>
+<p>* Is there a way to tell the code generator to do things more<br>
+    efficiently? (E.g., the way I described.)<br>
+one approach is to provide explicit local definitions in code equations,<br>
+e. g.</p>
+</blockquote>
+<p>lemma [code]:<br>
+   ‹f x = let e = (enum :: …) in …›</p>
+<p>Another possibility is to provide monomorphic abbreviations, e. g.</p>
+<p>definition min_int :: ‹int =&gt; int =&gt; int›<br>
+   [code_abbrev]: "min_int = min"</p>
+<p>lemma [code]:<br>
+   "min_int k l = …"</p>
+<p>Or a combination of both.  It depends on the context what is actually<br>
+applicable.</p>
+<blockquote>
+<p>* Perhaps future versions of the code generator could do this? (I<br>
+    don't know if the code generator is still being developed.)<br>
+Ocassionally there are still things happening.  But not with a big<br>
+agenda in mind.</p>
+</blockquote>
+<p>Hope this helps,<br>
+  Florian<br>
+</p>
+</blockquote>
+
+
+
+<a name="294758031"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20%26%20type%20classes%20-%20inefficient%20code/near/294758031" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20.26.20type.20classes.20-.20inefficient.20code.html#294758031">(Aug 22 2022 at 19:59)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Dominique,</p>
+<p>I was not aware that you are using the eval method here.</p>
+<p>Maybe something can be done by avoiding enum somehow altogether; is your<br>
+specification somewhere available for inspection?</p>
+<p>Cheers,<br>
+    Florian<br>
+<a href="/user_uploads/14278/fGaTeb6cJmbMbItWNtutcUzm/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294758118"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20%26%20type%20classes%20-%20inefficient%20code/near/294758118" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20.26.20type.20classes.20-.20inefficient.20code.html#294758118">(Aug 22 2022 at 19:59)</a>:</h4>
+<p>From: Dominique Unruh &lt;<a href="mailto:unruh@ut.ee">unruh@ut.ee</a>&gt;<br>
+Hi Florian,</p>
+<p>sorry, I wasn't clear about my use of eval...</p>
+<p>Yes, the code is available on GitHub. But it is part of a rather complex <br>
+whole.</p>
+<p>The repository is <a href="https://github.com/dominique-unruh/qrhl-tool">https://github.com/dominique-unruh/qrhl-tool</a>, the most <br>
+recent commit (6978604) shows the problem.</p>
+<p>The file with the problematic eval is examples/Teleport_Terse.thy <br>
+(besides others).</p>
+<p>The types on which I operate (('a,'b) Bounded and 'a linear_space) are <br>
+defined in Bounded_Operators.thy and Complex_Inner_Product.thy, <br>
+respectively (in the submodule isabelle-thys/Bounded_Operators).</p>
+<p>Those types represent bounded operators from Hilbert space 'a to Hilbert <br>
+space 'b, and closed subspaces of 'a, respectively. Furthermore, a <br>
+concrete Hilbert space is 'a ell2 (for any type 'a), the type of square <br>
+summable functions 'a=&gt;complex.</p>
+<p>This is the general setting. In the specific case where 'a,'b are finite <br>
+(more specifically, enum), ('a ell2,'b ell2) Bounded can be represented <br>
+by matrices (and 'a ell2 subspace as a span of vectors).  For this <br>
+specific case, I developed the theory QRHL_Code.thy to automate <br>
+computations in this finite case (using the matrix code from <br>
+AFP/Jordan_Normal_Form under the hood). Since the types Bounded and <br>
+linear_space are not just for the finite case but a general theory of <br>
+Hilbert spaces (and similar), I cannot replace them by something simpler <br>
+just for the sake of code generation (e.g., the goal in <br>
+Teleport_Terse.thy is a verification condition that arises from the <br>
+semantics of a quantum language).</p>
+<p>The line "apply (simp add: prepare_for_code)" rewrites the verification <br>
+condition (which is not directly computable because it refers to <br>
+operators operating on variables in an infinite-dimensional quantum <br>
+memory) into an expression involving only operators on finite <br>
+dimensional Hilbert spaces. Unfortunately, this rewriting leads to a <br>
+very large term because a lot of auxiliary operators are introduced to <br>
+"move" the applied operations to the right quantum variables (operators <br>
+for swapping registers and for "doing associativity").</p>
+<p>The resulting eval then struggles with a very large term. But most of <br>
+the runtime for compiling and running the code actually comes from the <br>
+duplication. (This I know because I tried generating the code for that <br>
+subgoal using export_code, and then edited the code manually to avoid <br>
+duplications, and the result was much shorter and faster.)</p>
+<p>I have tried the following solutions:</p>
+<p>* Writing simplification rules that rewrite the monster goal into one<br>
+    that directly uses only the operations from AFP/Jordan_Normal_Form<br>
+    (i.e., direct matrix operations). That is, I don't have any code<br>
+    equations for Bounded and linear_space any more. I committed this in<br>
+    branch experiment-code-rewrite. Unfortunately, this leads to a term<br>
+    that contains lots of enum-constructions again, and running eval on<br>
+    that term takes ages (or doesn't terminate). Also, even if that<br>
+    approach would work, it is somewhat unsatisfactory because it means<br>
+    that, if the enduser of my theories writes a new definition of a<br>
+    function involving operators (e.g., definition square x = x * x),<br>
+    then they have to also add a simplification rule for expanding it.<br>
+    The automatic "[code]" that is part of the definition command won't<br>
+    work.</p>
+<p>* I wrote a conversion that removed duplications from terms (using<br>
+    let) and applied it to the monster subgoal. I committed this in<br>
+    branch experiment-code-hacks. This has two problems: First, the code<br>
+    does not get much better because I can only avoid duplication it the<br>
+    same constant is reused, but not if different constants use the same<br>
+    type class. Second, it doesn't work: "by eval" fails without giving<br>
+    an error message (even though before applying the conversion, by<br>
+    eval succeeded). And "by normalization" (which is usually a goto<br>
+    point for debugging failing "by eval"s) fails with "exception Size<br>
+    raised (line 171 of "./basis/LibrarySupport.sml")" which if I am not<br>
+    mistaken, means that it tries to allocate a very large string.</p>
+<p>Best wishes,<br>
+Dominique.</p>
+
+
+
+<a name="294758136"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20%26%20type%20classes%20-%20inefficient%20code/near/294758136" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20.26.20type.20classes.20-.20inefficient.20code.html#294758136">(Aug 22 2022 at 20:00)</a>:</h4>
+<p>From: Dominique Unruh &lt;<a href="mailto:unruh@ut.ee">unruh@ut.ee</a>&gt;<br>
+A few things I forgot to mention:</p>
+<p>* There is a lot of Scala code etc in that repository, but for the<br>
+    problem at hand, only the Isabelle theories are relevant (in<br>
+    isabelle-thys, isabelle-thys/Bounded_Operators, examples).</p>
+<p>* The root of the repository contains a ROOTS file that can be used to<br>
+    open all those theories in Isabelle/jEdit.</p>
+<p>* The theories assume Isabelle2019, and AFP should be configured.<br>
+    (Tested with RC4)</p>
+<p>Best wishes,<br>
+Dominique.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

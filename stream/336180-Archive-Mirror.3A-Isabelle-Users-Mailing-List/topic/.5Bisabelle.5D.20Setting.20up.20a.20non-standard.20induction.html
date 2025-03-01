@@ -1,0 +1,113 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Setting up a non-standard induction · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Setting.20up.20a.20non-standard.20induction.html">[isabelle] Setting up a non-standard induction</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294057233"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Setting%20up%20a%20non-standard%20induction/near/294057233" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Setting.20up.20a.20non-standard.20induction.html#294057233">(Aug 18 2022 at 11:28)</a>:</h4>
+<p>From: Peter Chapman &lt;<a href="mailto:pc@cs.st-and.ac.uk">pc@cs.st-and.ac.uk</a>&gt;<br>
+Hi</p>
+<p>I wish to prove a theorem that uses induction based on a pair of  <br>
+natural numbers.  To make this concrete, I have that</p>
+<p>wf (less_than &lt;<em>lex</em>&gt; less_than)</p>
+<p>and then I have proved the induction scheme</p>
+<p>lemma my_wf_induct_pair:<br>
+  assumes    b: "/\x. [| /\y. ((fst y,snd y),(fst x,snd x))<br>
+                                     \&lt;in&gt; (less_than &lt;<em>lex</em>&gt;  <br>
+less_than) -&gt; P y |] =&gt; P x"<br>
+  shows "P x"<br>
+(proof omitted)<br>
+done</p>
+<p>Now, in the lemma I wish to prove, I have two natural numbers, one of  <br>
+which is computed using a function form =&gt; nat called "depth", and the  <br>
+other which is the sum of two other natural numbers, n and m.  So, I  <br>
+wrote</p>
+<p>lemma cutAdmissibility:<br>
+fixes A :: "form"<br>
+   and n m :: "nat"<br>
+assumes a: "Gam =&gt;* A at n" "Gam + {#A#} =&gt;* C at m"<br>
+shows "\&lt;exists&gt; k. Gam =&gt;* C at k"<br>
+using a<br>
+proof (induct "depth A" "n+m+1" arbitrary: Gam C rule:  <br>
+my_wf_induct_pair)</p>
+<p>but I get the error message</p>
+<p>*** Ill-typed instantiation:<br>
+***   depth A :: nat<br>
+*** At command "proof".</p>
+<p>How do I get Isabelle to do the induction based on the lexicographic  <br>
+path ordering of (depth A, n+m+1)?  I've tried putting</p>
+<p>proof (induct ("depth A",n+m+1) arbitrary : Gam C  <br>
+rule:,my_wf_induct_pair)</p>
+<p>but then I get a "bad argument" error.</p>
+<p>Many thanks</p>
+<p>Peter</p>
+
+
+
+<a name="294057379"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Setting%20up%20a%20non-standard%20induction/near/294057379" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Setting.20up.20a.20non-standard.20induction.html#294057379">(Aug 18 2022 at 11:29)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+This fails because the induction priciple is only about a single argument <br>
+(a nat pair), not two individual nats.</p>
+<p>Here is my version of the induction principle:</p>
+<p>abbreviation<br>
+  less_prod_nat  (infix "&lt;&lt;" 50) where<br>
+  "p &lt;&lt; q == (p, q) : less_than &lt;<em>lex</em>&gt; less_than"</p>
+<p>lemma nat_prod_induct [case_names less]:<br>
+  fixes x y :: nat<br>
+  assumes induct_step: "!!x y. (!!u v. (u, v) &lt;&lt; (x, y) ==&gt; P u v) ==&gt; P x y"<br>
+  shows "P x y"<br>
+proof -<br>
+  have "wf (less_than &lt;<em>lex</em>&gt; less_than)" by blast<br>
+  then show ?thesis<br>
+  proof (induct p == "(x, y)" arbitrary: x y)<br>
+    case (less p)<br>
+    show "P x y"<br>
+    proof (rule induct_step)<br>
+      fix u v<br>
+      assume "(u, v) &lt;&lt; (x, y)"<br>
+      with less show "P u v" by simp<br>
+    qed<br>
+  qed<br>
+qed</p>
+<p>This may already serve as an example how to deal with tricky inductions in <br>
+general (see also src/HOL/Induct/Common_Patterns.thy for further <br>
+patterns).  The idea is to represent the pair p as a concrete expression <br>
+"(x, y)" for arbitrary x and y, and pass this information through the <br>
+induction.  In the body, the "less" case (which is the only case of the <br>
+induction scheme) will hold all this information, although in a slightly <br>
+crude form involving explicit equalities again.  The Simplifier manages to <br>
+reduce this in the final step, towards a clean result.</p>
+<p>Here is an example application of the above rule:</p>
+<p>lemma<br>
+  fixes a :: 'a<br>
+    and f g :: "'a =&gt; nat"<br>
+  assumes "A (f a) (g a)"<br>
+  shows "P (f a) (g a)"<br>
+using assms<br>
+proof (induct x == "f a" y == "g a" arbitrary: a rule: nat_prod_induct)<br>
+  case (less x y)<br>
+  then have "!!b. A (f b) (g b) ==&gt;<br>
+      (f b, g b) &lt;&lt; (x, y) ==&gt; P (f b) (g b)"<br>
+    by simp<br>
+  note <code>x = f a</code> and <code>y = g a</code><br>
+  note <code>A (f a) (g a)</code><br>
+  show "P (f a) (g a)" sorry<br>
+qed</p>
+<p>The best way of spelling out the body of an induction proof depends a <br>
+little on your particular application.  Above the raw constituents are <br>
+presented in a reasonably digestible form.  At some point the "induct" <br>
+proof method might get smarter in taking care of equational reductions <br>
+without requiring the above "simp" steps.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

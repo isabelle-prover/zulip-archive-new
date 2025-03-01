@@ -1,0 +1,273 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] How to access a locale type parameter in a quo... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20How.20to.20access.20a.20locale.20type.20parameter.20in.20a.20quo.2E.2E.2E.html">[isabelle] How to access a locale type parameter in a quo...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294760244"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20How%20to%20access%20a%20locale%20type%20parameter%20in%20a%20quo.../near/294760244" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20How.20to.20access.20a.20locale.20type.20parameter.20in.20a.20quo.2E.2E.2E.html#294760244">(Aug 22 2022 at 20:13)</a>:</h4>
+<p>From: Wolfgang Jeltsch &lt;<a href="mailto:wolfgang-it@jeltsch.info">wolfgang-it@jeltsch.info</a>&gt;<br>
+Hi!</p>
+<p>Consider the following attempt of a locale definition:</p>
+<p>locale example =<br>
+      fixes R :: "['a, 'a] ⇒ bool"<br>
+      assumes is_equivalence: "equivp R"<br>
+    begin</p>
+<p>quotient_type Q = 'a / R</p>
+<p>end</p>
+<p>Isabelle doesn’t accept the use of the type variable <code>'a</code> in the<br>
+quotient type definition, although it does accept referring to <code>'a</code> in<br>
+types. How can I define a quotient type for the type <code>'a</code>?</p>
+<p>All the best,<br>
+Wolfgang</p>
+
+
+
+<a name="294760267"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20How%20to%20access%20a%20locale%20type%20parameter%20in%20a%20quo.../near/294760267" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20How.20to.20access.20a.20locale.20type.20parameter.20in.20a.20quo.2E.2E.2E.html#294760267">(Aug 22 2022 at 20:13)</a>:</h4>
+<p>From: mailing-list anonymous &lt;<a href="mailto:mailing.list.anonymous@gmail.com">mailing.list.anonymous@gmail.com</a>&gt;<br>
+Dear Wolfgang Jeltsch,</p>
+<p>I am not an expert in this subject and, hopefully, someone more<br>
+knowledgeable will correct me if I am wrong. However, as far as I know,<br>
+even the plain typedecl does not accept fixed type variables.  Of course,<br>
+internally the command quotient_type relies on the same mechanism for the<br>
+declaration of new types. Therefore, it is not possible to use the command<br>
+quotient_type to obtain the result that you need.</p>
+<p>Anecdotally, the Local Typedef Rule (LT) axiom associated with<br>
+Types-To-Sets can be used to solve the problem that you are dealing with,<br>
+but, as far as I know, with some restrictions. Effectively, the Local<br>
+Typedef Rule (LT) states the following:</p>
+<p>(*<br>
+Local Typedef Rule (LT)</p>
+<p>Γ ⊢ (∃(Rep::β ⇒ τ) Abs. type_definition Rep Abs A) ⟹ φ</p>
+<hr>
+<p>[β not in φ, Γ, A;<br>
+                       Γ ⊢ A ≠ ∅ ⟹ φ<br>
+ sort(β)=HOL.type]<br>
+*)</p>
+<p>Given that Rep, Abs and A are arbitrary (of course, A should not be empty),<br>
+it is not too difficult to define the ones suitable for a quotient type for<br>
+some relation R. Nevertheless, there is a restriction "β not in φ", which,<br>
+for your problem, might be too much to bear. In essence, you will be able<br>
+to use β as the quotient type, prove theorems about it, but these theorems<br>
+can only be used within the context with the assumption "∃(Rep::β ⇒ τ set)<br>
+Abs. type_definition Rep Abs A". To use them outside of this context, you<br>
+will need to transfer them back to the original type τ. This process can be<br>
+automated completely using the capabilities of the transfer package.<br>
+Nevertheless, I appreciate that this may be a substantial restriction for<br>
+your use case.</p>
+<p>The example below demonstrates, vaguely, how the 'Local Quotient Rule'<br>
+might work (of course, you need to import Types-To-Sets from the main<br>
+library to run the example). If you are interested, I can add something<br>
+akin to a 'Local Quotient Rule' (which would, effectively, hide all the<br>
+ugly details in the example below and complete it with the instantiation of<br>
+all quotient theorems and transfer rules) to my extension of Types-To-Sets (<br>
+<a href="https://github.com/xanonec/HOL-TTS-Ext">https://github.com/xanonec/HOL-TTS-Ext</a>).</p>
+<p>Thank you</p>
+<p>locale local_typedef =<br>
+  fixes R :: "['a, 'a] ⇒ bool"<br>
+  assumes is_equivalence: "equivp R"<br>
+begin</p>
+<p>(*The exposition subsumes some of the content of<br>
+ HOL/Types_To_Sets/Examples/Prerequisites.thy*)<br>
+context<br>
+  fixes S and s :: "'s itself"<br>
+  defines S: "S ≡ {x. ∃u. x = {v. R u v}}"<br>
+  assumes Ex_type_definition_S:<br>
+    "∃(Rep::'s ⇒ 'a set) (Abs::'a set ⇒ 's). type_definition Rep Abs S"<br>
+begin</p>
+<p>definition "rep = fst (SOME (Rep::'s ⇒ 'a set, Abs). type_definition Rep<br>
+Abs S)"<br>
+definition "Abs = snd (SOME (Rep::'s ⇒ 'a set, Abs). type_definition Rep<br>
+Abs S)"</p>
+<p>definition "rep' a = (SOME x. a ∈ S ⟶ x ∈ a)"<br>
+definition "Abs' x = (SOME a. a ∈ S ∧ a = {v. R x v})"</p>
+<p>definition "rep'' = rep' o rep"<br>
+definition "Abs'' = Abs o Abs'"</p>
+<p>lemma type_definition_S: "type_definition rep Abs S"<br>
+  unfolding Abs_def rep_def split_beta'<br>
+  by (rule someI_ex) (use Ex_type_definition_S in auto)</p>
+<p>lemma rep_in_S[simp]: "rep x ∈ S"<br>
+  and rep_inverse[simp]: "Abs (rep x) = x"<br>
+  and Abs_inverse[simp]: "y ∈ S ⟹ rep (Abs y) = y"<br>
+  using type_definition_S<br>
+  unfolding type_definition_def by auto</p>
+<p>definition cr_S where "cr_S ≡ λs b. s = rep b"<br>
+lemmas Domainp_cr_S = type_definition_Domainp[OF type_definition_S<br>
+cr_S_def, transfer_domain_rule]<br>
+lemmas right_total_cr_S = typedef_right_total[OF type_definition_S<br>
+cr_S_def, transfer_rule]<br>
+  and bi_unique_cr_S = typedef_bi_unique[OF type_definition_S cr_S_def,<br>
+transfer_rule]<br>
+  and left_unique_cr_S = typedef_left_unique[OF type_definition_S cr_S_def,<br>
+transfer_rule]<br>
+  and right_unique_cr_S = typedef_right_unique[OF type_definition_S<br>
+cr_S_def, transfer_rule]</p>
+<p>lemma cr_S_rep[intro, simp]: "cr_S (rep a) a" by (simp add: cr_S_def)<br>
+lemma cr_S_Abs[intro, simp]: "a∈S ⟹ cr_S a (Abs a)" by (simp add: cr_S_def)</p>
+<p>(* this part was sledgehammered - please do not pay attention to the<br>
+(absence of) proof style *)<br>
+lemma r1: "∀a. Abs'' (rep'' a) = a"<br>
+  unfolding Abs''_def rep''_def comp_def<br>
+proof-<br>
+  {<br>
+    fix s'<br>
+    note repS = rep_in_S[of s']<br>
+    then have "∃x. x ∈ rep s'" using S equivp_reflp is_equivalence by force<br>
+    then have "rep' (rep s') ∈ rep s'"<br>
+      using repS unfolding rep'_def by (metis verit_sko_ex')<br>
+    moreover with is_equivalence repS have "rep s' = {v. R (rep' (rep s'))<br>
+v}"<br>
+      by (smt CollectD S equivp_def)<br>
+    ultimately have arr: "Abs' (rep' (rep s')) = rep s'"<br>
+      unfolding Abs'_def by (smt repS some_sym_eq_trivial verit_sko_ex')<br>
+    have "Abs (Abs' (rep' (rep s'))) = s'" unfolding arr by (rule<br>
+rep_inverse)<br>
+  }<br>
+  then show "∀a. Abs (Abs' (rep' (rep a))) = a" by auto<br>
+qed</p>
+<p>lemma r2: "∀a. R (rep'' a) (rep'' a)"<br>
+  unfolding rep''_def rep'_def<br>
+  using is_equivalence unfolding equivp_def by blast</p>
+<p>lemma r3: "∀r s. R r s = (R r r ∧ R s s ∧ Abs'' r = Abs'' s)"<br>
+  apply(intro allI)<br>
+  apply standard<br>
+  subgoal unfolding Abs''_def Abs'_def<br>
+    using is_equivalence unfolding equivp_def by auto<br>
+  subgoal unfolding Abs''_def Abs'_def<br>
+    using is_equivalence unfolding equivp_def<br>
+    by (smt Abs''_def Abs'_def CollectD S comp_apply local.Abs_inverse<br>
+mem_Collect_eq someI_ex)<br>
+  done</p>
+<p>definition cr_Q where "cr_Q = (λx y. R x x ∧ Abs'' x = y)"</p>
+<p>lemma quotient_Q: "Quotient R Abs'' rep'' cr_Q"<br>
+  unfolding Quotient_def<br>
+  apply(intro conjI)<br>
+  subgoal by (rule r1)<br>
+  subgoal by (rule r2)<br>
+  subgoal by (rule r3)<br>
+  subgoal by (rule cr_Q_def)<br>
+  done</p>
+<p>(* instantiate the quotient lemmas from the theory Lifting *)<br>
+lemmas Q_Quotient_abs_rep = Quotient_abs_rep[OF quotient_Q]<br>
+(<em>...</em>)</p>
+<p>(* prove the statements about the quotient type 's *)<br>
+(<em>...</em>)</p>
+<p>(* transfer the results back to 'a using the capabilities of transfer -<br>
+not demonstrated in the example *)<br>
+lemma aa: "(a::'a) = (a::'a)"<br>
+  by auto</p>
+<p>end</p>
+<p>thm aa[cancel_type_definition]<br>
+(* this shows {x. ∃u. x = {v. R u v}} ≠ {} ⟹ ?a = ?a *)</p>
+<p>end</p>
+
+
+
+<a name="294760279"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20How%20to%20access%20a%20locale%20type%20parameter%20in%20a%20quo.../near/294760279" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20How.20to.20access.20a.20locale.20type.20parameter.20in.20a.20quo.2E.2E.2E.html#294760279">(Aug 22 2022 at 20:13)</a>:</h4>
+<p>From: mailing-list anonymous &lt;<a href="mailto:mailing.list.anonymous@gmail.com">mailing.list.anonymous@gmail.com</a>&gt;<br>
+Dear All,</p>
+<p>I forgot to mention the references that I used in the answer:</p>
+<ol>
+<li>
+<p>The document "Structured Formal Development with Quotient Types in<br>
+Isabelle/HOL" by Maksym Bortin and Christoph Lüth was used a general<br>
+reference</p>
+</li>
+<li>
+<p>The formula for the Local Typedef Rule was copied directly from the file<br>
+"HOL/Types_To_Sets/local_typedef.ML"</p>
+</li>
+<li>
+<p>The example subsumes the content of<br>
+HOL/Types_To_Sets/Examples/Prerequisites.thy</p>
+</li>
+</ol>
+<p>Thank you</p>
+
+
+
+<a name="294760293"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20How%20to%20access%20a%20locale%20type%20parameter%20in%20a%20quo.../near/294760293" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20How.20to.20access.20a.20locale.20type.20parameter.20in.20a.20quo.2E.2E.2E.html#294760293">(Aug 22 2022 at 20:13)</a>:</h4>
+<p>From: Wolfgang Jeltsch &lt;<a href="mailto:wolfgang-it@jeltsch.info">wolfgang-it@jeltsch.info</a>&gt;<br>
+Hi!<br>
+Thanks for your elaborate answer.<br>
+Unfortunately I know nothing about “types to sets” and the mathematics<br>
+behind it. Therefore the message I’m taking from your e-mail is that<br>
+what I want isn’t supported and making it somehow supported is<br>
+complicated and gives only a partial solution.<br>
+I think for my use case it’s easiest to just define the quotient types<br>
+manually for each individual interpretation of the locale. That said,<br>
+being able to define quotient types within locales might be very useful<br>
+in other situations; thus adding some sort of support for it might be a<br>
+good idea.<br>
+All the best,Wolfgang</p>
+
+
+
+<a name="294760304"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20How%20to%20access%20a%20locale%20type%20parameter%20in%20a%20quo.../near/294760304" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20How.20to.20access.20a.20locale.20type.20parameter.20in.20a.20quo.2E.2E.2E.html#294760304">(Aug 22 2022 at 20:13)</a>:</h4>
+<p>From: mailing-list anonymous &lt;<a href="mailto:mailing.list.anonymous@gmail.com">mailing.list.anonymous@gmail.com</a>&gt;<br>
+Dear Wolfgang Jeltsch</p>
+<p>Therefore the message I’m taking from your e-mail is that<br>
+I believe that the opening remark in my original email was not very clear -<br>
+I was in a rush to finish the email and was slightly careless - please<br>
+accept my apologies. However, indeed, I meant to say exactly what you<br>
+inferred from it. I would also like to provide a more clear explanation of<br>
+the opening remark using the PhD thesis Ondřej Kunčar as the general<br>
+reference. Isabelle/HOL provides two definitional primitives: one for<br>
+overloaded constants and one for types (i.e. typedef). All other<br>
+definitional mechanisms (including, e.g., quotient_type) have to be defined<br>
+in terms of these primitives, provided that one does not neglect the LCF<br>
+approach. The typedef primitive allows for the definition of new types in<br>
+terms of an isomorphism with respect to an arbitrary non-empty subset of an<br>
+existing type. typedef α k = S requires S to be a closed term, k to be a<br>
+fresh type constructor and all type variables in S need to be among the<br>
+variables in α. If one is to try to define a nullary type constructor based<br>
+on an existing fixed type variable, then the last condition will be<br>
+inevitably violated. Unfortunately, provided that there is no<br>
+misunderstanding on my part, this is exactly what you were trying to do by<br>
+calling the command quotient_type with the fixed type variable occurring in<br>
+the input term and not occurring on the lhs in the specification of the<br>
+type constructor.</p>
+<p>Also, perhaps, I can provide an explanation for another remark from your<br>
+original email "although it does accept referring to <code>'a</code> in types". When<br>
+you invoke the command quotient_type, your intention is to declare a new<br>
+type constructor. Of course, the mechanism of the declaration of new type<br>
+constructors is very different from merely using a fixed type variable as<br>
+an input to the existing type constructor. Hopefully, this clarifies why<br>
+one can refer to fixed variables when constructing new types, but not new<br>
+type constructors.</p>
+<p>Thank you</p>
+
+
+
+<a name="294760316"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20How%20to%20access%20a%20locale%20type%20parameter%20in%20a%20quo.../near/294760316" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20How.20to.20access.20a.20locale.20type.20parameter.20in.20a.20quo.2E.2E.2E.html#294760316">(Aug 22 2022 at 20:14)</a>:</h4>
+<p>From: Lawrence Paulson &lt;<a href="mailto:lp15@cam.ac.uk">lp15@cam.ac.uk</a>&gt;<br>
+Possibly now is a good time to plug my own paper "Defining functions on equivalence classes”, which is available* from my webpage (<a href="https://www.cl.cam.ac.uk/~lp15/papers/refereed.html">https://www.cl.cam.ac.uk/~lp15/papers/refereed.html</a>). In this I outline how one can create quotient constructions quite easily using the set-theoretic primitives of Isabelle/HOL. Obviously quotient_type is easier to use, but as discussed, it wants to introduce a type and there is no reason on earth to conflate quotient constructions with types.</p>
+<p>Larry Paulson</p>
+<ul>
+<li>It is available via an ACM system that supposedly provides open access from the author’s own webpage. If it doesn’t work for you, please email me for a copy.</li>
+</ul>
+
+
+
+<a name="294760383"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20How%20to%20access%20a%20locale%20type%20parameter%20in%20a%20quo.../near/294760383" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20How.20to.20access.20a.20locale.20type.20parameter.20in.20a.20quo.2E.2E.2E.html#294760383">(Aug 22 2022 at 20:14)</a>:</h4>
+<p>From: Wolfgang Jeltsch &lt;<a href="mailto:wolfgang-it@jeltsch.info">wolfgang-it@jeltsch.info</a>&gt;<br>
+Thanks for the pointer!</p>
+<p>Unfortunately, I cannot download the paper via that link.</p>
+<p>All the best,<br>
+Wolfgang</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

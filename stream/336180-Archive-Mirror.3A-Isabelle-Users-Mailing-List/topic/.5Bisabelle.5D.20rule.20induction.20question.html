@@ -1,0 +1,159 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] rule induction question · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20rule.20induction.20question.html">[isabelle] rule induction question</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294307071"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20rule%20induction%20question/near/294307071" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20rule.20induction.20question.html#294307071">(Aug 19 2022 at 15:57)</a>:</h4>
+<p>From: Amarin Phaosawasdi &lt;<a href="mailto:phaosaw2@illinois.edu">phaosaw2@illinois.edu</a>&gt;<br>
+Hi all,</p>
+<p>I've been using the book Concrete Semantics <br>
+(<a href="http://www21.in.tum.de/~nipkow/Concrete-Semantics/">http://www21.in.tum.de/~nipkow/Concrete-Semantics/</a>) as a tutorial.</p>
+<p>Currently, I'm trying to prove the following.<br>
+"⟦(WHILE b DO c,s)⇒t⟧⟹(WHILE b DO (c;;IF b THEN c ELSE SKIP),s)⇒t"</p>
+<p>In other words, I want to prove that I can unroll the loop and end up in <br>
+the same final state.</p>
+<p>At some point in the proof, I'm in a "subtree" (also another WHILE loop) <br>
+of the original WHILE b DO c. I want to be able to apply the induction <br>
+hypothesis and get an unrolled loop for that subtree.</p>
+<p>I looked at some examples of rule induction on the web and in the <br>
+Programming and Proving book. I tried structuring the proofs that way <br>
+and also used cases, but am still stuck.</p>
+<p>The version of the theory that I'm sending here uses "proof -". It helps <br>
+me being explicit what I'm trying to do since I'm new to Isabelle.</p>
+<p>I've laid out the whole proof and skipped the parts where I needed the <br>
+induction hypothesis with "sorry".</p>
+<p>Would anybody mind taking a look, please?</p>
+<p>The code is below. I've marked the places that I need help with "(* NEED <br>
+INDUCTION HYPOTHESIS *)".</p>
+<p>Thank you,<br>
+Amarin</p>
+<p>========================<br>
+Semantics.thy<br>
+========================<br>
+theory Semantics imports Main begin</p>
+<p>type_synonym vname = string<br>
+type_synonym val = int<br>
+type_synonym state = "vname ⇒ val"</p>
+<p>datatype aexp = N int | V vname<br>
+fun aval :: "aexp ⇒ state ⇒ val" where<br>
+"aval (N n) s = n" |<br>
+"aval (V x) s = s x"</p>
+<p>datatype bexp = Bc bool<br>
+fun bval :: "bexp ⇒ state ⇒ bool" where<br>
+"bval (Bc v) s = v"</p>
+<p>datatype<br>
+   com = SKIP<br>
+       | Assign vname aexp       ("_ ::= _" [1000, 61] 61)<br>
+       | Seq    com  com         ("_;;/ _"  [60, 61] 60)<br>
+       | If     bexp com com     ("(IF _/ THEN _/ ELSE _)"  [0, 0, 61] 61)<br>
+       | While  bexp com         ("(WHILE _/ DO _)"  [0, 61] 61)</p>
+<p>inductive<br>
+   big_step :: "com × state ⇒ state ⇒ bool" (infix "⇒" 55)<br>
+where<br>
+Skip: "(SKIP,s) ⇒ s" |<br>
+Assign: "(x ::= a,s) ⇒ s(x := aval a s)" |<br>
+Seq: "⟦ (c1,s1) ⇒ s2;  (c2,s2) ⇒ s3 ⟧ ⟹ (c1;;c2, s1) ⇒ s3" |<br>
+IfTrue: "⟦ bval b s;  (c1,s) ⇒ t ⟧ ⟹ (IF b THEN c1 ELSE c2, s) ⇒ t" |<br>
+IfFalse: "⟦ ¬bval b s;  (c2,s) ⇒ t ⟧ ⟹ (IF b THEN c1 ELSE c2, s) ⇒ t" |<br>
+WhileFalse: "⟦¬bval b s⟧ ⟹ (WHILE b DO c,s) ⇒ s" |<br>
+WhileTrue: "⟦ bval b s1;  (c,s1) ⇒ s2;  (WHILE b DO c,s2) ⇒ s3 ⟧<br>
+   ⟹ (WHILE b DO c, s1) ⇒ s3"</p>
+<p>declare big_step.intros [intro]<br>
+lemmas big_step_induct = big_step.induct[split_format(complete)]<br>
+inductive_cases SkipE[elim!]: "(SKIP,s) ⇒ t"<br>
+inductive_cases AssignE[elim!]: "(x ::= a,s) ⇒ t"<br>
+inductive_cases SeqE[elim!]: "(c1;;c2,s1) ⇒ s3"<br>
+inductive_cases IfE[elim!]: "(IF b THEN c1 ELSE c2,s) ⇒ t"<br>
+inductive_cases WhileE[elim]: "(WHILE b DO c,s) ⇒ t"</p>
+<p>theorem big_step_determ: "⟦ (c,s) ⇒ t; (c,s) ⇒ u ⟧ ⟹ u = t"<br>
+   by (induction arbitrary: u as3 rule: big_step_induct) blast+</p>
+<p>lemma unroll_while:<br>
+"⟦(WHILE b DO c,s)⇒t⟧⟹(WHILE b DO (c;;IF b THEN c ELSE SKIP),s)⇒t"<br>
+proof -<br>
+   fix b s c t<br>
+   assume assms: "(WHILE b DO c,s)⇒t"<br>
+   let ?thesis = "(WHILE b DO (c;;IF b THEN c ELSE SKIP),s)⇒t"<br>
+   {<br>
+     assume true1: "bval b s"<br>
+     obtain i where i1:"(c,s)⇒i" and i2:"(WHILE b DO c,i)⇒t" using assms <br>
+true1 by auto<br>
+     {<br>
+       assume true2: "bval b i"<br>
+       obtain i' where i3:"(c,i)⇒i'" and i4:"(WHILE b DO c,i')⇒t" using <br>
+i2 true2 by auto<br>
+       have body:"(c;;IF b THEN c ELSE SKIP,s) ⇒ i'" using i1 i3 true2 <br>
+by auto<br>
+       have loop:"(WHILE b DO (c;;IF b THEN c ELSE SKIP),i') ⇒ t" using i4<br>
+         sorry (* NEED INDUCTION HYPOTHESIS *)<br>
+       have ?thesis using body loop true1 by auto<br>
+     } moreover<br>
+     {<br>
+       assume false2: "¬bval b i"<br>
+       have body:"(c;;IF b THEN c ELSE SKIP,s) ⇒ i" using i1 false2 by auto<br>
+       have loop:"(WHILE b DO (c;;IF b THEN c ELSE SKIP),i) ⇒ t" using i2<br>
+         sorry (* NEED INDUCTION HYPOTHESIS *)<br>
+       have ?thesis using body loop true1 by auto<br>
+     }<br>
+     ultimately have "(WHILE b DO (c;;IF b THEN c ELSE SKIP),s)⇒t" by metis<br>
+   } moreover {<br>
+     assume false1: "¬bval b s"<br>
+     have final1:"(WHILE b DO c,s)⇒s" using false1 by auto<br>
+     have final2:"(WHILE b DO (c;;IF b THEN c ELSE SKIP),s)⇒s" using <br>
+false1 by auto<br>
+     have eq:"s=t" using assms final1 big_step_determ by auto<br>
+     have ?thesis using final2 eq by auto<br>
+   } ultimately show ?thesis by metis<br>
+qed</p>
+<p>end</p>
+
+
+
+<a name="294307089"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20rule%20induction%20question/near/294307089" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20rule.20induction.20question.html#294307089">(Aug 19 2022 at 15:57)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+Dear Amarin,</p>
+<p>That is a nice little puzzle. I had not tried it before and needed some time to<br>
+find a solution (see below). The fine structure of the proofs remains obscure<br>
+and you may want to spell it out yourself. The main point is however not that<br>
+difficult: the lemma lem did not drop out of thin air but comes directly from<br>
+looking at the subgoal in the WhileTrue case. On the techical side it is<br>
+important to write the induction in the given form because the proposition you<br>
+induct on contains other subterms than just variables.</p>
+<p>There may be other slicker ways of proving your goal but I could not see how to<br>
+complete your original attempt.</p>
+<p>Tobias</p>
+<p>lemma lem:<br>
+  "⟦ (WHILE b DO (c;; IF b THEN c ELSE SKIP),s2) ⇒ s3; bval b s1; (c,s1) ⇒ s2 ⟧<br>
+   ⟹ (WHILE b DO (c;; IF b THEN c ELSE SKIP),s1) ⇒ s3"<br>
+apply(induction "WHILE b DO (c;; IF b THEN c ELSE SKIP)" s2 s3<br>
+  arbitrary: s1 rule: big_step_induct)<br>
+ apply auto<br>
+done</p>
+<p>lemma "(WHILE b DO c,s) ⇒ t ⟹ (WHILE b DO (c;; IF b THEN c ELSE SKIP),s) ⇒ t"<br>
+proof(induction "WHILE b DO c" s t rule: big_step_induct)<br>
+  case WhileFalse thus ?case by blast<br>
+next<br>
+  case WhileTrue thus ?case using lem by blast<br>
+qed</p>
+
+
+
+<a name="294307150"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20rule%20induction%20question/near/294307150" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20rule.20induction.20question.html#294307150">(Aug 19 2022 at 15:58)</a>:</h4>
+<p>From: Amarin Phaosawasdi &lt;<a href="mailto:phaosaw2@illinois.edu">phaosaw2@illinois.edu</a>&gt;<br>
+Dear Tobias,</p>
+<p>This helped tremendously. I spelled the proof out and it made perfect sense.</p>
+<p>Thank you,<br>
+Amarin</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

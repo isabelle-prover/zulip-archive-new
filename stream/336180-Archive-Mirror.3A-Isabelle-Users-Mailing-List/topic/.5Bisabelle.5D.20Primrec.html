@@ -1,0 +1,108 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Primrec · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Primrec.html">[isabelle] Primrec</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294072098"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Primrec/near/294072098" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Primrec.html#294072098">(Aug 18 2022 at 12:59)</a>:</h4>
+<p>From: Peter Chapman &lt;<a href="mailto:pc@cs.st-and.ac.uk">pc@cs.st-and.ac.uk</a>&gt;<br>
+Hi</p>
+<p>I have a polymorphic datatype as follows</p>
+<p>datatype 'a form:<br>
+   ff<br>
+| Cpd 'a ('a form list)</p>
+<p>I also have a function which, given a list of naturals, returns the  <br>
+largest, called max_list.  I want to define a function on my datatype  <br>
+as follows:</p>
+<p>primrec depth  :: 'a form =&gt; nat<br>
+   depth ff = 0<br>
+   depth Cpd f fs = max_list (map depth fs) + 1</p>
+<p>Isabelle doesn't like it, giving me the error message</p>
+<p>*** Entity to be defined occurs on rhs<br>
+*** The error(s) above occurred in definition "depth_form_def":<br>
+***   "depth =_ form_rec_1 (\ i. 0) (\ f fs fsa. max_list (map depth  <br>
+fs) + 1) 0 undefined undefined"<br>
+*** At command "primrec".</p>
+<p>(where =_ is the identity symbol, and \ is a lambda).  Is this not a  <br>
+proper recursive call?  I think it should be.  For instance, if it is  <br>
+written as</p>
+<p>depth Cpd f [p,...q] = max_list [depth p,..., depth q]</p>
+<p>then I think it is a recursive call.  Can anyone point out how to fix  <br>
+this, or why I am wrong in my belief?</p>
+<p>Cheers</p>
+<p>Peter</p>
+
+
+
+<a name="294072162"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Primrec/near/294072162" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Primrec.html#294072162">(Aug 18 2022 at 12:59)</a>:</h4>
+<p>From: Stefan Berghofer &lt;<a href="mailto:berghofe@in.tum.de">berghofe@in.tum.de</a>&gt;<br>
+Peter Chapman wrote:<br>
+Hi Peter,</p>
+<p>unfortunately, the primrec command is rather restrictive as far as the recursion<br>
+scheme of the function is concerned. More precisely, it requires that the recursion<br>
+scheme of the function exactly matches the recursion scheme of the datatype. Since<br>
+the datatype "'a form" involves nested recursion through the list type constructor,<br>
+the type of lists is "unfolded" when constructing the datatype, as can be seen<br>
+from the induction rule</p>
+<p>[| P1 ff; !!list. P2 list ==&gt; P1 (Cpd a list); P2 [];<br>
+   !!form list. [| P1 form; P2 list |] ==&gt; P2 (form # list) |] ==&gt;<br>
+   P1 form &amp; P2 list</p>
+<p>which involves two predicates P1 and P2. Consequently, primrec also expects you<br>
+to define your depth function as two mutually recursive functions, where one of<br>
+the functions is on "'a form", while the other one is on "'a form list":</p>
+<p>primrec depth :: "'a form =&gt; nat" and depth_list :: "'a form list =&gt; nat list" where<br>
+  "depth ff = 0"<br>
+| "depth (Cpd f fs) = max_list (depth_list fs) + 1"<br>
+| "depth_list [] = []"<br>
+| "depth_list (f # fs) = depth f # depth_list fs"</p>
+<p>Alternatively, you can also use the more general "fun" command for defining<br>
+functions by well-founded recursion, which accepts your definition right away:</p>
+<p>fun depth :: "'a form =&gt; nat" where<br>
+  "depth ff = 0"<br>
+| "depth (Cpd f fs) = max_list (map depth fs) + 1"</p>
+<p>Greetings,<br>
+Stefan</p>
+
+
+
+<a name="294072192"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Primrec/near/294072192" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Primrec.html#294072192">(Aug 18 2022 at 12:59)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:lochbihl@ipd.info.uni-karlsruhe.de">lochbihl@ipd.info.uni-karlsruhe.de</a>&gt;<br>
+Hi Peter,</p>
+<blockquote>
+<p>datatype 'a form:<br>
+  ff<br>
+| Cpd 'a ('a form list)</p>
+</blockquote>
+<p>the problem is that Cpd does not take a parameter of type "'a form", but <br>
+the "'a form" is nested inside the list type constructor. Internally, <br>
+such nested datatypes are converted into mutually recursive datatypes, <br>
+which becomes visible when you try to use primrec.</p>
+<p>If you want to use primrec, you must define mutually recursive <br>
+functions, i.e. the following should work:</p>
+<p>primrec depth  :: 'a form =&gt; nat and depths :: 'a form list =&gt; nat list<br>
+where<br>
+   depth ff = 0<br>
+| depth Cpd f fs = max_list (depths fs) + 1<br>
+| depths [] = []<br>
+| depths (x # xs) = (depth x) # (depths xs)</p>
+<p>Then, you can later on prove a lemma saying<br>
+"depth Cpd f fs = max_list (map depth fs)"<br>
+by induction on fs.</p>
+<p>Alternatively, you can use the function package instead of primrec, <br>
+which allows arbitrary pattern matchings and recursion. Since Isabelle <br>
+2008, the termination prover usually handles such primitive recursion <br>
+for nested datatypes.</p>
+<p>Andreas</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

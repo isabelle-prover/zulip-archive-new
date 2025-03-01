@@ -1,0 +1,44 @@
+[
+    {
+        "content": "<p>From: Tom Ridge via Cl-isabelle-users &lt;<a href=\"mailto:cl-isabelle-users@lists.cam.ac.uk\">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>\nDear All,</p>\n<p>I'm exporting to OCaml from Isabelle/HOL. I would like type synonyms to be<br>\npreserved (because I perform some munging on the generated code). Is this<br>\npossible? The top of the isabelle .thy looks like:</p>\n<p>theory Export_code<br>\nimports Find Insert Delete Insert_many<br>\n\"~~/src/HOL/Library/Code_Target_Numeral\"<br>\n\"~~/src/HOL/Library/Code_Char\"<br>\nbegin</p>\n<p>export_code \"Code_Numeral.nat_of_integer\" \"Code_Numeral.int_of_integer\"</p>\n<p>...</p>\n<hr>\n<p>A related question: The code contains eg:</p>\n<p>let rec dest_lista<br>\n  xs = (match xs<br>\n         with [] -&gt;<br>\n           failwitha ['d'; 'e'; 's'; 't'; '_'; 'l'; 'i'; 's'; 't'; '\\039';<br>\n' ']<br>\n         | _ :: _ -&gt; (List.butlast xs, List.last xs));;</p>\n<p>In Isabelle, the param to failwitha is a string. How can I make the list of<br>\nchars param in the generated code a proper OCaml string?</p>\n<p>Similarly, my exported code contains things like:</p>\n<p>val split_at : Arith.nat -&gt; 'a list -&gt; 'a list * 'a list</p>\n<p>How can I get OCaml's \"int\" type instead of Arith.nat?</p>\n<p>Thanks</p>\n<p>Tom</p>",
+        "id": 294705441,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661180493
+    },
+    {
+        "content": "<p>From: Tobias Nipkow &lt;<a href=\"mailto:nipkow@in.tum.de\">nipkow@in.tum.de</a>&gt;<br>\nOn 08/02/2017 11:44, Tom Ridge via Cl-isabelle-users wrote:</p>\n<blockquote>\n<p>Dear All,</p>\n<p>I'm exporting to OCaml from Isabelle/HOL. I would like type synonyms to be<br>\npreserved (because I perform some munging on the generated code). Is this<br>\npossible? The top of the isabelle .thy looks like:</p>\n</blockquote>\n<p>Unfortunately not, they are expanded after parsing. What you can do, but this is <br>\na hack, is to fold them back explicitly via a translation. Example:</p>\n<p>type_synonym nat_list = \"nat list\"</p>\n<p>translations<br>\n(type) \"nat_list\" &lt;= (type) \"nat list\"</p>\n<p>But now EVERY occurrence of \"nat list\" becomes \"nat_list\". Use at your own risk.</p>\n<p>Tobias</p>\n<blockquote>\n<p>theory Export_code<br>\nimports Find Insert Delete Insert_many<br>\n\"~~/src/HOL/Library/Code_Target_Numeral\"<br>\n\"~~/src/HOL/Library/Code_Char\"<br>\nbegin</p>\n<p>export_code \"Code_Numeral.nat_of_integer\" \"Code_Numeral.int_of_integer\"</p>\n<p>...</p>\n<hr>\n<p>A related question: The code contains eg:</p>\n<p>let rec dest_lista<br>\n  xs = (match xs<br>\n         with [] -&gt;<br>\n           failwitha ['d'; 'e'; 's'; 't'; '_'; 'l'; 'i'; 's'; 't'; '\\039';<br>\n' ']<br>\n         | _ :: _ -&gt; (List.butlast xs, List.last xs));;</p>\n<p>In Isabelle, the param to failwitha is a string. How can I make the list of<br>\nchars param in the generated code a proper OCaml string?</p>\n<p>Similarly, my exported code contains things like:</p>\n<p>val split_at : Arith.nat -&gt; 'a list -&gt; 'a list * 'a list</p>\n<p>How can I get OCaml's \"int\" type instead of Arith.nat?</p>\n<p>Thanks</p>\n<p>Tom</p>\n<p><a href=\"/user_uploads/14278/6e1u48G7LFAq4DxpKPA4iAaJ/smime.p7s\">smime.p7s</a></p>\n</blockquote>",
+        "id": 294705461,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661180499
+    },
+    {
+        "content": "<p>From: Andreas Lochbihler &lt;<a href=\"mailto:andreas.lochbihler@inf.ethz.ch\">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>\nPretty-print translations only work within Isabelle, not for the generated code. The code <br>\ngenerator does not offer any means to use type synonyms. You have to make the type synonym <br>\na typedef and lift all functions in your formalisation to the new type.</p>\n<p>Andreas</p>",
+        "id": 294705481,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661180505
+    },
+    {
+        "content": "<p>From: Andreas Lochbihler &lt;<a href=\"mailto:andreas.lochbihler@inf.ethz.ch\">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>\nHi Tom,</p>\n<p>On 08/02/17 11:44, Tom Ridge via Cl-isabelle-users wrote:</p>\n<blockquote>\n<p>A related question: The code contains eg:</p>\n<p>let rec dest_lista<br>\n  xs = (match xs<br>\n         with [] -&gt;<br>\n           failwitha ['d'; 'e'; 's'; 't'; '_'; 'l'; 'i'; 's'; 't'; '\\039';<br>\n' ']<br>\n         | _ :: _ -&gt; (List.butlast xs, List.last xs));;</p>\n<p>In Isabelle, the param to failwitha is a string. How can I make the list of<br>\nchars param in the generated code a proper OCaml string?<br>\nThere are a few types in Isabelle/HOL's library which are designed for exchanging data in <br>\nthe generated code. For strings, you should use String.literal if you want to have OCaml <br>\nstrings.</p>\n</blockquote>\n<p>For integers, there's integer in the theory Code_Target, but this maps to Big_Int, not it. <br>\nMany years ago, there was also some setup to implement nat with the Big_Int type, but that <br>\nhas long gone, because it was not formally checked that all functions maintain the <br>\ninvariant \"&gt;= 0\". If you import Code_Target_Nat from HOL/Library, your generated code will <br>\nimplement Arith.nat using Big_Int, so you can construct such Arith.nat values in your <br>\nhand-written code and pass it to functions like split_at.</p>\n<p>As OCaml's int type is bounded, one should not use it for nat, because nat is unbounded in <br>\nHOL. My AFP entry Native_Word imports various fixed-length integers from the target <br>\nlanguages (OCaml's int as Uint.uint). But clearly, Uint.uint is not isomorphic to nat.</p>\n<p>In general, I recommend that you define a clear interface between the generated code and <br>\nyour hand-written parts, which should be as small as possible. Some thought's on this can <br>\nbe found in my Isabelle 2014 workshop paper (Section 4):</p>\n<p><a href=\"https://www.ethz.ch/content/dam/ethz/special-interest/infk/inst-infsec/information-security-group-dam/people/andreloc/lochbihler14iw.pdf\">https://www.ethz.ch/content/dam/ethz/special-interest/infk/inst-infsec/information-security-group-dam/people/andreloc/lochbihler14iw.pdf</a></p>\n<p>Hope this helps,<br>\nAndreas</p>\n<blockquote>\n<p>Similarly, my exported code contains things like:</p>\n<p>val split_at : Arith.nat -&gt; 'a list -&gt; 'a list * 'a list</p>\n<p>How can I get OCaml's \"int\" type instead of Arith.nat?</p>\n<p>Thanks</p>\n<p>Tom<br>\n</p>\n</blockquote>",
+        "id": 294705508,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661180511
+    },
+    {
+        "content": "<p>From: Tom Ridge via Cl-isabelle-users &lt;<a href=\"mailto:cl-isabelle-users@lists.cam.ac.uk\">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>\nThanks to all. Very useful, and the '14 paper is a good read.</p>\n<p>Thanks</p>",
+        "id": 294705537,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661180519
+    },
+    {
+        "content": "<p>From: Tom Ridge via Cl-isabelle-users &lt;<a href=\"mailto:cl-isabelle-users@lists.cam.ac.uk\">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>\nSuppose I know somehow (!) that integer overflow is not a problem, and in<br>\nOCaml I define a Nat module, with type t = int, which maintains the &gt;=0<br>\ninvariant (and others? basically, int is made to behave like nat). Is it<br>\npossible to target the Nat.t type in Isabelle code generation?</p>\n<p>Thanks</p>",
+        "id": 294705617,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661180531
+    },
+    {
+        "content": "<p>From: Andreas Lochbihler &lt;<a href=\"mailto:andreas.lochbihler@inf.ethz.ch\">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>\nHi Tom,</p>\n<p>Sure. You can map any HOL type constructor to any target-language type using adaptation. <br>\nBut as adaptations are unverified, they become part of the trusted code base, so be careful.</p>\n<p>Adaptations are explained in general the code generator tutorial (isabelle doc codegen, <br>\nSection 6). In your case, you can probably copy most of the OCaml adaptations (code_module <br>\nand code_printing) for uint in AFP/Native_Word/Uint and change everything from uint to <br>\nnat. Note that Native_Word does some things in a somewhat complicated way (there are <br>\nseveral versions of division), because it tries to fit several different target languages <br>\nand evaluation by the simplifier under one hood. If you grep for \"code_printing\" in the <br>\ndistribution and the AFP, you should find more examples of how adaptation is done in practice.</p>\n<p>Hope this helps,<br>\nAndreas</p>",
+        "id": 294705633,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661180535
+    }
+]

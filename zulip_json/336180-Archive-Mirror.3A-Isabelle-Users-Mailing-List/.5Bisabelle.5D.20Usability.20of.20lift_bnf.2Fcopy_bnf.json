@@ -1,0 +1,32 @@
+[
+    {
+        "content": "<p>From: Dmitriy Traytel &lt;<a href=\"mailto:traytel@inf.ethz.ch\">traytel@inf.ethz.ch</a>&gt;<br>\nHi Lars,</p>\n<p>coincidentally, I was using lift_bnf myself last week and run into exactly the same limitations as you did (except for the custom names which work fine as Jasmin pointed out).</p>\n<p>I think your way of dealing with those limitations (they also apply to set and rel) are as good as it can get for now. They are on my list of things to improve. Eventually, I’ll report here when this happens.</p>\n<p>Thanks for sharing,<br>\nDmitriy</p>",
+        "id": 294680072,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661176395
+    },
+    {
+        "content": "<p>From: Lars Hupel &lt;<a href=\"mailto:hupel@in.tum.de\">hupel@in.tum.de</a>&gt;<br>\nHi Dmitriy,</p>\n<p>glad to hear that you're on it :-)</p>\n<p>For posterity, here's an improved version of getting transfer to work,<br>\nas pointed out by Johannes:</p>\n<p>lemma fmmap_lifting[transfer_rule]:<br>\n  \"(op = ===&gt; pcr_fmap op = op = ===&gt; pcr_fmap op = op =)<br>\n     (λf. op ∘ (map_option f)) fmmap\"</p>\n<p>The proof is a little bit more complicated, but this avoids introducing<br>\nan extraneous constant.</p>\n<p>Cheers<br>\nLars</p>",
+        "id": 294680086,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661176401
+    },
+    {
+        "content": "<p>From: Lars Hupel &lt;<a href=\"mailto:hupel@in.tum.de\">hupel@in.tum.de</a>&gt;<br>\nDear BNF experts,</p>\n<p>on the weekend I was toying with introducing a new type for finite maps<br>\nfor my own formalization.¹</p>\n<p>typedef ('a, 'b) fmap = \"{m. finite (dom m)} :: ('a ⇀ 'b) set\"<br>\n    morphisms fmlookup Abs_fmap</p>\n<p>Luckily enough, registering this as a BNF is very simple:</p>\n<p>lift_bnf ('a, 'b) fmap [wits: Map.empty]<br>\n  by auto</p>\n<p>This is very nice – thanks for that facility!</p>\n<p>Constants such as 'map_fmap', 'set_fmap', 'rel_fmap' and 'pred_fmap' are<br>\ndefined using composition of their underlying counterparts and the<br>\nabstraction function. For example:</p>\n<p>map_fmap ≡ λf. Abs_fmap ∘ op ∘ (map_option f) ∘ fmlookup</p>\n<p>This is as expected. However, I noticed some problems when working with<br>\nthese constants wrt to other Isabelle tools and the BNF package itself:</p>\n<ul>\n<li>\n<p>The defining equations are not exported. I had to obtain them via</p>\n<p>BNF_Def.bnf_of @{context} @{type_name fmap}<br>\n  |&gt; the<br>\n  |&gt; BNF_Def.map_def_of_bnf</p>\n</li>\n<li>\n<p>I can't give them a custom name. If I want to rename 'map_fmap' to<br>\n'fmmap', I need to explicitly add an abbreviation.</p>\n</li>\n<li>\n<p>Lifting is not set up for these constants which makes proving lemmas<br>\nover e.g. 'map_fmap' and the lifted version of 'op ++' very tedious.<br>\nHere's an example:</p>\n<p>private lift_definition<br>\n  fmmap0 :: \"('b ⇒ 'c) ⇒ ('a, 'b) fmap ⇒ ('a, 'c) fmap\"<br>\n  is \"λf m. map_option f ∘ m\"<br>\nby simp</p>\n<p>lemma fmmap0: \"fmmap = fmmap0\"<br>\nunfolding fmmap0_def (* prove via defining equation of 'fmmap' *)</p>\n<p>lemma fmmap_add[simp]: \"fmmap f (m ++⇩f n) = fmmap f m ++⇩f fmmap f n\"<br>\nunfolding fmmap0<br>\nby transfer' (auto simp: map_add_def fun_eq_iff split: option.splits)</p>\n</li>\n</ul>\n<p>I introduced an auxiliary constant which is equivalent to 'map_fmap',<br>\nbut defined using 'lift_definition' instead of manually. I can use that<br>\nequivalence to rewrite propositions to make them amenable for 'transfer'.</p>\n<p>Cheers<br>\nLars</p>\n<p>¹ Yes, I'm aware of FinFun, Fin_Map and Mapping, but neither of these<br>\nfit my purpose.</p>",
+        "id": 294680266,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661176450
+    },
+    {
+        "content": "<p>From: Jasmin Blanchette &lt;<a href=\"mailto:jasmin.blanchette@inria.fr\">jasmin.blanchette@inria.fr</a>&gt;<br>\nDear Lars,</p>\n<blockquote>\n<p>This is as expected. However, I noticed some problems when working with<br>\nthese constants wrt to other Isabelle tools and the BNF package itself:</p>\n</blockquote>\n<p>I will let Dmitriy and/or handle most of your questions, since they're in charge of these parts. But here's some immediate help regarding one of them.</p>\n<blockquote>\n<ul>\n<li>\n<p>The defining equations are not exported. I had to obtain them via<br>\n[...]</p>\n</li>\n<li>\n<p>I can't give them a custom name. If I want to rename 'map_fmap' to<br>\n'fmmap', I need to explicitly add an abbreviation.</p>\n</li>\n</ul>\n</blockquote>\n<p>The \"them\" in the second point presumably refers to the constants introduced by the command, esp. the map function and the relator.</p>\n<p>In this case, I'm not sure where you get this notion from. If you look at \"isabelle doc datatypes\", you will find a syntactic item called map-rel in the syntax of \"lift_bnf\" and \"copy_bnf\". You can use that to specify custom names to the map function and the relator, e.g.</p>\n<p>lift_bnf ('a, 'b) fmap [wits: Map.empty] for map: fmmap<br>\n       by auto</p>\n<p>I hope this helps.</p>\n<p>Jasmin</p>",
+        "id": 294680638,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661176585
+    },
+    {
+        "content": "<p>From: Lars Hupel &lt;<a href=\"mailto:hupel@in.tum.de\">hupel@in.tum.de</a>&gt;<br>\nHi Jasmin,</p>\n<p>I stand corrected. I thought I tried that syntax and it didn't work, but<br>\nI must have done something wrong. It works now.</p>\n<p>Cheers<br>\nLars</p>",
+        "id": 294680981,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661176720
+    }
+]

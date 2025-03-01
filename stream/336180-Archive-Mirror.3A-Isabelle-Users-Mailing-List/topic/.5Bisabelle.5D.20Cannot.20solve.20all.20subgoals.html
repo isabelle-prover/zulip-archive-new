@@ -1,0 +1,127 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Cannot solve all subgoals · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Cannot.20solve.20all.20subgoals.html">[isabelle] Cannot solve all subgoals</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294648206"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Cannot%20solve%20all%20subgoals/near/294648206" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Cannot.20solve.20all.20subgoals.html#294648206">(Aug 22 2022 at 10:43)</a>:</h4>
+<p>From: Christoph Dittmann &lt;<a href="mailto:f-isabellelist@yozora.eu">f-isabellelist@yozora.eu</a>&gt;<br>
+Hi,</p>
+<p>sometimes when I prove a lemma with multiple subgoals one after the<br>
+other, the number of subgoals does not shrink and in the end there are<br>
+unsolved subgoals that I don't understand.</p>
+<p>The following is a minimal example of what happened:</p>
+<p>theory Test imports Main begin<br>
+lemma foo:<br>
+  assumes "R = {}"<br>
+  shows "⋀x y. (x, y) ∈ R ⟹ x = y" "⋀x y. (y, x) ∈ R ⟹ (x, y) ∈ R" proof-<br>
+  show "⋀x y. (x, y) ∈ R ⟹ x = y" sorry<br>
+  show "⋀x y. (y, x) ∈ R ⟹ (x, y) ∈ R" sorry<br>
+  (* 2 remaining subgoals at this point:</p>
+<p>1. ⋀x y. (x, y) ∈ R ⟹ (y, x) ∈ R<br>
+     2. ⋀x y. (y, x) ∈ R ⟹ (x, y) ∈ R<br>
+  *)<br>
+qed<br>
+(*<br>
+Failed to finish proof:<br>
+  goal (2 subgoals):</p>
+<p>1. ⋀x y. (x, y) ∈ R ⟹ (y, x) ∈ R<br>
+   2. ⋀x y. (y, x) ∈ R ⟹ (x, y) ∈ R<br>
+*)<br>
+end</p>
+<p>In the lemma, after positioning the cursor in jedit behind proof-, it<br>
+shows me the two subgoals I expect.  After solving these two subgoals,<br>
+there are now still 2 goals remaining and the proof fails.</p>
+<p>The last unsolved subgoal looks to me exactly like the one I proved<br>
+explicitly with the second show line, so I am somewhat puzzled as to why<br>
+it remains.</p>
+<p>Where did I go wrong?  Is this the expected behavior?</p>
+<p>(In case it is relevant, I work with Isabelle2015.)</p>
+<p>Thanks,<br>
+Christoph</p>
+
+
+
+<a name="294648379"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Cannot%20solve%20all%20subgoals/near/294648379" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Cannot.20solve.20all.20subgoals.html#294648379">(Aug 22 2022 at 10:44)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+Hi Christoph,</p>
+<blockquote>
+<p>Where did I go wrong?  Is this the expected behavior?</p>
+</blockquote>
+<p>the short answer: yes, this is expected behaviour.</p>
+<p>The longer answer: The statement</p>
+<p>show "P ⟹ Q"</p>
+<p>doesn't do what you think it does. Let's say, your goal state looks like<br>
+this:</p>
+<ol>
+<li>P ⟹ Q</li>
+</ol>
+<p>When you prove something with "show", then the goal state gets<br>
+<em>resolved</em> against what you proved. This allows you e.g. to prove<br>
+something more general than what the subgoal says.</p>
+<p>In this particular case, you would end up with the new subgoal</p>
+<ol>
+<li>P ⟹ P</li>
+</ol>
+<p>However, you can easily avoid that behaviour. You can structure your<br>
+proof as follows:</p>
+<p>proof -<br>
+  assume assm: P<br>
+  show Q<br>
+    using assm ...<br>
+next<br>
+  assume assm: Q<br>
+  show P<br>
+    using assm ...<br>
+qed</p>
+<p>By explicitly stating "P" as an assumption, the system knows – sloppily<br>
+speaking – that it should solve the whole subgoal.</p>
+<p>The whole situation is a little bit more complex and it's going to<br>
+change (it has already changed in the development version), but the<br>
+above is how you would generally structure your proof.</p>
+<p>Cheers<br>
+Lars</p>
+
+
+
+<a name="294648484"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Cannot%20solve%20all%20subgoals/near/294648484" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Cannot.20solve.20all.20subgoals.html#294648484">(Aug 22 2022 at 10:45)</a>:</h4>
+<p>From: Lars Noschinski &lt;<a href="mailto:noschinl@in.tum.de">noschinl@in.tum.de</a>&gt;<br>
+The short answer is: Don't use "_ ==&gt; _" in show statements. For a<br>
+longer explanation, see the following answer on Stackoverflow:</p>
+<p><a href="http://stackoverflow.com/questions/25285797/taming-meta-implication-in-isar-proofs/25442787#25442787">http://stackoverflow.com/questions/25285797/taming-meta-implication-in-isar-proofs/25442787#25442787</a></p>
+<p>-- Lars</p>
+
+
+
+<a name="294648533"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Cannot%20solve%20all%20subgoals/near/294648533" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Cannot.20solve.20all.20subgoals.html#294648533">(Aug 22 2022 at 10:45)</a>:</h4>
+<p>From: Christoph Dittmann &lt;<a href="mailto:f-isabellelist@yozora.eu">f-isabellelist@yozora.eu</a>&gt;<br>
+Thank you and also Lars Hupel for your answers.  This list is indeed<br>
+very helpful!</p>
+<p>I was using show statements with ==&gt; mostly because I had lots of them<br>
+from unfolding a locale and most of them were rather trivial one-line<br>
+proofs.  So I was looking for a way to avoid Isar style verbose proofs<br>
+in this specific case without resorting to apply scripts.</p>
+<p>Christoph</p>
+
+
+
+<a name="294648550"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Cannot%20solve%20all%20subgoals/near/294648550" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Cannot.20solve.20all.20subgoals.html#294648550">(Aug 22 2022 at 10:45)</a>:</h4>
+<p>From: Lars Noschinski &lt;<a href="mailto:noschinl@in.tum.de">noschinl@in.tum.de</a>&gt;<br>
+When they are really trivial, you might also be able to solve them by<br>
+giving a single proof method to the closing "qed".</p>
+<p>-- Lars</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

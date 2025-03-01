@@ -1,0 +1,93 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] &quot;code_pred&quot; introduces axioms? · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20.22code_pred.22.20introduces.20axioms.3F.html">[isabelle] &quot;code_pred&quot; introduces axioms?</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294252792"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20%22code_pred%22%20introduces%20axioms%3F/near/294252792" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20.22code_pred.22.20introduces.20axioms.3F.html#294252792">(Aug 19 2022 at 12:16)</a>:</h4>
+<p>From: Jasmin Christian Blanchette &lt;<a href="mailto:jasmin.blanchette@gmail.com">jasmin.blanchette@gmail.com</a>&gt;<br>
+Hi all,</p>
+<p>I was a bit surprised to discover that "code_pred" introduces axioms with strange names in some circumstances. I've checked the behavior with a recent repository version of Isabelle but it has been around for several weeks and should be in Isabelle2013-1-RC1 as well (and probably Isabelle2013).</p>
+<p>In "Jinja/Common/TypeRel.thy", there is the following command</p>
+<p>code_pred <br>
+      (modes: i ⇒ i × o ⇒ bool, i ⇒ i × i ⇒ bool)<br>
+      [inductify]<br>
+      subcls1 <br>
+    .</p>
+<p>Right after it,</p>
+<p>ML {* Theory.axioms_of @{theory} |&gt; map fst |&gt; rev |&gt; take 2 *}</p>
+<p>will produce somehting like</p>
+<p>val it = ["TypeRel.unnamed_axiom_2088252", "TypeRel.unnamed_axiom_2088251"]: string list</p>
+<p>where the numbers change on each invocation.</p>
+<p>(1) Is it desirable that "code_pred" introduces axioms for something that could (from what I can tell) easily be done using a definition?<br>
+(2) If the answer yes, shouldn't it provide some decent names to them rather than unpredictable, ever changing ones?</p>
+<p>Jasmin</p>
+
+
+
+<a name="294252810"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20%22code_pred%22%20introduces%20axioms%3F/near/294252810" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20.22code_pred.22.20introduces.20axioms.3F.html#294252810">(Aug 19 2022 at 12:17)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Jasmin,</p>
+<p>When Lukas told me about the axioms about three years ago, he said that indeed these <br>
+axioms only specify new constants which the inductify option of code_pred introduces for <br>
+code generation. He wanted to somewhen implement proper definitions for these constants, <br>
+but never found the time. So no, it is not desirable to have axioms instead of <br>
+definitions, even in code_pred [inductify].</p>
+<p>However a simple definition will not work, one would have to build quite some machinery, <br>
+because the definitions can be recursive. The following example illustrates the problem:</p>
+<p>theory Scratch<br>
+imports Main<br>
+begin</p>
+<p>definition Id :: "('a =&gt; 'a) =&gt; 'a =&gt; 'a" where "Id f x = f x"</p>
+<p>lemma [fundef_cong]: "[| x = y; f y = g y |] ==&gt; Id f x = Id g y"<br>
+by(simp add: Id_def)</p>
+<p>fun bar :: "nat =&gt; nat" where<br>
+   bar0: "bar 0 = 1"<br>
+| bar1: "bar (Suc n) = Id bar n" (* higher-order recursion through Id *)</p>
+<p>inductive foo :: "nat =&gt; bool"<br>
+where "foo 0" | "foo (bar k)"</p>
+<p>code_pred [inductify] foo .</p>
+<p>The invocation of code_pred introduces two new constants IdP and barP and specified the <br>
+following three axioms:</p>
+<p>IdP barP p res ==&gt; barP (Suc p) res<br>
+barP 0 1<br>
+h z res ==&gt; IdP h z res</p>
+<p>The introduction rules for barP are recursive and go through the higher-order predicate <br>
+IdP (just like the definition of bar higher-order-recurses throuch Id). If one wants to do <br>
+this definitionally (e.g., with the inductive package), then one also has to prove the <br>
+monotonicity rule for IdP. I am not sure whether one should spent that much effort, as <br>
+[inductify] itself is very flaky anyway.</p>
+<p>With respect to the names of the axioms, I don't care what they are called. I have never <br>
+wanted to use them, because they are really internal constructions of the code generator. <br>
+Only the generated .equation theorem is of interest. But if you want to implement stable <br>
+names, how about &lt;predicate name&gt;.intros?</p>
+<p>Andreas</p>
+
+
+
+<a name="294252822"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20%22code_pred%22%20introduces%20axioms%3F/near/294252822" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20.22code_pred.22.20introduces.20axioms.3F.html#294252822">(Aug 19 2022 at 12:17)</a>:</h4>
+<p>From: Jasmin Blanchette &lt;<a href="mailto:jasmin.blanchette@gmail.com">jasmin.blanchette@gmail.com</a>&gt;<br>
+Hi Andreas,</p>
+<p>Thank you for the (as usual) very thorough explanation.</p>
+<blockquote>
+<p>The introduction rules for barP are recursive and go through the higher-order predicate IdP (just like the definition of bar higher-order-recurses throuch Id). If one wants to do this definitionally (e.g., with the inductive package), then one also has to prove the monotonicity rule for IdP. I am not sure whether one should spent that much effort, as [inductify] itself is very flaky anyway.</p>
+</blockquote>
+<p>I believe Lars Hupel is trying to attack similar problems, also in the context of the code generator.</p>
+<blockquote>
+<p>With respect to the names of the axioms, I don't care what they are called. I have never wanted to use them, because they are really internal constructions of the code generator. Only the generated .equation theorem is of interest. But if you want to implement stable names, how about &lt;predicate name&gt;.intros?</p>
+</blockquote>
+<p>I did something a bit simpler -- ".intros" doesn't quite work with "Specification.axiom", which does one axiom at a time. It's not that I care so much about the names, but for a tool like MaSh it's a bit worrying when the fact names change each time you reload the theory.</p>
+<p>Jasmin</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

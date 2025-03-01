@@ -1,0 +1,224 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] One more case about induction · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20One.20more.20case.20about.20induction.html">[isabelle] One more case about induction</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294113239"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20One%20more%20case%20about%20induction/near/294113239" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20One.20more.20case.20about.20induction.html#294113239">(Aug 18 2022 at 15:45)</a>:</h4>
+<p>From: Tambet &lt;<a href="mailto:qtvali@gmail.com">qtvali@gmail.com</a>&gt;<br>
+I'm still stuck with inductive proofs. I did seek manuals of inductive<br>
+functions, searched Google about induction etc., but they all seem to lack<br>
+something.</p>
+<p>Case 1:<br>
+(* If someone would hint, how to make this a subclass of nat so that lemmas<br>
+about nat would be used and I could use it in fix part of lemmas, it would<br>
+be nice *)<br>
+definition cnat :: "nat =&gt; bool"     where "cnat n = (0 &lt; n)"</p>
+<p>(* This one is already proven - thanks to Lawrence and Rafal *)<br>
+lemma cn_is_cnat: "cnat n ==&gt; cnat (cn n)"</p>
+<p>(* This defines the following function - an ordered list, which will go to<br>
+infinite cycle at end. This would be nice to have a constructor for list,<br>
+which contains those elements, but currently this basic syntax should be<br>
+enough? *)<br>
+inductive cf :: "nat =&gt; nat =&gt; bool" where<br>
+ cnf[intro!]:<br>
+  "cnat n ==&gt; cf (cn n) n" |<br>
+ cff[intro!]:<br>
+  "cf m n ==&gt; cf (cn m) n"</p>
+<p>(* This follows directly from cf_def and cn_is_cnat. *)<br>
+lemma cf_is_cnat: "cnat n ==&gt; cf m n ==&gt; cnat m"</p>
+<p>I did try strategies described in<br>
+<a href="http://www.mkm-ig.org/meetings/mkm06/Presentations/Wenzel.pdf">http://www.mkm-ig.org/meetings/mkm06/Presentations/Wenzel.pdf</a></p>
+<p>For example, this:<br>
+lemma cf_is_cnat:<br>
+  assumes "cnat n"<br>
+  assumes f: "cf m n"<br>
+  shows "cnat m"<br>
+using f<br>
+proof (induct n fixing: m)</p>
+<p>I would read it as that if I fix m, then I can prove general statements,<br>
+which hold for any m. Then I could have case with cnf followed by case with<br>
+cff and it would be proven.</p>
+<p>Anyway, what I get is that I actually could not fix m:<br>
+*** method "HOL.induct": bad arguments<br>
+***   : m<br>
+*** At command "proof".</p>
+<p>lemma cf_is_cnat:<br>
+  assumes "cnat n"<br>
+  assumes "cf m n"<br>
+  shows "cnat m"<br>
+proof -<br>
+  fix x<br>
+  show "cf (cn x) x ==&gt; cnat (cn x)"<br>
+*** Local statement will fail to refine any pending goal<br>
+*** Failed attempt to solve goal by exported rule:<br>
+***   cf (cn (?x2::nat)) ?x2 ==&gt; cnat (cn ?x2)<br>
+*** At command "show".</p>
+<p>Now, how could I extract the cases of definition - first case<br>
+(non-inductive) is the case "cf (cn x) x"; second case is the inductive case<br>
+"cf (cn y) x", where y is resulting "cn ?" from first or second case. It<br>
+should be proven if I show that first case gives me number with property<br>
+cnat and inductive case gives me number with property cnat if it's given<br>
+number with property cnat.</p>
+<p>Anyway, I am unable to close such circle. I am unable to define that these<br>
+are the cases and all cases.</p>
+<p>This is the pattern from isar-overview I also tried:<br>
+lemma cf_is_cnat:<br>
+  assumes "cnat n"<br>
+  assumes f: "cf m n"<br>
+  shows "cnat m"<br>
+using f<br>
+proof (induct m)<br>
+  fix x<br>
+  case "cnat n ==&gt; cf (cn n) n"<br>
+  case "cnat n"<br>
+  case "cn n"<br>
+  case cnf</p>
+<p>That last list of cases is all kinds of things I tried to use to point out<br>
+that I mean the first, noninductive case there.</p>
+<p>I can understand that the best way to prove something about recursive<br>
+function is:</p>
+<p>- Show that the parts of function, which are not recursive ("entry<br>
+   points") will be True if values given have property x (and False otherwise).</p>
+<p>- Show that the parts of function, which are recursive and call those<br>
+   parts will be True if values given have property x (and False otherwise).</p>
+<p>This could be extended by having properties x, y and z and paths, which have<br>
+this property. This is finite task to create all possible paths from one to<br>
+another and show that iff given values have property x, y or z, then all<br>
+calls they make have property z, y or x (for example) and thus, all paths<br>
+lead to True if input has any of such properties; then to show that some<br>
+such property is assumed.</p>
+<p>Anyway, I am probably lacking some critical bit of knowledge to actually<br>
+create such path and show about those properties ...manuals give this rather<br>
+by example, but my current tries to generalize them to my case do not meet<br>
+some constraint if any of them is interpreted as meant at all.</p>
+<p>How to solve such cases - example for concrete examples would be nice, link<br>
+to general manual not needing too much foreknowledge would be also very<br>
+nice. Because this is totally critical for me to have such things proven to<br>
+continue - I can already handle the simple non-recursive proofs in many<br>
+cases, but I do not catch the logic(s?) behind cases.</p>
+<p>Tambet</p>
+
+
+
+<a name="294113301"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20One%20more%20case%20about%20induction/near/294113301" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20One.20more.20case.20about.20induction.html#294113301">(Aug 18 2022 at 15:45)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+Tambet wrote:</p>
+<blockquote>
+<p>I'm still stuck with inductive proofs. I did seek manuals of inductive<br>
+functions, searched Google about induction etc., but they all seem to lack<br>
+something.</p>
+<p>Case 1:<br>
+(* If someone would hint, how to make this a subclass of nat so that lemmas<br>
+about nat would be used and I could use it in fix part of lemmas, it would<br>
+be nice *)<br>
+definition cnat :: "nat =&gt; bool"     where "cnat n = (0 &lt; n)"</p>
+<p>(* This one is already proven - thanks to Lawrence and Rafal *)<br>
+lemma cn_is_cnat: "cnat n ==&gt; cnat (cn n)"</p>
+<p>(* This defines the following function - an ordered list, which will go to<br>
+infinite cycle at end. This would be nice to have a constructor for list,<br>
+which contains those elements, but currently this basic syntax should be<br>
+enough? *)<br>
+inductive cf :: "nat =&gt; nat =&gt; bool" where<br>
+ cnf[intro!]:<br>
+  "cnat n ==&gt; cf (cn n) n" |<br>
+ cff[intro!]:<br>
+  "cf m n ==&gt; cf (cn m) n"</p>
+<p>(* This follows directly from cf_def and cn_is_cnat. *)<br>
+lemma cf_is_cnat: "cnat n ==&gt; cf m n ==&gt; cnat m"</p>
+</blockquote>
+<p>lemma cf_is_cnat: "cf m n ==&gt; n&gt;0 ==&gt; m&gt;0"<br>
+apply(induct rule: cf.induct)<br>
+apply (metis cn_is_cnat)<br>
+by (metis cn_is_cnat)</p>
+<p>You can easily turn into a structured proof.</p>
+<p>I have eliminated cnat - I don't see the point of it. More importantly,<br>
+your whole approach is overly complicated. You want to iterate function<br>
+cn. Well, simply use function iteration: (cn^^k)(n) is the result of the<br>
+k-fold application of cn to n. See compower in theory Nat.thy.</p>
+<p>Tobias</p>
+<blockquote>
+<p>I did try strategies described in<br>
+<a href="http://www.mkm-ig.org/meetings/mkm06/Presentations/Wenzel.pdf">http://www.mkm-ig.org/meetings/mkm06/Presentations/Wenzel.pdf</a></p>
+<p>For example, this:<br>
+lemma cf_is_cnat:<br>
+  assumes "cnat n"<br>
+  assumes f: "cf m n"<br>
+  shows "cnat m"<br>
+using f<br>
+proof (induct n fixing: m)</p>
+<p>I would read it as that if I fix m, then I can prove general statements,<br>
+which hold for any m. Then I could have case with cnf followed by case with<br>
+cff and it would be proven.</p>
+<p>Anyway, what I get is that I actually could not fix m:<br>
+*** method "HOL.induct": bad arguments<br>
+***   : m<br>
+*** At command "proof".</p>
+<p>lemma cf_is_cnat:<br>
+  assumes "cnat n"<br>
+  assumes "cf m n"<br>
+  shows "cnat m"<br>
+proof -<br>
+  fix x<br>
+  show "cf (cn x) x ==&gt; cnat (cn x)"<br>
+*** Local statement will fail to refine any pending goal<br>
+*** Failed attempt to solve goal by exported rule:<br>
+***   cf (cn (?x2::nat)) ?x2 ==&gt; cnat (cn ?x2)<br>
+*** At command "show".</p>
+<p>Now, how could I extract the cases of definition - first case<br>
+(non-inductive) is the case "cf (cn x) x"; second case is the inductive case<br>
+"cf (cn y) x", where y is resulting "cn ?" from first or second case. It<br>
+should be proven if I show that first case gives me number with property<br>
+cnat and inductive case gives me number with property cnat if it's given<br>
+number with property cnat.</p>
+<p>Anyway, I am unable to close such circle. I am unable to define that these<br>
+are the cases and all cases.</p>
+<p>This is the pattern from isar-overview I also tried:<br>
+lemma cf_is_cnat:<br>
+  assumes "cnat n"<br>
+  assumes f: "cf m n"<br>
+  shows "cnat m"<br>
+using f<br>
+proof (induct m)<br>
+  fix x<br>
+  case "cnat n ==&gt; cf (cn n) n"<br>
+  case "cnat n"<br>
+  case "cn n"<br>
+  case cnf</p>
+<p>That last list of cases is all kinds of things I tried to use to point out<br>
+that I mean the first, noninductive case there.</p>
+<p>I can understand that the best way to prove something about recursive<br>
+function is:</p>
+<p>- Show that the parts of function, which are not recursive ("entry<br>
+   points") will be True if values given have property x (and False otherwise).<br>
+   - Show that the parts of function, which are recursive and call those<br>
+   parts will be True if values given have property x (and False otherwise).</p>
+<p>This could be extended by having properties x, y and z and paths, which have<br>
+this property. This is finite task to create all possible paths from one to<br>
+another and show that iff given values have property x, y or z, then all<br>
+calls they make have property z, y or x (for example) and thus, all paths<br>
+lead to True if input has any of such properties; then to show that some<br>
+such property is assumed.</p>
+<p>Anyway, I am probably lacking some critical bit of knowledge to actually<br>
+create such path and show about those properties ...manuals give this rather<br>
+by example, but my current tries to generalize them to my case do not meet<br>
+some constraint if any of them is interpreted as meant at all.</p>
+<p>How to solve such cases - example for concrete examples would be nice, link<br>
+to general manual not needing too much foreknowledge would be also very<br>
+nice. Because this is totally critical for me to have such things proven to<br>
+continue - I can already handle the simple non-recursive proofs in many<br>
+cases, but I do not catch the logic(s?) behind cases.</p>
+<p>Tambet</p>
+</blockquote>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

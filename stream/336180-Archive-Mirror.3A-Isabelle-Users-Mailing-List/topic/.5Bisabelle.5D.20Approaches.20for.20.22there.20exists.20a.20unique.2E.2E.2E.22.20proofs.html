@@ -1,0 +1,327 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Approaches for &quot;there exists a unique...&quot; proofs · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Approaches.20for.20.22there.20exists.20a.20unique.2E.2E.2E.22.20proofs.html">[isabelle] Approaches for &quot;there exists a unique...&quot; proofs</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294761814"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Approaches%20for%20%22there%20exists%20a%20unique...%22%20proofs/near/294761814" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Approaches.20for.20.22there.20exists.20a.20unique.2E.2E.2E.22.20proofs.html#294761814">(Aug 22 2022 at 20:26)</a>:</h4>
+<p>From: "John F. Hughes" &lt;<a href="mailto:jfh@cs.brown.edu">jfh@cs.brown.edu</a>&gt;<br>
+I want to show that in the Euclidean plane, there is a unique line between<br>
+any two distinct points. I want to show this is a particular way, so that I<br>
+can later show that my notion of a point in the Euclidean plane being on a<br>
+line matches the requirements for defining a (more general) affine plane,<br>
+i.e., I want to show that the Euclidean plane is an affine plane. To get<br>
+there, I define a function "a2meets P l" that is true when P is a point on<br>
+the line l, false otherwise. Points are pairs of reals, lines are either<br>
+vertical or "ordinary" (i.e., have an equation like y = mx + b). I want to<br>
+prove this:</p>
+<p>"P ≠ Q ⟹ ∃! l . a2meets P l ∧ a2meets Q l"</p>
+<p>To keep things simple, I proved existence and uniqueness separately:<br>
+  theorem a1a:<br>
+    fixes P :: a2pt<br>
+    fixes Q<br>
+    assumes "P ≠ Q"<br>
+    shows "∃ ls . a2meets P ls ∧ a2meets Q ls"</p>
+<p>lemma a1b:<br>
+    fixes P :: a2pt<br>
+    fixes Q<br>
+    fixes l<br>
+    fixes m<br>
+    assumes pq: "P ≠ Q"<br>
+    assumes pl : "a2meets P l"<br>
+    assumes ql : "a2meets Q l"<br>
+    assumes pm : "a2meets P m"<br>
+    assumes qm : "a2meets Q m"<br>
+    shows "l = m"</p>
+<p>I'd now like to conclude the overall theorem.  It's pretty clear (to me!)<br>
+that a1a and a1b imply the result, but the only way I can coax Isar to get<br>
+there seems needlessly convoluted:<br>
+theorem a1 : "P ≠ Q ⟹ ∃! l . a2meets P l ∧ a2meets Q l"<br>
+proof -<br>
+  assume "P ≠ Q"<br>
+  show ?thesis<br>
+  proof (cases P)<br>
+    case (A2Point x0 y0)<br>
+    then show ?thesis<br>
+    proof (cases Q)<br>
+      case (A2Point x1 y1)<br>
+      have ?thesis using ‹P ≠ Q› a1a a1b by blast<br>
+      show ?thesis by (simp add: ‹∃!l. a2meets P l ∧ a2meets Q l›)<br>
+    qed<br>
+  qed<br>
+qed</p>
+<p>Of course, a1a and a1b do appear in there, but are the nested cases really<br>
+necessary? (I wouldn't ask if I hadn't tried about 15 other approaches)</p>
+<p>More generally, is there  structure for proofs of existence of a unique<br>
+item satisfying some criteria, analogous to the nice structures we have for<br>
+proof-by-cases, or proof-by-various-forms-of-induction? Complete .thy file<br>
+follows.</p>
+<p>--John</p>
+<p>theory Small<br>
+  imports Complex_Main</p>
+<p>begin<br>
+  section {* The real affine plane *}<br>
+  datatype a2pt = A2Point "real" "real"</p>
+<p>datatype a2ln = A2Ordinary "real" "real"<br>
+                | A2Vertical "real"<br>
+  text "Ordinary m b represents the line y = mx+b; Vertical xo is the line<br>
+x = xo "</p>
+<p>fun a2meets :: "a2pt ⇒ a2ln ⇒ bool" where<br>
+    "a2meets (A2Point x y) (A2Ordinary m b) = (y = m*x + b)" |<br>
+    "a2meets (A2Point x y) (A2Vertical xi) = (x = xi)"</p>
+<p>text{* Now show a basic property: through any two distinct points,<br>
+there's a unique line,<br>
+      which, for consistency with the main theory, we want to write as<br>
+      "P ≠ Q ⟹ ∃! l . a2meets P l ∧ a2meets Q l" *}<br>
+  text{* Start with just existence *}</p>
+<p>theorem a1a:<br>
+    fixes P :: a2pt<br>
+    fixes Q<br>
+    assumes "P ≠ Q"<br>
+    shows "∃ ls . a2meets P ls ∧ a2meets Q ls"<br>
+  proof (cases P)<br>
+    case P: (A2Point x0 y0)<br>
+    then show ?thesis<br>
+    proof (cases Q)<br>
+      case Q: (A2Point x1 y1)<br>
+      then show ?thesis<br>
+      proof (cases "(x0 = x1)")<br>
+        case True<br>
+        assume f: "x0 = x1"<br>
+        have x1x0: "x1 = x0" by (simp add: True)<br>
+        let ?ll = "A2Vertical x0"<br>
+        have m1:  "a2meets P ?ll" using P  by simp<br>
+        have m2:  "a2meets Q ?ll" using Q  by (simp add: x1x0)<br>
+        thus ?thesis using m1 by blast (* We've proved the theorem...in the<br>
+case where x0 = x1 *)<br>
+      next<br>
+        case False (* Now on to the other case, where x0 ≠ x1; it's clear<br>
+what the answer is,<br>
+                      but tought to coax Isabelle along to see it. *)<br>
+        assume f: "x0 ≠ x1"<br>
+        have x01 : "x1 - x0  ≠ 0" using f by simp<br>
+        let ?ll = "A2Ordinary ((y1-y0)/(x1-x0))  (y0 -<br>
+((y1-y0)/(x1-x0))*x0) "<br>
+          (* we want to show that P and Q are both on ll; P is easy for<br>
+some reason; Q is not *)<br>
+        have m3:  "a2meets P ?ll" using P  by simp<br>
+            (* Now address the case of Q by doing all the algebra one step<br>
+at a time *)<br>
+        have s2: "((y1-y0)/(x1 - x0))* x1 + (y0 - ((y1-y0)/(x1 - x0) )*x0)<br>
+= ((y1-y0) * x1/(x1 - x0)) + (y0 - ((y1-y0)/(x1 - x0) )*x0)" by simp<br>
+        also have s3 : "... =  ((y1-y0) * x1/(x1 - x0)) + (y0 -<br>
+((y1-y0)*x0/(x1 - x0) ))" by simp<br>
+        also have s4 : "... =  ((y1<em>x1-y0</em>x1) /(x1 - x0)) + (y0 -<br>
+((y1<em>x0-y0</em>x0)/(x1 - x0) ))" by argo<br>
+        also have s5 : "... =  ((y1<em>x1-y0</em>x1) /(x1 - x0)) + (y0*(x1 -<br>
+x0)/(x1-x0) - ((y1<em>x0-y0</em>x0)/(x1 - x0) ))" using x01 by simp<br>
+        also have s6 : "... =  ((y1<em>x1-y0</em>x1) /(x1 - x0)) + ((y0*x1 -<br>
+y0<em>x0)/(x1-x0) - ((y1</em>x0-y0*x0)/(x1 - x0) ))" by argo<br>
+        also have s7 : "... =  (y1<em>x1-y0</em>x1) /(x1 - x0) + ((y0<em>x1 - y0</em>x0)</p>
+<ul>
+<li>
+<p>(y1<em>x0-y0</em>x0))/(x1 - x0) " by argo<br>
+        also have s8 : "... =  ((y1<em>x1-y0</em>x1) + (y0<em>x1 - y0</em>x0) -<br>
+(y1<em>x0-y0</em>x0))/(x1 - x0) " by argo<br>
+        also have s9 : "... =  (y1<em>x1-y0</em>x1 + y0<em>x1 - y0</em>x0 -<br>
+y1<em>x0+y0</em>x0)/(x1 - x0) " by argo<br>
+        also have s10 : "... =  (y1<em>x1 - y0</em>x0 - y1<em>x0+y0</em>x0)/(x1 - x0) "<br>
+by argo<br>
+        also have s11 : "... =  (y1<em>x1  - y1</em>x0)/(x1 - x0) " by argo<br>
+        also have s12 : "... =  (y1*(x1  - x0))/(x1 - x0) " by argo<br>
+        also have s13 : "... =  y1 " using x01 by simp<br>
+        finally have s14: "((y1-y0)/(x1 - x0))* x1 + (y0 - ((y1-y0)/(x1 -<br>
+x0) )*x0) = y1" .<br>
+        moreover have m4:  "a2meets Q ?ll" using s14 by (simp add: Q)<br>
+        show ?thesis using m3 m4 by auto<br>
+      qed<br>
+    qed<br>
+  qed</p>
+<p>text{*For this next theorem, it might make sense to phrase it as<br>
+lemma a1b: "P ≠ Q ⟹ ∃! l . a2meets P l ∧ a2meets Q l", i.e., as the final<br>
+result,<br>
+but that would require proving the existence of l (which we just did in the<br>
+previous lemma) and<br>
+then proving that it's unique. Instead, we can just say that if l and m<br>
+both contain the<br>
+distinct points P and Q, then l must equal m. From this, and the previous<br>
+lemma, we can then<br>
+conclude that axiom 1 is true (which we'll do in a final theorem).<br>
+ *}</p>
+<p>lemma a1b:<br>
+  fixes P :: a2pt<br>
+  fixes Q<br>
+  fixes l<br>
+  fixes m<br>
+  assumes pq: "P ≠ Q"<br>
+  assumes pl : "a2meets P l"<br>
+  assumes ql : "a2meets Q l"<br>
+  assumes pm : "a2meets P m"<br>
+  assumes qm : "a2meets Q m"<br>
+  shows "l = m"<br>
+proof (cases P)<br>
+  case (A2Point x0 y0)<br>
+  then show ?thesis<br>
+  proof (cases Q)<br>
+    case (A2Point x1 y1)<br>
+    have ?thesis<br>
+    proof (cases l)<br>
+      case (A2Ordinary s1 b1) (* l is ordinary *)<br>
+      assume lo: "l = A2Ordinary s1 b1"<br>
+      then show ?thesis<br>
+      proof (cases m) (* Handle m ordinary, vertical in two steps *)<br>
+        case (A2Ordinary s2 b2)<br>
+        then show ?thesis by (smt A2Point a2ln.inject(1) a2meets.elims(2)<br>
+a2meets.simps(1) a2pt.inject crossproduct_noteq lo pl pm pq ql qm)<br>
+      next<br>
+        case (A2Vertical x2)<br>
+        then have ?thesis using A2Point a2meets.elims(2) pl pm pq ql qm<br>
+by fastforce<br>
+        show ?thesis by (simp add: ‹l = m›)<br>
+      qed<br>
+    next<br>
+      case (A2Vertical x2) (* l is vertical *)<br>
+      then show ?thesis by (smt a2ln.inject(1) a2meets.elims(2)<br>
+a2meets.simps(2) pl pm pq ql qm)<br>
+    qed<br>
+    show ?thesis by (simp add: ‹l = m›)<br>
+  qed<br>
+qed</p>
+</li>
+</ul>
+<p>theorem a1 : "P ≠ Q ⟹ ∃! l . a2meets P l ∧ a2meets Q l"<br>
+proof -<br>
+  assume "P ≠ Q"<br>
+  show ?thesis<br>
+  proof (cases P)<br>
+    case (A2Point x0 y0)<br>
+    then show ?thesis<br>
+    proof (cases Q)<br>
+      case (A2Point x1 y1)<br>
+      have ?thesis using ‹P ≠ Q› a1a a1b by blast<br>
+      show ?thesis by (simp add: ‹∃!l. a2meets P l ∧ a2meets Q l›)<br>
+    qed<br>
+  qed<br>
+qed</p>
+
+
+
+<a name="294761829"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Approaches%20for%20%22there%20exists%20a%20unique...%22%20proofs/near/294761829" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Approaches.20for.20.22there.20exists.20a.20unique.2E.2E.2E.22.20proofs.html#294761829">(Aug 22 2022 at 20:26)</a>:</h4>
+<p>From: Thomas Sewell &lt;<a href="mailto:sewell@chalmers.se">sewell@chalmers.se</a>&gt;<br>
+I think that your nested proof of theorem a1 is just a long version of this:</p>
+<p>theorem a1 : "P ≠ Q ⟹ ∃! l . a2meets P l ∧ a2meets Q l"<br>
+  using a1a a1b by blast</p>
+<p>The core of your proof is that blast knows how to show exists-unique properties if you give it both a1a and a1b.</p>
+<p>I think that blast solves this using a default introduction rule for exists-unique, which is either ex1I or ex_ex1I. Here's a more Isar approach to the problem using ex_ex1I. I think that this style of using goal_cases is considered standard:</p>
+<p>theorem a1 : "P ≠ Q ⟹ ∃! l . a2meets P l ∧ a2meets Q l"<br>
+proof (rule ex_ex1I, goal_cases)<br>
+  case 1<br>
+  assume "P ≠ Q"<br>
+  then show ?case by (rule a1a)<br>
+next<br>
+  case (2 l y)<br>
+  then show ?case by (simp add: a1b)<br>
+qed</p>
+<p>I'm not sure what else to say. Perhaps you're looking for a particular style of proof?</p>
+<p>Cheers,<br>
+    Thomas.</p>
+
+
+
+<a name="294761840"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Approaches%20for%20%22there%20exists%20a%20unique...%22%20proofs/near/294761840" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Approaches.20for.20.22there.20exists.20a.20unique.2E.2E.2E.22.20proofs.html#294761840">(Aug 22 2022 at 20:26)</a>:</h4>
+<p>From: "John F. Hughes" &lt;<a href="mailto:jfh@cs.brown.edu">jfh@cs.brown.edu</a>&gt;<br>
+Thanks, Thomas. that "using a1a a1b by blast" thing was exactly what I was<br>
+looking for. In particular, it gives me confidence that my phrasing of a1b<br>
+wasn't getting the way of things; I find it's easy to say (for real<br>
+numbers, for instance) something like "x1 != x2" instead of "x1 - x2 != 0"<br>
+(which seem completely equivalent to me), and have it make a huge<br>
+difference to the complexity of a proof, so knowing that this pattern makes<br>
+things work is great.</p>
+<p>I now see that using "try" right after the statement of the theorem<br>
+produces your "blast" proof. Instead of doing that, I had tried</p>
+<p>theorem a1 : "P ≠ Q ⟹ ∃! l . a2meets P l ∧ a2meets Q l"<br>
+proof -<br>
+   try</p>
+<p>and gotten a "tried in vain" result. I'm not sure I understand why there's<br>
+a difference.</p>
+<p>But more generally, you recommend an alternate Isar-idiomatic proof using<br>
+"ex_ex1I, goal_cases", and (like the "blast" case), I'm wondering how I can<br>
+learn<br>
+(a) that these rules/provers exist at all, and<br>
+(b) what each of these rules or provers is actually good at.</p>
+<p>Looking at "Programming and Proving", for instance, the word "metis"<br>
+appears exactly four times, once with a brief description that suggests<br>
+that IT should be the tool used here rather than "blast". As a new user,<br>
+I'm constantly being surprised by new tools like "goal_cases" and<br>
+"ex_ex1l", neither of which is mentioned at all in P&amp;P.</p>
+<p>--John</p>
+
+
+
+<a name="294761847"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Approaches%20for%20%22there%20exists%20a%20unique...%22%20proofs/near/294761847" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Approaches.20for.20.22there.20exists.20a.20unique.2E.2E.2E.22.20proofs.html#294761847">(Aug 22 2022 at 20:26)</a>:</h4>
+<p>From: "Eugene W. Stark" &lt;<a href="mailto:isabelle-users@starkeffect.com">isabelle-users@starkeffect.com</a>&gt;<br>
+I would add:</p>
+<p>theorem a1 :<br>
+assumes "P ≠ Q"<br>
+shows "∃! l . a2meets P l ∧ a2meets Q l"<br>
+proof -<br>
+  have "∃l. a2meets P l ∧ a2meets Q l"<br>
+    using assms a1a by simp<br>
+  moreover have "⋀l l'. ⟦ a2meets P l ∧ a2meets Q l; a2meets P l' ∧ a2meets Q l' ⟧ ⟹ l' = l"<br>
+    using assms a1b by simp<br>
+  ultimately show ?thesis by blast<br>
+qed</p>
+<p>Maybe this is more the structure John is looking for.</p>
+<p>The default method for ∃! demands that the witness be exhibited:</p>
+<p>theorem a1 :<br>
+assumes "P ≠ Q"<br>
+shows "∃! l . a2meets P l ∧ a2meets Q l"<br>
+proof<br>
+  show "a2meets P XXX ∧ a2meets Q XXX"<br>
+    sorry<br>
+  show "⋀l. a2meets P l ∧ a2meets Q l ⟹ l = XXX"<br>
+    sorry<br>
+qed</p>
+<p>so it is not very convenient with the lemmas that have already been set up.</p>
+
+
+
+<a name="294761854"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Approaches%20for%20%22there%20exists%20a%20unique...%22%20proofs/near/294761854" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Approaches.20for.20.22there.20exists.20a.20unique.2E.2E.2E.22.20proofs.html#294761854">(Aug 22 2022 at 20:26)</a>:</h4>
+<p>From: Thomas Sewell &lt;<a href="mailto:sewell@chalmers.se">sewell@chalmers.se</a>&gt;<br>
+OK, let's clarify a bit. The ex_ex1I here is a theorem, not a mechanism. It's being used as an introduction rule here via "rule".</p>
+<p>I'd recommend people learning Isabelle to learn (roughly) what the rule-application calculus is, what intro/dest/elim rules do, and thus how to use them manually and also how to supply them to some tools, e.g. (clarsimp dest!: ...) or (blast intro: ...). Unfortunately I don't actually know where in the reference material to point you.</p>
+<p>Since it's a rule, you can search for it with find_theorems. I found the theorem by searching for rules that can prove exists-unique properties, like so:</p>
+<p>find_theorems "_ ⟹ ∃!_. _"</p>
+<p>I actually didn't know what goal_cases did until an hour or two ago. I was looking for a way to use ex_ex1I  in an Isar-like way, and I vaguely recalled that there was a new feature with cases in its name, and managed to figure it out from there. Roughly speaking, it sets you up to continue in an Isar structured proof from some goal state, which I created here by applying a rule.</p>
+<p>I think it is a real problem of a big complex system like this that there are features out there which you have likely forgotten about. In a long former Isabelle project, I famously forgot about a feature that I had implemented myself. You can find rules with both the sledgehammer and try, but there's no equivalent gadget for finding tools or understanding what they do.</p>
+<p>Quick primer: blast and metis are both first-order solvers. Blast does a search which involves introduction/elimination steps similar to Isabelle rule steps, and it uses the default rule sets. That's how it knew how to prove an exists-unique without being told a rule about it, ex_ex1I is a global default introduction rule. Metis doesn't have that global setup, but it understand equality better and generally has a smarter search strategy, if it's given enough information. There are, of course, many other variants.</p>
+<p>Asking the list: is there a good cheat-sheet or primer for commonly used methods/tactics and quick intuitions of when they're likely to be useful?</p>
+<p>Cheers,</p>
+<p>Thomas.</p>
+
+
+
+<a name="294761985"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Approaches%20for%20%22there%20exists%20a%20unique...%22%20proofs/near/294761985" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Approaches.20for.20.22there.20exists.20a.20unique.2E.2E.2E.22.20proofs.html#294761985">(Aug 22 2022 at 20:27)</a>:</h4>
+<p>From: Karn Kallio &lt;<a href="mailto:tierpluspluslists@skami.org">tierpluspluslists@skami.org</a>&gt;<br>
+With respect to this comment:</p>
+<p>I have been making an on and off investigation into Isabelle, and have<br>
+found the only practical way to learn these sorts of things is to spend<br>
+a lot of time reading the developments in the AFP.  The you will<br>
+discover them, and by the context of use get an idea of when they may<br>
+be helpful.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

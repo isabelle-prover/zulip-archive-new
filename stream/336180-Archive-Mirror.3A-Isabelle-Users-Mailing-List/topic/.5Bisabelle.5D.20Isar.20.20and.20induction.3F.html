@@ -1,0 +1,128 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Isar  and induction? · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isar.20.20and.20induction.3F.html">[isabelle] Isar  and induction?</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294049316"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isar%20%20and%20induction%3F/near/294049316" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isar.20.20and.20induction.3F.html#294049316">(Aug 18 2022 at 10:31)</a>:</h4>
+<p>From: Alexander Krauss &lt;<a href="mailto:krauss@in.tum.de">krauss@in.tum.de</a>&gt;<br>
+Hi David,</p>
+<blockquote>
+<p>In the last line of the following proof I am tring  to use a  known<br>
+fact  (that is something that appears in the  prems list of facts) by<br>
+placing it between \&lt;langle&gt; and \&lt;rangle&gt;.<br>
+Am I unable to  refer to facts like this?</p>
+</blockquote>
+<p>In recent Isabelle versions (post-2005 developer's version, I believe),<br>
+you can refer to literal facts using backquotes. They are just converted<br>
+to the small angle brackets in printed theory sources.</p>
+<p>lemma "A --&gt; A"<br>
+proof<br>
+  assume "A"</p>
+<p>from <code>A</code> show "A" .<br>
+qed</p>
+<p>Note that there are also other ways to reference facts:</p>
+<ul>
+<li>
+<p>If you are inside a "case", the name of the case refers to a list of<br>
+assumptions</p>
+</li>
+<li>
+<p>You can use prems(i) (where i is a number). This actually works for<br>
+any list of facts.</p>
+</li>
+</ul>
+<blockquote>
+<p>using  p proof (induct    rule:   lts.fat_act.induct)  --" fixing: P<br>
+fails to parse"</p>
+</blockquote>
+<p>The "fixing" option is now called "arbitrary".</p>
+<blockquote>
+<p>Question 2.</p>
+<p>The next thing I tried was<br>
+       from  prems tinAB  [where t = s  and A = A and P = (Abs P) and Q<br>
+= (Abs Q)]     show ?case</p>
+<p>but this failed to parse.</p>
+<p>so I rewrote tinAA replacing P by  Abs P  and Q by Abs Q.  Thus I used.</p>
+<p>from  prems tinAB  [where t = s  and A = A and P = P and Q = Q]   show<br>
+?case</p>
+<p>Have I missed some thing or are  the right hand side of these equalities<br>
+very restricted?</p>
+</blockquote>
+<p>You are missing quotes:</p>
+<p>from  prems tinAB  [where t = s  and A = A and P ="(Abs P)"<br>
+                    and Q = "(Abs Q)"]     show ?case</p>
+<p>Every term or type ("inner syntax") must be quoted. Just for single<br>
+symbols, the quotes can be ommitted.</p>
+<blockquote>
+<p>Question 3.  I have defined parallel composition but the transitions in<br>
+this definition are the union of three somewhat complexe sets. I will<br>
+frequently need to split these transitions into the three cases and<br>
+proove my results for each case (set).</p>
+</blockquote>
+<p>I haven't looked very closely at your specific instance... but in<br>
+general you want a rule which can be used as an elimination rule. This<br>
+should have the following format (more or less):</p>
+<p>lemma mytrans_cases:<br>
+  "t : trans (par P A Q)<br>
+   ==&gt; ((fst_tran t : trans P &amp; ...) ==&gt; C)<br>
+   ==&gt; ((snd_tran t : trans Q &amp; ...) ==&gt; C)<br>
+   ==&gt; (!!a. (act t : trans P &amp; a : liftobs A ...) ==&gt; C)<br>
+   ==&gt; C"</p>
+<p>Here is a simple example that actually works:</p>
+<p>definition<br>
+  "myRel P = {(x,y). P x y | P y x}"</p>
+<p>lemma myRel_cases[consumes 1]:<br>
+  "[| (x,y) : myRel P;<br>
+      P x y ==&gt; A;<br>
+      P y x ==&gt; A |]<br>
+  ==&gt; A"<br>
+  unfolding myRel_def<br>
+  by blast</p>
+<p>lemma example: "(x,y) : myRel P ==&gt; something"<br>
+proof -<br>
+  assume "(x,y) : myRel P"<br>
+  thus something<br>
+  proof (cases rule:myRel_cases)<br>
+    assume "P x y" thus something sorry<br>
+  next<br>
+    assume "P y x" thus something sorry<br>
+  qed<br>
+qed</p>
+<p>Note that the existentials in your lemma become universals in the<br>
+cases-theorem, since you are working "on the left hand side of the arrow".</p>
+<p>The "consumes 1" attribute tells the "cases" method to resolve one<br>
+premise with the assumptions in your actual proof. To get a clearer<br>
+understanding of what happens here, just leave it out and see what changes.</p>
+<p>If you need the splitting very often, you can also give names to the<br>
+different cases, which makes proofs look nicer. For the simple example:</p>
+<p>lemma myRel_cases[consumes 1, case_names foo bar]:<br>
+  "[| (x,y) : myRel P;<br>
+      P x y ==&gt; A;<br>
+      P y x ==&gt; A |]<br>
+  ==&gt; A"<br>
+  unfolding myRel_def<br>
+  by blast</p>
+<p>lemma "(x,y) : myRel P ==&gt; something"<br>
+proof -<br>
+  assume "(x,y) : myRel P"<br>
+  thus something<br>
+  proof (cases rule:myRel_cases)<br>
+    case foo thus something sorry<br>
+  next<br>
+    case bar thus something sorry<br>
+  qed<br>
+qed</p>
+<p>You will be excited about how pretty your proofs can become :-)</p>
+<p>Alex</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

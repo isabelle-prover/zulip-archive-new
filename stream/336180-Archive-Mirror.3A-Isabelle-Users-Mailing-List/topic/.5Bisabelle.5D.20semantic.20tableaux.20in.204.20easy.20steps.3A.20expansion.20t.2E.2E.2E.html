@@ -1,0 +1,200 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] semantic tableaux in 4 easy steps: expansion t... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20semantic.20tableaux.20in.204.20easy.20steps.3A.20expansion.20t.2E.2E.2E.html">[isabelle] semantic tableaux in 4 easy steps: expansion t...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294272296"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20semantic%20tableaux%20in%204%20easy%20steps%3A%20expansion%20t.../near/294272296" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20semantic.20tableaux.20in.204.20easy.20steps.3A.20expansion.20t.2E.2E.2E.html#294272296">(Aug 19 2022 at 14:00)</a>:</h4>
+<p>From: Gottfried Barrow &lt;<a href="mailto:igbi@gmx.com">igbi@gmx.com</a>&gt;<br>
+As to what kind of tableaux it really is, that is questionable.</p>
+<p>Please consider this formula:</p>
+<p>(A &amp; B) --&gt; C ==&gt; ~A --&gt; D ==&gt;  B --&gt; (C | D).</p>
+<p>Has it been in your wildest dreams to do the following?<br>
+   (a) negate the conclusion of that formula,<br>
+   (b) then expand it into 6 negated chains of conjunctions,<br>
+   (c) then convert that into a formula that only uses Trueprop, ==&gt;, <br>
+False, and bool variables,<br>
+   (d) and then prove that expression with auto, auto needing none of <br>
+this to be done.</p>
+<p>It went like this:</p>
+<p>(1) I became aware that Larry's blast is used by auto, the word <br>
+"tableau" being involved, by necessity implicating that French guy, <br>
+Thomas Voeckler.</p>
+<p>(2) From looking at a combination of Reeves &amp; Clarke's free logic book, <br>
+[1], and the chapter on analytic tableaux in Smullyan, [2], I worked up <br>
+some notation to implement the tree of a tableaux for the formula above, <br>
+from [1] page 76.</p>
+<p>(3) I tried to automate building the binary tree in Isabelle, but <br>
+aborted that due to lack of programming skills.</p>
+<p>(4) I switched to trying to expand the formula in just the right way, to <br>
+get the chains that correspond to the tree.</p>
+<p>(5) I stumbled on the right combination of rules needed, at least for <br>
+that formula, which is enough for now.</p>
+<p>Can we not agree, that ==&gt; is the Isabelle mother-of-all-meta-logic <br>
+operators? However, though mothers are very important, even mothers, at <br>
+times, need a little help from their children to arrive at the desired <br>
+location.</p>
+<p>I included the source and attached the THY. Even a true artiste must <br>
+continually experiment with notation to find something which meet many, <br>
+many needs. Over and over again, initial choices are refined or abandoned.</p>
+<p>This will be part of my voluminous work, "The Logic of a True Artiste - <br>
+In All Its Majestic Fame and Glory - Alonso Church, You and Haskell <br>
+Curry Would be Proud - Donald Knuth, One Word, LaTeX - Mike Gordon, You <br>
+Are Absent from This Mailing List, Three Letters, HOL - Robin Milner, <br>
+It's Enough to Say Your Name."</p>
+<p>Regards,<br>
+GB</p>
+<p>[1] Logic for Computer Science, <a href="http://www.cs.waikato.ac.nz/~stever/LCS.html">http://www.cs.waikato.ac.nz/~stever/LCS.html</a><br>
+[2] First-order logic, <br>
+<a href="http://www.amazon.com/First-Order-Logic-Dover-Books-Mathematics/dp/0486683702">http://www.amazon.com/First-Order-Logic-Dover-Books-Mathematics/dp/0486683702</a></p>
+<p>(<strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong>***)<br>
+theory i140309aa__semantab<br>
+imports Complex_Main (<em>"../../iHelp/i"</em>) (*"../../IsaN/work/IsaN" *)<br>
+begin</p>
+<p>(*( \&lt;turnstile&gt; ): Turnstile to shorten the notation for <br>
+meta-implication.*)<br>
+no_notation ==&gt; (infixr "\&lt;turnstile&gt;" 4)<br>
+abbreviation mimp_turn :: "prop \&lt;Rightarrow&gt; prop \&lt;Rightarrow&gt; prop" where<br>
+   "mimp_turn P Q == (PROP P \&lt;Longrightarrow&gt; PROP Q)"<br>
+   notation mimp_turn (infixr "\&lt;turnstile&gt;" 4)</p>
+<p>(*( \&lt;cedilla&gt; ): Cedilla, to act as a comma, for formulas such as <br>
+P\&lt;cedilla&gt; Q \&lt;turnstile&gt; R.*)<br>
+notation (input) ==&gt; (infixr "\&lt;cedilla&gt;" 4)</p>
+<p>(*( \&lt;bottom&gt; ): False, to shorten the notation. The output is bold for <br>
+visibility.*)<br>
+notation (input) False ("\&lt;bottom&gt;")<br>
+notation (output) False ("\&lt;^bold&gt;\&lt;bottom&gt;")</p>
+<p>(<em>( \&lt;cdot&gt;~\&lt;cdot&gt; ): notP, PROP not.</em>)<br>
+abbreviation notP :: "prop \&lt;Rightarrow&gt; prop" where<br>
+   "notP P == (PROP P \&lt;Longrightarrow&gt; False)"<br>
+   notation notP ("\&lt;cdot&gt;~\&lt;cdot&gt;'(_')") (* \&lt;cdot&gt;~\&lt;cdot&gt; *)</p>
+<p>(*( \&lt;or&gt;\&lt;^sub&gt;p ): orP, PROP disjunction.*)<br>
+(<em>PROP or: orP</em>)<br>
+abbreviation orP :: "prop \&lt;Rightarrow&gt; prop \&lt;Rightarrow&gt; prop" where<br>
+   "orP P Q == ((PROP P \&lt;Longrightarrow&gt; False) \&lt;Longrightarrow&gt; PROP Q)"<br>
+notation<br>
+   orP (infixr "(\&lt;or&gt;\&lt;^sub&gt;p)" 4)</p>
+<p>(*( \&lt;and&gt;\&lt;^sub&gt;p ): andP, PROP conjunction.*)<br>
+abbreviation andP :: "prop \&lt;Rightarrow&gt; prop \&lt;Rightarrow&gt; prop" where<br>
+   "andP P Q == ((PROP P \&lt;Longrightarrow&gt; PROP Q \&lt;Longrightarrow&gt; <br>
+False) \&lt;Longrightarrow&gt; False)"<br>
+notation<br>
+   andP (infixr "(\&lt;and&gt;\&lt;^sub&gt;p)" 4)</p>
+<p>(*( \&lt;and&gt;\&lt;^sub&gt;4 ): and4, bool conjunction with the same priority as <br>
+andP. For conversions<br>
+   from bool to PROP, to ensure that the same parenthesizing applies.*)<br>
+abbreviation (input) and4 :: "bool \&lt;Rightarrow&gt; bool \&lt;Rightarrow&gt; <br>
+bool" where<br>
+   "and4 P Q == (P \&lt;and&gt; Q)"<br>
+notation<br>
+   and4 (infixr "(\&lt;and&gt;\&lt;^sub&gt;4)" 4)</p>
+<p>(<strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong>*)<br>
+(* LOGIC RULES <strong>*</strong><strong>*</strong><strong>*</strong>**)<br>
+(<strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong>*)</p>
+<p>lemma mimp2in_to_3and_mimps_False:<br>
+   "P\&lt;cedilla&gt; Q \&lt;turnstile&gt; R == P \&lt;and&gt;\&lt;^sub&gt;4 Q \&lt;and&gt;\&lt;^sub&gt;4 <br>
+\&lt;not&gt;R \&lt;turnstile&gt; False"<br>
+by(rule equal_intr_rule, auto)</p>
+<p>lemma or6_mimps_False_to_6andP_of_notPs:<br>
+   "P\&lt;^sub&gt;1 \&lt;or&gt; P\&lt;^sub&gt;2 \&lt;or&gt; P\&lt;^sub&gt;3 \&lt;or&gt; P\&lt;^sub&gt;4 \&lt;or&gt; <br>
+P\&lt;^sub&gt;5 \&lt;or&gt; P\&lt;^sub&gt;6 \&lt;turnstile&gt; False<br>
+     == \&lt;cdot&gt;~\&lt;cdot&gt;(P\&lt;^sub&gt;1) \&lt;and&gt;\&lt;^sub&gt;p <br>
+\&lt;cdot&gt;~\&lt;cdot&gt;(P\&lt;^sub&gt;2) \&lt;and&gt;\&lt;^sub&gt;p \&lt;cdot&gt;~\&lt;cdot&gt;(P\&lt;^sub&gt;3) <br>
+\&lt;and&gt;\&lt;^sub&gt;p \&lt;cdot&gt;~\&lt;cdot&gt;(P\&lt;^sub&gt;4) \&lt;and&gt;\&lt;^sub&gt;p <br>
+\&lt;cdot&gt;~\&lt;cdot&gt;(P\&lt;^sub&gt;5) \&lt;and&gt;\&lt;^sub&gt;p \&lt;cdot&gt;~\&lt;cdot&gt;(P\&lt;^sub&gt;6)"<br>
+by(rule equal_intr_rule, auto)</p>
+<p>lemma and_eq_andP:<br>
+   "Trueprop(P \&lt;and&gt; Q) == P \&lt;and&gt;\&lt;^sub&gt;p Q"<br>
+by(rule equal_intr_rule, auto)</p>
+<p>lemma not_eq_notP:<br>
+   "Trueprop(\&lt;not&gt;P) == \&lt;cdot&gt;~\&lt;cdot&gt;(P)"<br>
+by(rule equal_intr_rule, auto)</p>
+<p>lemmas semantab_bool_expansion =<br>
+   simp_thms(1)<br>
+   imp_conv_disj<br>
+   de_Morgan_conj<br>
+   de_Morgan_disj<br>
+   conj_comms<br>
+   conj_disj_distribL<br>
+   disj_assoc</p>
+<p>lemmas semantab_bool_to_prop =<br>
+   and_eq_andP<br>
+   not_eq_notP</p>
+<p>(<strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong>*)<br>
+(* THEOREM <strong>*</strong><strong>*</strong><strong>*</strong>*)<br>
+(<strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong>*)</p>
+<p>notation Trueprop ("_\&lt;Colon&gt;\&lt;^sub&gt;T" [1000] 1000)<br>
+declare[[show_sorts=false, show_types=false, show_brackets=true]]</p>
+<p>lemma<br>
+   "(A \&lt;and&gt; B) \&lt;longrightarrow&gt; C\&lt;cedilla&gt; \&lt;not&gt;A \&lt;longrightarrow&gt; <br>
+D \&lt;turnstile&gt; B \&lt;longrightarrow&gt; (C \&lt;or&gt; D)"<br>
+   unfolding mimp2in_to_3and_mimps_False<br>
+   unfolding semantab_bool_expansion<br>
+   unfolding or6_mimps_False_to_6andP_of_notPs<br>
+   unfolding semantab_bool_to_prop<br>
+by(auto)</p>
+<p>lemma<br>
+   "(A \&lt;and&gt; B) \&lt;longrightarrow&gt; C\&lt;cedilla&gt; \&lt;not&gt;A \&lt;longrightarrow&gt; <br>
+D \&lt;turnstile&gt; B \&lt;longrightarrow&gt; (C \&lt;or&gt; D)"<br>
+(*|Negate the conclusion and convert it to a 3-bool-and that mimps False.<br>
+   The notation for (P \&lt;turnstile&gt; False) is \&lt;cdot&gt;~\&lt;cdot&gt;(P). <br>
+Because of requirements due to Trueprop<br>
+   and other low priorities, notP needs to be in parentheses.|*)<br>
+   unfolding mimp2in_to_3and_mimps_False</p>
+<p>(*|Expand the bool formulas. The result will be a 6-bool-or that is <br>
+nested to<br>
+   the left, and that mimps False.|*)<br>
+   unfolding<br>
+     simp_thms(1)<br>
+     imp_conv_disj<br>
+     de_Morgan_conj<br>
+     de_Morgan_disj<br>
+     conj_comms<br>
+     conj_disj_distribL</p>
+<p>(<em>|Nest the 6-bool-or to the right.|</em>)<br>
+   unfolding disj_assoc</p>
+<p>(<em>|Convert the 6-bool-or to 6 chains of andP-ands that each mimp False.|</em>)<br>
+   unfolding or6_mimps_False_to_6andP_of_notPs</p>
+<p>(<em>|Convert the bool-nots and bool-ands to notP-nots and andP-ands.|</em>)<br>
+   unfolding and_eq_andP<br>
+   unfolding not_eq_notP</p>
+<p>(*Now, there is no use of HOL in the formula except for the use of Trueprop<br>
+   and False. This can be seen by the fact that all of A, B, C, and D <br>
+are being<br>
+   coerced by Trueprop. To turn the Trueprop printing off, change <br>
+notation above<br>
+   to no_notation.*)<br>
+   using[[show_sorts=false, show_types=false, show_brackets=false]]</p>
+<p>(*The definition is shown as follows, from HOL.thy:</p>
+<p>defs<br>
+     True_def:     "True      == ((%x::bool. x) = (%x. x))"<br>
+     All_def:      "All(P)    == (P = (%x. True))"<br>
+     Ex_def:       "Ex(P)     == !Q. (!x. P x --&gt; Q) --&gt; Q"<br>
+     False_def:    "False     == (!P. P)"</p>
+<p>It's defined using only All and True, however, obviously, it's <br>
+totally tied<br>
+   into the logic of HOL. But then, that's what makes auto work by magic <br>
+when<br>
+   used above, and below.</p>
+<p>Of course, auto doesn't need any of this to be done for this theorem, <br>
+but<br>
+   it could be that auto will be grateful someday. On the other hand, <br>
+it's more<br>
+   likely that auto is an emotionless automaton, who doesn't care <br>
+whether I live<br>
+   or die. In that case, it will be me who is grateful someday.*)<br>
+by(auto)</p>
+<p>(<strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong>***)<br>
+end<br>
+<a href="/user_uploads/14278/LX0TGiT80sMyhHNHJ8fsO1Ft/i140309aa__semantab.thy">i140309aa__semantab.thy</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

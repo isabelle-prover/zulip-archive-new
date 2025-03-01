@@ -1,0 +1,63 @@
+<html>
+<head><meta charset="utf-8"><title>Concrete semantics theorem proving · Beginner Questions · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/index.html">Beginner Questions</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Concrete.20semantics.20theorem.20proving.html">Concrete semantics theorem proving</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="391442444"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Concrete%20semantics%20theorem%20proving/near/391442444" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Abu <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Concrete.20semantics.20theorem.20proving.html#391442444">(Sep 17 2023 at 02:17)</a>:</h4>
+<p>(Disclaimer: I'm using my own list definition instead of the built-in one for learning purposes)<br>
+Hello. I'm having trouble proving this simple lemma below. I've reduced it to: "reverse (reverse (exercises.list.Cons x1 xs)) = exercises.list.Cons x1 xs" but isabelle still can't solve it. What am I missing here?</p>
+<p>datatype 'a list = Nil | Cons 'a " 'a list"</p>
+<p>fun snoc :: "'a list ⇒ 'a ⇒ 'a list" where<br>
+"snoc Nil x = Cons x Nil" |<br>
+"snoc (Cons y ys) x = Cons y (snoc ys x)"</p>
+<p>fun reverse :: "'a list ⇒ 'a list" where<br>
+"reverse Nil = Nil" |<br>
+"reverse (Cons x xs) = (snoc (reverse xs) x)"</p>
+<p>lemma snoc_simp [simp] : "snoc (reverse xs) x = reverse (Cons x xs)"<br>
+  apply(induction xs)<br>
+  apply(auto)<br>
+  done</p>
+<p>lemma rev_1: "reverse (reverse xs) = xs"<br>
+  apply (induction xs)<br>
+  apply(auto)<br>
+  done</p>
+
+
+
+<a name="391513414"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Concrete%20semantics%20theorem%20proving/near/391513414" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Wolfgang Jeltsch <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Concrete.20semantics.20theorem.20proving.html#391513414">(Sep 17 2023 at 14:10)</a>:</h4>
+<p>For <code>snoc_simp</code> you can get away with a much simpler proof, as it is just the second defining equation of <code>reverse</code> with sides swapped. For example, this works:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">lemma</span><span class="w"> </span><span class="n">snoc_simp</span><span class="w"> </span><span class="o">[</span><span class="n">simp</span><span class="o">]:</span><span class="w"> </span><span class="s">"snoc (reverse xs) x = reverse (Cons x xs)"</span>
+<span class="w">  </span><span class="kp">apply</span><span class="w"> </span><span class="o">(</span><span class="n">fact</span><span class="w"> </span><span class="n">reverse.simps</span><span class="o">(</span><span class="n">2</span><span class="o">)</span><span class="w"> </span><span class="o">[</span><span class="n">symmetric</span><span class="o">])</span>
+<span class="w">  </span><span class="k">done</span>
+</code></pre></div>
+<p>You can also let Isabelle automatically pick said defining equation as a rewrite rule, as in the following version:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">lemma</span><span class="w"> </span><span class="n">snoc_simp</span><span class="w"> </span><span class="o">[</span><span class="n">simp</span><span class="o">]:</span><span class="w"> </span><span class="s">"snoc (reverse xs) x = reverse (Cons x xs)"</span>
+<span class="w">  </span><span class="kp">apply</span><span class="w"> </span><span class="n">simp</span>
+<span class="w">  </span><span class="k">done</span>
+</code></pre></div>
+<p>I guess the fact that <code>snoc_simp</code> is the second defining equation reversed is the root of <code>auto</code> in the last proof getting stuck: both <code>snoc_simp</code> and the second defining equation are part of the simpset, which means that simplifying proof methods like <code>auto</code> can just get stuck with rewriting back and forth.</p>
+
+
+
+<a name="391514881"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Concrete%20semantics%20theorem%20proving/near/391514881" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Wolfgang Jeltsch <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Concrete.20semantics.20theorem.20proving.html#391514881">(Sep 17 2023 at 14:17)</a>:</h4>
+<p>When proving <code>reverse (reverse xs) = xs</code> and applying induction on <code>xs</code>, you get as the second case <code>reverse (reverse (Cons y ys))</code>. The inner <code>reverse</code> application can then get rewritten using the second defining equation of <code>reverse</code>, which turns the whole subgoal into <code>reverse (snoc (reverse ys) y)</code>. I guess you now need a lemma for rewriting the outer <code>reverse</code> application such that the reverse is pushed inside and you get <code>reverse (reverse ys)</code> as a subterm, which can then be rewritten using the induction hypothesis. So you don’t need your <code>snoc_simp</code>, which is for rewriting <code>snoc</code> applied to a <code>reverse</code> application, but you need a lemma for rewriting <code>reverse</code> applied to a <code>snoc</code> application.</p>
+
+
+
+<a name="391586195"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Concrete%20semantics%20theorem%20proving/near/391586195" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Abu <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Concrete.20semantics.20theorem.20proving.html#391586195">(Sep 17 2023 at 23:30)</a>:</h4>
+<p>Thank you so much!</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

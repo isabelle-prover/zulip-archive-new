@@ -1,0 +1,70 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Problem with timeLimit · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problem.20with.20timeLimit.html">[isabelle] Problem with timeLimit</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294137868"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problem%20with%20timeLimit/near/294137868" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problem.20with.20timeLimit.html#294137868">(Aug 18 2022 at 17:49)</a>:</h4>
+<p>From: Matthias Schmalz &lt;<a href="mailto:Matthias.Schmalz@inf.ethz.ch">Matthias.Schmalz@inf.ethz.ch</a>&gt;<br>
+Hi,</p>
+<p>when using timeLimit I sometimes observe that the code executed <em>after</em> <br>
+the timeLimit raises an Interrupt exception.</p>
+<p>I had a look at the definition of timeLimit:</p>
+<p>fun timeLimit time f x = uninterruptible (fn restore_attributes =&gt; fn () =&gt;<br>
+   let<br>
+     val worker = Thread.self ();<br>
+     val timeout = ref false;<br>
+     val watchdog = Thread.fork (fn () =&gt;<br>
+       (OS.Process.sleep time; timeout := true; Thread.interrupt <br>
+worker), []);</p>
+<p>val result = Exn.capture (restore_attributes f) x;<br>
+     val was_timeout = Exn.is_interrupt_exn result andalso ! timeout;</p>
+<p>val _ = Thread.interrupt watchdog handle Thread _ =&gt; ();<br>
+   in if was_timeout then raise TimeOut else Exn.release result end) ();</p>
+<p>When evaluating "timeLimit time f x", I suspect that the "watchdog" <br>
+sometimes interrupts the current thread after the evaluation of <br>
+"(restore_attributes f) x"; the interrupt is then delayed (thanks to <br>
+uninterruptible) until after the evaluation of "timeLimit time f x".</p>
+<p>Do you agree with that explanation?</p>
+<p>It may be important to mention that I used timeLimit to limit the <br>
+execution of auto and force. The problem arised only with force. When <br>
+the problem arised, force consumed a lot of memory and much more run <br>
+time than specified by the timeout.</p>
+<p>-Matthias</p>
+
+
+
+<a name="294137895"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problem%20with%20timeLimit/near/294137895" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problem.20with.20timeLimit.html#294137895">(Aug 18 2022 at 17:49)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Yes, I had seen this before.  Just after the Isabelle2011 release I've <br>
+spent some time on it again, including in-depth discussion with David <br>
+Matthews to understand the exact Poly/ML runtime behaviour here.</p>
+<p>This resulted in the following changes <br>
+<a href="http://isabelle.in.tum.de/repos/isabelle/log/2b92a6943915/src/Pure/Concurrent/time_limit.ML">http://isabelle.in.tum.de/repos/isabelle/log/2b92a6943915/src/Pure/Concurrent/time_limit.ML</a></p>
+<p>It probably requires some fiddling to port this back to Isabelle2011.</p>
+<p>You can also try Poly/ML 5.4.1-SVN, although it is still in flux.  IIRC, <br>
+David had some clarification there in his code as well, that demands less <br>
+adjustment as I did for the official Poly/ML versions.</p>
+<p>Makarius</p>
+
+
+
+<a name="294137959"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problem%20with%20timeLimit/near/294137959" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problem.20with.20timeLimit.html#294137959">(Aug 18 2022 at 17:49)</a>:</h4>
+<p>From: Matthias Schmalz &lt;<a href="mailto:Matthias.Schmalz@inf.ethz.ch">Matthias.Schmalz@inf.ethz.ch</a>&gt;<br>
+Thanks. Good to know that the problem is fixed. The current situation is <br>
+quite acceptable for me. If the bug causes more problems, I will <br>
+consider porting the fix to Isabelle2011.</p>
+<p>-Matthias</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

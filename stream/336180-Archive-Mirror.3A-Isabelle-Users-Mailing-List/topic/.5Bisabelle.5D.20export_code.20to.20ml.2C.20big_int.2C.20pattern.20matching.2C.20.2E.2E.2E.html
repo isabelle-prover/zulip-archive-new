@@ -1,0 +1,104 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] export_code to ml, big_int, pattern matching, ... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20export_code.20to.20ml.2C.20big_int.2C.20pattern.20matching.2C.20.2E.2E.2E.html">[isabelle] export_code to ml, big_int, pattern matching, ...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294699325"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20export_code%20to%20ml%2C%20big_int%2C%20pattern%20matching%2C%20.../near/294699325" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20export_code.20to.20ml.2C.20big_int.2C.20pattern.20matching.2C.20.2E.2E.2E.html#294699325">(Aug 22 2022 at 14:30)</a>:</h4>
+<p>From: Tom Ridge via Cl-isabelle-users &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Dear All,</p>
+<p>I am extracting some isabelle code to ocaml.</p>
+<p>The generated code contains monster definitions like:</p>
+<p>let rec partial_term_of_rresult _A<br>
+  ty x1 = match ty, x1 with<br>
+    ty, Narrowing_constructor ((Big_int.big_int_of_int 1), []) -&gt;<br>
+      Const ("Util.rresult.Error",<br>
+              Typerep<br>
+                ("Util.rresult", [typerep _A.typerep_partial_term_of Type]))<br>
+    | ty, Narrowing_constructor (Big_int.zero_big_int, [a]) -&gt;<br>
+        App (Const ("Util.rresult.Ok",<br>
+                     Typerep<br>
+                       ("fun",<br>
+                         [typerep _A.typerep_partial_term_of Type;<br>
+                           Typerep<br>
+                             ("Util.rresult",<br>
+                               [typerep _A.typerep_partial_term_of<br>
+Type])])),<br>
+              partial_term_of _A Type a)<br>
+    | ty, Narrowing_variable (p, tt) -&gt;<br>
+        Free ("_", Typerep<br>
+                     ("Util.rresult",<br>
+                       [typerep _A.typerep_partial_term_of Type]));;</p>
+<p>Unfortunately this won't compile: ocamlc gives "Error: Syntax error:<br>
+operator expected."</p>
+<p>The problem is that the expression (Big_int.big_int_of_int 1) is used as a<br>
+pattern, but it is a function application.</p>
+<p>A quick fix is to manually replace occurrences with a variable "x" and add<br>
+a "when" clause to the pattern. But obviously manually editing generated<br>
+code is a no-no.</p>
+<p>What am I doing wrong?</p>
+<p>Thanks</p>
+
+
+
+<a name="294699355"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20export_code%20to%20ml%2C%20big_int%2C%20pattern%20matching%2C%20.../near/294699355" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20export_code.20to.20ml.2C.20big_int.2C.20pattern.20matching.2C.20.2E.2E.2E.html#294699355">(Aug 22 2022 at 14:31)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Tom,</p>
+<p>The problem is that partial_term_of has code equations which pattern-match on <br>
+Code_Integer.integer literals (namely 0 or 1) and there is a code_printing setup for this <br>
+type. The simplest approach is probably to change the code equations such that they do <br>
+if-tests rather than pattern matching. But before you do that: Why does the export_code <br>
+command generate a definition for partial_term_of at all? This is supposed to be a <br>
+constant that is used only internally by quickcheck with narrowing and therefore should <br>
+only ever be exported to Haskell.</p>
+<p>Can you find out why partial_term_of shows up in the generated code at all?</p>
+<p>Andreas</p>
+
+
+
+<a name="294699410"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20export_code%20to%20ml%2C%20big_int%2C%20pattern%20matching%2C%20.../near/294699410" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20export_code.20to.20ml.2C.20big_int.2C.20pattern.20matching.2C.20.2E.2E.2E.html#294699410">(Aug 22 2022 at 14:31)</a>:</h4>
+<p>From: Tom Ridge via Cl-isabelle-users &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Not sure why it appears (indeed, I don't really need this defn at all). The<br>
+.thy file is attached. I am on Isabelle2015.<br>
+<a href="/user_uploads/14278/Gs1MwkycTDyEnhLafC_ytDE5/Util.thy">Util.thy</a></p>
+
+
+
+<a name="294699424"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20export_code%20to%20ml%2C%20big_int%2C%20pattern%20matching%2C%20.../near/294699424" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20export_code.20to.20ml.2C.20big_int.2C.20pattern.20matching.2C.20.2E.2E.2E.html#294699424">(Aug 22 2022 at 14:31)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Tom,</p>
+<p>Your export_code command says that you want to export <em>all</em> constants defined in Util.thy. <br>
+Since the partial_term_of instance for rresult happens at the datatype declaration, <br>
+"Util._" also selects the definitions for the type class instance. So, if you select only <br>
+the functions you are interested in (say by explicitly listing them), you should not get <br>
+such monster definitions.</p>
+<p>Hope this helps,<br>
+Andreas</p>
+
+
+
+<a name="294699446"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20export_code%20to%20ml%2C%20big_int%2C%20pattern%20matching%2C%20.../near/294699446" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20export_code.20to.20ml.2C.20big_int.2C.20pattern.20matching.2C.20.2E.2E.2E.html#294699446">(Aug 22 2022 at 14:31)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Tom,</p>
+<p>Your export_code command says that you want to export <em>all</em> constants defined in Util.thy. <br>
+Since the partial_term_of instance for rresult happens at the datatype declaration, <br>
+"Util._" also selects the definitions for the type class instance. So, if you select only <br>
+the functions you are interested in (say by explicitly listing them), you should not get <br>
+such monster definitions.</p>
+<p>Hope this helps,<br>
+Andreas</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

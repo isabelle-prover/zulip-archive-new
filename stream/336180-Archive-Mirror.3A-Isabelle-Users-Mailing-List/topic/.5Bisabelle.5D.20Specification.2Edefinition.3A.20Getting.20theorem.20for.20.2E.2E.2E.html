@@ -1,0 +1,101 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Specification.definition: Getting theorem for ... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Specification.2Edefinition.3A.20Getting.20theorem.20for.20.2E.2E.2E.html">[isabelle] Specification.definition: Getting theorem for ...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294677753"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Specification.definition%3A%20Getting%20theorem%20for%20.../near/294677753" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Specification.2Edefinition.3A.20Getting.20theorem.20for.20.2E.2E.2E.html#294677753">(Aug 22 2022 at 13:39)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:lammich@in.tum.de">lammich@in.tum.de</a>&gt;<br>
+Hi List,</p>
+<p>I have a problem with Specification.definition: </p>
+<p>I want to implement the following functionality on ML-level:</p>
+<p>context <br>
+    fixes a::'a<br>
+  begin  </p>
+<p>(* Want to implement these 3 definitions: *)<br>
+    definition "bar = ((a,1::nat),(a,True))"<br>
+    definition "foo b = (a,b)"<br>
+    lemmas test = bar_def[folded foo_def]<br>
+    &gt;&gt;&gt; theorem test: <a href="http://local.bar">local.bar</a> = (<a href="http://local.foo">local.foo</a> 1, <a href="http://local.foo">local.foo</a> True)</p>
+<p>My first attempt was:</p>
+<p>context <br>
+    fixes a::'a<br>
+  begin  </p>
+<p>local_setup ‹fn lthy =&gt; let<br>
+        val ((_,(_,bar'_thm)),lthy) = Specification.definition (NONE,<br>
+((Binding.empty,[]),@{prop "bar' = ((a,1::nat),(a,True))"})) lthy<br>
+        val ((_,(_,foo'_thm)),lthy) = Specification.definition (NONE,<br>
+((Binding.empty,[]),@{prop "foo' b = (a,b)"})) lthy</p>
+<p>val _ = @{make_string} [foo'_thm, bar'_thm] |&gt; tracing</p>
+<p>val test_thm = Local_Defs.fold lthy [foo'_thm] bar'_thm</p>
+<p>val (_,lthy) = Local_Theory.note ((@{binding test'},[]),<br>
+[test_thm]) lthy</p>
+<p>in<br>
+        lthy<br>
+      end<br>
+      ›<br>
+    thm test'</p>
+<p>However, the theorem does not look as expected, foo is not folded. A<br>
+quick inspection of the generated theorems (see tracing-output) quickly<br>
+reveals the reason for that:</p>
+<p>tracing output is: <br>
+  ["foo' ?b = (a, ?b)"  [.], "bar' = ((a, 1), a, True)"  [.]]</p>
+<p>where foo' and bar' are free variables (!) rather than constants, and<br>
+the type of ?b is ?b::'b, which, obviously, does not unify with nat nor<br>
+bool.</p>
+<p>My question:<br>
+  What is the correct way to implement the above in Isabelle-ML? <br>
+  Is there a way to get a _def-theorem that contains a Const rather than<br>
+a Free, and a ?b::?'b rather than ?b::'b  ?</p>
+<p>Thanks in advance for any help,<br>
+  Peter</p>
+
+
+
+<a name="294677765"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Specification.definition%3A%20Getting%20theorem%20for%20.../near/294677765" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Specification.2Edefinition.3A.20Getting.20theorem.20for.20.2E.2E.2E.html#294677765">(Aug 22 2022 at 13:39)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+Hi Peter,</p>
+<p>that you get frees/tfrees out of Specification.definition is as<br>
+expected. In order to obtain something with schematic variables, you<br>
+need to look, or rather, obtain the "foundation" of the newly-introduced<br>
+definitions. This can be done with appropriate morphisms:</p>
+<p>local_setup ‹fn lthy =&gt;<br>
+    let<br>
+      val (_, lthy') = Local_Theory.open_target lthy</p>
+<p>val ((_,(_,bar'_thm)),lthy') = Specification.definition<br>
+        (NONE, ((Binding.empty,[]),<br>
+           @{prop "bar' = ((a,1::nat),(a,True))"})) lthy'<br>
+      val ((_,(_,foo'_thm)),lthy') = Specification.definition<br>
+        (NONE, ((Binding.empty,[]),@{prop "foo' b = (a,b)"})) lthy'</p>
+<p>val _ = map (Thm.pretty_thm lthy') [foo'_thm, bar'_thm]<br>
+        |&gt; Pretty.big_list "before" |&gt; Pretty.writeln</p>
+<p>val lthy'' = Local_Theory.close_target lthy'</p>
+<p>val phi = Proof_Context.export_morphism lthy' lthy''</p>
+<p>val foo'_thm = Morphism.thm phi foo'_thm<br>
+      val bar'_thm = Morphism.thm phi bar'_thm</p>
+<p>val _ = map (Thm.pretty_thm lthy') [foo'_thm, bar'_thm]<br>
+        |&gt; Pretty.big_list "after" |&gt; Pretty.writeln</p>
+<p>val test_thm = Local_Defs.fold lthy'' [foo'_thm] bar'_thm</p>
+<p>val (_, lthy'') =<br>
+        Local_Theory.note ((@{binding test'},[]), [test_thm]) lthy''<br>
+    in<br>
+      lthy''<br>
+    end›</p>
+<p>thm test'</p>
+<p>The pattern open_target/close_target is used all over BNF, presumably<br>
+with the same intent, although I'm not quite sure whether I've<br>
+reproduced it fully canonically here.</p>
+<p>Cheers<br>
+Lars</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

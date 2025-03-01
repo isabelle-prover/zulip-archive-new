@@ -1,0 +1,26 @@
+[
+    {
+        "content": "<p>From: Andreas Lochbihler &lt;<a href=\"mailto:andreas.lochbihler@inf.ethz.ch\">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>\nDear experts on adhoc overloading,</p>\n<p>When I want to instantiate variables in a theorem using the attribute \"of\", sometimes the <br>\nexception TYPE_MATCH gets raised. This seems strange to me because I would expect that <br>\nadhoc_overloading either complains about not being able to uniquely resolve an overloaded <br>\nconstant or exchanges the constant in the AST.</p>\n<p>By adding more type annotations, I have so far been able to circumvent the exception, but <br>\nthere seems to be a check missing. Attached you find a small example.</p>\n<p>Best,<br>\nAndreas<br>\n<a href=\"/user_uploads/14278/bWrnwsovAmRoWO4FTbeOXr7d/Scratch.thy\">Scratch.thy</a></p>",
+        "id": 294319234,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660926379
+    },
+    {
+        "content": "<p>From: Christian Sternagel &lt;<a href=\"mailto:c.sternagel@gmail.com\">c.sternagel@gmail.com</a>&gt;<br>\nDear Andreas,</p>\n<p>Thanks for the report, I'll have a look. First an immediate observation:</p>\n<p>When adding the following to Scratch.thy</p>\n<p>declare [[show_variants]]</p>\n<p>notepad<br>\nbegin<br>\n   fix f :: \"('b ⇒ 'b ⇒ 'a) stream\"<br>\n   and x :: \"'b stream\"<br>\n   term \"pure id :: ('b =&gt; 'b) stream\"</p>\n<p>the first \"term\" results in</p>\n<p>\"pure_stream id\"<br>\n   :: \"('c ⇒ 'c) stream\"</p>\n<p>while the second results in</p>\n<p>\"pure_stream id\"<br>\n   :: \"('b ⇒ 'b) stream\"</p>\n<p>So it is not surprising that the first causes problems while matching. <br>\nWhy, however \"'c\" is produced instead of \"'b\" is not immediately clear <br>\nto me. I'll investigate.</p>\n<p>cheers</p>\n<p>chris</p>",
+        "id": 294319412,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660926422
+    },
+    {
+        "content": "<p>From: Christian Sternagel &lt;<a href=\"mailto:c.sternagel@gmail.com\">c.sternagel@gmail.com</a>&gt;<br>\nI'm currently a bit confused by the result of \"Sign.typ_unify\" (or <br>\nrather the result of applying the corresponding \"unifier\"). So maybe the <br>\nproblem stems from my ignorance w.r.t. to its intended result.</p>\n<p>After applying the attached \"debug\" patch for the following</p>\n<p>consts pure :: \"'a ⇒ 'b\"</p>\n<p>definition pure_stream :: \"'a ⇒ 'a stream\"<br>\n   where \"pure_stream = sconst\"</p>\n<p>adhoc_overloading pure pure_stream</p>\n<p>consts ap_stream :: \"('a ⇒ 'b) stream ⇒ 'a stream ⇒ 'b stream\" <br>\n(infixl \"◇\" 70)<br>\n   consts S_stream :: \"(('a ⇒ 'b ⇒ 'c) ⇒ ('a ⇒ 'b) ⇒ 'a ⇒ 'c) stream\"</p>\n<p>declare [[show_variants]]</p>\n<p>term \"pure id :: ('b ⇒ 'b) stream\"</p>\n<p>we obtain the output</p>\n<p>oconst type: (??'a ⇒ ??'a) ⇒ ('b ⇒ 'b) stream<br>\nvariant type: ?'a ⇒ ?'a stream<br>\n(\"unifier:\",<br>\n  {((\"'a\", 0), ([\"HOL.type\"], \"??'a ⇒ ??'a\")),<br>\n    ((\"?'a\", 0),<br>\n      ([\"HOL.type\"],<br>\n       \"'b\"))}) (line 165 of <br>\n\"/home/griff/Repos/isabelle/src/Tools/adhoc_overloading.ML\")<br>\n(\"candidate term:\",<br>\n  Const (\"Scratch.pure_stream\",<br>\n         \"?'a<br>\n          ⇒ ?'a <a href=\"http://Stream.stream\">Stream.stream</a>\")) (line 167 of <br>\n\"/home/griff/Repos/isabelle/src/Tools/adhoc_overloading.ML\")<br>\n(\"after unification:\",<br>\n  Const (\"Scratch.pure_stream\",<br>\n         \"(??'a ⇒ ??'a)<br>\n          ⇒ (??'a<br>\n              ⇒ ??'a) <a href=\"http://Stream.stream\">Stream.stream</a>\")) (line 168 of <br>\n\"/home/griff/Repos/isabelle/src/Tools/adhoc_overloading.ML\")<br>\n\"pure_stream id\"<br>\n   :: \"('a ⇒ 'a) stream\"</p>\n<p>The result of unification is a bit surprising to me, since the obtained <br>\n\"unifier\" seems to claim that</p>\n<p>('b =&gt; 'b) =&gt; ('b =&gt; 'b) stream</p>\n<p>and</p>\n<p>(??'a =&gt; ??'a) =&gt; (??'a =&gt; ??'a) stream</p>\n<p>are equal. What am I missing here? Maybe Envir.subst_term_types is not <br>\nthe way to apply the typenv obtained by typ_unify? (In this special <br>\ncase, if I would call subst_term_types twice with the same typenv, the <br>\nresult would be as I expected.)</p>\n<p>cheers</p>\n<p>chris</p>\n<p>Btw: the \"delete\" patch (which is to be applied before \"debug\") fixes a <br>\ntypo in the description of \"no_adhoc_overloading\". It is entirely <br>\nunrelated to the issue at hand, but maybe somebody could apply it anyway.<br>\n<a href=\"/user_uploads/14278/CfRPZwIdEYzbMvXiH8s__RCW/delete\">delete</a><br>\n<a href=\"/user_uploads/14278/7nJyc8e-KUWuvLpx04p8_z5G/debug\">debug</a></p>",
+        "id": 294319794,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660926515
+    },
+    {
+        "content": "<p>From: Dmitriy Traytel &lt;<a href=\"mailto:traytel@in.tum.de\">traytel@in.tum.de</a>&gt;<br>\nHi Christian,</p>\n<p>just a few weeks ago, I learned that Envir.subst_term_types is indeed <br>\nthe wrong function when substituting with a unifier (instead it is <br>\nintended for matchers).</p>\n<p>The right functions for unifiers in envir.ML are the ones prefixed with <br>\n\"norm\".</p>\n<p>Hope that helps,<br>\nDmitriy</p>",
+        "id": 294319812,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660926523
+    }
+]

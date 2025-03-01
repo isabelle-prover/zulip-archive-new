@@ -1,0 +1,77 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Running some ml code without storing the bindings · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Running.20some.20ml.20code.20without.20storing.20the.20bindings.html">[isabelle] Running some ml code without storing the bindings</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="485045723"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Running%20some%20ml%20code%20without%20storing%20the%20bindings/near/485045723" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Running.20some.20ml.20code.20without.20storing.20the.20bindings.html#485045723">(Nov 29 2024 at 08:30)</a>:</h4>
+<p>From: i n &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Hi all,<br>
+    I'm wondering if there's a method to execute ML code without keeping its bindings while keeping state changes.<br>
+This is meant to replace code that was done by Fabian immler/Jonas Rädle in their HOL4 in isabelle which I'm working on for the use of it as an IDE for HOL4.</p>
+<p>The code in question does ML ‹fun with_temp_ML_env f x =<br>
+  let<br>
+    val context = Context.the_generic_context()<br>
+    val res = f x<br>
+    val () = Context.&gt;&gt; (ML_Env.inherit [context])<br>
+  in res end<br>
+›which I believe is wrong due to it messing up synchronized variables and making them unusable.</p>
+<p>I think I should be using a Proof context, is that the right path?.</p>
+<p>Thanks,<br>
+Irvin</p>
+
+
+
+<a name="485763281"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Running%20some%20ml%20code%20without%20storing%20the%20bindings/near/485763281" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Running.20some.20ml.20code.20without.20storing.20the.20bindings.html#485763281">(Dec 03 2024 at 06:05)</a>:</h4>
+<p>From: Fabian Immler &lt;<a href="mailto:fabian.immler@gmail.com">fabian.immler@gmail.com</a>&gt;<br>
+Hi Irvin,</p>
+<p>I‘m not entirely sure what you mean by “state changes”.<br>
+Synchronized variables (in the sense of Synchronized.var) are mutable<br>
+reference cells, i.e., a pointer to some memory location, and therefore not<br>
+managed by Isabelle/ML’s context. If your code uses those, Isabelle’s IDE<br>
+will “mess” with the contents of those cells, as they are not tied to the<br>
+command that modifies them.</p>
+<p>As far as I know, this can only be achieved by storing the values of such<br>
+“variables” in the context. See section 3.1 of our paper [1]. There we<br>
+describe how we mapped the type “ref” to a context-managed variables<br>
+“Context_Var.var”. I believe that you could achieve similar things by<br>
+re-defining Synchronized.var for your purposes.</p>
+<p>But also note the trick that we describe in section 3.2: it is critical for<br>
+performance and to avoid memory leaks to distinguish “local state”<br>
+variables and mark them explicitly in the HOL4 sources as Uref.t. But if<br>
+there was a need to declare a variable as synchronized, it’s probably not<br>
+“local” in that sense…</p>
+<p>Let me know if that information helps.</p>
+<p>Best wishes,<br>
+Fabian</p>
+<p>[1]<br>
+<a href="https://drops.dagstuhl.de/storage/00lipics/lipics-vol141-itp2019/LIPIcs.ITP.2019.21/LIPIcs.ITP.2019.21.pdf">https://drops.dagstuhl.de/storage/00lipics/lipics-vol141-itp2019/LIPIcs.ITP.2019.21/LIPIcs.ITP.2019.21.pdf</a></p>
+<p>On Fri, Nov 29, 2024 at 10:14 i n &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt; wrote:</p>
+<blockquote>
+<p>Hi all,<br>
+    I'm wondering if there's a method to execute ML code without keeping<br>
+its bindings while keeping state changes.<br>
+This is meant to replace code that was done by Fabian immler/Jonas Rädle<br>
+in their HOL4 in isabelle which I'm working on for the use of it as an IDE<br>
+for HOL4.</p>
+<p>The code in question does</p>
+<p>ML ‹fun with_temp_ML_env f x =  let    val context = Context.the_generic_context()    val res = f x    val () = Context.&gt;&gt; (ML_Env.inherit [context])  in res end›</p>
+<p>which I believe is wrong due to it messing up synchronized variables and<br>
+making them unusable.</p>
+<p>I think I should be using a Proof context, is that the right path?.</p>
+<p>Thanks,<br>
+Irvin<br>
+</p>
+</blockquote>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

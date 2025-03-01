@@ -1,0 +1,112 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Isabelle2019-RC2: Cannot get exception trace · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2019-RC2.3A.20Cannot.20get.20exception.20trace.html">[isabelle] Isabelle2019-RC2: Cannot get exception trace</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294755865"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2019-RC2%3A%20Cannot%20get%20exception%20trace/near/294755865" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2019-RC2.3A.20Cannot.20get.20exception.20trace.html#294755865">(Aug 22 2022 at 19:44)</a>:</h4>
+<p>From: Alexander Krauss &lt;<a href="mailto:krauss@in.tum.de">krauss@in.tum.de</a>&gt;<br>
+Hi all,</p>
+<p>This might just be a misunderstanding, but it is also something that<br>
+would probably go unnoticed by automated tests when broken, so I am<br>
+reporting this here as a possible regression.</p>
+<p>I am failing to get a meaningful exception trace out of the system. Here<br>
+is a small example which is typical for real-life debugging situations.</p>
+<p>ML ‹</p>
+<p>(* Raises exception Empty eventually. Recursive to avoid inlining. *)<br>
+fun f xs = case xs of _::xs' =&gt; f xs' | _ =&gt; hd xs;</p>
+<p>(* Returns the empty list. Recursive to avoid inlining. *)<br>
+fun g xs = case xs of _::xs' =&gt; g xs' | _ =&gt; xs;</p>
+<p>(* Would expect to see which if f or g raises the exception, but I only get</p>
+<p>exception Empty raised (line 47 of "./basis/List.sml")</p>
+<p>which does not help. *)<br>
+Runtime.exn_trace (fn () =&gt; (f [0,1], g [2,3]))<br>
+›</p>
+<p>I also experimented with [[ML_exception_trace = true]], but without success.</p>
+<p>Thanks for any help.</p>
+<p>Alex<br>
+<a href="/user_uploads/14278/3cYTHUIJ3bH9HILdQo2TkQ6x/Tracing_Example.thy">Tracing_Example.thy</a></p>
+
+
+
+<a name="294756023"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2019-RC2%3A%20Cannot%20get%20exception%20trace/near/294756023" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2019-RC2.3A.20Cannot.20get.20exception.20trace.html#294756023">(Aug 22 2022 at 19:45)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Some years ago, David Matthews has improved the performance of exception<br>
+handling by removing most of the classic exception_trace facilities. It<br>
+is now done with the ML debugger instead. See this NEWS entry for<br>
+Isabelle2016-1 (December 2016):</p>
+<ul>
+<li>Option ML_exception_debugger controls detailed exception trace via the<br>
+Poly/ML debugger. Relevant ML modules need to be compiled beforehand<br>
+with ML_file_debug, or with ML_file and option ML_debugger enabled. Note<br>
+debugger information requires consirable time and space: main<br>
+Isabelle/HOL with full debugger support may need ML_system_64.</li>
+</ul>
+<p>This still holds for Isabelle2019, but you can probably ignore<br>
+ML_system_64 for all practical applications.</p>
+<p>Here is your example with these hints applied:</p>
+<p>declare [[ML_debugger]]<br>
+ML ‹</p>
+<p>(* Raises exception Empty eventually. Recursive to avoid inlining. *)<br>
+fun f xs = case xs of _::xs' =&gt; f xs' | _ =&gt; hd xs;</p>
+<p>(* Returns the empty list. Recursive to avoid inlining. *)<br>
+fun g xs = case xs of _::xs' =&gt; g xs' | _ =&gt; xs;</p>
+<p>(* Would expect to see which if f or g raises the exception, but I only get</p>
+<p>exception Empty raised (line 47 of "./basis/List.sml")</p>
+<p>which does not help. *)<br>
+Runtime.exn_debugger (fn () =&gt; (f [0,1], g [2,3]))<br>
+›</p>
+<p>Output:<br>
+Exception trace - exception Empty raised (line 47 of "./basis/List.sml")<br>
+  f⌂<br>
+  f⌂<br>
+  f⌂<br>
+  it-(1)⌂<br>
+val f = fn: 'a list -&gt; 'a<br>
+val g = fn: 'a list -&gt; 'a list<br>
+exception Empty raised (line 47 of "./basis/List.sml")</p>
+<p>If you want to get information from a complex hierarchy of modules, you<br>
+need to rebuild them with ML_debugger enabled or the 'ML_debug' command<br>
+just in the right spots. This can be sometimes awkward, and sometimes<br>
+have bad effects (loss of performance, deadlocks).</p>
+<p>Makarius</p>
+
+
+
+<a name="294756066"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2019-RC2%3A%20Cannot%20get%20exception%20trace/near/294756066" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2019-RC2.3A.20Cannot.20get.20exception.20trace.html#294756066">(Aug 22 2022 at 19:45)</a>:</h4>
+<p>From: Alexander Krauss &lt;<a href="mailto:krauss@in.tum.de">krauss@in.tum.de</a>&gt;<br>
+Am 29.05.2019 um 19:48 schrieb Makarius:</p>
+<blockquote>
+<p>Some years ago, David Matthews has improved the performance of exception<br>
+handling by removing most of the classic exception_trace facilities. It<br>
+is now done with the ML debugger instead.</p>
+</blockquote>
+<p>[...]</p>
+<blockquote>
+<p>Here is your example with these hints applied:</p>
+</blockquote>
+<p>[...]<br>
+Thanks that helps.</p>
+<p>Does this mean that the old tracing flags/functions are obsolete by now?</p>
+<p>Alex</p>
+
+
+
+<a name="294758046"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2019-RC2%3A%20Cannot%20get%20exception%20trace/near/294758046" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2019-RC2.3A.20Cannot.20get.20exception.20trace.html#294758046">(Aug 22 2022 at 19:59)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Maybe. I will think about removing them after the Isabelle2019 release.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

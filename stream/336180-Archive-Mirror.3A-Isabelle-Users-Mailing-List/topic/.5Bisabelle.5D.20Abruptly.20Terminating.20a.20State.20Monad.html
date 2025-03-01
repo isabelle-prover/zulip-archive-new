@@ -1,0 +1,124 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Abruptly Terminating a State Monad · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Abruptly.20Terminating.20a.20State.20Monad.html">[isabelle] Abruptly Terminating a State Monad</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294329898"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Abruptly%20Terminating%20a%20State%20Monad/near/294329898" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Abruptly.20Terminating.20a.20State.20Monad.html#294329898">(Aug 19 2022 at 17:24)</a>:</h4>
+<p>From: scott constable &lt;<a href="mailto:sdconsta@syr.edu">sdconsta@syr.edu</a>&gt;<br>
+Hi All,</p>
+<p>I'm currently trying to reason in AutoCorres about a bit of code which may<br>
+abruptly terminate. What I'm trying to prove is something like this:</p>
+<p>{| &lt;\lambda&gt; s. True |}<br>
+interesting_function() {<br>
+    global_flag = 0;<br>
+    if (condition)<br>
+        reboot();<br>
+    else<br>
+        global_flag = 1;<br>
+    return;<br>
+}<br>
+{| &lt;\lambda&gt; s _. global_flag = 1 |}</p>
+<p>Clearly, interesting_function() will only return with global_flag set to 1,<br>
+but I'm not sure how a state monadic framework could possibly model the<br>
+reboot() call. After interesting_function() returns, another function, say<br>
+interesting_function2() will be called with global_flag=1 as a<br>
+precondition.</p>
+<p>At a high level, I'm trying to prove reachability. That is,<br>
+interesting_function2() is reachable only if condition=false in<br>
+interesting_function1(). So it's also possible that I'm using entirely the<br>
+wrong approach here.</p>
+<p>Thanks in advance for any feedback.</p>
+<p>~Scott Constable</p>
+
+
+
+<a name="294330551"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Abruptly%20Terminating%20a%20State%20Monad/near/294330551" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Abruptly.20Terminating.20a.20State.20Monad.html#294330551">(Aug 19 2022 at 17:28)</a>:</h4>
+<p>From: Gerwin Klein &lt;<a href="mailto:Gerwin.Klein@nicta.com.au">Gerwin.Klein@nicta.com.au</a>&gt;<br>
+Hi Scott,</p>
+<p>you’re right that this will not be properly representable in the monadic framework AutoCorres uses, because that wants termination for everything.</p>
+<p>It’s conceivable that you might be able get away with manually defining (axiomatising) reboot as MAGIC, i.e. the function that returns the empty set and does not fail. Should be equivalent to a C-level specification that claims the function terminates with post condition False.</p>
+<p>You’ll need to think about what that really means, though, and if that agrees with what you want to prove. I haven’t thought too much about this, might be that this is a more general way to deal with non-termination, or it might break down at some point.</p>
+<p>Depending on if it would be Ok to propagate “condition” up through your preconditions, you could also model “reboot()” as “unreachable”, i.e. a function with precondition False, which will require you to prove that it is never called. (This is what we use for “halt()”, since we never want that to happen.)</p>
+<p>Cheers,<br>
+Gerwin</p>
+<hr>
+<p>The information in this e-mail may be confidential and subject to legal professional privilege and/or copyright. National ICT Australia Limited accepts no liability for any damage caused by this email or its attachments.</p>
+
+
+
+<a name="294632129"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Abruptly%20Terminating%20a%20State%20Monad/near/294632129" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Abruptly.20Terminating.20a.20State.20Monad.html#294632129">(Aug 22 2022 at 08:58)</a>:</h4>
+<p>From: scott constable &lt;<a href="mailto:sdconsta@syr.edu">sdconsta@syr.edu</a>&gt;<br>
+Thanks Gerwin,</p>
+<p>We've been toying with your ideas and a few others over the past week, and<br>
+have observed that both techniques you've described (MAGIC and making<br>
+reboot() "unreachable") amount to the same thing: stating preconditions<br>
+which ensure that reboot() is never called. While this helps us to reason<br>
+about program behavior when reboot() is called, it also prevents us from<br>
+reasoning about program behavior when reboot() is called. For example, we<br>
+could prove something like the following:</p>
+<p>{ P s }<br>
+entire_program<br>
+{ True }!</p>
+<p>where P is the conjunction of all the assumptions which need to hold in<br>
+order for entire_program to terminate properly (i.e. not call reboot()).</p>
+<p>This, I believe, is essentially stating that "if P s holds, then<br>
+entire_program() terminates properly." But what we are more interested in<br>
+is proving the statement "entire_program will terminate properly *only if *P<br>
+s holds."</p>
+<p>~Scott</p>
+
+
+
+<a name="294633612"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Abruptly%20Terminating%20a%20State%20Monad/near/294633612" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Abruptly.20Terminating.20a.20State.20Monad.html#294633612">(Aug 22 2022 at 09:08)</a>:</h4>
+<p>From: Thomas Sewell &lt;<a href="mailto:thomas.sewell@nicta.com.au">thomas.sewell@nicta.com.au</a>&gt;<br>
+I guess the short summary here is that there won't be a quick fix. The<br>
+type of the state monad has to change.</p>
+<p>Some kind of exception/state monad combination will be an appropriate<br>
+type for your function. So reboot() will be able to abort all subsequent<br>
+actions (exception monad) but keep the current state (state monad).</p>
+<p>The problem is that AutoCorres won't produce such a monad, and the<br>
+bigger problem is that the C-parser won't assign appropriate semantics.<br>
+We've had this discussion at NICTA before - there was a fast abort<br>
+mechanism that would be useful in seL4 - but the problem is that<br>
+anything like this isn't really C. The only C approximation is<br>
+setjmp/longjmp which is horrible and isn't going to be supported.</p>
+<p>In short, we don't really know what to do about this. It's clear there's<br>
+a lot of C code out there with nonreturning functions, so maybe we<br>
+should think about how to support it at the C semantics level. Having<br>
+AutoCorres deal with this by returning a more general monad type won't<br>
+be too difficult. But I think this is low priority for NICTA at the moment.</p>
+<p>Cheers,<br>
+     Thomas.</p>
+<p>P.S. The reason we had this discussion at NICTA before is to do with<br>
+seL4's design. It uses a syscall stack model, where every OS entry lives<br>
+on a newly created stack. This makes a convenient operation possible (if<br>
+written in assembly): a function which discards the running stack<br>
+entirely and either reenters the OS with new toplevel arguments or<br>
+returns to user level. I guess it's a lot like a reboot, only it happens<br>
+to be really fast. Supporting this would allow us to shrink the kernel<br>
+code a lot - there's lots of caller/callee pairs where the caller has to<br>
+check for failure, and where the callee could instead call the failure<br>
+handling mechanism then abort everything.</p>
+<p>it would be convenient in OS's such as seL4 to implement the action that<br>
+aborts everything in the current system call stack, and either re-enters<br>
+the kernel or returns to user mode. A bit like rebooting, I suppose,<br>
+although much faster. The SIMPL semantics that the C semantics builds on<br>
+has an exception mechanism that would work for this purpose, but the<br>
+problem is that it isn't really C.</p>
+<hr>
+<p>The information in this e-mail may be confidential and subject to legal professional privilege and/or copyright. National ICT Australia Limited accepts no liability for any damage caused by this email or its attachments.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

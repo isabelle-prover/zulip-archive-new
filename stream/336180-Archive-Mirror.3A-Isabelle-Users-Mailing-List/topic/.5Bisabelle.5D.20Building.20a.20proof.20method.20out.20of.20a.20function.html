@@ -1,0 +1,455 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Building a proof method out of a function · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Building.20a.20proof.20method.20out.20of.20a.20function.html">[isabelle] Building a proof method out of a function</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294248556"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Building%20a%20proof%20method%20out%20of%20a%20function/near/294248556" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Building.20a.20proof.20method.20out.20of.20a.20function.html#294248556">(Aug 19 2022 at 11:51)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:eberlm@in.tum.de">eberlm@in.tum.de</a>&gt;<br>
+Hallo,</p>
+<p>I have an executable decision procedure, say "frobnicate", that takes<br>
+some parameters and yields a result. When I run</p>
+<p>value "frobnicate x"</p>
+<p>I get some result "y". I would now like to turn this into a proof method<br>
+that proves the statement "frobnicate x = y", ideally by deduction,<br>
+without relying on oracles. (I dimly remember the "eval" method that, if<br>
+I recall correctly, uses the code generator and ML as an oracle, doing<br>
+basically the same thing as the "value" command)</p>
+<p>What is the best way to do this? At the moment, I use the CONVERSION<br>
+tactical and Code_Runtime.static_holds_conv, but I am not sure what this<br>
+does internally (oracle or deduction) and it is quite slow.<br>
+Additionally, I have to pass a number of constants by hand as a list of<br>
+@{code_name … } and I am not sure which of these I really need in order<br>
+for it to work reliably.</p>
+<p>So, how does one normally do these things? Ifi the conversion with<br>
+static_holds_conv is the way to go, is there some way to make it faster?</p>
+<p>Cheers,<br>
+Manuel</p>
+
+
+
+<a name="294248763"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Building%20a%20proof%20method%20out%20of%20a%20function/near/294248763" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Building.20a.20proof.20method.20out.20of.20a.20function.html#294248763">(Aug 19 2022 at 11:52)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Manuel,</p>
+<p>Florian is the expert on Code_Runtime, but here's what I know. Can you make precise which <br>
+execution model evaluates the "frobnicate x" in the value example? In principle, you can <br>
+use [code] with the code generator, [nbe] for normalization by evaluation and [simp] for <br>
+rewriting with the simplifier. For each of these options, there's a separate method: eval, <br>
+normalization and code_simp.</p>
+<p>The eval method generates ML code for the statement, runs it and checks that it returns <br>
+True. It cannot deal with variables in the statement.</p>
+<p>normalization converts the statement into an intermediate language and symbolically <br>
+executes it in the intermediate language.</p>
+<p>code_simp produces a simpset with only the code equations as rewrite rules and invokes the <br>
+simplifier with this simpset on the goal after preprocessing with the code_unfold rules. <br>
+This meets your criteria for "no oracle", but is the slowest of the three.</p>
+<p>In the code generator tutorial, Code_Runtime.static_holds_conv is listed under the column <br>
+code, so I expect that it involves code generation and the ML oracle. Isabelle has no <br>
+execution engine for HOL, I only know that the simplifier can be used to normalise <br>
+functions, which corresponds to executing when the rewrite system are the code equations. <br>
+If this is what you want, then you should try code_simp.</p>
+<p>Andreas</p>
+
+
+
+<a name="294248810"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Building%20a%20proof%20method%20out%20of%20a%20function/near/294248810" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Building.20a.20proof.20method.20out.20of.20a.20function.html#294248810">(Aug 19 2022 at 11:52)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Interestingly Coq has such a builtin execution engine, and the French have <br>
+invested a lot of energy into it (conceptually and performance wise).</p>
+<p>Nonetheless, some Coq expert users have told me that they like the <br>
+Isabelle/HOL approach better for certain applications, e.g. what <br>
+Isabelle/IsaFoR does with native Haskell compared to Coq/CoLoR with the<br>
+on-board execution engine.</p>
+<p>Doing actual LCF proofs via computation is a different thing, though.</p>
+<p>Makarius</p>
+
+
+
+<a name="294248955"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Building%20a%20proof%20method%20out%20of%20a%20function/near/294248955" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Building.20a.20proof.20method.20out.20of.20a.20function.html#294248955">(Aug 19 2022 at 11:53)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:eberlm@in.tum.de">eberlm@in.tum.de</a>&gt;<br>
+Hallo,</p>
+<p>ah, very good, I did not know about the code generator tutorial.</p>
+<p>I tried to use Code_Simp now, but it does not terminate even after quite<br>
+some time. I then tried "value [simp]" with some examples and found the<br>
+following:</p>
+<p>value [simp] "[:1:] - [:1, 2::real :]"<br>
+Result: "[:1:] + - [:1, 2:]" :: "real poly"</p>
+<p>That is obviously not what I wanted. Does this mean that there is some<br>
+problem with the way the code equations in Polynomial.thy are set up?</p>
+<p>Cheers,<br>
+Manuel</p>
+
+
+
+<a name="294248964"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Building%20a%20proof%20method%20out%20of%20a%20function/near/294248964" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Building.20a.20proof.20method.20out.20of.20a.20function.html#294248964">(Aug 19 2022 at 11:53)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Manuel,</p>
+<p>What Isabelle version are you using? And what are your imports? In Isabelle2013, I get the <br>
+following results (imports Complex_Main and Polynomial):</p>
+<p>value [code] =&gt; "[:0, -2:]"<br>
+value [nbe]  =&gt; "[:0, -2:]"<br>
+value [simp] =&gt; "[: real_of_rat (1 - 1), real_of_rat (- 2) :]"</p>
+<p>With the development version f6629734dd2b, I get:</p>
+<p>value [code] =&gt; "Poly [0, -2]"<br>
+value [nbe]  =&gt; "Poly [0, -2]"<br>
+value [simp] =&gt; "[:1:] + - [:1, 2:]"</p>
+<p>Two months ago, Florian changed in 3cc46b8cca5e the code setup for polynomials from <br>
+explicit constructors 0 and pCons to an abstract type with constructor Poly and destructor <br>
+coeffs. This explains why the syntax [: and :] is lost.</p>
+<p>Since poly is now an abstract datatype, the code generator transforms the [code abstract] <br>
+equations for code generation from "Rep (f x) = ..." to "f x = Abs (...)" where Rep is the <br>
+destructor and Abs is the constructor (following the usual typedef terminology). For <br>
+code_simp, however, no such preprocessing happens, i.e., the simplifier is fed directly <br>
+with "Rep (f x) = ...". Therefore, evaluation with [simp] will be delayed until you <br>
+destruct the values. This is only a problem for value [simp], but not for proofs by <br>
+code_simp, because code_simp can only be called on terms of type bool, i.e., all <br>
+polynomials in the statement will be deconstructed if needed.</p>
+<p>Maybe Florian can say more how one could use change value [simp] to address this issue, <br>
+possibly before the next release makes all this public.</p>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<a name="294248989"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Building%20a%20proof%20method%20out%20of%20a%20function/near/294248989" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Building.20a.20proof.20method.20out.20of.20a.20function.html#294248989">(Aug 19 2022 at 11:53)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:eberlm@in.tum.de">eberlm@in.tum.de</a>&gt;<br>
+Thanks for the explanations so far.</p>
+<p>I use the development version because, if I remember correctly, it<br>
+contains some theorems that I need.</p>
+<p>The reason why I asked about "value [simp]" is that code_simp seems to<br>
+take a very, very long time, in fact, so long that I think it either<br>
+loops or builds up some enormously big term. Other expressions involving<br>
+polynomials also lead to unpleasant results, such as:</p>
+<p>value [simp] "gcd [:1, 2::real :] [:3:]"<br>
+Result: "smult (real_of_rat (inverse 3)) [:3:]" :: "real poly"</p>
+<p>If I try to use Poly instead of [: and :], I get the following error<br>
+message.</p>
+<p>value "Poly [0::real]"<br>
+*** Abstraction violation:<br>
+*** constant Poly</p>
+<p>Attempting to use any of the evaluation conversions on the ML level<br>
+results in the same error message, so apparently, switching from [: … :]<br>
+to Poly does not solve the problem either, it seems to make things even<br>
+worse.</p>
+<p>I can, of course, use evaluation instead of code_simp, but I do prefer<br>
+deduction within the logic over trusted prove such as the code<br>
+generator, and apart from that, I really would like to understand what<br>
+is going wrong here and why.</p>
+<p>Cheers,<br>
+Manuel</p>
+
+
+
+<a name="294249009"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Building%20a%20proof%20method%20out%20of%20a%20function/near/294249009" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Building.20a.20proof.20method.20out.20of.20a.20function.html#294249009">(Aug 19 2022 at 11:54)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Manuel,</p>
+<p>Evaluation in the simplifier is a tricky beast to debug! Recently (8e8941fea278), Florian <br>
+added a tracing option code_simp_trace to see what's happening. I expect that in your <br>
+application, the abstract datatypes cause the trouble. When you use polynomials of reals, <br>
+you have the following types stacked into one another:</p>
+<ul>
+<li>Numerals with constructors One, Bit0, Bit1</li>
+<li>int with constructors 0, Pos, Neg</li>
+<li>Rationals as abstract datatype with constructor Frct and destructor quotient_of</li>
+<li>Reals with constructor Ratreal</li>
+<li>Polynomials as abstract datatype with constructor Poly and destructor coeffs</li>
+</ul>
+<p>Evaluation with the simplifier does not obey the call-by-value strategy of ML. There are <br>
+some congruence rules for some functions like op &amp; and op | that prevent execution of the <br>
+second argument, but nothing more. For normal code_datatypes like Numerals, int and Reals, <br>
+this is OK, because the simplifier works bottom-up, i.e., it will first simplify the <br>
+arguments of a constant (from left to right) and only then try to rewrite with the <br>
+constant's code equation. For abstract datatypes, this breaks down as can be seen in your <br>
+examples:</p>
+<p>"inverse 3 :: rat" is not evaluated because rat is an abstract type, a quotient_of <br>
+destructor would be necessary to trigger evaluation. Instead, the simplifier continues the <br>
+execution with the code equations for outer constants. If these do not destruct "inverse <br>
+3", this term will be passed around unevaluated. As may code equation duplicate <br>
+parameters, this can yield exponentially large terms. Even worse, the duplicates are not <br>
+shared (in terms of execution), i.e., if "inverse 3" is destructed later, it will be <br>
+destructed and evaluated each time. In summary: evaluation in the simplifier currently <br>
+does not work well for abstract datatypes. Maybe Florian has some ideas to mitigate the issue.</p>
+<p>Now to your next question with Poly: 'a poly is an abstract datatype with constructor Poly <br>
+and destructor quotient_of. The abstract means that the constructor Poly must not occur in <br>
+anything that you execute. Otherwise, you will get an abstraction violation. For normal <br>
+code generation, this check is essential for soundness, because the code generator <br>
+transforms all the [code abstract] equations from destructor style to constructor style.<br>
+For code_simp, however, this check is bogus because it does not do the transformation and <br>
+soundness is not endangered. Nevertheless, the check currently is there. Maybe you can <br>
+convince Florian to drop this check for code_simp. But this will not stop the blow-up that <br>
+I have described above.</p>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<a name="294249062"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Building%20a%20proof%20method%20out%20of%20a%20function/near/294249062" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Building.20a.20proof.20method.20out.20of.20a.20function.html#294249062">(Aug 19 2022 at 11:54)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Please, just one more attempt to get rid of this wrong idea of "the ML <br>
+level of Isabelle".</p>
+<p>The proper terminology is "Isabelle/ML".  You don't have to understand the <br>
+reasons for that, just use the correct term as a habit.</p>
+<p>Makarius</p>
+
+
+
+<a name="294249104"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Building%20a%20proof%20method%20out%20of%20a%20function/near/294249104" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Building.20a.20proof.20method.20out.20of.20a.20function.html#294249104">(Aug 19 2022 at 11:54)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:eberlm@in.tum.de">eberlm@in.tum.de</a>&gt;<br>
+So all in all, at the moment, the only way to do something like what I<br>
+am trying to do is to rely on the code generator? Is this what all the<br>
+other decision procedure in Isabelle (such as, off the top of my head,<br>
+Presburger arithmetic) do?</p>
+
+
+
+<a name="294249158"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Building%20a%20proof%20method%20out%20of%20a%20function/near/294249158" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Building.20a.20proof.20method.20out.20of.20a.20function.html#294249158">(Aug 19 2022 at 11:54)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;</p>
+<blockquote>
+<p>So all in all, at the moment, the only way to do something like what I<br>
+am trying to do is to rely on the code generator? Is this what all the<br>
+other decision procedure in Isabelle (such as, off the top of my head,<br>
+Presburger arithmetic) do?<br>
+I do not have a complete overview over all the Isabelle decision procedures, but I know of <br>
+three approaches:</p>
+</blockquote>
+<ol>
+<li>
+<p>Formalise the algorithm in Isabelle, prove it correct, compile the algorithm to ML with <br>
+the code generator and use it as a decision procedure. I expect that all the proof methods <br>
+that use reflection rely on the code generator. Amine and Tobias have describe this <br>
+approach for linear arithmetic in [1].</p>
+</li>
+<li>
+<p>Do the proof search outside the kernel, record it if you find one, and then replay that <br>
+prove inside the kernel. IIRC, blast uses this approach and sledgehammer/metis probably, <br>
+too. This is only sensible if the proof itself requires much less inferences than the <br>
+search. In any case, you do not have to formalise and verify your algorithm for soundness, <br>
+the kernel takes care of that.</p>
+</li>
+<li>
+<p>Do everything within the kernel like the simplifier does. In your case, you could code <br>
+your own execution engine for the kernel, but that's probably overkill.</p>
+</li>
+</ol>
+<p>Best,<br>
+Andreas</p>
+<p>[1] Amine Chaieb and Tobias Nipkow. Proof Synthesis and Reflection for Linear Arithmetic. <br>
+Journal of Automated Reasoning, April 2008</p>
+
+
+
+<a name="294249188"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Building%20a%20proof%20method%20out%20of%20a%20function/near/294249188" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Building.20a.20proof.20method.20out.20of.20a.20function.html#294249188">(Aug 19 2022 at 11:54)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+Am 04/09/2013 17:31, schrieb Manuel Eberl:</p>
+<blockquote>
+<p>So all in all, at the moment, the only way to do something like what I<br>
+am trying to do is to rely on the code generator?</p>
+</blockquote>
+<p>If you want the execution speed of ML, you use the code generator. If you want<br>
+to go through the kernel, you use some form of the simplifier.</p>
+<blockquote>
+<p>Is this what all the<br>
+other decision procedure in Isabelle (such as, off the top of my head,<br>
+Presburger arithmetic) do?</p>
+</blockquote>
+<p>All the default decision procedures go through the kernel and use ad-hoc<br>
+combinations of inference rules, including the simplifier. Those in<br>
+Decision_Procs use reflection and the code generator. The big advantage of<br>
+reflection is speed and the ability to prove both soundness and completeness of<br>
+your algorithm.</p>
+<p>Tobias</p>
+<blockquote>
+<p>On 09/04/2013 04:29 PM, Andreas Lochbihler wrote:</p>
+<blockquote>
+<p>Hi Manuel,</p>
+<p>Evaluation in the simplifier is a tricky beast to debug! Recently<br>
+(8e8941fea278), Florian added a tracing option code_simp_trace to see<br>
+what's happening. I expect that in your application, the abstract<br>
+datatypes cause the trouble. When you use polynomials of reals, you<br>
+have the following types stacked into one another:</p>
+<ul>
+<li>Numerals with constructors One, Bit0, Bit1</li>
+<li>int with constructors 0, Pos, Neg</li>
+<li>Rationals as abstract datatype with constructor Frct and destructor<br>
+quotient_of</li>
+<li>Reals with constructor Ratreal</li>
+<li>Polynomials as abstract datatype with constructor Poly and<br>
+destructor coeffs</li>
+</ul>
+<p>Evaluation with the simplifier does not obey the call-by-value<br>
+strategy of ML. There are some congruence rules for some functions<br>
+like op &amp; and op | that prevent execution of the second argument, but<br>
+nothing more. For normal code_datatypes like Numerals, int and Reals,<br>
+this is OK, because the simplifier works bottom-up, i.e., it will<br>
+first simplify the arguments of a constant (from left to right) and<br>
+only then try to rewrite with the constant's code equation. For<br>
+abstract datatypes, this breaks down as can be seen in your examples:</p>
+<p>"inverse 3 :: rat" is not evaluated because rat is an abstract type, a<br>
+quotient_of destructor would be necessary to trigger evaluation.<br>
+Instead, the simplifier continues the execution with the code<br>
+equations for outer constants. If these do not destruct "inverse 3",<br>
+this term will be passed around unevaluated. As may code equation<br>
+duplicate parameters, this can yield exponentially large terms. Even<br>
+worse, the duplicates are not shared (in terms of execution), i.e., if<br>
+"inverse 3" is destructed later, it will be destructed and evaluated<br>
+each time. In summary: evaluation in the simplifier currently does not<br>
+work well for abstract datatypes. Maybe Florian has some ideas to<br>
+mitigate the issue.</p>
+<p>Now to your next question with Poly: 'a poly is an abstract datatype<br>
+with constructor Poly and destructor quotient_of. The abstract means<br>
+that the constructor Poly must not occur in anything that you execute.<br>
+Otherwise, you will get an abstraction violation. For normal code<br>
+generation, this check is essential for soundness, because the code<br>
+generator transforms all the [code abstract] equations from destructor<br>
+style to constructor style.<br>
+For code_simp, however, this check is bogus because it does not do the<br>
+transformation and soundness is not endangered. Nevertheless, the<br>
+check currently is there. Maybe you can convince Florian to drop this<br>
+check for code_simp. But this will not stop the blow-up that I have<br>
+described above.</p>
+<p>Best,<br>
+Andreas<br>
+</p>
+</blockquote>
+<p>On 04/09/13 15:38, Manuel Eberl wrote:</p>
+<blockquote>
+<blockquote>
+<p>Thanks for the explanations so far.</p>
+<p>I use the development version because, if I remember correctly, it<br>
+contains some theorems that I need.</p>
+<p>The reason why I asked about "value [simp]" is that code_simp seems to<br>
+take a very, very long time, in fact, so long that I think it either<br>
+loops or builds up some enormously big term. Other expressions involving<br>
+polynomials also lead to unpleasant results, such as:</p>
+<p>value [simp] "gcd [:1, 2::real :] [:3:]"<br>
+Result: "smult (real_of_rat (inverse 3)) [:3:]" :: "real poly"</p>
+<p>If I try to use Poly instead of [: and :], I get the following error<br>
+message.</p>
+<p>value "Poly [0::real]"<br>
+*** Abstraction violation:<br>
+*** constant Poly</p>
+<p>Attempting to use any of the evaluation conversions on the ML level<br>
+results in the same error message, so apparently, switching from [: … :]<br>
+to Poly does not solve the problem either, it seems to make things even<br>
+worse.</p>
+<p>I can, of course, use evaluation instead of code_simp, but I do prefer<br>
+deduction within the logic over trusted prove such as the code<br>
+generator, and apart from that, I really would like to understand what<br>
+is going wrong here and why.</p>
+<p>Cheers,<br>
+Manuel<br>
+</p>
+</blockquote>
+<p>On 09/04/2013 03:28 PM, Andreas Lochbihler wrote:</p>
+<blockquote>
+<blockquote>
+<p>Hi Manuel,</p>
+<blockquote>
+<p>I tried to use Code_Simp now, but it does not terminate even after<br>
+quite<br>
+some time. I then tried "value [simp]" with some examples and found<br>
+the<br>
+following:</p>
+<p>value [simp] "[:1:] - [:1, 2::real :]"<br>
+Result: "[:1:] + - [:1, 2:]" :: "real poly"</p>
+<p>That is obviously not what I wanted. Does this mean that there is some<br>
+problem with the way the code equations in Polynomial.thy are set up?<br>
+What Isabelle version are you using? And what are your imports? In<br>
+Isabelle2013, I get the following results (imports Complex_Main and<br>
+Polynomial):</p>
+</blockquote>
+<p>value [code] =&gt; "[:0, -2:]"<br>
+value [nbe]  =&gt; "[:0, -2:]"<br>
+value [simp] =&gt; "[: real_of_rat (1 - 1), real_of_rat (- 2) :]"</p>
+<p>With the development version f6629734dd2b, I get:</p>
+<p>value [code] =&gt; "Poly [0, -2]"<br>
+value [nbe]  =&gt; "Poly [0, -2]"<br>
+value [simp] =&gt; "[:1:] + - [:1, 2:]"</p>
+<p>Two months ago, Florian changed in 3cc46b8cca5e the code setup for<br>
+polynomials from explicit constructors 0 and pCons to an abstract type<br>
+with constructor Poly and destructor coeffs. This explains why the<br>
+syntax [: and :] is lost.</p>
+<p>Since poly is now an abstract datatype, the code generator transforms<br>
+the [code abstract] equations for code generation from "Rep (f x) =<br>
+..." to "f x = Abs (...)" where Rep is the destructor and Abs is the<br>
+constructor (following the usual typedef terminology). For code_simp,<br>
+however, no such preprocessing happens, i.e., the simplifier is fed<br>
+directly with "Rep (f x) = ...". Therefore, evaluation with [simp]<br>
+will be delayed until you destruct the values. This is only a problem<br>
+for value [simp], but not for proofs by code_simp, because code_simp<br>
+can only be called on terms of type bool, i.e., all polynomials in the<br>
+statement will be deconstructed if needed.</p>
+<p>Maybe Florian can say more how one could use change value [simp] to<br>
+address this issue, possibly before the next release makes all this<br>
+public.</p>
+<p>Best,<br>
+Andreas<br>
+</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+
+
+
+<a name="294249220"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Building%20a%20proof%20method%20out%20of%20a%20function/near/294249220" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Building.20a.20proof.20method.20out.20of.20a.20function.html#294249220">(Aug 19 2022 at 11:55)</a>:</h4>
+<p>From: Jeremy Dawson &lt;<a href="mailto:Jeremy.Dawson@anu.edu.au">Jeremy.Dawson@anu.edu.au</a>&gt;<br>
+Why is it wrong?  It seems a perfectly good description as I understand <br>
+the structure of the system.</p>
+<p>Anyone who doesn't understand the reasons for what you say isn't likely <br>
+to see the expression "the ML level of Isabelle" as a "wrong idea", or <br>
+"Isabelle/ML" as the only correct term.</p>
+<p>Cheers,</p>
+<p>Jeremy</p>
+<p>Makarius wrote:</p>
+
+
+
+<a name="294249330"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Building%20a%20proof%20method%20out%20of%20a%20function/near/294249330" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Building.20a.20proof.20method.20out.20of.20a.20function.html#294249330">(Aug 19 2022 at 11:55)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Manuel,</p>
+<p>(first, thanks to Andreas for the thorough analysis).</p>
+<p>the short answer is that code_simp indeed in its current state does not<br>
+perform well with abstract datatypes.  To mitigate this, it would need<br>
+to be enriched with a non-trivial machinery to do bookkeeping on<br>
+invariants at runtime, to be able to reduce redexes rep (Abs x) = x when<br>
+needed.  This is definitely nothing to be done in the short run.</p>
+<p>To come to your particular issue.  Usually when using the simplifier you<br>
+first determine an appropriate set of rewrite rules in order to solve<br>
+your problem by rewriting and then just do a specific simplifier setup<br>
+suited for your problem.  Cf. the following minimalistic example</p>
+<p>ML {*<br>
+val numeral_syms = @{thms numeral_1_eq_1 [symmetric] numeral_2_eq_2<br>
+[symmetric]};</p>
+<p>fun subst_numerals ctxt =<br>
+  simplify (ctxt |&gt; put_simpset HOL_basic_ss |&gt; fold<br>
+(Simplifier.add_simp o mk_meta_eq) numeral_syms) o Thm.transfer<br>
+(Proof_Context.theory_of ctxt)<br>
+*}</p>
+<p>ML {* subst_numerals @{context} @{thm nat_mult_1} *}</p>
+<p>Hope this helps,<br>
+    Florian<br>
+<a href="/user_uploads/14278/hUK8fZjc8DqACgU4JQn8BcIs/signature.asc">signature.asc</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

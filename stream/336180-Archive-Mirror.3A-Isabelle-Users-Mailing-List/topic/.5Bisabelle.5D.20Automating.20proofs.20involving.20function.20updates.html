@@ -1,0 +1,68 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Automating proofs involving function updates · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Automating.20proofs.20involving.20function.20updates.html">[isabelle] Automating proofs involving function updates</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294243332"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Automating%20proofs%20involving%20function%20updates/near/294243332" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Automating.20proofs.20involving.20function.20updates.html#294243332">(Aug 19 2022 at 11:18)</a>:</h4>
+<p>From: Giuliano Losa &lt;<a href="mailto:giuliano.losa@epfl.ch">giuliano.losa@epfl.ch</a>&gt;<br>
+Hello,<br>
+I would like to automate some proofs that involve non-recursive data<br>
+types, records, and function updates.</p>
+<p>For example:</p>
+<p>typedecl T<br>
+datatype B = Zero | One</p>
+<p>record R =<br>
+  f :: "T ⇒ B"</p>
+<p>lemma test:<br>
+  fixes r::R and x::T<br>
+  assumes "f r x = Zero"<br>
+  and "r = r⦇f := (f r)(x := One)⦈"<br>
+  shows False<br>
+proof -<br>
+  from assms(2) have "f r x = ((f r)(x := One)) x" by (cases r, simp)<br>
+  hence "f r x = One" by simp<br>
+  with assms(1) show ?thesis by simp<br>
+qed</p>
+<p>Is there an easy way to enable simp or auto to solve this kind of goal?<br>
+Sledgehammer can solve this goal but fails as soon as the example gets a<br>
+little bigger.</p>
+<p>Thanks,<br>
+Giuliano</p>
+
+
+
+<a name="294243368"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Automating%20proofs%20involving%20function%20updates/near/294243368" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Automating.20proofs.20involving.20function.20updates.html#294243368">(Aug 19 2022 at 11:18)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+The problem is that "r = r..." cannot be used as a rewrite rule because it would<br>
+not terminate. The simplifier recognises that and ignores that rule. However,<br>
+you can apply it by hand via "subst". Here is your proof in compact form:</p>
+<p>proof -<br>
+  from assms(1) show False<br>
+    apply(subst (asm) assms(2))<br>
+    by simp<br>
+qed</p>
+<p>This is not automate matters but may help you a little.</p>
+<p>Something else that may help is to turn equalities between records into<br>
+equalities between fields. In your case the lemma</p>
+<p>lemma R_ext: "((r1::R) = r2) = (f r1 = f r2)"<br>
+by auto</p>
+<p>can be given to the simplifier and turns your second assumption into</p>
+<p>f r = (f r)(x := One)</p>
+<p>and lemma fun_eq_iff can lower that one step further. But the difficulty remains<br>
+that you may have recursive equations that the simplifier will not use.</p>
+<p>I suspect that your problem is actually automatable but requires more work at<br>
+the ML level.</p>
+<p>Tobias</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

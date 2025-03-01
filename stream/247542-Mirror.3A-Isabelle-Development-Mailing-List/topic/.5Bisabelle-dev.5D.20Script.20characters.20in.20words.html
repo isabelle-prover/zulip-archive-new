@@ -1,0 +1,148 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle-dev] Script characters in words · Mirror: Isabelle Development Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/index.html">Mirror: Isabelle Development Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20Script.20characters.20in.20words.html">[isabelle-dev] Script characters in words</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="425073166"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20Script%20characters%20in%20words/near/425073166" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20Script.20characters.20in.20words.html#425073166">(Mar 06 2024 at 12:20)</a>:</h4>
+<p>From: Lawrence Paulson &lt;<a href="mailto:lp15@cam.ac.uk">lp15@cam.ac.uk</a>&gt;<br>
+I have noticed something unusual, which is true both on Isabelle2023 and in the current version: most script letters seem to be regarded as word characters (as we would expect), but not all of them.</p>
+<p>To see this, it is enough to type </p>
+<p>thm 𝒜_def ℬ_def 𝒞_def 𝒟_def ℰ_def ℱ_def ℛ_def 𝒮_def</p>
+<p>and double click on the letter f. It's pretty hard to explain why A should be treated differently from B here, or R from S. </p>
+<p>Larry</p>
+<hr>
+<p>isabelle-dev mailing list<br>
+<a href="mailto:isabelle-dev@in.tum.de">isabelle-dev@in.tum.de</a><br>
+<a href="https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev">https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev</a></p>
+
+
+
+<a name="425090641"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20Script%20characters%20in%20words/near/425090641" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20Script.20characters.20in.20words.html#425090641">(Mar 06 2024 at 13:51)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+You have rediscovered a long-standing problem of "Unicode". It started out as <br>
+a universal and uniform 16-bit character sets many decades ago (UCS-2), but is <br>
+now a conglomerate of many add-ons and adhoc complexity, in order to <br>
+approximate text representation for every language on the planet (including <br>
+mathematics).</p>
+<p>The problem here is that the script "𝒜" was introduced much later than "ℬ": <br>
+thus it requires 2 16-bit characters instead of just 1. Many Java (or <br>
+JavaScript) programs will usually get it wrong, because they work with type <br>
+Char ("character") instead of Int (codepoint).</p>
+<p>This complexity (and failure) of Unicode is avoided in Isabelle by using a <br>
+more stable and uniform notion of "Isabelle symbols". The Isabelle/jEdit <br>
+front-end uses "poor-man's rendering of Isabelle symbols in Unicode". Thus the <br>
+underlying jEdit text editor may get things wrong occasionally: it would be <br>
+better to work natively with Isabelle symbols everywhere.</p>
+<p>Here are some snippets to illustrate the situation:</p>
+<p>(<em>Isabelle/ML symbols: good</em>)<br>
+ML ‹Symbol.explode "𝒜_def ℬ_def" |&gt; map (fn s =&gt; (s, Symbol.is_letter s))›</p>
+<p>(<em>Isabelle/Scala symbols or UTF-16 codepoints: good</em>)<br>
+Symbol.explode("𝒜_def ℬ_def").map(s =&gt; (s, Symbol.is_letter(s)))</p>
+<p>(<em>Java UTF-16 codepoints: good</em>)<br>
+Codepoint.iterator("𝒜_def ℬ_def").toList.map(c =&gt; (c, Character.isLetter(c)))</p>
+<p>(<em>Java UCS-2 characters: bad</em>)<br>
+"𝒜_def ℬ_def".toList.map(c =&gt; (c, Character.isLetter(c)))</p>
+<p>The first one is for the Isabelle/jEdit document buffer, within a formal <br>
+theory context. The other ones are for the Console/Scala REPL: here you may <br>
+notice that the Java GUI component cannot display the "𝒜" anymore, after it <br>
+got chopped up into 2 characters.</p>
+<p>I am already used to post tickets to the average Java project, in order to <br>
+make such fine-points more correct. But for jEdit we have a certain status-quo <br>
+that won't move much.</p>
+<p>Makarius</p>
+<hr>
+<p>isabelle-dev mailing list<br>
+<a href="mailto:isabelle-dev@in.tum.de">isabelle-dev@in.tum.de</a><br>
+<a href="https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev">https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev</a></p>
+
+
+
+<a name="425106055"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20Script%20characters%20in%20words/near/425106055" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20Script.20characters.20in.20words.html#425106055">(Mar 06 2024 at 14:56)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On 06/03/2024 15:01, Lawrence Paulson wrote:</p>
+<blockquote>
+<p>Thanks for the explanation. I guess you are saying this is outside of our <br>
+control.</p>
+</blockquote>
+<p>It would mean to submit patches to the jEdit project. I did this for really <br>
+important things in the past: it does work, but can take a long time.</p>
+<blockquote>
+<p>You do have to wonder how they did not introduce the entire script <br>
+alphabet at the same time.</p>
+</blockquote>
+<p>The Unicode committee has always been a bit of a mess. I guess the problem is <br>
+that US-centric mentality has tried to rule over the world's languages, with <br>
+limited success.</p>
+<p>In recent years, related to the STIX project, much of the mathematical <br>
+repertoire from TeX/LaTeX has been added in a post-hoc fashion.</p>
+<p>Makarius</p>
+<hr>
+<p>isabelle-dev mailing list<br>
+<a href="mailto:isabelle-dev@in.tum.de">isabelle-dev@in.tum.de</a><br>
+<a href="https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev">https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev</a></p>
+
+
+
+<a name="425116135"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20Script%20characters%20in%20words/near/425116135" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20Script.20characters.20in.20words.html#425116135">(Mar 06 2024 at 15:36)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+On 06/03/2024 15:56, Makarius wrote:</p>
+<blockquote>
+<p>On 06/03/2024 15:01, Lawrence Paulson wrote:</p>
+<blockquote>
+<p>Thanks for the explanation. I guess you are saying this is outside of our <br>
+control.</p>
+</blockquote>
+<p>It would mean to submit patches to the jEdit project. I did this for really <br>
+important things in the past: it does work, but can take a long time.</p>
+<blockquote>
+<p>You do have to wonder how they did not introduce the entire script alphabet at <br>
+the same time.</p>
+</blockquote>
+<p>The Unicode committee has always been a bit of a mess. I guess the problem is <br>
+that US-centric mentality has tried to rule over the world's languages, with <br>
+limited success.</p>
+</blockquote>
+<p>Introducing script "𝒜" much later than "ℬ" is a typical US-centric ploy.</p>
+<p>Tobias</p>
+<blockquote>
+<p>In recent years, related to the STIX project, much of the mathematical <br>
+repertoire from TeX/LaTeX has been added in a post-hoc fashion.</p>
+<p>Makarius</p>
+<hr>
+<p>isabelle-dev mailing list<br>
+<a href="mailto:isabelle-dev@in.tum.de">isabelle-dev@in.tum.de</a><br>
+<a href="https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev">https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev</a></p>
+</blockquote>
+<p><a href="/user_uploads/14278/lNFZiucVtdzmXPf2J01sYoaG/smime.p7s">smime.p7s</a></p>
+
+
+
+<a name="425131306"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20Script%20characters%20in%20words/near/425131306" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20Script.20characters.20in.20words.html#425131306">(Mar 06 2024 at 16:41)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Yes. If you want to understand Unicode history, see this detailed exposition:<br>
+<a href="http://utf8everywhere.org">http://utf8everywhere.org</a></p>
+<p>I was in particular thinking of the original work by Joseph D. Becker that is <br>
+cited early on that webpage. It reads a bit like "16bit should be sufficient" <br>
+for everything". And then they had to omit many mathematical script <br>
+characters, just because they were not widely used at that time.</p>
+<p>Makarius</p>
+<hr>
+<p>isabelle-dev mailing list<br>
+<a href="mailto:isabelle-dev@in.tum.de">isabelle-dev@in.tum.de</a><br>
+<a href="https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev">https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

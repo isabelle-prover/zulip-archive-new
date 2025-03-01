@@ -1,0 +1,261 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Locale interpretations and imported theories · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Locale.20interpretations.20and.20imported.20theories.html">[isabelle] Locale interpretations and imported theories</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294079717"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Locale%20interpretations%20and%20imported%20theories/near/294079717" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Locale.20interpretations.20and.20imported.20theories.html#294079717">(Aug 18 2022 at 13:44)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:peter.lammich@uni-muenster.de">peter.lammich@uni-muenster.de</a>&gt;<br>
+Hi all,</p>
+<p>I encountered a problem/bug(?) with locales and imported theories.<br>
+I have four theories:<br>
+  def: Defines a locale<br>
+  add: Adds some lemma to the locale<br>
+  inst: Interprets the locale, but does <em>not</em> import add<br>
+  use: Imports add and inst</p>
+<p>The problem is, that I need to use the added lemma in the<br>
+interpretation. However, it is not visible in the theory "use".<br>
+Even more strange things happen, if I try to reinterpret the locale in<br>
+theory "use": The re-interpretation (done with a different prefix name)<br>
+adds no lemmas, neither the ones originally defined in the locale, nor the<br>
+ones added by the theory "add".</p>
+<p>The only workarounds that I can currently figure out is instantiating<br>
+the missing lemmas by hand, i.e. lemmas xyz_lem = locale_name.lem[OF<br>
+xyz_is_interp] or trying to change the structure of the imports-graph.<br>
+Is there some better method how to get the desired lemmas, especially<br>
+the ones that are declared as [simp] and hence should be filled into the<br>
+simpset?</p>
+<p>Regards,<br>
+  Peter</p>
+<p>Here follows a boiled-down example: (I also attached a tgz with the four<br>
+thy-files)</p>
+<p>theory "use"<br>
+imports inst add<br>
+begin</p>
+<p>thm int.orig   -- "Works"<br>
+  thm l.added    -- "The theorem is in the locale"<br>
+  (* thm int.added  -- "Does not work ... ok, would have to be merged on<br>
+import" *)</p>
+<p>interpretation xxx: l .</p>
+<p>-- "The namespace below xxx seems to be empty ?"<br>
+  thm xxx.orig  -- "Does not work"<br>
+  thm xxx.added -- "Does not work"</p>
+<p>end</p>
+<hr>
+<p>theory "def"<br>
+imports Main<br>
+begin<br>
+  locale l<br>
+  begin<br>
+    lemma orig: True ..</p>
+<p>end<br>
+end</p>
+<hr>
+<p>theory add<br>
+imports "def"<br>
+begin</p>
+<p>context l begin<br>
+    lemma added: "x=x" ..<br>
+  end</p>
+<p>end</p>
+<hr>
+<p>theory inst<br>
+imports "def"<br>
+begin</p>
+<p>interpretation int: l .</p>
+<p>thm int.orig</p>
+<p>end</p>
+<hr>
+<p><a href="/user_uploads/14278/Gejylq5d3KJUPD8u5ZzZsp1d/strange.tgz">strange.tgz</a></p>
+
+
+
+<a name="294079735"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Locale%20interpretations%20and%20imported%20theories/near/294079735" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Locale.20interpretations.20and.20imported.20theories.html#294079735">(Aug 18 2022 at 13:44)</a>:</h4>
+<p>From: Brian Huffman &lt;<a href="mailto:brianh@cs.pdx.edu">brianh@cs.pdx.edu</a>&gt;<br>
+On Thu, Jul 9, 2009 at 9:11 AM, Peter<br>
+Lammich&lt;<a href="mailto:peter.lammich@uni-muenster.de">peter.lammich@uni-muenster.de</a>&gt; wrote:</p>
+<blockquote>
+<p>Hi all,</p>
+<p>I encountered a problem/bug(?) with locales and imported theories.<br>
+I have four theories:<br>
+ def: Defines a locale<br>
+ add: Adds some lemma to the locale<br>
+ inst: Interprets the locale, but does <em>not</em> import add<br>
+ use: Imports add and inst</p>
+<p>The problem is, that I need to use the added lemma in the<br>
+interpretation. However, it is not visible in the theory "use".</p>
+</blockquote>
+<p>Hi Peter,</p>
+<p>This is a long-standing bug in Isabelle's implementation of locales.<br>
+It was discussed briefly on the mailing list in February 2008:</p>
+<p><a href="https://lists.cam.ac.uk/mailman/htdig/cl-isabelle-users/2008-February/msg00001.html">https://lists.cam.ac.uk/mailman/htdig/cl-isabelle-users/2008-February/msg00001.html</a></p>
+<blockquote>
+<p>The only workarounds that I can currently figure out is instantiating<br>
+the missing lemmas by hand, i.e. lemmas xyz_lem = locale_name.lem[OF<br>
+xyz_is_interp] or trying to change the structure of the imports-graph.</p>
+</blockquote>
+<p>Those are exactly the two workarounds that Clemens Ballarin suggested<br>
+on the list last February. I'm afraid the situation with the locale<br>
+package has not changed, so one of those workarounds will still be<br>
+necessary. Of the two, making the import structure more linear is<br>
+probably the easiest one to use. The drawback is that it introduces a<br>
+lot of extra theory dependencies that shouldn't be there. (For much of<br>
+Isabelle's history, import graphs were required to be totally-ordered,<br>
+and most of the packages were apparently designed with this in mind.<br>
+The locale package is not the only package in Isabelle that doesn't<br>
+handle theory merges very well.)</p>
+<ul>
+<li>Brian</li>
+</ul>
+
+
+
+<a name="294079759"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Locale%20interpretations%20and%20imported%20theories/near/294079759" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Locale.20interpretations.20and.20imported.20theories.html#294079759">(Aug 18 2022 at 13:44)</a>:</h4>
+<p>From: Clemens Ballarin &lt;<a href="mailto:ballarin@in.tum.de">ballarin@in.tum.de</a>&gt;<br>
+Quoting Brian Huffman &lt;<a href="mailto:brianh@cs.pdx.edu">brianh@cs.pdx.edu</a>&gt;:</p>
+<p>I would like to point out that calling this behaviour a bug is jumping  <br>
+to conclusions.</p>
+<p>It is conceivable to "round up" interpretations at theory merges, but  <br>
+note that this will not only populate the new theory with additional  <br>
+theorems but also with syntax and other declarations.  Enabling this  <br>
+has to be thought through very carefully.  I expect it to cause many  <br>
+more "surprising" effects that will confuse users, hence I'm very  <br>
+hesitant to provide this.</p>
+<p>Clemens</p>
+
+
+
+<a name="294079771"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Locale%20interpretations%20and%20imported%20theories/near/294079771" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Locale.20interpretations.20and.20imported.20theories.html#294079771">(Aug 18 2022 at 13:44)</a>:</h4>
+<p>From: Clemens Ballarin &lt;<a href="mailto:ballarin@in.tum.de">ballarin@in.tum.de</a>&gt;<br>
+Hi Peter,</p>
+<blockquote>
+<p>I encountered a problem/bug(?) with locales and imported theories.<br>
+I have four theories:<br>
+  def: Defines a locale<br>
+  add: Adds some lemma to the locale<br>
+  inst: Interprets the locale, but does <em>not</em> import add<br>
+  use: Imports add and inst</p>
+</blockquote>
+<p>Brian was so kind to dig out my answer to an earlier enquiry of the  <br>
+same kind, so I can refer to his e-mail.</p>
+<blockquote>
+<p>Even more strange things happen, if I try to reinterpret the locale in<br>
+theory "use": The re-interpretation (done with a different prefix name)<br>
+adds no lemmas, neither the ones originally defined in the locale, nor the<br>
+ones added by the theory "add".</p>
+</blockquote>
+<p>It is not possible to force the re-interpretation of a locale  <br>
+instance.  In fact, the interpretation does not take place for any  <br>
+locale fragments that are subsumed by existing interpretations (also  <br>
+indirect ones created by sublocale).</p>
+<blockquote>
+<p>The only workarounds that I can currently figure out is instantiating<br>
+the missing lemmas by hand, i.e. lemmas xyz_lem = locale_name.lem[OF<br>
+xyz_is_interp] or trying to change the structure of the imports-graph.<br>
+Is there some better method how to get the desired lemmas, especially<br>
+the ones that are declared as [simp] and hence should be filled into the<br>
+simpset?</p>
+</blockquote>
+<p>If you want too keep the diamond theory hierarchy because "inst"  <br>
+contains a lengthy proof of the interpretation theorem, you might  <br>
+consider leaving the proof in "inst" but move the interpretation to  <br>
+"use".  This is, however, not going to work very well if you have a  <br>
+hierarchy of locales.</p>
+<p>Clemens</p>
+
+
+
+<a name="294079793"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Locale%20interpretations%20and%20imported%20theories/near/294079793" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Locale.20interpretations.20and.20imported.20theories.html#294079793">(Aug 18 2022 at 13:44)</a>:</h4>
+<p>From: Brian Huffman &lt;<a href="mailto:brianh@cs.pdx.edu">brianh@cs.pdx.edu</a>&gt;<br>
+On Thu, Jul 9, 2009 at 12:33 PM, Clemens Ballarin&lt;<a href="mailto:ballarin@in.tum.de">ballarin@in.tum.de</a>&gt; wrote:</p>
+<blockquote>
+<p>Quoting Brian Huffman &lt;<a href="mailto:brianh@cs.pdx.edu">brianh@cs.pdx.edu</a>&gt;:</p>
+<p>On Thu, Jul 9, 2009 at 9:11 AM, Peter</p>
+<blockquote>
+<p>Lammich&lt;<a href="mailto:peter.lammich@uni-muenster.de">peter.lammich@uni-muenster.de</a>&gt; wrote:</p>
+<blockquote>
+<p>Hi all,</p>
+<p>I encountered a problem/bug(?) with locales and imported theories.<br>
+I have four theories:<br>
+ def: Defines a locale<br>
+ add: Adds some lemma to the locale<br>
+ inst: Interprets the locale, but does <em>not</em> import add<br>
+ use: Imports add and inst</p>
+<p>The problem is, that I need to use the added lemma in the<br>
+interpretation. However, it is not visible in the theory "use".</p>
+</blockquote>
+<p>Hi Peter,</p>
+<p>This is a long-standing bug in Isabelle's implementation of locales.<br>
+It was discussed briefly on the mailing list in February 2008:</p>
+<p>...</p>
+</blockquote>
+<p>I would like to point out that calling this behaviour a bug is jumping to<br>
+conclusions.</p>
+</blockquote>
+<p>At the very least, I think I can safely say that when locales and<br>
+interpretations are used together with theory merges, the result is<br>
+often not what users expect.</p>
+<p>The issue stems from the interaction between two Isabelle features<br>
+(locales and theory-merging), so I guess I shouldn't have called it a<br>
+bug in the locale package; it could just as well be called a bug in<br>
+Isabelle's theory-merging feature.</p>
+<blockquote>
+<p>It is conceivable to "round up" interpretations at theory merges, but note<br>
+that this will not only populate the new theory with additional theorems but<br>
+also with syntax and other declarations. Enabling this has to be thought<br>
+through very carefully.  I expect it to cause many more "surprising" effects<br>
+that will confuse users, hence I'm very hesitant to provide this.</p>
+<p>Clemens</p>
+</blockquote>
+<p>After thinking about this a bit more, I now see a situation where<br>
+"rounding up" interpretations during merges could cause problems. The<br>
+problem is that the same "merge" could happen in more than one place.<br>
+Here's an example:</p>
+<p>theory A  (defines locale "foo")<br>
+theory B imports A (proves lemma "bar" in locale 'foo")<br>
+theory C imports A (interpretation "baz" of locale "foo")<br>
+theory D imports B C (merge creates lemma "<a href="http://baz.bar">baz.bar</a>")<br>
+theory D' imports B C (merge creates another lemma "<a href="http://baz.bar">baz.bar</a>")<br>
+theory E imports D D' (???)</p>
+<p>Maybe the duplicate lemmas aren't such a big problem, but as you<br>
+pointed out, the locales could have syntax or other declarations that<br>
+operate on the theory context in arbitrary ways.</p>
+<p>If there is not a good solution to the locale/theory-merge issue, then<br>
+I think it should be made clear in the documentation that using<br>
+locales together with theory-merges is <em>not supported</em>.</p>
+<ul>
+<li>Brian</li>
+</ul>
+
+
+
+<a name="294079804"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Locale%20interpretations%20and%20imported%20theories/near/294079804" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Locale.20interpretations.20and.20imported.20theories.html#294079804">(Aug 18 2022 at 13:44)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Theory merge does nothing more than delegate the actual merge operation to <br>
+theory data provided in user space (here the locale mechanism).  So there <br>
+cannot be a bug "in" Isabelle's theory merge feature, but you could call <br>
+the whole feature a bug, because it raises delicate questions (which is a <br>
+well-known fact).  But then, "feature" and "bug" are really synonyms, and <br>
+life can be generally simplified by deleting both words from one's <br>
+dictionary (which I have done many years ago).</p>
+<p>BTW, the locale mechanism is properly called a "target" (of the local <br>
+theory framework).  A "package" is something that implements a <br>
+specification mechanism that lives within such a target, e.g. 'inductive', <br>
+'function', 'primrec'.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

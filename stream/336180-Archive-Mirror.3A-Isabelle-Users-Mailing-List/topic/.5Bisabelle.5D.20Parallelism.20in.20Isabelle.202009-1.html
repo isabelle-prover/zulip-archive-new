@@ -1,0 +1,119 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Parallelism in Isabelle 2009-1 · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Parallelism.20in.20Isabelle.202009-1.html">[isabelle] Parallelism in Isabelle 2009-1</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294105189"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Parallelism%20in%20Isabelle%202009-1/near/294105189" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Parallelism.20in.20Isabelle.202009-1.html#294105189">(Aug 18 2022 at 15:03)</a>:</h4>
+<p>From: Thomas Sewell &lt;<a href="mailto:Thomas.Sewell@nicta.com.au">Thomas.Sewell@nicta.com.au</a>&gt;<br>
+Hey Isabelle users.</p>
+<p>I've been playing with Isabelle 2009-1's parallelism features for a <br>
+while now, and have come to the conclusion that I can never get quite <br>
+what I want from them. There are two problems. On my desktop machine at <br>
+work, I can't safely enable parallelism. On my desktop machine at home, <br>
+I can't completely disable parallelism.</p>
+<p>The first problem is that the L4.verified proof repository I work on is <br>
+huge (tens of thousands of lemmas and hundreds of thousands of lines of <br>
+proof). This exposes a problem with parallel proof checking. CPU usage <br>
+looks good to begin with but then our systems very rapidly run out of <br>
+memory and start thrashing. I suspect the problem here is that for every <br>
+proof saved for later checking the relevant context needs to saved as <br>
+well. Our contexts get quite large, so the theory-parsing thread doesn't <br>
+have to get far ahead of the proof-checking threads for memory to run <br>
+out. The solution to this is to turn off parallel proof checking.</p>
+<p>Furthermore, although Isabelle 2009-1 loads theories in parallel this <br>
+does not seem to translate to CPU parallelism. It is clear from the log <br>
+chatter that multiple theories are being loaded at once, however, when <br>
+parallel proofs are disabled CPU usage remains at one core's worth. <br>
+Running UNIX top and showing thread decompositions (press "H") reveals <br>
+that there are multiple polyml threads running but their CPU usage <br>
+always adds to exactly one core. It looks a lot like there's a lock <br>
+somewhere all the threads need to run. This prevents me getting any <br>
+parallel execution on my work machine.</p>
+<p>Finally, on my machine at home, which seems to act up in the context of <br>
+parallelism, I can't disable it. I can turn off parallel proof checking <br>
+and set the maximum thread count to 1. UNIX top confirms that this <br>
+reduces the number of polyml threads created from 7 to 2, which then <br>
+share the CPU between them in exactly the same way. This prevents me <br>
+disabling real parallelism on my home machine. I can still run a busy <br>
+loop on the other core, which seems to hide the mysterious issues.</p>
+<p>Do other users see the same behaviour? Do the developers know what's <br>
+going on? Could it be easily fixed?</p>
+<p>Yours,<br>
+    Thomas.</p>
+
+
+
+<a name="294105241"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Parallelism%20in%20Isabelle%202009-1/near/294105241" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Parallelism.20in.20Isabelle.202009-1.html#294105241">(Aug 18 2022 at 15:03)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On Fri, 9 Apr 2010, Thomas Sewell wrote:</p>
+<blockquote>
+<p>The first problem is that the L4.verified proof repository I work on is <br>
+huge (tens of thousands of lemmas and hundreds of thousands of lines of <br>
+proof). This exposes a problem with parallel proof checking. CPU usage <br>
+looks good to begin with but then our systems very rapidly run out of <br>
+memory and start thrashing. I suspect the problem here is that for every <br>
+proof saved for later checking the relevant context needs to saved as <br>
+well. Our contexts get quite large, so the theory-parsing thread doesn't <br>
+have to get far ahead of the proof-checking threads for memory to run <br>
+out. The solution to this is to turn off parallel proof checking.</p>
+</blockquote>
+<p>In a low memory situation, you have two options to play with:</p>
+<p>* Multithreading.max_threads (usedir option -M)<br>
+   * Goal.parallel_proofs (usedir option -q)</p>
+<p>See also section 3.4 in the Isabelle System manual for some further <br>
+explanations.  In particulay, -q1 vs. -q2 might sometimes help.</p>
+<p>Since your application is rather big, I would say the real solution is to <br>
+install more memory.  As a rule of thumb, you need to scale up memory with <br>
+the number of cores.  Less than 2 GB per core is unlikely to work here. <br>
+Since the total heap size of Poly/ML is limited to 2-3 GB on 32bit, you <br>
+might have to switch to 64bit by editing the ML settings accordingly. <br>
+There is an example in Isabelle2009-1/etc/settings.  Multiply the memory <br>
+by 1.5 or even 2 for 64bit mode.</p>
+<blockquote>
+<p>Furthermore, although Isabelle 2009-1 loads theories in parallel this <br>
+does not seem to translate to CPU parallelism. It is clear from the log <br>
+chatter that multiple theories are being loaded at once, however, when <br>
+parallel proofs are disabled CPU usage remains at one core's worth. <br>
+Running UNIX top and showing thread decompositions (press "H") reveals <br>
+that there are multiple polyml threads running but their CPU usage <br>
+always adds to exactly one core. It looks a lot like there's a lock <br>
+somewhere all the threads need to run. This prevents me getting any <br>
+parallel execution on my work machine.</p>
+</blockquote>
+<p>The degree of parallelism in typical theory development graphs is <br>
+surprisingly low.  Nonetheless, you should get some speedup, unless the <br>
+graph is all linear.</p>
+<p>If CPU usage is really just 100% there might be some ML tools using <br>
+something like setmp_CRITICAL internally.  The official Isabelle <br>
+distribution is essentially free from such exclusive execution, but maybe <br>
+you have your own tools.  Or maybe it is just some critical wrapper around <br>
+the main use_thys invocation in ROOT.ML of the session (only relevant for <br>
+batch mode).</p>
+<blockquote>
+<p>Finally, on my machine at home, which seems to act up in the context of <br>
+parallelism, I can't disable it. I can turn off parallel proof checking <br>
+and set the maximum thread count to 1. UNIX top confirms that this <br>
+reduces the number of polyml threads created from 7 to 2, which then <br>
+share the CPU between them in exactly the same way. This prevents me <br>
+disabling real parallelism on my home machine. I can still run a busy <br>
+loop on the other core, which seems to hide the mysterious issues.</p>
+</blockquote>
+<p>I have just tried ISABELLE_USEDIR_OPTIONS="-M 1" on my 2-core laptop and <br>
+it works as expected: there are only 2 threads, the main ML thread <br>
+(typically 80% CPU time) and the GC thread (20% CPU time).  Total CPU <br>
+usage is &lt; 50% accounting for the 2 cores, i.e. this is really single-core <br>
+mode.  The ML thread and GC thread are alternating each other.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

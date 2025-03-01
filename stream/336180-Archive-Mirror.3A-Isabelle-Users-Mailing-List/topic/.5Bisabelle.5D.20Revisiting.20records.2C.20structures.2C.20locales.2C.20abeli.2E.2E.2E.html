@@ -1,0 +1,390 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Revisiting records, structures, locales, abeli... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Revisiting.20records.2C.20structures.2C.20locales.2C.20abeli.2E.2E.2E.html">[isabelle] Revisiting records, structures, locales, abeli...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294761247"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Revisiting%20records%2C%20structures%2C%20locales%2C%20abeli.../near/294761247" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Revisiting.20records.2C.20structures.2C.20locales.2C.20abeli.2E.2E.2E.html#294761247">(Aug 22 2022 at 20:21)</a>:</h4>
+<p>From: Fabian Immler &lt;<a href="mailto:immler@in.tum.de">immler@in.tum.de</a>&gt;<br>
+On 8/5/2019 3:37 PM, mailing-list anonymous wrote:</p>
+<blockquote>
+<p>I would like to understand if one was to, hypothetically, implement a<br>
+large-scale overhaul of HOL-Algebra using the modern locale features, what<br>
+would the structure of the new library look like?</p>
+</blockquote>
+<p>I never thought about what a "modern" HOL-Algebra would look like.</p>
+<blockquote>
+<p>However, I am still not certain as to what would be the best way to<br>
+structure the set-based library. At the moment, the development follows the<br>
+approach that merely extends the locales that exist in the main HOL library<br>
+with an additional locale parameter that represents a carrier set (or<br>
+several locale parameters for multiple carrier sets) - this approach is<br>
+consistent with the existing library of relativised results (primarily,<br>
+about vector spaces) that was previously developed by Bohua Zhan and Fabian<br>
+Immler. This approach, straightforward as it may seem, has several<br>
+problems.</p>
+</blockquote>
+<p>All I can say is that we chose the locale-with-carrier approach not <br>
+because we thought it was a superior structuring mechanism, but because <br>
+it was easier to deal with in the context of relativising results <br>
+automatically (e.g., no need to transfer record types).</p>
+<p>Fabian<br>
+<a href="/user_uploads/14278/Lw5zfidkKGrD7vMeFB10PaQW/smime.p7s">smime.p7s</a></p>
+
+
+
+<a name="294761289"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Revisiting%20records%2C%20structures%2C%20locales%2C%20abeli.../near/294761289" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Revisiting.20records.2C.20structures.2C.20locales.2C.20abeli.2E.2E.2E.html#294761289">(Aug 22 2022 at 20:21)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:mail@andreas-lochbihler.de">mail@andreas-lochbihler.de</a>&gt;<br>
+Hi,</p>
+<p>Here are my thoughts on this topic. I have played around with various <br>
+options that you mention and I also ran into the problems you mentioned.</p>
+<p>Records in Isabelle/HOL provide only one extension slot. So fields must <br>
+be added linearly. You cannot have one record (such as partial_object) <br>
+be extended independently (ord and topology) and then later combine <br>
+them. To do that smoothly, we would need to have a unification mechanism <br>
+that can work modulo type isomorphisms, which basically adds the <br>
+conversions as needed. The coercions functionality implements something <br>
+like that, but I could never get this to work properly because the <br>
+conversions are added during parsing and not during reasoning. I'm <br>
+pretty sure, though, that one could implement such a coercion insertion <br>
+algorithm, at least for first-order unification or higher-order pattern <br>
+matching, in Isabelle/ML. Yet, this would not be integrated with all the <br>
+proof methods (simp, clarify, auto, ...) and therefore of little use.</p>
+<p>In my AFP entry Monomorphic_Monad [1], I therefore gave up on using <br>
+records and went for listing every parameter individually. I found that <br>
+I could get a long way by judiciously using nested<br>
+"context fixes ... begin" with interspersed "interpretation" commands.</p>
+<p>This approach works well with higher-order unification and all proof <br>
+tools. The main drawback is that the terms get rather large, in <br>
+particular if you stack several algebraic constructions on top of each <br>
+other. Consequently, type checking the terms and folding the <br>
+abbreviations for displaying terms may get slow.</p>
+<p>If your types are sufficiently distinct, the notation problem can be <br>
+worked around with adhoc_overloading as follows:</p>
+<ol>
+<li>Define an uninterpreted constant for each operation of the right <br>
+arity and attach the notation to it. For example,</li>
+</ol>
+<p>consts plus :: "'a =&gt; 'a =&gt; 'a"<br>
+notation plus (infixl "\&lt;oplus&gt;" 65)</p>
+<ol start="2">
+<li>Register on demand the operations for which you want to use the notation:</li>
+</ol>
+<p>context<br>
+   fixes plus1 :: "'a =&gt; 'a =&gt; 'a"<br>
+   and plus2 :: "'b =&gt; 'b =&gt; 'b"<br>
+begin</p>
+<p>adhoc_overloading plus plus1<br>
+adhoc_overloading plus plus2</p>
+<p>You can now use \&lt;oplus&gt; for both plus1 and plus2 in your lemmas <br>
+provided that type inference can unoverload all occurrences. You may <br>
+have to add occasional type constraints. Clearly, this does not work if <br>
+the types overlap.</p>
+<p>Finally, here's another proposal that might be worth a try: unrestricted <br>
+overloading. If Isabelle/HOL had multi-parameter type classes, we could <br>
+formalize all these things as type classes. In Haskell, we'd say</p>
+<p>class PartialObject a b where carrier :: a =&gt; b set</p>
+<p>with a dependency from a to b, i.e., if a is known, then so is b. In <br>
+Isabelle/HOL, type class operations may only have one type parameter, so <br>
+this does not work directly. However, type classes are internally <br>
+implemented with unrestricted overloading + some type inference magic. <br>
+So we can achieve something if we don't care too much about the type <br>
+inference convenience. Here's a sketch:</p>
+<p>consts<br>
+   carrier :: "'a =&gt; 'b set"<br>
+   le :: "'a =&gt; 'b =&gt; 'b =&gt; bool"<br>
+   tau :: "'a =&gt; 'b set =&gt; bool"</p>
+<p>Here, the algebraic structure is left abstract as "'a" and you phrase <br>
+all your definitions and theorems such that the structure is always an <br>
+abstract type.</p>
+<p>For example, to specify that a structure of type 'a is an order on <br>
+elements of type 'b, you'd write</p>
+<p>definition order :: "'a itself =&gt; 'b itself =&gt; bool" where<br>
+   "order G _ = (ALL x :: 'b. x \&lt;in&gt; carrier G --&gt; le G x x) &amp; ..."</p>
+<p>In practice, you'll have to add many type constraints to guide type <br>
+inference into the right direction. This can be alleviated with custom <br>
+syntax that shortens the type syntax. An example for this is the <br>
+CARD('a) syntax from HOL-Library.Cardinality [2]. So you'd write</p>
+<p>"ORDER('b) G"</p>
+<p>instead of</p>
+<p>"order G (Pure.type :: 'b itself)"</p>
+<p>and "CARRIER('b) G" instead of "carrier G :: 'b set"</p>
+<p>Combining two structures in this way is then very simple, as the <br>
+definitions and proofs do not assume any particular repesentation of the <br>
+structure. Accordingly, I'd recommend to also do constructions <br>
+abstractly. For example, the product construction would look like</p>
+<p>datatype ('a1, 'a2) product = Product (proj1: 'a1) (proj2: 'a2)</p>
+<p>overloading<br>
+   carrier_product == "carrier :: ('a1, 'a2) product =&gt; ('b1 * 'b2) set"<br>
+begin</p>
+<p>definition carrier_product :: "('a1, 'a2) product =&gt; ('b1 * 'b2) set"<br>
+where<br>
+   "carrier_product G =<br>
+    CARRIER('b1) (proj1 G) &lt;*&gt;<br>
+    CARRIER('b2) (proj2 G)"</p>
+<p>end</p>
+<p>Here, I've introduced a separate type "product" for the generic product <br>
+construction such that we keep the types of abstract constructions (like <br>
+products) separate from types that may show up in normal applications <br>
+(like the type constructor for pairs).</p>
+<p>Hope this helps,<br>
+Andreas</p>
+<p>[1] <a href="https://www.isa-afp.org/entries/Monomorphic_Monad.html">https://www.isa-afp.org/entries/Monomorphic_Monad.html</a></p>
+<p>[2] <br>
+<a href="http://isabelle.in.tum.de/repos/isabelle/file/5c1b2f616d15/src/HOL/Library/Cardinality.thy#l33">http://isabelle.in.tum.de/repos/isabelle/file/5c1b2f616d15/src/HOL/Library/Cardinality.thy#l33</a></p>
+
+
+
+<a name="294761361"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Revisiting%20records%2C%20structures%2C%20locales%2C%20abeli.../near/294761361" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Revisiting.20records.2C.20structures.2C.20locales.2C.20abeli.2E.2E.2E.html#294761361">(Aug 22 2022 at 20:22)</a>:</h4>
+<p>From: mailing-list anonymous &lt;<a href="mailto:mailing.list.anonymous@gmail.com">mailing.list.anonymous@gmail.com</a>&gt;<br>
+Dear Fabian Immler and Andreas Lochbihler,</p>
+<p>Thank you very much for your replies.</p>
+<p>I believe that records with the support for multiple inheritance would<br>
+be exceptionally useful for Isabelle/HOL users. However, I guess, it<br>
+would be too much to hope that this technology will become available<br>
+in the near future.</p>
+<p>Having, to an extent, tried the various approaches that I was aware of<br>
+before asking the question and, also, the methods suggested by Andreas<br>
+Lochbihler, I am beginning to converge on the thought that, for my use<br>
+case, the best methodology might be the one that I am already using<br>
+(i.e. the methodology similar to the one used by Bohua Zhan and Fabian<br>
+Immler in their development). Unfortunately, by now, I have completely<br>
+convinced myself that records are not suitable for libraries with<br>
+complex locale inheritance trees, primarily, due to the absence of<br>
+support for multiple inheritance.</p>
+<p>I liked the method proposed by Andreas Lochbihler that uses constants<br>
+parameterised by the spaces/algebraic structures themselves. However,<br>
+even ignoring the problem of the type inference, I am not certain how<br>
+would one deal with the interpretation of the theorems stated for the<br>
+parametric constants using suitable arbitrary user-supplied terms.<br>
+Would it not be necessary for the users to combine and abstract the<br>
+terms as an element of some newly designed type before the can be<br>
+achieved? In this case, as it seems, making the interpretation<br>
+mechanism as convenient for the users as the locale interpretation for<br>
+the approach that is used at the moment would require a substantial<br>
+amount of effort for the developer.</p>
+<p>Thank you</p>
+
+
+
+<a name="294761988"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Revisiting%20records%2C%20structures%2C%20locales%2C%20abeli.../near/294761988" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Revisiting.20records.2C.20structures.2C.20locales.2C.20abeli.2E.2E.2E.html#294761988">(Aug 22 2022 at 20:27)</a>:</h4>
+<p>From: mailing-list anonymous &lt;<a href="mailto:mailing.list.anonymous@gmail.com">mailing.list.anonymous@gmail.com</a>&gt;<br>
+Dear All,</p>
+<p>I would like to ask a question in the context of one of the existing<br>
+threads:<br>
+<a href="https://lists.cam.ac.uk/mailman/htdig/cl-isabelle-users/2019-April/msg00090.html">https://lists.cam.ac.uk/mailman/htdig/cl-isabelle-users/2019-April/msg00090.html</a><br>
+.</p>
+<p>To set the context for the question, I would like to provide two quotes<br>
+from the aforementioned thread:</p>
+<p>On Fri, 12 Apr 2019 22:36:17 Clemens Ballarin wrote:</p>
+<p>&gt;</p>
+<p>... The approach of combining locales with records dates back to that time.</p>
+<blockquote>
+<p>Definitions in locales were unavailable, and the solution was to extract<br>
+the signature part of an algebraic structure into a record, on which<br>
+definitions could be made globally.  ...</p>
+</blockquote>
+<p>On Fri, 12 Apr 2019 22:51:32 Manuel Eberl wrote (in reply to the comments<br>
+made by Clemens Ballarin on Fri, 12 Apr 2019 22:36:17):</p>
+<p>&gt;</p>
+<p>... That's interesting. It would certainly be of interest to think of a</p>
+<blockquote>
+<p>large-scale overhaul of HOL-Algebra using modern locale features. ...<br>
+</p>
+</blockquote>
+<p>I would like to understand if one was to, hypothetically, implement a<br>
+large-scale overhaul of HOL-Algebra using the modern locale features, what<br>
+would the structure of the new library look like? Would the records still<br>
+be used or would it be implemented in the style of the main HOL library<br>
+with all parameters stated explicitly and all definitions stated implicitly<br>
+in the locale context? Would it be too much to ask to provide a small<br>
+example that demonstrates this modern approach based on the existing<br>
+locales in HOL-Algebra?</p>
+<p>The primary reason why I am asking the question is that I would like to<br>
+understand what is considered to be a canonical methodology for the<br>
+implementation of a library about abstract spaces/algebraic structures with<br>
+the explicit carrier sets using locales.</p>
+<hr>
+<p>I provide further (and, perhaps, superfluous) details with regard to my<br>
+enquiry. I am working on the relativization of the main HOL library using<br>
+Types-To-Sets: <a href="https://github.com/xanonec/HOL-SML-Relativization">https://github.com/xanonec/HOL-SML-Relativization</a>. I believe<br>
+that this development directly addresses some of the existing concerns of<br>
+the users of HOL. For example, in the context of the previously referenced<br>
+thread:</p>
+<p>On Sat, 13 Apr 2019 10:37:23 Dominique Unruh wrote:</p>
+<blockquote>
+<p>The classes have the advantage of being easier to use than locales in many<br>
+cases (at least I feel that way), but they have the limitation of always<br>
+having UNIV as the carrier.<br>
+</p>
+</blockquote>
+<p>As far as I know, all proofs are simply done twice. And someone building a</p>
+<blockquote>
+<p>development on these things needs to pick on approach and is then "locked<br>
+in", which is problematic, since some material is only available in the HOL<br>
+approach and some only in the HOL-Algebra approach. In case of an overhaul,<br>
+perhaps these concepts could be unified as well?</p>
+</blockquote>
+<blockquote>
+<p>My own development, effectively, unifies both approaches using<br>
+Types-To-Sets as the conceptual glue. The proofs of the set-based theorems<br>
+no longer need to be stated explicitly: the type-based theorems from the<br>
+main library are converted to the set-based theorems automatically.<br>
+Moreover, the adopted methodology explicitly establishes an injection<br>
+(potentially, there can be several distinct relativisations of the same<br>
+type-based theorem) from the set-based theorems to the type-based theorems<br>
+and this injection can be visualised using the features of the framework.</p>
+</blockquote>
+<p>However, I am still not certain as to what would be the best way to<br>
+structure the set-based library. At the moment, the development follows the<br>
+approach that merely extends the locales that exist in the main HOL library<br>
+with an additional locale parameter that represents a carrier set (or<br>
+several locale parameters for multiple carrier sets) - this approach is<br>
+consistent with the existing library of relativised results (primarily,<br>
+about vector spaces) that was previously developed by Bohua Zhan and Fabian<br>
+Immler. This approach, straightforward as it may seem, has several<br>
+problems. Firstly, whenever reasoning about the spaces/algebraic structures<br>
+themselves, the long list of the locale parameters always needs to be<br>
+provided explicitly in each theorem. This problem is exaggerated further<br>
+whenever dealing with pairs/triples of spaces/algebraic structures - the<br>
+lists of parameters can become dramatically long. For example, a context<br>
+that describes a pair of complete lattices would look similar to (of<br>
+course, explicit context can be replaced with a locale named, for example,<br>
+complete_lattice_pair_ow, but the problem remains the same)</p>
+<p>context<br>
+  fixes 𝔘A :: "'at set"<br>
+  fixes 𝔘B :: "'bt set"<br>
+  fixes lea leb<br>
+    and lsa lsb<br>
+    and infa infb<br>
+    and supa supb<br>
+    and bota botb<br>
+    and topa topb<br>
+    and Infa Infb<br>
+    and Supa Supb<br>
+  assumes clow_a: "complete_lattice_ow 𝔘A Infa Supa infa lea lsa supa bota<br>
+topa"<br>
+  assumes clow_b: "complete_lattice_ow 𝔘B Infb Supb infb leb lsb supb botb<br>
+topb"</p>
+<p>Furthermore, the notation associated with the locale parameters for a<br>
+single space/algebraic structure, as far as I know, cannot be reused<br>
+directly when dealing with pairs/triples of spaces/algebraic structures due<br>
+to overlaps. Also, I am not aware of any methodology that would enable one<br>
+to make the notation associated with the locale parameters to depend on,<br>
+for example, other locale parameters. In the context of the example above,<br>
+if one is to define the notation for Infa as (‹⨅⇩o⇩w⇩a›), then it becomes<br>
+non-sensical if 𝔘A is interpreted as a set named 𝔘B and 𝔘B is<br>
+interpreted as a set named 𝔘A. The same problem also occurs when trying to<br>
+transfer the notation for the implicit definitions (i.e. definitions stated<br>
+in a locale context) from a single space/algebraic structure to a pair of<br>
+spaces/algebraic structures. Moreover, even restating the notation for the<br>
+locale parameters and implicit definitions when providing the locales for<br>
+the pairs/triples of algebraic structures/abstract spaces can be a very<br>
+irritating, tedious and error-prone process that results in a substantial<br>
+amount of seemingly boilerplate code.</p>
+<p>I believe that the use of records/schemes with the explicitly stated<br>
+definitions (i.e. outside of the context of locales), as archaic as it may<br>
+seem, resolves all of the aforementioned issues. However, the lack of<br>
+support for multiple inheritance creates its own problems. While in some<br>
+cases, using a scheme that has more fields than necessary is bearable (as<br>
+the referenced example from HOL-Algebra demonstrates), in certain cases, it<br>
+becomes impossible. For example, in my attempt to use records/structures in<br>
+the library of relativised results, I defined</p>
+<p>record 'a ord =  "'a partial_object" +<br>
+  le :: "['a, 'a] ⇒ bool" (infix ‹⊑ı› 50)<br>
+  ls :: "['a, 'a] ⇒ bool" (infix ‹⊏ı› 50)</p>
+<p>and</p>
+<p>record 'a topology = "'a partial_object" +<br>
+  τ :: "'a set ⇒ bool" (‹τı›)</p>
+<p>Now, I would like to define an order topology. It does not seem that<br>
+records provide a natural way to combine the two concepts together. The<br>
+best methodology that I was able to come up with is exhibited via the<br>
+following locale that uses two structures:</p>
+<p>locale order_topology_ow =<br>
+  order_ow 𝒪 for 𝒪 :: "('at, 'bt) ord_scheme" (structure) +<br>
+  fixes 𝒯 :: "('at, 'bt) topology_scheme" (structure)<br>
+    and 𝔘 :: "'at set"<br>
+  assumes 𝔘𝒪: "𝔘 = carrier 𝒪"<br>
+    and 𝔘𝒯: "𝔘 = carrier 𝒯"<br>
+    and open_generated_order:<br>
+      "s ⊆ 𝔘 ⟹ τ⇘𝒯⇙ s = generate_topology_on ((λa. {..⊏a}) <code> 𝔘 ∪ (λa.
+{a⊏..}) </code> 𝔘) 𝔘 s"</p>
+<p>In my view, this approach is still better than providing all definitional<br>
+elements explicitly. However, this approach is still quite limiting and, in<br>
+certain cases, even the list of schemes can become quite long.</p>
+<p>I would be curious to know if anyone has dealt with similar problems in the<br>
+past and knows a solution that is better than using explicitly listed<br>
+parameters. Alternatively, perhaps, someone could suggest a canonical<br>
+approach for combining two distinct schemes into one scheme with a 'shared'<br>
+field.</p>
+<p>Thank you</p>
+
+
+
+<a name="294762180"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Revisiting%20records%2C%20structures%2C%20locales%2C%20abeli.../near/294762180" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Revisiting.20records.2C.20structures.2C.20locales.2C.20abeli.2E.2E.2E.html#294762180">(Aug 22 2022 at 20:29)</a>:</h4>
+<p>From: mailing-list anonymous &lt;<a href="mailto:mailing.list.anonymous@gmail.com">mailing.list.anonymous@gmail.com</a>&gt;<br>
+Dear All,</p>
+<p>I would like to submit a short errata for two of my posts in the thread<br>
+"Revisiting records, structures, locales, abelian_group, HOL-Algebra and<br>
+Types-To-Sets". Unfortunately, recently, I noticed that my posts contain<br>
+two grievous errors (I believe that it is best to classify them as<br>
+typographical errors because I am unable to identify their root cause):</p>
+<p>The first error occurs in the statement of the question (<br>
+<a href="https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2019-August/msg00006.html">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2019-August/msg00006.html</a><br>
+):</p>
+<blockquote>
+<p>... the adopted methodology explicitly establishes an injection<br>
+(potentially, there can be several distinct relativisations of the same<br>
+type-based theorem) from the set-based theorems to the type-based theorems<br>
+...</p>
+<p>Of course, the excerpt above can be interpreted as equivalent to<br>
+(∀f::sb_to_tb. injective f) ∧ (∃f::sb_to_tb. ¬injective f) and, of course,<br>
+my goal was to emphasize that a function that maps the set-based theorems<br>
+to their type-based counterparts (represented as a term of a type sb_to_tb<br>
+above) is not, necessarily, injective. I am not certain why I stated that<br>
+the function of this type is always injective immediately before stating<br>
+that there exist non-injective functions of this type.</p>
+</blockquote>
+<p>The second error occurs in my first answer in the thread (<br>
+<a href="https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2019-August/msg00020.html">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2019-August/msg00020.html</a><br>
+):</p>
+<blockquote>
+<p>...locale inheritance trees...</p>
+<p>Of course, I meant to use the word 'graphs' instead of the word 'trees' and<br>
+the phrase 'sublocale relations' instead of 'locale inheritance'.</p>
+</blockquote>
+<p>Please accept my sincere apologies for making these errors. I will try to<br>
+be more careful in the future.</p>
+<p>Thank you</p>
+<p>On Mon, Aug 5, 2019 at 4:37 PM mailing-list anonymous &lt;<br>
+<a href="mailto:mailing.list.anonymous@gmail.com">mailing.list.anonymous@gmail.com</a>&gt; wrote:</p>
+<blockquote>
+<p>Dear All,</p>
+<p>I would like to ask a question in the context of one of the existing<br>
+threads:</p>
+<p><a href="https://lists.cam.ac.uk/mailman/htdig/cl-isabelle-users/2019-April/msg00090.html">https://lists.cam.ac.uk/mailman/htdig/cl-isabelle-users/2019-April/msg00090.html</a><br>
+.</p>
+<p>To set the context for the question, I would like to provide two quotes<br>
+from the aforementioned thread: ...</p>
+<p>--<br>
+Please accept my apologies for posting anonymously. This is done to<br>
+protect my privacy. I can make my identity and my real contact details<br>
+available upon request in private communication under the condition that<br>
+they are not to be mentioned on the mailing list.</p>
+<p>...</p>
+</blockquote>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

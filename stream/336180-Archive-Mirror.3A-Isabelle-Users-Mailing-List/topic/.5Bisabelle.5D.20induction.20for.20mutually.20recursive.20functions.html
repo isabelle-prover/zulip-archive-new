@@ -1,0 +1,130 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] induction for mutually recursive functions · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20induction.20for.20mutually.20recursive.20functions.html">[isabelle] induction for mutually recursive functions</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294143810"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20induction%20for%20mutually%20recursive%20functions/near/294143810" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20induction.20for.20mutually.20recursive.20functions.html#294143810">(Aug 18 2022 at 18:19)</a>:</h4>
+<p>From: Alexander Krauss &lt;<a href="mailto:krauss@in.tum.de">krauss@in.tum.de</a>&gt;<br>
+Hi Viorel,</p>
+<p>The two versions are actually equivalent, so one should be provable when <br>
+the other is. Unfortunately, the equation "na = n" seems to be oriented <br>
+in an unfortunate way, such that the simplifier does not help you here...</p>
+<p>Note that here you are relying on a feature of the induct method to do <br>
+induction over non-variable terms, which introduces equations on the fly <br>
+(which you already see in the simplified form; if you add (no_simp) <br>
+after "induct", you see where they come from).</p>
+<p>You can avoid this situation altogether by using currying instead of <br>
+tuple arguments in your function definition, which is generally recommended:</p>
+<p>function<br>
+   init_fun :: "nat =&gt; nat * nat * nat"<br>
+   and loop_fun :: "nat =&gt; nat =&gt; nat =&gt; nat * nat * nat"<br>
+   and final_fun :: "nat =&gt; nat =&gt; nat =&gt; nat * nat * nat"<br>
+   where<br>
+     "init_fun n = loop_fun n 0 0" |<br>
+     "loop_fun n k s = (if k &lt; n then loop_fun n (k + 1) (s + k + 1)<br>
+                              else if k = n then final_fun n k s<br>
+                              else (n, k, s))"|</p>
+<p>"final_fun n k s = (n, k, s)"</p>
+<p>by pat_completeness auto<br>
+termination<br>
+   apply (relation "measure (% x. case x of Inl n =&gt; n + 3 | Inr (Inl <br>
+(n, k, s)) =&gt; n - k + 2 | Inr (Inr (n, k, s)) =&gt; n - k + 1)")<br>
+   by auto</p>
+<p>theorem TestInduction:<br>
+   "Testa n ==&gt;  Test (init_fun n)"<br>
+   "Testb n k s ==&gt; Test (loop_fun n k s)"<br>
+   "Testc n k s ==&gt; Test (final_fun n k s)"<br>
+apply (induct n and n k s and n k s rule: <br>
+init_fun_loop_fun_final_fun.induct)</p>
+<p>Hope this helps...</p>
+<p>Alex</p>
+
+
+
+<a name="294143822"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20induction%20for%20mutually%20recursive%20functions/near/294143822" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20induction.20for.20mutually.20recursive.20functions.html#294143822">(Aug 18 2022 at 18:19)</a>:</h4>
+<p>From: Viorel Preoteasa &lt;<a href="mailto:viorel.preoteasa@abo.fi">viorel.preoteasa@abo.fi</a>&gt;<br>
+Hi Alex,</p>
+<p>That you for your message. Changing the function definition to<br>
+the curried version helped. After this change I got<br>
+the proof obligations that I expected.</p>
+<p>I managed already to prove the theorem by instantiating the<br>
+induction theorems manually, but it was very cumbersome,<br>
+and I needed to prove the same facts 3 times.</p>
+<p>Regarding my initial definition, it still does not seem provable.<br>
+The conditions na = n; 0 = k; 0 = s cannot be discharged.<br>
+If you look at the second subgoal, the situation is even worse<br>
+because one would need to prove k = k+1. Maybe there is an error<br>
+in applying the induction when the functions have tuples<br>
+as parameters.</p>
+<p>Best regards,</p>
+<p>Viorel</p>
+
+
+
+<a name="294145217"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20induction%20for%20mutually%20recursive%20functions/near/294145217" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20induction.20for.20mutually.20recursive.20functions.html#294145217">(Aug 18 2022 at 18:27)</a>:</h4>
+<p>From: Viorel Preoteasa &lt;<a href="mailto:viorel.preoteasa@abo.fi">viorel.preoteasa@abo.fi</a>&gt;<br>
+Hello,</p>
+<p>I have the following mutually recursive function definition</p>
+<p>function<br>
+   init_fun :: "nat =&gt; nat * nat * nat"<br>
+   and loop_fun :: "nat * nat * nat =&gt; nat * nat * nat"<br>
+   and final_fun :: "nat * nat * nat =&gt; nat * nat * nat"<br>
+   where<br>
+     "init_fun n = loop_fun (n, 0, 0)" |<br>
+     "loop_fun (n, k, s) = (if k &lt; n then loop_fun (n, k + 1, s + k + 1)<br>
+                              else if k = n then final_fun (n, k, s)<br>
+                              else (n, k, s))"|</p>
+<p>"final_fun (n, k, s) = (n, k, s)"</p>
+<p>by pat_completeness auto<br>
+termination<br>
+   apply (relation "measure (% x. case x of Inl n =&gt; n + 3 | Inr (Inl <br>
+(n, k, s)) =&gt; n - k + 2 | Inr (Inr (n, k, s)) =&gt; n - k + 1)")<br>
+   by auto</p>
+<p>Asumming that Testa, Testb, Testc, and Test are defined I want to prove by<br>
+(mutual) induction:</p>
+<p>theorem TestInduction:<br>
+   "Testa n ==&gt;  Test (init_fun n)"<br>
+   "Testb n k s ==&gt; Test (loop_fun (n, k, s))"<br>
+   "Testc n k s ==&gt; Test (final_fun (n, k, s))"</p>
+<p>If I try</p>
+<p>apply (induct n and "(n, k, s)" and "(n, k, s)" rule: <br>
+init_fun_loop_fun_final_fun.induct)</p>
+<p>I get something that is unprovable:</p>
+<ol>
+<li>
+<p>[| [| na = n; 0 = k; 0 = s; Testb n k s|] ==&gt; Test (loop_fun (n, k, <br>
+s)); Testa na |] ==&gt; Test (init_fun na)</p>
+</li>
+<li>
+<p>...</p>
+</li>
+<li>...</li>
+</ol>
+<p>I would expect something like:</p>
+<ol>
+<li>
+<p>[| [| Testb na 0 0|] ==&gt; Test (loop_fun (na, 0, 0)); Testa na |] ==&gt; <br>
+Test (init_fun na)</p>
+</li>
+<li>
+<p>...</p>
+</li>
+<li>...</li>
+</ol>
+<p>that I can prove using the definition of the Test predicates.</p>
+<p>Best regards,</p>
+<p>Viorel Preoteasa</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

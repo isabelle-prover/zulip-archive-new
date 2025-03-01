@@ -1,0 +1,245 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] fixrec’s demand for continuity proofs · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20fixrec.E2.80.99s.20demand.20for.20continuity.20proofs.html">[isabelle] fixrec’s demand for continuity proofs</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294115351"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20fixrec%E2%80%99s%20demand%20for%20continuity%20proofs/near/294115351" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20fixrec.E2.80.99s.20demand.20for.20continuity.20proofs.html#294115351">(Aug 18 2022 at 15:55)</a>:</h4>
+<p>From: Peter Gammie &lt;<a href="mailto:peteg42@gmail.com">peteg42@gmail.com</a>&gt;<br>
+Joachim,</p>
+<p>Just a quick response, as it is late here. I'd suggest you read more background material before trying to prove anything. In particular, the original HOLCF paper is great, and there are some theories in the AFP that illustrate how to use HOLCF - Brian Huffman's stream fusion one is very well presented, and I hacked some things together in my worker/wrapper entry. There you will find a theory for the natural numbers that handles some of these issues.</p>
+<p>I'd be very wary about mixing the continuous (HOLCF) and total (HOL) function spaces. It does work if you obey the design principles spelt out in the original paper.</p>
+<p>Start with easy stuff - reasoning about lists defined using 'domain', e.g. The naturals, unless defined as a domain, are already fiddly. Sets are a long way from obvious, probably leading you to power domains if you have a non-trivial recursive definition.</p>
+<p>Take a look at the examples in the HOLCF directory of the Isabelle distribution too.</p>
+<p>It might help to switch on "Show sorts" in proof general and remember that if a type isn't annotated with pcpo (etc) then HOLCF doesn't know much about it.</p>
+<p>cheers<br>
+peter</p>
+
+
+
+<a name="294116522"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20fixrec%E2%80%99s%20demand%20for%20continuity%20proofs/near/294116522" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20fixrec.E2.80.99s.20demand.20for.20continuity.20proofs.html#294116522">(Aug 18 2022 at 16:01)</a>:</h4>
+<p>From: Joachim Breitner &lt;<a href="mailto:mail@joachim-breitner.de">mail@joachim-breitner.de</a>&gt;<br>
+Dear Brian,</p>
+<p>thanks for your detailed response, I’m having a much clearer picture now<br>
+and also managed to define my function using HOLCF.</p>
+<p>I had some problems with the cont2cont_Let' rule in the cont2cont rule<br>
+set. Here is a minimal example:</p>
+<hr>
+<p>lemma "cont (λx. x⋅(Discr True))"<br>
+by (intro cont2cont)</p>
+<hr>
+<p>works as expected. But</p>
+<hr>
+<p>lemma "cont (λx. let y = True in x⋅(Discr y))"<br>
+by (intro cont2cont)</p>
+<hr>
+<p>does not. The goal that it is stuck on is<br>
+"cont (λp. Discr (snd p))".</p>
+<p>It works after I added this lemma to the cont2cont set, which works for<br>
+let expressions where the variable x does not appear in the bound<br>
+expression:</p>
+<hr>
+<p>lemma cont2cont_Let_simple[simp,cont2cont]:<br>
+  assumes "cont (λx. g x t)"<br>
+  shows "cont (λx. let y = t in g x y)"<br>
+unfolding Let_def using assms .</p>
+<hr>
+<p>I’m not sure if this is a general solution and or it would somehow<br>
+conflict with cont2cont_Let'. If it is a general solution, feel free to<br>
+add it to HOLCF.</p>
+<p>Furthermore, I had to add these lemmas:</p>
+<hr>
+<p>lemma cont2cont_list_case [simp, cont2cont]:<br>
+  assumes "⋀y. cont (λx. f1 x)"<br>
+     and  "⋀y z. cont (λx. f2 x y z)"<br>
+  shows "cont (λx. list_case (f1 x) (f2 x) l)"<br>
+using assms<br>
+by (cases l) auto</p>
+<p>lemma cont2cont_prod_case [simp, cont2cont]:<br>
+  assumes "⋀y z. cont (λx. f x y z)"<br>
+  shows "cont (λx. prod_case (f x) p)"<br>
+using assms<br>
+by (cases p) auto</p>
+<hr>
+<p>plus similar ones for each algebraic data types that I am using. The<br>
+form of these lemmas is very static – do you think this can be<br>
+generalized somehow? I did not yet write any ML scripts in Isabelle, but<br>
+I’m eager to learn if there is a worthwhile goal.</p>
+<p>Thanks,<br>
+Joachim</p>
+<p>PS: I wrote a "list :: cpo(cpo)" instance, relating lists of equal<br>
+length piecewise and not relating lists of different lengths, at<br>
+<a href="http://git.nomeata.de/?p=funcCF.git;a=blob;f=CFGraph/HOLCFList.thy;hb=HEAD">http://git.nomeata.de/?p=funcCF.git;a=blob;f=CFGraph/HOLCFList.thy;hb=HEAD</a><br>
+If you think this is generally useful and know where to put it I’d<br>
+happily share it (after make the proofs prettier).<br>
+<a href="/user_uploads/14278/vdp7qN5PTVYd7jeV__rgIz42/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294116556"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20fixrec%E2%80%99s%20demand%20for%20continuity%20proofs/near/294116556" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20fixrec.E2.80.99s.20demand.20for.20continuity.20proofs.html#294116556">(Aug 18 2022 at 16:01)</a>:</h4>
+<p>From: Joachim Breitner &lt;<a href="mailto:mail@joachim-breitner.de">mail@joachim-breitner.de</a>&gt;<br>
+Hi Brian,</p>
+<p>Am Freitag, den 03.09.2010, 14:25 -0700 schrieb Brian Huffman:</p>
+<blockquote>
+<blockquote>
+<p>It works after I added this lemma to the cont2cont set, which works for<br>
+let expressions where the variable x does not appear in the bound<br>
+expression:</p>
+<hr>
+<p>lemma cont2cont_Let_simple[simp,cont2cont]:<br>
+ assumes "cont (λx. g x t)"<br>
+ shows "cont (λx. let y = t in g x y)"<br>
+unfolding Let_def using assms .</p>
+<hr>
+<p>I’m not sure if this is a general solution and or it would somehow<br>
+conflict with cont2cont_Let'. If it is a general solution, feel free to<br>
+add it to HOLCF.</p>
+</blockquote>
+<p>It would be good to add this new rule to HOLCF, but I would make a<br>
+small change to the "assumes" part:</p>
+<p>lemma cont2cont_Let_simple[simp,cont2cont]:<br>
+ assumes "!!y. cont (λx. g x y)"<br>
+ shows "cont (λx. let y = t in g x y)"<br>
+unfolding Let_def using assms .</p>
+<p>In case "t" is a large term, and/or "y" occurs many times in the body<br>
+of g, this might avoid a blow-up in term size.</p>
+</blockquote>
+<p>it probably would not affect me at the moment, but are there no cases<br>
+where this would be too weak? What if "cont (λx. g x y)" does not hold<br>
+for all y, but only for y=t? But maybe such cases are only pathological<br>
+and do not occur in practice.</p>
+<p>I guess the premise "let y = t in cont (λx. g x y)" would not allow the<br>
+other cont2cont rules to proceed.</p>
+<blockquote>
+<blockquote>
+<p>Furthermore, I had to add these lemmas:</p>
+<hr>
+<p>lemma cont2cont_list_case [simp, cont2cont]:<br>
+ assumes "⋀y. cont (λx. f1 x)"<br>
+    and  "⋀y z. cont (λx. f2 x y z)"<br>
+ shows "cont (λx. list_case (f1 x) (f2 x) l)"<br>
+using assms<br>
+by (cases l) auto</p>
+<p>lemma cont2cont_prod_case [simp, cont2cont]:<br>
+ assumes "⋀y z. cont (λx. f x y z)"<br>
+ shows "cont (λx. prod_case (f x) p)"<br>
+using assms<br>
+by (cases p) auto</p>
+<hr>
+<p>plus similar ones for each algebraic data types that I am using. The<br>
+form of these lemmas is very static – do you think this can be<br>
+generalized somehow? I did not yet write any ML scripts in Isabelle, but<br>
+I’m eager to learn if there is a worthwhile goal.</p>
+</blockquote>
+<p>I see that these lemmas assume that the variable "x" doesn't occur in<br>
+the scrutinee of the case expression; in practice it might be<br>
+necessary to create both versions of cont2cont rules for each case<br>
+combinator.</p>
+</blockquote>
+<p>I used cont2cont_if as the template for these, and did not see a<br>
+cont2cont rule for if where x occurs in the condition. After all, it is<br>
+easy to create non-continuous functions then:<br>
+    cont (λx. if x then False else True)<br>
+using the bool:pcpo instance should be false (because it is not<br>
+monotonous), even though "cont (λx. x)", "cont (λx. False)" and "cont<br>
+(λx. True)" hold. What form would a cont2cont rule about if have, if x<br>
+appears in the condition?</p>
+<p>Thanks,<br>
+Joachim<br>
+<a href="/user_uploads/14278/yymR-03jH7RbizwcmZqQ7gEK/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294117963"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20fixrec%E2%80%99s%20demand%20for%20continuity%20proofs/near/294117963" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20fixrec.E2.80.99s.20demand.20for.20continuity.20proofs.html#294117963">(Aug 18 2022 at 16:07)</a>:</h4>
+<p>From: Joachim Breitner &lt;<a href="mailto:mail@joachim-breitner.de">mail@joachim-breitner.de</a>&gt;<br>
+Hi again,</p>
+<p>I have more questions about HOL/CF, especially about the fixrec package:</p>
+<p>Consider again the function from my last example:<br>
+        f b = {b} ∪ f b</p>
+<p>I have this working definition:</p>
+<hr>
+<p>fixrec f :: "int discr → (int ⇒ one)" where<br>
+  "f⋅b = (f⋅b) (undiscr b := ONE)"</p>
+<hr>
+<p>but I do not like how I have to use undiscr here (especially as in my<br>
+real example, the argument is more complex).</p>
+<p>Shouldn’t fixrec be able to define the function having the type "int ⇒<br>
+(int ⇒ one)"? Based on my understanding, this type is also a pcpo and<br>
+therefore the operator based on the recursive definition with type<br>
+"(int ⇒ (int ⇒ one)) → (int ⇒ (int ⇒ one))" can be used to define f.<br>
+Unfortunately, this does not work:</p>
+<hr>
+<p>fixrec f :: "int ⇒ int ⇒ one" where<br>
+  "f b = (f b) (b := ONE)"</p>
+<hr>
+<p>gives me <br>
+*** fixrec definition error:<br>
+*** unknown term<br>
+*** At command "fixrec".<br>
+while</p>
+<hr>
+<p>fixrec f :: "int ⇒ int ⇒ one" where<br>
+  "f = (λb. (f b) (b := ONE))"</p>
+<hr>
+<p>gives<br>
+*** Continuity proof failed; please check that cont2cont rules<br>
+*** or simp rules are configured for all non-HOLCF constants.<br>
+*** The error occurred for the goal statement:<br>
+*** cont (λf b. (f b)(b := ONE))<br>
+*** At command "fixrec".</p>
+<p>I’m also wondering why this works</p>
+<hr>
+<p>fixrec g :: "(int×int) discr → ((int×int) ⇒ one)" where<br>
+  "g⋅b = (case undiscr b of t ⇒ (g⋅(Discr t)) (t := ONE))"</p>
+<hr>
+<p>but this does not:</p>
+<hr>
+<p>fixrec g :: "(int×int) discr → ((int×int) ⇒ one)" where<br>
+  "g⋅b = (case undiscr b of (a,c) ⇒ (g⋅(Discr (a,c))) ((a,c) := ONE))"</p>
+<hr>
+<p>*** Continuity proof failed; please check that cont2cont rules<br>
+*** or simp rules are configured for all non-HOLCF constants.<br>
+*** The error occurred for the goal statement:<br>
+*** cont (λg. Λ a. case undiscr a of (a, c) ⇒ (g⋅(Discr (a, c)))((a, c) := ONE))<br>
+*** At command "fixrec".</p>
+<p>Is all this a limitation of fixrec, or a limitation in my understanding<br>
+it? :-)</p>
+<p>Thank in advance for your help,<br>
+Joachim<br>
+<a href="/user_uploads/14278/OV7x4tNNaALu4NjHr3CnUmBw/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294118207"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20fixrec%E2%80%99s%20demand%20for%20continuity%20proofs/near/294118207" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20fixrec.E2.80.99s.20demand.20for.20continuity.20proofs.html#294118207">(Aug 18 2022 at 16:08)</a>:</h4>
+<p>From: Joachim Breitner &lt;<a href="mailto:mail@joachim-breitner.de">mail@joachim-breitner.de</a>&gt;<br>
+Hi,</p>
+<p>I think I can answer one of the questions myself:</p>
+<p>It works if I first show this lemma:</p>
+<hr>
+<p>lemma cont_prod_case [simp, cont2cont]:<br>
+  "[|⋀ a b. cont (f a b)|] ==&gt; cont (λx. prod_case (λa b. f a b x) p)"<br>
+unfolding prod_case_unfold<br>
+by (induct p) simp_all</p>
+<hr>
+<p>Does this mean that I have to show such a lemma for every function (or<br>
+case expression) that contains a recursive call to the function I’m<br>
+defining with fixrec? Or is there some automatism that I’m missing at<br>
+the moment?</p>
+<p>Thanks again,<br>
+Joachim<br>
+<a href="/user_uploads/14278/z8J70UF8zkeHKdKP4sY0BOQO/signature.asc">signature.asc</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

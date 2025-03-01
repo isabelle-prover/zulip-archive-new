@@ -1,0 +1,177 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] What is sumC? · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20What.20is.20sumC.3F.html">[isabelle] What is sumC?</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294636344"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20What%20is%20sumC%3F/near/294636344" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20What.20is.20sumC.3F.html#294636344">(Aug 22 2022 at 09:25)</a>:</h4>
+<p>From: "W. Douglas Maurer" &lt;<a href="mailto:maurer@gwu.edu">maurer@gwu.edu</a>&gt;<br>
+As a first example of explaining to my students what a subproof is, <br>
+without complicating the matter by doing one with cases or with <br>
+induction, I prepared the following (contrived) proof that 6 is the <br>
+factorial of 3:<br>
+lemma "fact(3::nat) = 6" proof-<br>
+   have "(3::nat) = (2::nat)+1" by simp<br>
+   then have "fact(3::nat) = fact((2::nat)+1)" by (rule arg_cong)<br>
+   also have 1: "... = ((2::nat)+1)*fact(2) by (rule fact_plus_one_nat)<br>
+   have "fact(2::nat) = 2" proof-<br>
+     have "(2::nat) = 1+(1::nat)" by simp<br>
+     then have "fact(2::nat)=fact(1+(1::nat))" by (rule arg_cong)<br>
+     also have "... = (1+1)*fact(1)" by (rule fact_plus_one_nat)<br>
+     finally show ?thesis by simp<br>
+   qed<br>
+   with 1 have "fact(3::nat) = ((2::nat)+1)*2" by simp<br>
+   then show ?thesis by simp<br>
+qed<br>
+This works, but it's ugly. I would much rather have a proof that <br>
+somehow proceeds automatically from fact(3) = 6 to fact(Suc 2) = 6 to <br>
+(Suc 2)<em>fact(2) = 6 to (Suc 2)</em>fact(Suc 1) = 6 to (Suc 2)*(Suc <br>
+1)<em>fact(1) = 6 to (Suc 2)</em>(Suc 1)<em>fact(Suc 0) = 6 to (Suc 2)</em>(Suc <br>
+1)<em>(Suc 0)</em>fact(0) = 6 to 3<em>2</em>1*1 = 6, all in one step. As a first <br>
+try, after a few iterations, I wrote:<br>
+theory FactDef imports Main Fact begin<br>
+lemma "fact(3::nat) = 6" by (auto simp add: fact_nat_def)<br>
+end<br>
+which didn't work (I didn't necessarily expect it to), but the <br>
+message I got was:<br>
+Failed to finish proof: goal (1 subgoal): 1. fact_nat_sumC 3 = 6<br>
+So my question now is: What is this sumC? I searched for it in <br>
+"Isabelle/HOL --- Higher-Order Logic" and in the Isabelle/Isar <br>
+Reference Manual, and it wasn't in either place. -Douglas</p>
+
+
+
+<a name="294636459"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20What%20is%20sumC%3F/near/294636459" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20What.20is.20sumC.3F.html#294636459">(Aug 22 2022 at 09:25)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+Hello,</p>
+<blockquote>
+<p>This works, but it's ugly. I would much rather have a proof that somehow<br>
+proceeds automatically from fact(3) = 6 to fact(Suc 2) = 6 to (Suc<br>
+2)<em>fact(2) = 6 to (Suc 2)</em>fact(Suc 1) = 6 to (Suc 2)<em>(Suc 1)</em>fact(1) = 6<br>
+to (Suc 2)<em>(Suc 1)</em>fact(Suc 0) = 6 to (Suc 2)<em>(Suc 1)</em>(Suc 0)*fact(0) =<br>
+6 to 3<em>2</em>1*1 = 6, all in one step.</p>
+</blockquote>
+<p>I'm not sure I fully understand the requirement. Are you looking for a<br>
+proof method which can solve the full goal automatically? If so, you can<br>
+try 'code_simp' or 'eval'.</p>
+<p>Perhaps a better way to understand what's going on internally is to<br>
+first convert the numeral notation to 'Suc ... 0' notation of natural<br>
+numbers:</p>
+<p>lemma "fact 3 = 6"<br>
+  unfolding eval_nat_numeral BitM.simps</p>
+<p>At this point, the subgoal looks like this:</p>
+<p>fact (Suc (Suc (Suc 0))) = Suc (Suc (Suc (Suc (Suc (Suc 0)))))</p>
+<p>This goal can be solved 'by simp'. Of course, you can also add that rule<br>
+to the simpset:</p>
+<p>lemma "fact 3 = 6"<br>
+  by (simp add: eval_nat_numeral)</p>
+<p>Does that help?</p>
+<blockquote>
+<p>As a first try, after a few<br>
+iterations, I wrote:<br>
+theory FactDef imports Main Fact begin<br>
+lemma "fact(3::nat) = 6" by (auto simp add: fact_nat_def)<br>
+end<br>
+which didn't work (I didn't necessarily expect it to), but the message I<br>
+got was:<br>
+Failed to finish proof: goal (1 subgoal): 1. fact_nat_sumC 3 = 6<br>
+So my question now is: What is this sumC?</p>
+</blockquote>
+<p>It's an internal definition of the function command. See here for an<br>
+older discussion:<br>
+&lt;<a href="http://thread.gmane.org/gmane.science.mathematics.logic.isabelle.user/10667">http://thread.gmane.org/gmane.science.mathematics.logic.isabelle.user/10667</a>&gt;.</p>
+<p>Cheers<br>
+Lars</p>
+
+
+
+<a name="294636559"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20What%20is%20sumC%3F/near/294636559" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20What.20is.20sumC.3F.html#294636559">(Aug 22 2022 at 09:26)</a>:</h4>
+<p>From: "W. Douglas Maurer" &lt;<a href="mailto:maurer@gwu.edu">maurer@gwu.edu</a>&gt;<br>
+Where is code_simp described? It's not in "Programming and Proving in <br>
+Isabelle/HOL"; it's not in "The Isabelle/Isar Reference Manual"; it's <br>
+not in "The Isabelle/Isar Implementation"; it's not in "Isabelle/HOL <br>
+-- A Proof Assistant for Higher-Order Logic." Are there other manuals <br>
+or tutorials I should try?</p>
+
+
+
+<a name="294636567"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20What%20is%20sumC%3F/near/294636567" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20What.20is.20sumC.3F.html#294636567">(Aug 22 2022 at 09:26)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+Can you give the definition of your 'fact' function? I was assuming<br>
+something along those lines:</p>
+<p>fun fact :: "nat =&gt; nat" where<br>
+  "fact 0 = 1" |<br>
+  "fact (Suc n) = (Suc n) * fact n"</p>
+
+
+
+<a name="294636581"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20What%20is%20sumC%3F/near/294636581" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20What.20is.20sumC.3F.html#294636581">(Aug 22 2022 at 09:26)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+Both 'eval' and 'code_simp' use the code generator, which is why they're<br>
+described in the code generator manual, section 6.</p>
+<p>Cheers<br>
+Lars</p>
+
+
+
+<a name="294637047"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20What%20is%20sumC%3F/near/294637047" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20What.20is.20sumC.3F.html#294637047">(Aug 22 2022 at 09:29)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;</p>
+<blockquote>
+<p>I searched the code generation manual for code-simp and eval. Code-simp<br>
+appears in only one place in that manual, and it's in the Schematic<br>
+Diagram (section 6.3), which hardly qualifies as a description.</p>
+</blockquote>
+<p>It's slightly more detailed in §6.1.</p>
+<blockquote>
+<p>Having said this, though, it doesn't look as if I'll be able to use<br>
+these, anyway. The Abstract to the code generation manual says that "the<br>
+code generator facilities of Isabelle/HOL...empower the user to turn HOL<br>
+specifications into corresponding executable programs in the languages<br>
+SML, OCaml, Haskell and Scala." I'm based in the US, and my only<br>
+exposure to functional languages has been to Lisp. (Maybe that's<br>
+chauvinistic, since Lisp was developed in the US.) I've been studying<br>
+Paulson's ML book, but I haven't actually used ML yet.</p>
+</blockquote>
+<p>The 'code_simp' and 'eval' methods are using code generator<br>
+infrastructure, but are not actually generating code (at least not<br>
+observably). They are completely embedded in Isabelle and have nothing<br>
+to do with any of the targets the code generator supports.</p>
+<p>Cheers<br>
+Lars</p>
+
+
+
+<a name="294637053"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20What%20is%20sumC%3F/near/294637053" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20What.20is.20sumC.3F.html#294637053">(Aug 22 2022 at 09:29)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+After digging a bit, it turns out that the Fact theory is part of HOL in<br>
+Isabelle2014, but not anymore in Isabelle2015-RC*.</p>
+<p>I couldn't reproduce the tactic failure, though. 'simp add:<br>
+eval_nat_numeral' solves the goal just fine.</p>
+<p>Cheers<br>
+Lars</p>
+
+
+
+<a name="294637176"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20What%20is%20sumC%3F/near/294637176" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20What.20is.20sumC.3F.html#294637176">(Aug 22 2022 at 09:30)</a>:</h4>
+<p>From: Larry Paulson &lt;<a href="mailto:lp15@cam.ac.uk">lp15@cam.ac.uk</a>&gt;<br>
+The theory Fact was combined with Binomial and is now included in Complex_Main. The integer version of the factorial function no longer exists. See NEWS:</p>
+<p>The factorial function, "fact", now has type "nat = 'a" (of sort semiring_char_0, which admits numeric types including nat, int, real and complex. INCOMPATIBILITY: an expression such as "fact 3 = 6" may require a type constraint, and the combination "real (fact k)" is likely to be unsatisfactory. If a type conversion is still necessary, then use "of_nat (fact k)" or "real_of_nat (fact k)”.</p>
+<p>Larry Paulson</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

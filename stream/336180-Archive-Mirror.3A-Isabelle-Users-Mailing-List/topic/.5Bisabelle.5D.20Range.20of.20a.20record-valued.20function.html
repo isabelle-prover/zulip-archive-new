@@ -1,0 +1,96 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Range of a record-valued function · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Range.20of.20a.20record-valued.20function.html">[isabelle] Range of a record-valued function</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294222930"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Range%20of%20a%20record-valued%20function/near/294222930" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Range.20of.20a.20record-valued.20function.html#294222930">(Aug 19 2022 at 08:41)</a>:</h4>
+<p>From: Holger Blasum &lt;<a href="mailto:hbl@sysgo.com">hbl@sysgo.com</a>&gt;<br>
+Dear all,</p>
+<p>this is probably an easy one, I am trying to define the range <br>
+of a function that uses pattern matching on a datatype (num_t). <br>
+I can show it by "auto" in lemma f_range (see below) on <br>
+a function that is num_t-valued. I seem to be missing an intermediate <br>
+step once I am wrapping that num_t into a record num_wrapper_t, <br>
+(see proof attempt at f_wrapper_def below). </p>
+<p>theory record_valued_function<br>
+imports Main<br>
+begin</p>
+<p>datatype num_t = ONE | TWO</p>
+<p>(* The following lemma has been proved by "auto". *)</p>
+<p>definition f::"num_t =&gt; nat set" where <br>
+  "f n = (if (n = ONE) then {1} else {2})"<br>
+lemma f_range: "Union ({x. EX n. x = f n}) = {1,2}"<br>
+proof-<br>
+  from f_def show ?thesis by auto<br>
+qed</p>
+<p>(* This is the lemma where I am missing an intermediate step. *)</p>
+<p>record num_wrapper_t = num::num_t<br>
+definition f_wrapper::"num_wrapper_t =&gt; nat set" where <br>
+  "f_wrapper r = (if ((num r) = ONE) then {1} else {2})"<br>
+lemma f_wrapper_range: "Union ({x. (EX r. x = f_wrapper r)}) = {1,2}"<br>
+proof-<br>
+  from f_wrapper_def have r1: "ALL r. num r = ONE<br>
+  --&gt; f_wrapper r = {1}" by fastforce<br>
+  from f_wrapper_def have r2: "ALL r. num r = TWO<br>
+  --&gt; f_wrapper r = {2}" by fastforce<br>
+  from r1 and r2 and f_wrapper_def show ?thesis<br>
+sorry &lt;-- fails</p>
+<p>Suggestions on how to complete the second lemma would be welcome,</p>
+
+
+
+<a name="294222955"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Range%20of%20a%20record-valued%20function/near/294222955" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Range.20of.20a.20record-valued.20function.html#294222955">(Aug 19 2022 at 08:41)</a>:</h4>
+<p>From: Thomas Sewell &lt;<a href="mailto:Thomas.Sewell@nicta.com.au">Thomas.Sewell@nicta.com.au</a>&gt;<br>
+You can solve this problem via:</p>
+<p>lemma f_wrapper_range: "Union ({x. (EX r. x = f_wrapper r)}) = {1,2}"<br>
+   by (auto simp add: f_wrapper_def num_wrapper_t.splits)</p>
+<p>To be slightly clearer:</p>
+<p>lemma f_wrapper_range: "Union ({x. (EX r. x = f_wrapper r)}) = {1,2}"<br>
+proof -<br>
+   have exs: "EX x. num x = ONE" "EX x. num x ~= ONE"<br>
+     by (simp_all add: num_wrapper_t.splits exI[where x=TWO])<br>
+   thus ?thesis<br>
+     by (auto simp add: f_wrapper_def)<br>
+qed</p>
+<p>What you need to show is that there are objects in the num_wrapper_t <br>
+type with num taking both values. That's not syntactically clear: if num <br>
+x had a more limited range, f_wrapper would too.</p>
+<p>Yours,<br>
+     Thomas.</p>
+
+
+
+<a name="294222977"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Range%20of%20a%20record-valued%20function/near/294222977" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Range.20of.20a.20record-valued.20function.html#294222977">(Aug 19 2022 at 08:41)</a>:</h4>
+<p>From: Tjark Weber &lt;<a href="mailto:webertj@in.tum.de">webertj@in.tum.de</a>&gt;<br>
+Main already provides image (`) and range operators, cf. Section 4 of<br>
+<a href="http://www.cl.cam.ac.uk/research/hvg/isabelle/dist/Isabelle2012/doc/main.pdf">http://www.cl.cam.ac.uk/research/hvg/isabelle/dist/Isabelle2012/doc/main.pdf</a></p>
+<p>So you could simply claim "range f = {1,2}".</p>
+<p>Best regards,<br>
+Tjark</p>
+
+
+
+<a name="294227278"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Range%20of%20a%20record-valued%20function/near/294227278" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Range.20of.20a.20record-valued.20function.html#294227278">(Aug 19 2022 at 09:16)</a>:</h4>
+<p>From: Holger Blasum &lt;<a href="mailto:hbl@sysgo.com">hbl@sysgo.com</a>&gt;<br>
+Hi Thomas, Tjark,</p>
+<p>I realize I never followed up this on. Yup, worked. <br>
+The "splits" lemma also made me curious about what exactly gets <br>
+introduced after declaring a datatype and a record,<br>
+so I also played a bit with "print_theorems" after declaring <br>
+the datatype and the record - useful information.</p>
+<p>Thanks,</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

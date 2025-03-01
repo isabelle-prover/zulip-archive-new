@@ -1,0 +1,111 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] bug in Isabelle2005 · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20bug.20in.20Isabelle2005.html">[isabelle] bug in Isabelle2005</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="293896521"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20bug%20in%20Isabelle2005/near/293896521" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20bug.20in.20Isabelle2005.html#293896521">(Aug 17 2022 at 13:27)</a>:</h4>
+<p>From: Jeremy Dawson &lt;<a href="mailto:Jeremy.Dawson@rsise.anu.edu.au">Jeremy.Dawson@rsise.anu.edu.au</a>&gt;<br>
+There seems to be a bug in the processing of inductive definitions in <br>
+Isabelle2005</p>
+<p>bug = Main +</p>
+<p>consts<br>
+   evens :: "nat set"</p>
+<p>inductive "evens"<br>
+   intrs<br>
+     evens_0 "0 : evens"<br>
+     evens_next "n : id evens ==&gt; Suc (Suc n) : evens"<br>
+   monos id_mono</p>
+<p>end</p>
+<p>Jeremy</p>
+
+
+
+<a name="293896528"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20bug%20in%20Isabelle2005/near/293896528" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20bug.20in.20Isabelle2005.html#293896528">(Aug 17 2022 at 13:28)</a>:</h4>
+<p>From: Stefan Berghofer &lt;<a href="mailto:berghofe@in.tum.de">berghofe@in.tum.de</a>&gt;<br>
+Jeremy Dawson wrote:<br>
+This problem only affects old theories, for which Isabelle generates<br>
+ML files containing the theory extension commands. It seems that<br>
+the ML interface of the inductive definition package has been changed,<br>
+but the generator for the theory extension code has not been adapted<br>
+to these changes. To fix the problem, you have to make the following<br>
+modification in the file HOL/thy_syntax.ML:<br>
+In function</p>
+<p>fun inductive_decl coind =<br>
+  let<br>
+    ...<br>
+    fun mk_params ((recs, ipairs), monos) =<br>
+      let val big_rec_name = space_implode "_" (map (scan_to_id o unenclose) recs)<br>
+          ...<br>
+      in<br>
+        ";\n\n\<br>
+        ...<br>
+        \  InductivePackage.add_inductive true " ^<br>
+        (if coind then "true " else "false ") ^ srec_tms ^<br>
+         sintrs ^ " " ^ mk_list (no_atts monos) ^ " thy;\n\</p>
+<p>replace the line containing (no_atts monos) by</p>
+<p>sintrs ^ " " ^ mk_list (no_atts (map (fn s =&gt; "Name " ^ s) monos)) ^ " thy;\n\</p>
+<p>Note that the old non-Isar theory file format will no longer be supported<br>
+in future releases of Isabelle anyway, so porting your theories to the new<br>
+format is a good alternative to the above fix.</p>
+<p>Greetings,<br>
+Stefan</p>
+
+
+
+<a name="293896530"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20bug%20in%20Isabelle2005/near/293896530" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20bug.20in.20Isabelle2005.html#293896530">(Aug 17 2022 at 13:28)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+There is indeed a problem with the ML code generator for 'inductive', but<br>
+the above is an old non-Isar theory, which is not really supported any<br>
+more.</p>
+<p>It is very easy to convert old theories to the current format;  ML proof<br>
+scripts work as before with the help of use_legacy_bindings.  Your theory<br>
+then looks like this (ignoring the fact that id_mono may not exist):</p>
+<p>theory Scratch<br>
+imports Main<br>
+begin</p>
+<p>consts<br>
+  evens :: "nat set"</p>
+<p>inductive evens<br>
+  intros<br>
+    evens_0: "0 : evens"<br>
+    evens_next: "n : id evens ==&gt; Suc (Suc n) : evens"<br>
+  monos id_mono</p>
+<p>ML {* use_legacy_bindings (the_context ()) *}</p>
+<p>end</p>
+<p>Note that the above 'bug' is no longer present in the current Isabelle<br>
+development version, because the old theory format has been discontinued<br>
+altogether.</p>
+<p>Makarius</p>
+
+
+
+<a name="294998636"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20bug%20in%20Isabelle2005/near/294998636" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Lukas Stevens <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20bug.20in.20Isabelle2005.html#294998636">(Aug 24 2022 at 08:12)</a>:</h4>
+<p>From:  Jeremy Dawson &lt;<a href="mailto:Jeremy.Dawson@rsise.anu.edu.au">Jeremy.Dawson@rsise.anu.edu.au</a>&gt;</p>
+<p>Stefan Berghofer wrote:</p>
+<blockquote>
+<p>Note that the old non-Isar theory file format will no longer be supported<br>
+in future releases of Isabelle anyway, so porting your theories to the new<br>
+format is a good alternative to the above fix.</p>
+<p>Greetings,<br>
+Stefan<br>
+</p>
+</blockquote>
+<p>In converting a non_Isar theory file to Isar format,<br>
+what is the equivalent in Isar of the "rules" section of a non-Isar theory?</p>
+<p>By the way, what has happened to the Introduction to Isabelle - it seems to have disappeared from the doc directory?</p>
+<p>Jeremy</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

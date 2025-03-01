@@ -1,0 +1,288 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Converting apply-style induction to Structured... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Converting.20apply-style.20induction.20to.20Structured.2E.2E.2E.html">[isabelle] Converting apply-style induction to Structured...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294131857"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Converting%20apply-style%20induction%20to%20Structured.../near/294131857" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Converting.20apply-style.20induction.20to.20Structured.2E.2E.2E.html#294131857">(Aug 18 2022 at 17:18)</a>:</h4>
+<p>From: Christian Sternagel &lt;<a href="mailto:christian.sternagel@uibk.ac.at">christian.sternagel@uibk.ac.at</a>&gt;<br>
+How about</p>
+<p>lemma cata_uniq:<br>
+   assumes "cata c f b"<br>
+   shows "c as = catafunc f b as"<br>
+proof (induct as)<br>
+   case (Singleton a)<br>
+   from assms show ?case<br>
+     by (simp add: catafunc_def cata_def)<br>
+next<br>
+   case (Snoc as a)<br>
+   from assms show ?case<br>
+     by (simp only: Snoc cata_def cons_rewrite) simp<br>
+qed</p>
+<p>The fact that I need to split the final step into 2 parts (one only <br>
+using cons_rewrite cata_def and the induction hypothesis, and the other <br>
+using all the simplification rules that are around) indicates that some <br>
+of your equations may be oriented in the wrong direction (without the <br>
+split, the simplifier loops). But I didn't have closer look. Another <br>
+thing that I find strange in your original proof is the use of <br>
+catafunc_def which was defined via "fun" an hence provides <br>
+simplification rules catafunc.simps.</p>
+<p>A few words on the above proof: Fixing local variables and stating <br>
+assumptions (e.g., the IH) is done automatically when using "case", e.g.,</p>
+<p>case (Snoc as a)</p>
+<p>is a kind of abbreviation for</p>
+<p>fix as a<br>
+   assume "c as = catafunc f b as"</p>
+<p>I hope this helps.</p>
+<p>cheers</p>
+<p>chris</p>
+
+
+
+<a name="294131873"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Converting%20apply-style%20induction%20to%20Structured.../near/294131873" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Converting.20apply-style.20induction.20to.20Structured.2E.2E.2E.html#294131873">(Aug 18 2022 at 17:18)</a>:</h4>
+<p>From: Johannes Hölzl &lt;<a href="mailto:hoelzl@in.tum.de">hoelzl@in.tum.de</a>&gt;<br>
+Am Donnerstag, den 31.03.2011, 13:29 +0200 schrieb Søren Haagerup:</p>
+<blockquote>
+<p>Hello,</p>
+<p>I have a hard time going from Apply-style induction proofs to the<br>
+Structured Isar-style.</p>
+<p>In the apply-style case, the proof of "cata_uniq" is a mere 4 lines:<br>
+<a href="http://gawis.dk/misc/apply_sample.thy">http://gawis.dk/misc/apply_sample.thy</a></p>
+<p>In the structured style, I need to write much more:<br>
+<a href="http://gawis.dk/misc/structured_sample.thy">http://gawis.dk/misc/structured_sample.thy</a></p>
+</blockquote>
+<ul>
+<li>
+<p>Do not add catafunc_def, this is the wrong simp rule. The rules<br>
+  catafunc.simps are automatically added to the simpset by primrec.</p>
+<p>This also adds the rules for "app" to the simp set, which is the<br>
+inverse of cata_rewrite, and hence when you add cata_rewrite without<br>
+removing app.simps, like "simp add: cata_rewrite" the simplifier does<br>
+not terminate. Instead use "simp add: cata_rewrite del: app.simps"</p>
+</li>
+<li>
+<p>You cata_helper lemma is always a good idea to add. Probably named<br>
+  added to the simplifier. However adding rules to the automatization<br>
+  needs some experience, but you should try to play with it. (they also <br>
+  look like nice dest rules)</p>
+</li>
+<li>
+<p>The "case" command lets you specify the fixed variables no need to<br>
+  add "fix" and "assume".</p>
+</li>
+<li>
+<p>If you use "case" with the method "induct" the thesis is not <br>
+  named ?thesis but ?case, the facts are named after the case name (look<br>
+at Isabelle / Show me / Facts) :</p>
+<p>proof (induct c)<br>
+  case (Cons1 a b c) then show ?case ...<br>
+next<br>
+  case (Cons2 a b c) then show ?case ...<br>
+qed</p>
+</li>
+<li>
+<p>In your structured cata_uniq you do not need the additional<br>
+    show "" proof -  ...  qed<br>
+  command.</p>
+</li>
+<li>
+<p>My solution would be:</p>
+<p>lemma cata_uniq:<br>
+  "cata c f b ==&gt; c as = catafunc f b as"<br>
+proof (induct as)<br>
+  case (Snoc as a)<br>
+  then have "c (app as (Singleton a)) = b (catafunc f b as) (f a)"<br>
+    by (simp_all add: cata_def del: app.simps)<br>
+  then show ?case<br>
+    by simp<br>
+qed (simp add: cata_def)<br>
+  (** the method supplied to "qed" is applied to the remaining goals.<br>
+      Here it is the Singleton case. **)</p>
+</li>
+<li>
+<p>Another possible solution would be:</p>
+<p>lemma cata_uniq:<br>
+  "cata c f b ==&gt; c as = catafunc f b as"<br>
+proof (induct as)<br>
+  case (Snoc as a) then show ?case<br>
+    by (simp add: cata_def cons_rewrite del: app.simps) simp<br>
+qed (simp add: cata_def)</p>
+</li>
+</ul>
+<p>This is shorted but probably not as readable and stable as the previous<br>
+proof.</p>
+<p>The lines</p>
+<p>by (simp add: cata_def cons_rewrite del: app.simps)<br>
+         simp</p>
+<p>are the same as</p>
+<p>proof (simp add: cata_def cons_rewrite del: app.simps)<br>
+ qed simp</p>
+<p>Hope this helps,<br>
+  Johannes</p>
+<blockquote>
+<p>Is there a way to make a concise structured proof of this fact?</p>
+<p>Best regards,<br>
+Søren</p>
+</blockquote>
+
+
+
+<a name="294131881"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Converting%20apply-style%20induction%20to%20Structured.../near/294131881" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Converting.20apply-style.20induction.20to.20Structured.2E.2E.2E.html#294131881">(Aug 18 2022 at 17:18)</a>:</h4>
+<p>From: Christian Urban &lt;<a href="mailto:urbanc@in.tum.de">urbanc@in.tum.de</a>&gt;<br>
+Quoting Søren Haagerup &lt;<a href="mailto:shaagerup@gmail.com">shaagerup@gmail.com</a>&gt;:</p>
+<blockquote>
+<p>Hello,</p>
+<p>I have a hard time going from Apply-style induction proofs to the<br>
+Structured Isar-style.</p>
+<p>In the apply-style case, the proof of "cata_uniq" is a mere 4 lines:<br>
+<a href="http://gawis.dk/misc/apply_sample.thy">http://gawis.dk/misc/apply_sample.thy</a></p>
+<p>In the structured style, I need to write much more:<br>
+<a href="http://gawis.dk/misc/structured_sample.thy">http://gawis.dk/misc/structured_sample.thy</a></p>
+<p>Is there a way to make a concise structured proof of this fact?</p>
+</blockquote>
+<p>Well, you have to keep in mind that a 'good' Isar proof conveys more<br>
+information than an apply-script. In a 'good' Isar proof you should<br>
+be able to easily read off the proof idea. This means in practice<br>
+that an Isar proof is sometimes a bit more verbose.</p>
+<p>However looking at your proof, I would formulate it as follows.</p>
+<p>lemma cata_uniq :<br>
+    assumes a: "cata c f b"<br>
+    shows "c as = catafunc f b as"<br>
+  proof (induct as)<br>
+    case (Singleton a)<br>
+    show "c (Singleton a) = catafunc f b (Singleton a)"<br>
+      using a by (simp add: catafunc_def cata_def)<br>
+  next<br>
+    case (Snoc as a)<br>
+    have hyp: "c as = catafunc f b as" by fact<br>
+    have "c (Snoc as a) = c (app as (Singleton a))" by (simp only:  <br>
+cons_rewrite)<br>
+    also have "... = b (c as) (f a)"<br>
+      using cata_helper(3)[OF a, of as "Singleton a"]  <br>
+cata_helper(2)[OF a, of a] by auto<br>
+    also have "... = b (catafunc f b as) (f a)" using hyp by auto<br>
+    finally show "c (Snoc as a) = catafunc f b (Snoc as a)"<br>
+      by simp<br>
+qed</p>
+<p>1.) As suggested before, I fix the variables at the case-level. This  <br>
+gets rid of the explicit fix lines.</p>
+<p>2.) Also often I start with a proof like yours (which contains forward  <br>
+and backward reasoning steps). If possible, I then reformulate these  <br>
+proofs to<br>
+be completely forward proofs, which tend to be slightly shorter (you  <br>
+can save the lines about opening and closing subproofs).</p>
+<p>3.) If you think that the Singleton-case is too trivial and should not  <br>
+be shown<br>
+explicitly, you can 'hide' it by discharging it at the qed-statement,  <br>
+like this:</p>
+<p>lemma cata_uniq :<br>
+  assumes a: "cata c f b"<br>
+  shows "c as = catafunc f b as"<br>
+proof (induct as)<br>
+   case (Snoc as a)<br>
+   have hyp: "c as = catafunc f b as" by fact<br>
+   have "c (Snoc as a) = c (app as (Singleton a))" by (simp only: cons_rewrite)<br>
+   also have "... = b (c as) (f a)"<br>
+     using cata_helper(3)[OF a, of as "Singleton a"] cata_helper(2)[OF  <br>
+a, of a] by auto<br>
+   also have "... = b (catafunc f b as) (f a)" using hyp by auto<br>
+   finally show "c (Snoc as a) = catafunc f b (Snoc as a)"<br>
+     by simp<br>
+qed (simp add: a[unfolded cata_def])</p>
+<p>OK, this is not as short as your apply-script and the two solutions,<br>
+but as said above the purpose of an Isar proof is not to be as concise as<br>
+an apply-script, but to easily read off the proof idea (your calculation).<br>
+This might mean in this case that the proof is a bit more verbose (but this<br>
+is not always the case).</p>
+<blockquote>
+<p>I have a hard time going from Apply-style induction proofs to the<br>
+Structured Isar-style.</p>
+</blockquote>
+<p>My experience is also that going from an apply script to an Isar proof<br>
+is not that easy. Fiddling with an apply script usually completely buries<br>
+the proof idea. Constructing then the corresponding Isar proof means that<br>
+one has to think again about what are the important steps in the proof are.<br>
+That can sometimes be non-obvious.</p>
+<p>Hope this helps,<br>
+Christian</p>
+
+
+
+<a name="294131902"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Converting%20apply-style%20induction%20to%20Structured.../near/294131902" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Converting.20apply-style.20induction.20to.20Structured.2E.2E.2E.html#294131902">(Aug 18 2022 at 17:18)</a>:</h4>
+<p>From: Søren Haagerup &lt;<a href="mailto:shaagerup@gmail.com">shaagerup@gmail.com</a>&gt;<br>
+This really made my day -- I have been craving for such a feature for<br>
+very long :-)<br>
+Thank you for all your suggestions and solutions - it sped up my<br>
+learning process a lot!</p>
+<p>Best,<br>
+Søren</p>
+
+
+
+<a name="294133987"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Converting%20apply-style%20induction%20to%20Structured.../near/294133987" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Converting.20apply-style.20induction.20to.20Structured.2E.2E.2E.html#294133987">(Aug 18 2022 at 17:29)</a>:</h4>
+<p>From: Søren Haagerup &lt;<a href="mailto:shaagerup@gmail.com">shaagerup@gmail.com</a>&gt;<br>
+Hello,</p>
+<p>I have a hard time going from Apply-style induction proofs to the<br>
+Structured Isar-style.</p>
+<p>In the apply-style case, the proof of "cata_uniq" is a mere 4 lines:<br>
+<a href="http://gawis.dk/misc/apply_sample.thy">http://gawis.dk/misc/apply_sample.thy</a></p>
+<p>In the structured style, I need to write much more:<br>
+<a href="http://gawis.dk/misc/structured_sample.thy">http://gawis.dk/misc/structured_sample.thy</a></p>
+<p>Is there a way to make a concise structured proof of this fact?</p>
+<p>Best regards,<br>
+Søren</p>
+
+
+
+<a name="294134005"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Converting%20apply-style%20induction%20to%20Structured.../near/294134005" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Converting.20apply-style.20induction.20to.20Structured.2E.2E.2E.html#294134005">(Aug 18 2022 at 17:29)</a>:</h4>
+<p>From: Rafal Kolanski &lt;<a href="mailto:rafalk@cse.unsw.edu.au">rafalk@cse.unsw.edu.au</a>&gt;<br>
+Hi,</p>
+<p>While drinking tea, I took a quick stab at it too, here's what I ended <br>
+up with:</p>
+<p>lemma cata_uniq2: "cata c f b ==&gt; c as = catafunc f b as"<br>
+   unfolding cata_def<br>
+proof (induct as)<br>
+   case (Singleton a) thus ?case by simp<br>
+next<br>
+   case (Snoc as a)<br>
+   thus ?case<br>
+     by (subst catafunc.simps)<br>
+        (simp add: cons_rewrite del: app.simps)<br>
+qed</p>
+<p>The "cons_rewrite" lemma is in direct conflict with app.simps, so they <br>
+can't both be in the simpset at the same time.</p>
+<p>If you repeatedly run into this type of conflict, you might want to <br>
+remove the function equations from the simpset using:</p>
+<p>declare app.simps[simp del]</p>
+<p>Then you can always add them back in to the simplifier when needed.</p>
+<p>By now, you should have a nice collection of various people's proving <br>
+styles in Isar :)</p>
+<p>Sincerely,</p>
+<p>Rafal Kolanski.</p>
+
+
+
+<a name="294134936"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Converting%20apply-style%20induction%20to%20Structured.../near/294134936" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Converting.20apply-style.20induction.20to.20Structured.2E.2E.2E.html#294134936">(Aug 18 2022 at 17:34)</a>:</h4>
+<p>From: Tjark Weber &lt;<a href="mailto:webertj@in.tum.de">webertj@in.tum.de</a>&gt;<br>
+I've found metis quite handy in similar situations.  metis knows about<br>
+symmetry, so (unlike simp) it may still succeed when equalities are<br>
+oriented the wrong way.</p>
+<p>Kind regards,<br>
+Tjark</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

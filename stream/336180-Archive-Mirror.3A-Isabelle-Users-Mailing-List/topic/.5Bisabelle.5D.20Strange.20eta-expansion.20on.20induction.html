@@ -1,0 +1,183 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Strange eta-expansion on induction · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Strange.20eta-expansion.20on.20induction.html">[isabelle] Strange eta-expansion on induction</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294153524"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Strange%20eta-expansion%20on%20induction/near/294153524" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Strange.20eta-expansion.20on.20induction.html#294153524">(Aug 18 2022 at 19:17)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:lammich@in.tum.de">lammich@in.tum.de</a>&gt;<br>
+Hi,</p>
+<p>[Referring to Isabelle-2011-1]</p>
+<p>I recently encountered a quite strange behavior of the induct method. It<br>
+seems to arbitrarily eta-expand its subgoals under certain conditions<br>
+(If the induction variable is nested inside higher-order context ???).</p>
+<p>In the boiled-down example below, the first induct method fully<br>
+eta-expands its subgoals. In the second induct-method, the subgoals are<br>
+not eta-expanded, but the generated cases are. That is, on apply-style<br>
+scripts, you see eta-contracted goals, and when switching to ISAR, using<br>
+case-commands, you get eta-expanded goals.</p>
+<p>Is this behavior somehow documented? Can I switch it off? <br>
+In my concrete application, it kills my simplifier setup, as the<br>
+simplifier applies rules inside the eta-expanded terms that I do not<br>
+expect to be applied there.</p>
+<p>Regards,<br>
+  Peter</p>
+<hr>
+<p>declare [[eta_contract = false ]] (* Configure pretty-printer not to<br>
+eta-contract on pretty-printing *)</p>
+<p>consts<br>
+  f :: "('a \&lt;Rightarrow&gt; 'b \&lt;Rightarrow&gt; bool) \&lt;Rightarrow&gt; bool"<br>
+  i :: "('a list \&lt;Rightarrow&gt; 'a set \&lt;Rightarrow&gt; 'a \&lt;Rightarrow&gt; 'b<br>
+\&lt;Rightarrow&gt; bool)"</p>
+<p>lemma "f (i xs s)"<br>
+  apply (induct xs)   (* Subgoals are fully eta-expanded here *)<br>
+  print_cases (* Cases are eta-expanded, too*)<br>
+  oops</p>
+<p>lemma "f (i xs s)"<br>
+  apply (induct xs arbitrary: s) (* Subgoals are <em>NOT</em> eta-expanded here<br>
+*)<br>
+  print_cases  (* Cases are eta-expanded *)<br>
+  oops</p>
+
+
+
+<a name="294153653"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Strange%20eta-expansion%20on%20induction/near/294153653" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Strange.20eta-expansion.20on.20induction.html#294153653">(Aug 18 2022 at 19:18)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+This is the normal order of things.  Combinations of simplification with <br>
+rule applications of the resolution family (intro/elim/dest) can lead to <br>
+eta-expansion and thus more reductions than first anticipated.</p>
+<p>The above simpset is a bit fragile in that sense, as you have observed <br>
+already.  If you do not want to add more rules, but want to retain control <br>
+of lambda equivalences, you can try to wrap up some App or Abs nodes in <br>
+auxiliary operators; similar to Collect/member for 'a set in HOL.</p>
+<p>Makarius</p>
+
+
+
+<a name="294153748"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Strange%20eta-expansion%20on%20induction/near/294153748" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Strange.20eta-expansion.20on.20induction.html#294153748">(Aug 18 2022 at 19:18)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+The induct method itself does not eta-contract or expand. It merely uses<br>
+primitives, in particular resolution, which in turn uses higher-order<br>
+unification. And higher-order unification does indeed eta-expand. In<br>
+certain situations. This is intentionally not fixed and you should not<br>
+expect or rely on a particular behaviour. That is, you may have to<br>
+ensure eta-contraction yourself if some part of your proof method is<br>
+sensitive to it.</p>
+<p>Tobias</p>
+
+
+
+<a name="294153869"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Strange%20eta-expansion%20on%20induction/near/294153869" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Strange.20eta-expansion.20on.20induction.html#294153869">(Aug 18 2022 at 19:19)</a>:</h4>
+<p>From: Brian Huffman &lt;<a href="mailto:huffman@in.tum.de">huffman@in.tum.de</a>&gt;<br>
+I have complained at length about this issue before. See this thread<br>
+from August of last year:</p>
+<p><a href="https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2011-August/msg00080.html">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2011-August/msg00080.html</a><br>
+<a href="https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2011-August/msg00089.html">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2011-August/msg00089.html</a></p>
+<p>To summarize: In my opinion, having a proof kernel that does<br>
+eta-expansion willy-nilly is an embarrassment; I also have similar<br>
+feelings about the "eta-contract" option in the pretty-printer, which<br>
+our eta-expanding kernel makes necessary.</p>
+<p>Unfortunately, fixing the problem properly would require modifying the<br>
+unification code in the kernel, which hardly anybody understands. It<br>
+would be hard to get anyone to trust a modified version of it.</p>
+<p>As a workaround, perhaps someone could write a wrapper around the<br>
+induct method that would do its own unification outside the kernel,<br>
+and pre-instantiate the induction rule before applying it. This would<br>
+avoid using the kernel's unification code, thus preventing the<br>
+eta-expansion.</p>
+<ul>
+<li>Brian</li>
+</ul>
+
+
+
+<a name="294154028"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Strange%20eta-expansion%20on%20induction/near/294154028" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Strange.20eta-expansion.20on.20induction.html#294154028">(Aug 18 2022 at 19:20)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+As Tobias points out, the Pure Isabelle system conceptually works modulo <br>
+eta (and beta and alpha) conversion -- although there are well known <br>
+traps.  So to continue the thread, I would also like to see the other part <br>
+-- the proof tool by Peter that fails here.</p>
+<p>Makarius</p>
+
+
+
+<a name="294154164"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Strange%20eta-expansion%20on%20induction/near/294154164" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Strange.20eta-expansion.20on.20induction.html#294154164">(Aug 18 2022 at 19:21)</a>:</h4>
+<p>From: Lawrence Paulson &lt;<a href="mailto:lp15@cam.ac.uk">lp15@cam.ac.uk</a>&gt;<br>
+Eta-expansion is an intrinsic part of the higher-order unification algorithm. Following each unification by an eta-contraction step would be inefficient, and equally arbitrary. The “problem" that must be “fixed" is any code that cannot exist with this basic fact of nature.</p>
+<p>Larry Paulson</p>
+
+
+
+<a name="294154334"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Strange%20eta-expansion%20on%20induction/near/294154334" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Strange.20eta-expansion.20on.20induction.html#294154334">(Aug 18 2022 at 19:23)</a>:</h4>
+<p>From: Brian Huffman &lt;<a href="mailto:huffman@in.tum.de">huffman@in.tum.de</a>&gt;<br>
+On Fri, Mar 2, 2012 at 9:28 AM, Lawrence Paulson &lt;<a href="mailto:lp15@cam.ac.uk">lp15@cam.ac.uk</a>&gt; wrote:</p>
+<blockquote>
+<p>Eta-expansion is an intrinsic part of the higher-order unification algorithm. Following each unification by an eta-contraction step would be inefficient, and equally arbitrary. The “problem" that must be “fixed" is any code that cannot exist with this basic fact of nature.</p>
+</blockquote>
+<p>By this reasoning, the Isabelle simplifier is a "problem" that must be "fixed".</p>
+<p>The simplifier does not respect eta-equivalence of terms. I don't<br>
+think I would want one that did.</p>
+<ul>
+<li>Brian</li>
+</ul>
+<blockquote>
+<p>On 1 Mar 2012, at 20:15, Brian Huffman wrote:</p>
+<blockquote>
+<p>I have complained at length about this issue before. See this thread<br>
+from August of last year:</p>
+<p><a href="https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2011-August/msg00080.html">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2011-August/msg00080.html</a><br>
+<a href="https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2011-August/msg00089.html">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2011-August/msg00089.html</a></p>
+<p>To summarize: In my opinion, having a proof kernel that does<br>
+eta-expansion willy-nilly is an embarrassment; I also have similar<br>
+feelings about the "eta-contract" option in the pretty-printer, which<br>
+our eta-expanding kernel makes necessary.</p>
+<p>Unfortunately, fixing the problem properly would require modifying the<br>
+unification code in the kernel, which hardly anybody understands. It<br>
+would be hard to get anyone to trust a modified version of it.<br>
+</p>
+</blockquote>
+</blockquote>
+
+
+
+<a name="294154436"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Strange%20eta-expansion%20on%20induction/near/294154436" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Strange.20eta-expansion.20on.20induction.html#294154436">(Aug 18 2022 at 19:23)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:lammich@in.tum.de">lammich@in.tum.de</a>&gt;<br>
+It's no custom "proof tool" involved here. My setting is roughly like<br>
+this:</p>
+<p>I have assertions of type "heap =&gt; addr set =&gt; bool", and hoare-tripels<br>
+of type "assertion =&gt; program =&gt; assertion =&gt; bool" (syntax: {P} S {Q})</p>
+<p>I defined the assertion <br>
+  definition [simp]: "false h as == False"</p>
+<p>Moreover, I have a rule <br>
+  lemma [simp]: "{false} S {Q}"</p>
+<p>The proof that fails has the form:<br>
+  lemma "{is_list xs p} S Q" proof (induct xs arbitrary: p)<br>
+    case Nil show ?case by (cases p, simp_all)<br>
+    ...</p>
+<p>Here, depending on the case for p, "is_list [] p" simplifies to false,<br>
+which is then simplified to \lambda _ _. False, before the rule for<br>
+{false} S {Q} is applied.</p>
+<p>So, if I have to expect eta-expansion at any point, I have to add<br>
+additional rules to the simpset to make it confluent again. This<br>
+certainly works, but may blow up the simpset.</p>
+<p>Just as a remark: The simpset setup from the standard library has such<br>
+problems, too --- for example there is id_apply, that happily simplifies<br>
+"%x. id x" to "%x. x", but not "id" (I already had problems with that).</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

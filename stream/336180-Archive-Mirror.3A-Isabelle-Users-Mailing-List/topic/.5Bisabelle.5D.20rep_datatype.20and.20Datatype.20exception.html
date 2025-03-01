@@ -1,0 +1,156 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] rep_datatype and Datatype exception · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20rep_datatype.20and.20Datatype.20exception.html">[isabelle] rep_datatype and Datatype exception</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294124761"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20rep_datatype%20and%20Datatype%20exception/near/294124761" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20rep_datatype.20and.20Datatype.20exception.html#294124761">(Aug 18 2022 at 16:42)</a>:</h4>
+<p>From: Mathieu Giorgino &lt;<a href="mailto:mathieu.giorgino@irit.fr">mathieu.giorgino@irit.fr</a>&gt;<br>
+Hello all,</p>
+<p>I'm trying to use rep_datatype command, however I'm getting an exception <br>
+"Datatype" and I'm not sure why.</p>
+<p>In the following example, the only difference between Cons2 and Cons2' is the <br>
+(un)currying of the parameters but it's OK for the first one while it isn't <br>
+for the second.</p>
+<hr>
+<p>theory RepDatatype imports Main<br>
+begin</p>
+<p>typedef 'a list2 = "UNIV:: 'a list set" ..</p>
+<p>definition Nil2 :: "'a list2" where "Nil2 = Abs_list2 []"</p>
+<p>fun Cons2 :: "'a \&lt;Rightarrow&gt; 'a list2 \&lt;Rightarrow&gt; 'a list2" where<br>
+  "Cons2 a as = Abs_list2 (a # Rep_list2 as)"</p>
+<p>rep_datatype Nil2 Cons2 (* OK *)<br>
+oops</p>
+<p>fun Cons2' :: "('a * 'a list2) \&lt;Rightarrow&gt; 'a list2" where<br>
+  "Cons2' (a, as) = Abs_list2 (a # Rep_list2 as)"</p>
+<p>rep_datatype Nil2 Cons2' (* exception Datatype raised<br>
+    (line 218 of "~~/src/HOL/Tools/Datatype/datatype_aux.ML") *)</p>
+<hr>
+<p>What does this exception mean ?</p>
+<p>Thanks,</p>
+<p>Mathieu Giorgino<br>
+<a href="/user_uploads/14278/OJPQDjba6pqZ-D78g2MFNrVG/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294124860"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20rep_datatype%20and%20Datatype%20exception/near/294124860" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20rep_datatype.20and.20Datatype.20exception.html#294124860">(Aug 18 2022 at 16:43)</a>:</h4>
+<p>From: Brian Huffman &lt;<a href="mailto:brianh@cs.pdx.edu">brianh@cs.pdx.edu</a>&gt;<br>
+Hi Mathieu,</p>
+<p>This is a bug. "Datatype" is an exception used internally in the<br>
+implementation of "rep_datatype"; users are never supposed to see it.</p>
+<p>It appears that while "rep_datatype" supports mutual recursion, it has<br>
+problems with indirect-recursive datatypes like your "list2" type.<br>
+(Indirect recursion means that a recursive type appears as a parameter<br>
+of another datatype. In your case, type "'a list2" appears inside a<br>
+product type.)</p>
+<p>To the Isabelle developers: I was able to get a little further on this<br>
+example by modifying HOL/Tools/Datatype/datatype_data.ML like this:</p>
+<p>val descr = map_index mk_spec cs;<br>
+     val injs = Datatype_Prop.make_injs [descr] vs;<br>
+     val half_distincts = map snd (Datatype_Prop.make_distincts [descr] vs);</p>
+<ul>
+<li>val ind = Datatype_Prop.make_ind [descr] vs;</li>
+<li>val dt_info = get_all thy;</li>
+<li>val (descrs, _) = unfold_datatypes thy descr vs dt_info descr (length cs);</li>
+<li>val ind = Datatype_Prop.make_ind descrs vs;<br>
+     val rules = (map o map o map) Logic.close_form [[[ind]], injs,<br>
+half_distincts];</li>
+</ul>
+<p>Now the rep_datatype command produces the right goals for me to prove,<br>
+but it raises another Datatype exception after I finish the proof.<br>
+Maybe whoever is currently maintaining the datatype package (Stefan or<br>
+Florian?) can follow up on this.</p>
+<ul>
+<li>Brian</li>
+</ul>
+
+
+
+<a name="294124956"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20rep_datatype%20and%20Datatype%20exception/near/294124956" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20rep_datatype.20and.20Datatype.20exception.html#294124956">(Aug 18 2022 at 16:43)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi all,</p>
+<p>the issue with rep_datatype is that it started as a semi-official<br>
+bootstrap device for HOL and, over the last years, turned more and more<br>
+in a user-space command which still carries around restrictions from<br>
+that time.  For this sake I recommend to prefer datatype, and use<br>
+rep_datatype only under special conditions.</p>
+<p>Traditionally, Isabelle/HOL is built in a way that there is practically<br>
+only one way to introduce a certain type, although there might be a<br>
+couple of legitimate views on that type (e.g. multisets either as<br>
+typedef with a restriction predicate over 'a =&gt; nat or a quotient of 'a<br>
+list).  This is indeed a constructivism which has no justification<br>
+except pragmatism, and maybe future developments should lift that<br>
+restriction.  For the moment, the only known exception to this is indeed<br>
+rep_datatype, which in its current implementation is an<br>
+underapproximation of what it should be properly.</p>
+<p>Maybe I find some time to have a look at it.</p>
+<p>Florian<br>
+<a href="/user_uploads/14278/nfJJ2_m2hKxE9FVf2hkrm5-D/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294124965"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20rep_datatype%20and%20Datatype%20exception/near/294124965" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20rep_datatype.20and.20Datatype.20exception.html#294124965">(Aug 18 2022 at 16:43)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On Fri, 17 Dec 2010, Florian Haftmann wrote:</p>
+<blockquote>
+<p>the issue with rep_datatype is that it started as a semi-official <br>
+bootstrap device for HOL and, over the last years, turned more and more <br>
+in a user-space command which still carries around restrictions from <br>
+that time.  For this sake I recommend to prefer datatype, and use <br>
+rep_datatype only under special conditions.</p>
+</blockquote>
+<p>Right.  And of course there is no "bug" in the package, it merely tells <br>
+you via a low-level exception that it cannot handle certain cases.</p>
+<p>I have recently had other surprises with 'rep_datatype', which are in fact <br>
+to be expected, since the main characterizing theorems that your have <br>
+already usually differ from what 'datatype' would produce (induct rule <br>
+etc.).  This means one should not lean out of the window too much, and use <br>
+plain datatype from the very start whenever this is possible.</p>
+<blockquote>
+<blockquote>
+<p>To the Isabelle developers: I was able to get a little further on this <br>
+example by modifying HOL/Tools/Datatype/datatype_data.ML like this:</p>
+</blockquote>
+<blockquote>
+<p>Now the rep_datatype command produces the right goals for me to prove, <br>
+but it raises another Datatype exception after I finish the proof. <br>
+Maybe whoever is currently maintaining the datatype package (Stefan or <br>
+Florian?) can follow up on this.</p>
+</blockquote>
+</blockquote>
+<p>The situation of the datatype package is twofold:</p>
+<p>(1) It is very complex already.<br>
+   (2) It still needs to be localized.</p>
+<p>Practically this means that I will have to spend quite some time with it <br>
+myself, to upgrade it to the current system infrastructure.  I hope that <br>
+this is still feasible, so that this key component of Isabelle/HOL is not <br>
+stuck in the past -- due to a load of features that is too heavy to lift <br>
+it again.</p>
+<p>Makarius</p>
+
+
+
+<a name="294125098"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20rep_datatype%20and%20Datatype%20exception/near/294125098" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20rep_datatype.20and.20Datatype.20exception.html#294125098">(Aug 18 2022 at 16:44)</a>:</h4>
+<p>From: Alexander Krauss &lt;<a href="mailto:krauss@in.tum.de">krauss@in.tum.de</a>&gt;<br>
+Makarius wrote:</p>
+<blockquote>
+<p>The situation of the datatype package is twofold:</p>
+</blockquote>
+<p>(I moved this discussion to the isabelle-dev list, since it is getting <br>
+into implementation details)</p>
+<p>Alex</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

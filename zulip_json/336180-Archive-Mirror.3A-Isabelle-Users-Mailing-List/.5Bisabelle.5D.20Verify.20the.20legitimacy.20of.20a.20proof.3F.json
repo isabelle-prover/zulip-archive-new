@@ -1,0 +1,116 @@
+[
+    {
+        "content": "<p>From: scott constable &lt;<a href=\"mailto:sdconsta@syr.edu\">sdconsta@syr.edu</a>&gt;<br>\nHi All,</p>\n<p>Let's suppose I have some lemma</p>\n<p>lemma ComplexProperty: \"something interesting\"<br>\n...<br>\ndone</p>\n<p>whose proof cites numerous other lemmas in other .thy files, possibly<br>\nwritten by other persons with malicious intentions. Is there a command in<br>\nIsabelle which I could use to determine the legitimacy of the entire proof<br>\ntree of ComplexProperty? That is, I want to ensure that no lemma in the<br>\nproof tree ended with \"sorry\", or if any axioms were used, I want to know<br>\nwhich ones, etc.</p>\n<p>Thanks,</p>\n<p>Scott Constable</p>",
+        "id": 294713077,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661182836
+    },
+    {
+        "content": "<p>From: \"C. Diekmann\" &lt;<a href=\"mailto:diekmann@in.tum.de\">diekmann@in.tum.de</a>&gt;</p>\n<blockquote>\n<p>That is, I want to ensure that no lemma in the<br>\nproof tree ended with \"sorry\",</p>\n</blockquote>\n<p>If you make a command line run with <code>isabelle build</code>, every use of <code>sorry</code><br>\nis counted as cheating and makes the build fail (but only at the end of the<br>\nbuild, not at the time when the thy with the sorry is processed).</p>\n<p>This raises a new question: can I enable cheating (quick_and_dirty) mode in<br>\na command line build?</p>\n<p>One question answered, one not answered, one new problem ;-)</p>\n<p>Cheers,<br>\n  Cornelius</p>",
+        "id": 294713085,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661182842
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nIsabelle does not protect against malicious intentions. It would require<br>\na quite different system to do that, one that you won't like to use.</p>\n<p>The other big provers (e.g. Coq) are similar in this respect.</p>\n<p>HOL-Zero is a notable exception in targeting a market of potentially<br>\nmalicious (ab-)users, but it is not a \"big prover\".</p>\n<p>Makarius</p>",
+        "id": 294713122,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661182861
+    },
+    {
+        "content": "<p>From: Simon Wimmer &lt;<a href=\"mailto:wimmersimon@gmail.com\">wimmersimon@gmail.com</a>&gt;<br>\nHi Scott,</p>\n<p>you can also check which oracles a theorem depends on from the ML level.<br>\nA hack to look for the oracle that is used to implement sorry can look like<br>\nthis:</p>\n<p>theory Scratch<br>\n  imports Main<br>\n  keywords \"check_sorry\" :: diag<br>\nbegin</p>\n<p>ML ‹<br>\nval get_oracles = Proofterm.all_oracles_of o Proofterm.strip_thm o<br>\nThm.proof_body_of</p>\n<p>val contains_sorry = exists (fn (a, _) =&gt; a = \"Pure.skip_proof\") o<br>\nget_oracles</p>\n<p>fun report_sorry ctxt =<br>\n  if Context_Position.is_visible ctxt then<br>\n<a href=\"http://Output.report\">Output.report</a> [Markup.markup Markup.bad \"Proof arises from sorry<br>\noracle!\"]<br>\n  else ();</p>\n<p>fun check_sorry ctxt th =<br>\n    if contains_sorry th then report_sorry ctxt else ()</p>\n<p>fun check_sorry_cmd thm_ref st =<br>\n  let<br>\n    val ctxt = Toplevel.context_of st<br>\n    val th = Proof_Context.get_fact_single ctxt thm_ref<br>\n  in check_sorry ctxt th end</p>\n<p>val _ =<br>\n  Outer_Syntax.command @{command_keyword check_sorry} \"Check theorem for<br>\nsorry\"<br>\n    (Parse.thm &gt;&gt; (fn (th, _) =&gt; Toplevel.keep (check_sorry_cmd th)));<br>\n›</p>\n<p>(* Usage: *)<br>\nlemma one_add_1_eq_3:<br>\n  \"1 + 1 = 3\"<br>\n  sorry</p>\n<p>check_sorry HOL.refl<br>\ncheck_sorry one_add_1_eq_3</p>\n<p>Cheers,<br>\nSimon</p>",
+        "id": 294713168,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661182876
+    },
+    {
+        "content": "<p>From: Manuel Eberl &lt;<a href=\"mailto:eberlm@in.tum.de\">eberlm@in.tum.de</a>&gt;<br>\nUnfortunately, it is very easy to circumvent this. I don't recall who<br>\nfound this originally, but you can hide the ‘taint’ of a theorem by<br>\ngoing through a type class instantiation:</p>\n<p>lemma one_add_1_eq_3:<br>\n  \"(1::nat) + 1 = 3\"<br>\n  sorry</p>\n<p>class foo = semiring_1 +<br>\n  assumes foo: \"1 + 1 = 3\"</p>\n<p>instance nat :: foo<br>\n  by intro_classes (rule one_add_1_eq_3)</p>\n<p>lemmas one_add_1_eq_3' = foo [where ?'a = nat]</p>\n<p>check_sorry one_add_1_eq_3'</p>\n<p>Cheers,</p>\n<p>Manuel</p>",
+        "id": 294713176,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661182879
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\n\"Found this originally\" sounds very funny to me.</p>\n<p>Of course, the problem of oracles vs. type classes instantiations is as<br>\nold as oracles and type class instantiations in Isabelle. It is rather<br>\nwell-known for insiders.</p>\n<p>So we are back to the new meta-problem from recent years: even power<br>\nusers don't know anymore what Isabelle is and what it does, and<br>\nespecially what it does not.</p>\n<p>Makarius</p>",
+        "id": 294713182,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661182885
+    },
+    {
+        "content": "<p>From: Tobias Nipkow &lt;<a href=\"mailto:nipkow@in.tum.de\">nipkow@in.tum.de</a>&gt;<br>\nOn 08/07/2017 13:30, Makarius wrote:</p>\n<blockquote>\n<p>On 08/07/17 13:01, Manuel Eberl wrote:</p>\n<blockquote>\n<p>Unfortunately, it is very easy to circumvent this. I don't recall who<br>\nfound this originally, but you can hide the ‘taint’ of a theorem by<br>\ngoing through a type class instantiation:</p>\n</blockquote>\n<p>\"Found this originally\" sounds very funny to me.</p>\n<p>Of course, the problem of oracles vs. type classes instantiations is as<br>\nold as oracles and type class instantiations in Isabelle. It is rather<br>\nwell-known for insiders.</p>\n</blockquote>\n<p>I am sure Manuel meant no disrespect. No doubt you were aware of this behaviour <br>\nfrom the start.</p>\n<blockquote>\n<p>So we are back to the new meta-problem from recent years: even power<br>\nusers don't know anymore what Isabelle is and what it does, and<br>\nespecially what it does not.<br>\nIt is usually due to a fanciful interpretation of the documentation. The latter <br>\nsays that \"The system always records oracle invocations within derivations of <br>\ntheorems by a unique tag.\" but does not claim that these tags are also always <br>\ninherited in the way one is all too likely to assume. There you are, Manuel.</p>\n</blockquote>\n<p>Tobias<br>\n<a href=\"/user_uploads/14278/J7KfR7k_bAozB3eWVnsrN38Z/smime.p7s\">smime.p7s</a></p>",
+        "id": 294713198,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661182891
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nOn 08/07/17 15:33, Tobias Nipkow wrote:</p>\n<blockquote>\n<p>On 08/07/2017 13:30, Makarius wrote:</p>\n<p>On 08/07/17 13:01, Manuel Eberl wrote:</p>\n<blockquote>\n<blockquote>\n<p>Unfortunately, it is very easy to circumvent this. I don't recall who<br>\nfound this originally, but you can hide the ‘taint’ of a theorem by<br>\ngoing through a type class instantiation:</p>\n</blockquote>\n<p>\"Found this originally\" sounds very funny to me.</p>\n<p>Of course, the problem of oracles vs. type classes instantiations is as<br>\nold as oracles and type class instantiations in Isabelle. It is rather<br>\nwell-known for insiders.</p>\n</blockquote>\n<p>I am sure Manuel meant no disrespect. No doubt you were aware of this<br>\nbehaviour from the start.</p>\n</blockquote>\n<p>No, and neither did I mean any disrespect to Manuel.</p>\n<blockquote>\n<blockquote>\n<p>So we are back to the new meta-problem from recent years: even power<br>\nusers don't know anymore what Isabelle is and what it does, and<br>\nespecially what it does not.<br>\nIt is usually due to a fanciful interpretation of the documentation. The<br>\nlatter says that \"The system always records oracle invocations within<br>\nderivations of theorems by a unique tag.\" but does not claim that these<br>\ntags are also always inherited in the way one is all too likely to<br>\nassume.</p>\n</blockquote>\n</blockquote>\n<p>The problem remains open: How can true expertise about how Isabelle<br>\nreally works be reconstructed? We've seen a slow and steady decline in<br>\nthe past 10 years, and myself writing hundreds of pages of documentation<br>\nhelped only very little.</p>\n<p>Makarius</p>",
+        "id": 294713204,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661182897
+    },
+    {
+        "content": "<p>From: Manuel Eberl &lt;<a href=\"mailto:eberlm@in.tum.de\">eberlm@in.tum.de</a>&gt;</p>\n<blockquote>\n<p>I am sure Manuel meant no disrespect. No doubt you were aware of this<br>\nbehaviour from the start. <br>\nIndeed I only wanted to stress that I was definitely not the one to<br>\ndiscover this behaviour and that it has been well-known for some time,<br>\nand that I do not know anything beyond that.</p>\n</blockquote>\n<p>Manuel</p>",
+        "id": 294713217,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661182903
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nLike this:</p>\n<p>isabelle build -o quick_and_dirty</p>\n<p>Makarius</p>",
+        "id": 294713248,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661182913
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nBack to the very start. This is how I usually do it:</p>\n<p>* Everything needs to work cleanly with \"isabelle build\" in batch<br>\nmode, with default options (no quick_and_dirty).</p>\n<p>* Superficial inspection of syntax. The substring \"axiomatization\"<br>\npoints to most ways to use axioms in practice (but very obscure<br>\npossibilities remain).</p>\n<p>* Inspection if add-on Isabelle/ML setup is used (normally not<br>\nrequired at all).</p>\n<p>* Inspection of definitions, statements, proofs (preferably in<br>\nstructured Isar). Does it all \"make sense\", \"look reasonable\" etc.?</p>\n<p>The latter is often the main problem: definitions that are not what one<br>\nwould expect or like to see, or proofs that don't expose the reasoning<br>\nproperly.</p>\n<p>In that sense, I would say that a \"legitimate\" proof needs to be one<br>\nthat is nicely structured and presented, based on clear definitions.</p>\n<p>Extra points for proofs that are checked reasonably fast.</p>\n<p>Makarius</p>",
+        "id": 294713256,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661182918
+    },
+    {
+        "content": "<p>From: Mark Adams &lt;<a href=\"mailto:mark@proof-technologies.com\">mark@proof-technologies.com</a>&gt;<br>\nYes, and it is mainly intended to be used as a proof checker, via proof <br>\nobjects.  You export your formal proof as proof objects, then import <br>\nthese into HOL Zero.  In this sense it is perfectly capable - it has <br>\nsuccessfully checked in one session of a few hours the 1.4 billion <br>\nprimitive inference steps of 2 of the 4 parts of Flyspeck (the main text <br>\nand the linear inequalities).</p>\n<p>Mark.</p>",
+        "id": 294713273,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661182922
+    },
+    {
+        "content": "<p>From: scott constable &lt;<a href=\"mailto:sdconsta@syr.edu\">sdconsta@syr.edu</a>&gt;<br>\nThanks all, I think this has been a productive discussion :)</p>\n<p>I would like to respond to a point Makarius brought up earlier:</p>\n<p>Isabelle does not protect against malicious intentions. It would require<br>\na quite different system to do that, one that you won't like to use.</p>\n<p>The other big provers (e.g. Coq) are similar in this respect.</p>\n<p>I'm also familiar with Coq, and I do think Coq should be better in this<br>\nrespect. In Coq, proofs are themselves objects with a given type. So they<br>\ncan be checked or examined, for instance by dumping them to the console. So<br>\nto check the legitimacy of a theorem in Coq, I believe it would suffice to<br>\nwalk the proof tree by recursively expanding each non-atomic node, and thus<br>\nensure that the proof tree is composed entirely of legitimate proof objects.</p>\n<p>Am I wrong about this? If not, might there be a similar approach in<br>\nIsabelle?</p>\n<p>Scott</p>",
+        "id": 294713329,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661182932
+    },
+    {
+        "content": "<p>From: Lawrence Paulson &lt;<a href=\"mailto:lp15@cam.ac.uk\">lp15@cam.ac.uk</a>&gt;<br>\nTo protect against malicious intentions would turn Isabelle into a form of security software. But the guarantees we get from the latter are quite different from what we get from a formal proof. Ultimately security claims depend upon trusting a lot of complicated mechanisms, such as certificate authorities and cryptosystems. We are not a lot better off than when a model checker comes back with nothing.</p>\n<p>However, we work with formal proofs, which can be examined, even interactively. We do not have to work on the basis that \"X has been proved, therefore X is true\", but rather \"We have been given a proof of X; Is it credible?\" Then we can look at any part of this proof where we have doubts. A devious user has many ways to try to fool us, but it's not so easy if he has to supply the full source code and we insist on legibility throughout. The effort we choose to invest in this would depend on how important X is and how much we distrust the person who supplied the proof.</p>\n<p>Larry Paulson</p>",
+        "id": 294713372,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661182944
+    },
+    {
+        "content": "<p>From: Lars Hupel &lt;<a href=\"mailto:hupel@in.tum.de\">hupel@in.tum.de</a>&gt;<br>\nMaybe it's time for an Underhanded Isabelle Contest?</p>\n<p>&lt;<a href=\"http://www.underhanded-c.org/\">http://www.underhanded-c.org/</a>&gt;<br>\n&lt;<a href=\"https://en.wikipedia.org/wiki/Underhanded_C_Contest\">https://en.wikipedia.org/wiki/Underhanded_C_Contest</a>&gt;</p>\n<p>Cheers<br>\nLars</p>",
+        "id": 294713386,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661182948
+    },
+    {
+        "content": "<p>From: Tobias Nipkow &lt;<a href=\"mailto:nipkow@in.tum.de\">nipkow@in.tum.de</a>&gt;<br>\nScott,</p>\n<p>Of course you are right and if some prover does not guarantee correctness on its <br>\nown, that is the standard answer: proof terms. Isabelle has had proof terms for <br>\na long time now, but their checker is also part of Isabelle and uses the same <br>\ninfrastructure of terms, types etc. Hence it is only as reliable as that <br>\ninfrastructure is. An independent checker would improve the situation. That's <br>\nwhy, for example, for SAT solvers independent and verified proof checkers are <br>\nbecoming available.</p>\n<p>The discussion about \"malicious intentions\" never ceases to amaze me. Using the <br>\ninterfaces that a system offers is not malicious by definition of the term <br>\ninterface. If it requires wizard status to know what is ok and what not, that is <br>\na design decision one can take, but then one need not be suprised that <br>\nnon-wizards may perceive this as risky.</p>\n<p>Appealing to readable proofs is not a panacea as Mark Adams' email shows: the <br>\nproofs about the linear inequalities he refers to are by necessity machine <br>\ngenerated and beyond human checking. But we would still like to have strong <br>\ncorrectness guarantees.</p>\n<p>Tobias<br>\n<a href=\"/user_uploads/14278/c0uUlNsEvZYHF53KEUMoXsdw/smime.p7s\">smime.p7s</a></p>",
+        "id": 294713400,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661182953
+    },
+    {
+        "content": "<p>From: Ondřej Kunčar &lt;<a href=\"mailto:kuncar@in.tum.de\">kuncar@in.tum.de</a>&gt;<br>\nRegardless of the question whether Isabelle should be a security software or whether there are some malicious users, in my opinion, every theorem prover should be able to answer the following question: </p>\n<p>“Given a theorem X, which nondefinitional axioms and/or oracles (e.g., sorry) were used to prove X.” (using Isabelle’s terminology, other provers might use a different terminology).</p>\n<p>As we saw in this thread, to obtain an answer to this question is in case of Isabelle<br>\n1) neither simple (as documented by Simon’s ML code)<br>\n2) nor reliable (as pointed out by Manuel).</p>\n<p>I hope we can improve on this in foreseeable future.</p>\n<p>Best,<br>\nOndřej<br>\n<a href=\"/user_uploads/14278/6Q4LJfzDK2YzpEYCV-t4heUI/smime.p7s\">smime.p7s</a></p>",
+        "id": 294713639,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661183033
+    },
+    {
+        "content": "<p>From: Peter Lammich &lt;<a href=\"mailto:lammich@in.tum.de\">lammich@in.tum.de</a>&gt;<br>\nAt this point, I second Ken. Although having human-readable machine<br>\nchecked proofs is certainly a nice feature to get an idea of how a<br>\nproof works, the main points to check should be the statement of the<br>\ntheorem, including the definitions (syntax tweaks, etc) it uses, as<br>\nwell as the axioms its proof uses. Then, one relies on the logical<br>\ninference kernel that the proof is actually correct.<br>\nIn particular, auxiliary lemmas and definitions only used for the<br>\nproof, but not in the main statement of the theorem, should be<br>\nirrelevant for trusting the theorem.</p>\n<p>This principle should, in first place, be independent of whether the<br>\nuser is malicious or not. However, in Isabelle, the malicious user has<br>\na lot of possibilities to hide tweaks from a reviewer, while, in<br>\nHOLZero, these possibilities are very limited (if existent at all).</p>\n<p>Actually, Isabelle contains many tools in this spirit, for example,<br>\neven the simplifier or classical reasoner apply some transformations on<br>\nthe theorems provided to them. More high-level tools like function<br>\npackage or datatype package even do really complex proofs, completely<br>\nhidden from the user.</p>",
+        "id": 294713846,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661183087
+    },
+    {
+        "content": "<p>From: Lawrence Paulson &lt;<a href=\"mailto:lp15@cam.ac.uk\">lp15@cam.ac.uk</a>&gt;<br>\nI think that we are talking at cross purposes here. Of course we want our systems to be sound, and a kernel architecture is a great help in this, as we have known for 40 years. But even with a kernel architecture, it is easy for a result to be misrepresented. See e.g.</p>\n<blockquote>\n<p>Avra Cohn. The Notion of Proof in Hardware Verification. J. Autom. Reasoning5(2): 127-139 (1989)</p>\n</blockquote>\n<p>The proof kernel is no defence whatever against misrepresentation or misunderstanding, so it’s important that formal documents are openly available for inspection.</p>\n<p>Larry Paulson</p>\n<blockquote>\n<p>On 10 Jul 2017, at 10:10, Peter Lammich &lt;<a href=\"mailto:lammich@in.tum.de\">lammich@in.tum.de</a>&gt; wrote:</p>\n<p>On Sa, 2017-07-08 at 19:59 +0100, Lawrence Paulson wrote:</p>\n<blockquote>\n<p>\"We have been given a proof of X; Is it credible?\"</p>\n</blockquote>\n<p>At this point, I second Ken. Although having human-readable machine<br>\nchecked proofs is certainly a nice feature to get an idea of how a<br>\nproof works, the main points to check should be the statement of the<br>\ntheorem, including the definitions (syntax tweaks, etc) it uses, as<br>\nwell as the axioms its proof uses. Then, one relies on the logical<br>\ninference kernel that the proof is actually correct.<br>\nIn particular, auxiliary lemmas and definitions only used for the<br>\nproof, but not in the main statement of the theorem, should be<br>\nirrelevant for trusting the theorem.</p>\n<p>This principle should, in first place, be independent of whether the<br>\nuser is malicious or not. However, in Isabelle, the malicious user has<br>\na lot of possibilities to hide tweaks from a reviewer, while, in<br>\nHOLZero, these possibilities are very limited (if existent at all).</p>\n<p>Actually, Isabelle contains many tools in this spirit, for example,<br>\neven the simplifier or classical reasoner apply some transformations on<br>\nthe theorems provided to them. More high-level tools like function<br>\npackage or datatype package even do really complex proofs, completely<br>\nhidden from the user.</p>\n<p>--<br>\n  Peter</p>\n</blockquote>",
+        "id": 294713933,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661183118
+    }
+]

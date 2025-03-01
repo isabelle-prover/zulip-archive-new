@@ -1,0 +1,38 @@
+[
+    {
+        "content": "<p>From: Mario Alvarez &lt;<a href=\"mailto:mmalvare@eng.ucsd.edu\">mmalvare@eng.ucsd.edu</a>&gt;<br>\nHello Isabelle Users,</p>\n<p>I can't figure out how to get Isabelle to generate a sufficiently general<br>\ninduction principle for the following type:</p>\n<p>datatype tree =<br>\nNode \"nat\"<br>\n| Branch \"tree list\"</p>\n<p>The induction principle generated here is not general enough: it applies<br>\nthe \"set\" predicate to the list argument of Branch, but for my purposes I<br>\nalso care about the order of the trees in that list (i.e., applying \"set\"<br>\nto the argument loses too much information, the order of elements)</p>\n<p>I could define a mutually inductive type to capture the tree lists in the<br>\nBranch case, but this seems inelegant: I'd like to be able to use<br>\npreexisting abstractions and theorems about lists when reasoning with my<br>\ndata structure.</p>\n<p>How do I solve this? I've poked around Google a fair bit but haven't found<br>\nan answer.</p>\n<p>Thanks,<br>\nMario Alvarez</p>",
+        "id": 294720915,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661184772
+    },
+    {
+        "content": "<p>From: Jeremy Dawson &lt;<a href=\"mailto:Jeremy.Dawson@anu.edu.au\">Jeremy.Dawson@anu.edu.au</a>&gt;<br>\nHi Mario,</p>\n<p>What is the induction principle you get, and what is the one you want?</p>\n<p>The reason I ask is because, using the old datatype package, I get</p>\n<blockquote>\n<p>set show_types ;<br>\nval it = true : bool<br>\ntree.induct ;<br>\nval it =<br>\n    \"[| !!nat::nat. (?P1.0::tree =&gt; bool) (Node nat);<br>\n          !!list::tree list.<br>\n             (?P2.0::tree list =&gt; bool) list ==&gt; ?P1.0 (Branch list);<br>\n          ?P2.0 [];<br>\n          !!(tree::tree) list::tree list.<br>\n             [| ?P1.0 tree; ?P2.0 list |] ==&gt; ?P2.0 (tree # list) |]<br>\n       ==&gt; ?P1.0 (?tree::tree) &amp; ?P2.0 (?list::tree list)\" : Thm.thm</p>\n</blockquote>\n<p>which doesn't use the \"set\" predicate at all</p>\n<p>Cheers,</p>\n<p>Jeremy</p>",
+        "id": 294720927,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661184778
+    },
+    {
+        "content": "<p>From: Andrei Popescu &lt;<a href=\"mailto:A.Popescu@mdx.ac.uk\">A.Popescu@mdx.ac.uk</a>&gt;<br>\nHi Mario,</p>\n<p>It does not make sense to factor in the order in the induction hypothesis, since the induction hypothesis involves all components at the same time (as given by the \"set\" operator). What is the proof principle you have in mind?</p>\n<p>Andrei</p>",
+        "id": 294720937,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661184784
+    },
+    {
+        "content": "<p>From: Andrei Popescu &lt;<a href=\"mailto:A.Popescu@mdx.ac.uk\">A.Popescu@mdx.ac.uk</a>&gt;<br>\nHi Jeremy (and Mario),</p>\n<p>The old-style principle can be inferred by composing tree induction with list induction. (Theory also attached. The proof can be condensed into a one-liner, but I wish to show its structure more clearly.)</p>\n<p>datatype tree = Node \"nat\" | Branch \"tree list\"</p>\n<p>lemma old_tree_induct:<br>\nassumes N: \"(⋀nat. P1 (Node nat))\"<br>\nand B: \"⋀list. P2 list ⟹ P1 (Branch list)\"<br>\nand Nl: \"P2 []\" and Cs: \"⋀tree list. P1 tree ⟹ P2 list ⟹ P2 (tree # list)\"<br>\nshows \"P1 tree ∧ P2 list\"<br>\nproof-<br>\n  {fix tree<br>\n   have \"P1 tree ∧ (∀ list. tree = Branch list ⟶ P2 list)\"<br>\n   proof (induction)<br>\n     case (Node) thus ?case using N by auto<br>\n   next<br>\n     case (Branch list)<br>\n     thus ?case apply(induct list) using B Nl Cs by auto blast+<br>\n   qed<br>\n  }<br>\n  thus ?thesis by auto<br>\nqed</p>\n<p>The reason why we prefer \"set\"-based induction for nested datatypes in the new datatype package is because this follows the type structure modularly, without breaking the abstraction layer. This happens for both induction and recursion: Whenever a datatype T is defined by nesting a (polymorphic) type L, the induction/recursion principle for T appeals to the set/map operator for L, without delving into the constructors of L. Incidentally, without this modularity principle we would not have been able to nest inductive types into coinductive types or vice versa.</p>\n<p>Andrei<br>\n<a href=\"/user_uploads/14278/0kYufHCW56UpA3mNAPVnzDXe/New_to_Old.thy\">New_to_Old.thy</a></p>",
+        "id": 294720953,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661184791
+    },
+    {
+        "content": "<p>From: Andreas Lochbihler &lt;<a href=\"mailto:andreas.lochbihler@inf.ethz.ch\">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>\nHi Mario,</p>\n<p>I agree with Andrei that structural induction on rose trees should not depend on the order <br>\nof the subtrees in the list, as you only have one inductive property. With the old <br>\ndatatype package, nested datatype recursion was mapped to mutual recursion (as shown by <br>\nJeremy below) where you could specify <em>two</em> inductive predicates (one for trees and one <br>\nfor lists of trees) for the induction. If this is what you want, you can have the datatype <br>\npackage generate the appropriate rule:</p>\n<p>datatype_compat tree</p>\n<p>thm compat_tree_tree_list.induct</p>\n<p>Hope this helps,<br>\nAndreas</p>",
+        "id": 294720965,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661184794
+    },
+    {
+        "content": "<p>From: Mario Alvarez &lt;<a href=\"mailto:mmalvare@eng.ucsd.edu\">mmalvare@eng.ucsd.edu</a>&gt;<br>\nThank you all for your feedback. I think the old style inductor for my tree<br>\ndatatype is just what I want. Thanks especially for the code segment<br>\nshowing how to do it.</p>\n<p>Best,<br>\nMario</p>",
+        "id": 294721003,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661184807
+    }
+]

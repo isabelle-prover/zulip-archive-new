@@ -1,0 +1,79 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] redundant equations and inconsistent function ... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20redundant.20equations.20and.20inconsistent.20function.20.2E.2E.2E.html">[isabelle] redundant equations and inconsistent function ...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294136305"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20redundant%20equations%20and%20inconsistent%20function%20.../near/294136305" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20redundant.20equations.20and.20inconsistent.20function.20.2E.2E.2E.html#294136305">(Aug 18 2022 at 17:40)</a>:</h4>
+<p>From: Anh Le &lt;<a href="mailto:anhlevn@cims.nyu.edu">anhlevn@cims.nyu.edu</a>&gt;<br>
+Hi everyone,<br>
+I am reading some Isabelle code (proving type safety of Featherweight Java).</p>
+<p>A primitive recursion is defined below, where the function subst_list is<br>
+defined twice, exactly the same, with two different names: subst_list1 and<br>
+subst_list2.<br>
+I though it was redundant and removes one of them, and renamed the other to<br>
+subst_list. But then Isabelle showed an error, which is inconsistent<br>
+function error.<br>
+So my question is why isabelle requires those duplicated equations? is there<br>
+any way that we can just define only one function subst_list?</p>
+<p>Thank you very much<br>
+Anh</p>
+<p>primrec<br>
+  substs :: "(varName \&lt;rightharpoonup&gt; exp) \&lt;Rightarrow&gt; exp \&lt;Rightarrow&gt;<br>
+exp"<br>
+  and subst_list1 :: "(varName \&lt;rightharpoonup&gt; exp) \&lt;Rightarrow&gt; exp list<br>
+\&lt;Rightarrow&gt; exp list"<br>
+  and subst_list2 :: "(varName \&lt;rightharpoonup&gt; exp) \&lt;Rightarrow&gt; exp list<br>
+\&lt;Rightarrow&gt; exp list"</p>
+<p>where<br>
+  "substs sub (Var x) = (case (sub(x)) of None \&lt;Rightarrow&gt; (Var x) | Some<br>
+p \&lt;Rightarrow&gt; p)" |<br>
+  "substs sub (FieldProj e f) = FieldProj(substs sub e) f" |<br>
+  "substs sub (MethodInvk e m es) = MethodInvk (substs sub e) m<br>
+                                               (subst_list1 sub es)" |<br>
+  "substs sub (New C es) = New C (subst_list2 sub es)" |<br>
+  "substs sub (Cast C e) = Cast C (substs sub e)" |</p>
+<p>"subst_list1 sub [] = []" |<br>
+  "subst_list2 sub (h # t) = (substs sub h) # (subst_list sub t)" |</p>
+<p>"subst_list2 sub [] = []" |<br>
+  "subst_list2 sub (h # t) = (substs sub h) # (subst_list2 sub t)"</p>
+
+
+
+<a name="294136308"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20redundant%20equations%20and%20inconsistent%20function%20.../near/294136308" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20redundant.20equations.20and.20inconsistent.20function.20.2E.2E.2E.html#294136308">(Aug 18 2022 at 17:40)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@kit.edu">andreas.lochbihler@kit.edu</a>&gt;<br>
+Hi Anh,</p>
+<p>restrictions of the primrec and datatype package is the reason for two versions <br>
+of subst_list. As I gather from the function definition of substs, the exp <br>
+datatype looks something like this:</p>
+<p>datatype exp<br>
+   = Var vname<br>
+   | FieldProj exp fname<br>
+   | MethodInvk exp mname "exp list"<br>
+   | New cname "exp list"<br>
+   | Cast cname exp</p>
+<p>The problem here is that the two constructors MethodInvk and New both take a <br>
+<em>list</em> of expressions. The datatype package unfolds nested recursion in datatype <br>
+declarations into primitive recursion by mutual recursion, see Section 3.4.2 of <br>
+the Isabelle/HOL tutorial. Since nested recursion occurs twice, the datatype <br>
+package inlines the list datatype twice. This can also be seen in the induction <br>
+rule foo.induct and the recursion combinators foo_rec_1, foo_rec_2 and foo_rec3.</p>
+<p>primrec expects the function definition to strictly follow the induction rule <br>
+and the recursion combinators. Hence, there must be two definitions of subst_list.</p>
+<p>The fun command allows more general recursion. By replacing primrec with fun, <br>
+you may get rid of the duplicated subst_list functions. fun also proves an <br>
+induction rule for proofs about substs.</p>
+<p>Andreas</p>
+<p>Anh Le schrieb:</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

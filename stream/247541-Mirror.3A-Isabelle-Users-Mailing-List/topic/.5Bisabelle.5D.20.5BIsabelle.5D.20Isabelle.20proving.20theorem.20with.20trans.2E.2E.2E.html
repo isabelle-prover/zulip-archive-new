@@ -1,0 +1,140 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] [Isabelle] Isabelle proving theorem with trans... · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20.5BIsabelle.5D.20Isabelle.20proving.20theorem.20with.20trans.2E.2E.2E.html">[isabelle] [Isabelle] Isabelle proving theorem with trans...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="206004309"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20%5BIsabelle%5D%20Isabelle%20proving%20theorem%20with%20trans.../near/206004309" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20.5BIsabelle.5D.20Isabelle.20proving.20theorem.20with.20trans.2E.2E.2E.html#206004309">(Aug 05 2020 at 09:43)</a>:</h4>
+<p>From: "Wong, Yat" &lt;<a href="mailto:yat.wong18@imperial.ac.uk">yat.wong18@imperial.ac.uk</a>&gt;<br>
+Hi everyone,</p>
+<p>I met some problems when I was trying to prove my theorems with my defined translation.</p>
+<hr>
+<p>My theory imports theory with:</p>
+<div class="codehilite"><pre><span></span><code>imports Nlist IntExt Hilbert ZF.Univ
+(* Nlist, IntExt, Hilbert are defined on my own, they only contain theorems related to int *)
+</code></pre></div>
+
+
+<hr>
+<p>I had defined a few translations like this:</p>
+<div class="codehilite"><pre><span></span><code>consts
+  &quot;time&quot; :: &quot;i&quot;
+  &quot;sig&quot; :: &quot;i ⇒ i&quot;
+  &quot;BaseChTy&quot; :: &quot;i&quot;
+
+syntax
+  &quot;time&quot; :: &quot;i&quot;
+  &quot;sig&quot; :: &quot;i ⇒ i&quot;
+translations
+  &quot;time&quot; ⇌ &quot;CONST int&quot;
+  &quot;sig(A)&quot; ⇌ &quot;CONST int → A&quot;
+</code></pre></div>
+
+
+<hr>
+<p>Then, I want to prove a theorem like this:</p>
+<div class="codehilite"><pre><span></span><code>theorem sig_mono: &quot;⟦ A ⊆ B ⟧ ⟹ sig(A) ⊆ sig(B)&quot;
+</code></pre></div>
+
+
+<hr>
+<p>It should be a very simple theorem, and should be proved with theorem <em>Pi_mono</em> in a single step:</p>
+<div class="codehilite"><pre><span></span><code>thm Pi_mono
+?B ⊆ ?C ⟹ ?A → ?B ⊆ ?A → ?C
+</code></pre></div>
+
+
+<hr>
+<p>So I did it like this:</p>
+<div class="codehilite"><pre><span></span><code>theorem sig_mono: &quot;⟦ A ⊆ B ⟧ ⟹ sig(A) ⊆ sig(B)&quot;
+
+apply(drule Pi_mono[of _ _ &quot;time&quot;])
+(*Output:
+goal (1 subgoal):
+ 1. sig(A) ⊆ sig(B) ⟹ sig(A) ⊆ sig(B)
+*)
+
+apply(simp)
+(*Output:
+Failed ...
+*)
+</code></pre></div>
+
+
+<hr>
+<p>Since the premise has become the same as the goal, it should be proved immediately, but it didn't. May I know have I done anything wrong in the translation definition?<br>
+I tried to change the theorem to:</p>
+<div class="codehilite"><pre><span></span><code>theorem sig_mono: &quot;⟦ A ⊆ B ⟧ ⟹ (time → A) ⊆ (time → B)&quot;
+(*Output:
+goal (1 subgoal):
+ 1. A ⊆ B ⟹ sig(A) ⊆ sig(B)
+*)
+
+apply(drule Pi_mono[of _ _ &quot;time&quot;])
+(*Output:
+goal (1 subgoal):
+ 1. sig(A) ⊆ sig(B) ⟹ sig(A) ⊆ sig(B)
+*)
+
+apply(simp)
+(*Output:
+Success ...
+*)
+</code></pre></div>
+
+
+<p>Then it works immediately, but shouldn't the translation will make them to be the same thing?</p>
+<hr>
+<p>Thanks for Mathias Fleury’s reply from stack overflow, I tried to do a simplify trace, and it shows something like this:</p>
+<div class="codehilite"><pre><span></span><code>theorem sig_mono: &quot;⟦ A ⊆ B ⟧ ⟹ sig(A) ⊆ sig(B)&quot;
+using [[show_sorts]] apply(drule Pi_mono[of _ _ &quot;time&quot;])
+using [[simp_trace]] apply(simp)
+oops
+
+(*
+Output:
+[1]SIMPLIFIER INVOKED ON THE FOLLOWING TERM:
+sig(A::i) ⊆ sig(B::i) ⟹ sig(A) ⊆ sig(B)
+[1]Adding rewrite rule &quot;??.unknown&quot;:
+sig(A::i) ⊆ sig(B::i) ≡ True
+*)
+</code></pre></div>
+
+
+<hr>
+<p>while the <em>time -&gt; A</em> version shows:</p>
+<div class="codehilite"><pre><span></span><code>theorem sig_mono: &quot;⟦ A ⊆ B ⟧ ⟹ time → A ⊆ time → B&quot;
+using [[show_sorts]] apply(drule Pi_mono[of _ _ &quot;time&quot;])
+using [[simp_trace]] apply(simp)
+oops
+
+(*
+Output:
+[1]SIMPLIFIER INVOKED ON THE FOLLOWING TERM:
+sig(A::i) ⊆ sig(B::i) ⟹ sig(A) ⊆ sig(B)
+[1]Adding rewrite rule &quot;??.unknown&quot;:
+sig(A::i) ⊆ sig(B::i) ≡ True
+[1]Applying instance of rewrite rule &quot;??.unknown&quot;:
+sig(A::i) ⊆ sig(B::i) ≡ True
+[1]Rewriting:
+sig(A::i) ⊆ sig(B::i) ≡ True
+*)
+</code></pre></div>
+
+
+<hr>
+<p>Why can this time version can apply the instance of rewrite rule to continue to the proof, but the original one does not?</p>
+<p>Thank you very much,</p>
+<p>Best regards,<br>
+Chester</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,208 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Z3 proof reconstruction - optimizations · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Z3.20proof.20reconstruction.20-.20optimizations.html">[isabelle] Z3 proof reconstruction - optimizations</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294290093"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Z3%20proof%20reconstruction%20-%20optimizations/near/294290093" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Z3.20proof.20reconstruction.20-.20optimizations.html#294290093">(Aug 19 2022 at 15:32)</a>:</h4>
+<p>From: Filip Marić &lt;<a href="mailto:filipmatfbgacrs@gmail.com">filipmatfbgacrs@gmail.com</a>&gt;<br>
+Hi!</p>
+<p>In a recent project I have been extensively using automation provided by<br>
+the SMT solver interface in Isabelle 2013-2 and it had really been a great<br>
+experience (many thanks to Sasha, Tjark, Jasmin and other members of the<br>
+team for making this option available in Isabelle)! However, I have noticed<br>
+that proof reconstruction of some small and fast z3 proofs goes<br>
+unexpectedly slow (e.g., z3 produces a proof in under a second and a proof<br>
+consists only of several thousand steps, but reconstruction goes well<br>
+beyond 10 seconds) and I have decided to investigate this issue deeper. By<br>
+using the [[smt_trace = true]] option, I think that I have pinpointed some<br>
+sources of inefficiency. Although I do not have explicit timings for each<br>
+proof step (what would be a desirable feature), it seemed pretty obvious<br>
+that proof reconstruction gets stuck only in a very small number of proof<br>
+steps, and interestingly, these are all "rewrite" steps - they are all<br>
+given to fast (logic) method and after a rather long period of time it<br>
+succeeds (and even worse, in a very small number of cases it seems that it<br>
+gets stuck).</p>
+<p>One case of such behavior occurred when proving lemmas whose conclusion<br>
+contains &lt;--&gt;. At first I solved the problem by using (by (rule iffI, smt+)<br>
+instead of by smt), but after examining the problematic rewrite steps I<br>
+have noticed that I do not need to do this and that many such proofs can be<br>
+made enormously faster by adding the following z3_rule:</p>
+<p>lemma [z3_rule]:<br>
+  "(\&lt;not&gt; (A \&lt;longleftrightarrow&gt; \&lt;not&gt; B)) \&lt;longleftrightarrow&gt; (A<br>
+\&lt;longleftrightarrow&gt; B)"<br>
+by simp</p>
+<p>Then, the problematic rewrite steps are solved in the first pass and are<br>
+never even given to the "fast (logic)" method which was very slow on them.</p>
+<p>In other cases that I noticed that are problematic in my project I have<br>
+also spotted a pattern, but this happened with much more complicated<br>
+formulas so I am not sure how to fix this. Here are some examples of<br>
+problematic proof steps of this kind (all are rewrite steps):</p>
+<p>(iff<br>
+(and #72578 (not #72574) #72571 (not #72567) (not (or #134247 #134251<br>
+#134255 #134259 #134263 #133898 #133902 #133907)) #72564)<br>
+(not (or (not #72578) #72574 (not #72571) #72567 #134247 #134251 #134255<br>
+#134259 #134263 #133898 #133902 #133907 (not #72564))))</p>
+<p>(iff<br>
+(and (not #75701) #72571 (not #72567) (not (or #134259 #134724 #134263<br>
+#134729 #134733 #133911 #134575 #133915)) #76020)<br>
+(not (or #75701 (not #72571) #72567 #134259 #134724 #134263 #134729 #134733<br>
+#133911 #134575 #133915 (not #76020))))</p>
+<p>(iff<br>
+(and (not #96335) #93205 (not #93201) (not (or #140614 #141079 #140618<br>
+#141084 #141088 #140266 #140930 #140270)) #96654)<br>
+(not (or #96335 (not #93205) #93201  #140614 #141079 #140618 #141084<br>
+#141088 #140266 #140930 #140270 (not #96654))))</p>
+<p>(iff<br>
+(and (not #93212) (not #93208) #93892 (not #92681) (not (or #140769 #140773<br>
+#140602 #140777 #140614 #140436 #140440 #140253)) #93887)<br>
+(not (or #93212 #93208 (not #93892) #92681 #140769 #140773 #140602 #140777<br>
+#140614 #140436 #140440 #140253 (not #93887))))</p>
+<p>(iff<br>
+(and (not #181613) #181578 #206617 #180700 #180691 #181342 #181291 (not (or<br>
+(not #206438) (not #206236))) #206701)<br>
+(not (or #181613 (not #181578) (not #206617) (not #180700) (not #180691)<br>
+(not #181342) (not #181291) (not #206438) (not #206236) (not #206701))))</p>
+<p>Hash-numbers in these formulas represent very complex atoms of linear<br>
+arithmetic (some of them extensively use ite operator). It can be noticed<br>
+that in all these cases the lhs of iff is a conjuction containing atoms and<br>
+exactly one negation of a disjunction.</p>
+<p>(1)<br>
+Is it possible to add some simple z3_rules that would cover all these proof<br>
+steps and to prevent to give this large formule to the fast (logic) method<br>
+as it turns out that it needs much time (several seconds) to discharge them<br>
+(and in some cases it seems that it gets totally stuck and cannot finish<br>
+their proof)?</p>
+<p>(2)<br>
+Is it possible to set a timeout for each proof step or for the whole proof<br>
+reconstruction (it seems to me that smt_timeout is only for SMT solver<br>
+time, and not the reconstruction time, but maybe I am wrong here)? From a<br>
+users perspective it seems that it would be good to have a timeout for each<br>
+proof step as it would help detecting the cases were reconstruction gets<br>
+stuck or is very slow. Otherwise i must either use smt_trace which is slow<br>
+because of the large output or I must wait very long time and never know if<br>
+the reconstruction is stuck somewhere. A very nice option would be to give<br>
+some progress ratio in the trace -- as you know the total number of proof<br>
+steps that need to be reconstructed, from time to time (e.g., every second)<br>
+you could print the percent of reconstructed proof steps. Also, is it<br>
+possible to get some statistics about the number of proof steps of each<br>
+kind and time spent for their reconstruction in Isabelle?</p>
+<p>I hope that you have some quick and nice solution to the issue (1), and<br>
+issue (2) is only a feature request from a user so I know that it cannot be<br>
+done immediately, but I hope that some of this could be incorporated in<br>
+some future releases :)</p>
+<p>Best regards,<br>
+Filip</p>
+
+
+
+<a name="294319440"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Z3%20proof%20reconstruction%20-%20optimizations/near/294319440" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Z3.20proof.20reconstruction.20-.20optimizations.html#294319440">(Aug 19 2022 at 16:27)</a>:</h4>
+<p>From: Jasmin Christian Blanchette &lt;<a href="mailto:jasmin.blanchette@gmail.com">jasmin.blanchette@gmail.com</a>&gt;<br>
+Hi Filip,</p>
+<p>First, sorry for the enormous delay in answering your email. I was hoping at first that some of the people who have more of a clue about reconstruction might answer first, but now sweeping through my "Isabelle" email folter I see that nobody answered it yet.</p>
+<blockquote>
+<p>In a recent project I have been extensively using automation provided by<br>
+the SMT solver interface in Isabelle 2013-2</p>
+</blockquote>
+<p>Be aware that Sascha and I have reimplemented the SMT module for Isabelle2014. The new module is called SMT2 -- the corresponding proof method is "smt2". In the current repository version, and in the future Isabelle2015, SMT is renamed to Old_SMT (and "old_smt") and SMT2 becomes SMT again.</p>
+<p>The main changes are that (1) the new module is now based on SMT-LIB 2; (2) we now use the latest Z3 (4.3.2) and CVC4 (1.5-prerelease); (3) the Z3 proof reconstruction code has been rewritten from scratch (by Sascha); and (4) we now offer Isar proofs as an alternative to "smt", for those who don't want to rely on Z3 for reconstruction (e.g. for submitting to Isabelle or the AFP).</p>
+<blockquote>
+<p>One case of such behavior occurred when proving lemmas whose conclusion<br>
+contains &lt;--&gt;. At first I solved the problem by using (by (rule iffI, smt+)<br>
+instead of by smt), but after examining the problematic rewrite steps I<br>
+have noticed that I do not need to do this and that many such proofs can be<br>
+made enormously faster by adding the following z3_rule:</p>
+<p>lemma [z3_rule]:<br>
+ "(\&lt;not&gt; (A \&lt;longleftrightarrow&gt; \&lt;not&gt; B)) \&lt;longleftrightarrow&gt; (A<br>
+\&lt;longleftrightarrow&gt; B)"<br>
+by simp</p>
+<p>Then, the problematic rewrite steps are solved in the first pass and are<br>
+never even given to the "fast (logic)" method which was very slow on them.</p>
+</blockquote>
+<p>I'll try adding that.</p>
+<blockquote>
+<p>In other cases that I noticed that are problematic in my project I have<br>
+also spotted a pattern, but this happened with much more complicated<br>
+formulas so I am not sure how to fix this. Here are some examples of<br>
+problematic proof steps of this kind (all are rewrite steps):</p>
+<p>(iff<br>
+(and #72578 (not #72574) #72571 (not #72567) (not (or #134247 #134251<br>
+#134255 #134259 #134263 #133898 #133902 #133907)) #72564)<br>
+(not (or (not #72578) #72574 (not #72571) #72567 #134247 #134251 #134255<br>
+#134259 #134263 #133898 #133902 #133907 (not #72564))))</p>
+<p>...</p>
+<p>(iff<br>
+(and (not #181613) #181578 #206617 #180700 #180691 #181342 #181291 (not (or<br>
+(not #206438) (not #206236))) #206701)<br>
+(not (or #181613 (not #181578) (not #206617) (not #180700) (not #180691)<br>
+(not #181342) (not #181291) (not #206438) (not #206236) (not #206701))))</p>
+<p>Hash-numbers in these formulas represent very complex atoms of linear<br>
+arithmetic (some of them extensively use ite operator). It can be noticed<br>
+that in all these cases the lhs of iff is a conjuction containing atoms and<br>
+exactly one negation of a disjunction.</p>
+</blockquote>
+<p>It might be that the issue goes away with the new module. Sascha has implemented a new proof producing SAT solver in Isabelle (to be used by "sat" and "satx") and uses it for propositional reasoning, which should work for the above formulas. That would be my answer to point (1):</p>
+<blockquote>
+<p>(1)<br>
+Is it possible to add some simple z3_rules that would cover all these proof<br>
+steps and to prevent to give this large formule to the fast (logic) method<br>
+as it turns out that it needs much time (several seconds) to discharge them<br>
+(and in some cases it seems that it gets totally stuck and cannot finish<br>
+their proof)?</p>
+</blockquote>
+<p>Regarding point (2):</p>
+<blockquote>
+<p>(2)<br>
+Is it possible to set a timeout for each proof step or for the whole proof<br>
+reconstruction (it seems to me that smt_timeout is only for SMT solver<br>
+time, and not the reconstruction time, but maybe I am wrong here)? From a<br>
+users perspective it seems that it would be good to have a timeout for each<br>
+proof step as it would help detecting the cases were reconstruction gets<br>
+stuck or is very slow. Otherwise i must either use smt_trace which is slow<br>
+because of the large output or I must wait very long time and never know if<br>
+the reconstruction is stuck somewhere. A very nice option would be to give<br>
+some progress ratio in the trace -- as you know the total number of proof<br>
+steps that need to be reconstructed, from time to time (e.g., every second)<br>
+you could print the percent of reconstructed proof steps. Also, is it<br>
+possible to get some statistics about the number of proof steps of each<br>
+kind and time spent for their reconstruction in Isabelle?</p>
+<p>I hope that you have some quick and nice solution to the issue (1), and<br>
+issue (2) is only a feature request from a user so I know that it cannot be<br>
+done immediately, but I hope that some of this could be incorporated in<br>
+some future releases :)</p>
+</blockquote>
+<p>What you are asking for are really debugging features for powerusers. You happen to be such a user, but we designed "smt" for people who don't necessarily know how SMT solvers work. I am currently just trying to keep it alive. My main interest is rather in the Isar proof reconstruction, which is so far less powerful and less efficient but has the merit of kicking Z3 out of the reconstruction loop. Judging from the difficulty of your SMT problems, it looks like the "smt" method is perhaps still the best option for you.</p>
+<p>Starting next year, I will be working on a project where I might find myself adding more theory support to Isabelle's SMT module. If it comes to this, and I start diving into the code, I might very well add some of the features you describe. Otherwise, my recommendation would be for you to implement what you need yourself.</p>
+<p>One more point: According to my experience, "smt" succeeds in reconstructing proofs in about 99% of cases where Z3 succeeds from Sledgehammer. Judging from your comments, your problems appear to be more difficult than typical Sledgehammer problems. Could you give us some details on your use of "smt"?</p>
+<p>Regards,</p>
+<p>Jasmin</p>
+
+
+
+<a name="294324891"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Z3%20proof%20reconstruction%20-%20optimizations/near/294324891" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Z3.20proof.20reconstruction.20-.20optimizations.html#294324891">(Aug 19 2022 at 16:57)</a>:</h4>
+<p>From: <a href="mailto:boehmes@in.tum.de">boehmes@in.tum.de</a><br>
+Hi Filip,</p>
+<p>Your feature request (2) will be available in the next release of Isabelle. There are two new options:</p>
+<ul>
+<li>
+<p>smt_reconstruction_step_timeout specifies the maximum time for reconstructing a single Z3 step</p>
+</li>
+<li>
+<p>smt_statistics prints statistics for Z3 proof reconstruction: the total runtime, the number and the individual runtime of the reconstructed Z3 rules, and the progress of Z3 proof reconstruction based on the number of reconstructed steps (after each block of 100 successfully reconstructed steps, the runtime is printed)</p>
+</li>
+</ul>
+<p>Cheers,</p>
+<p>Sascha</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

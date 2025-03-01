@@ -1,0 +1,158 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Accessing lift_definition from the ML-level · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Accessing.20lift_definition.20from.20the.20ML-level.html">[isabelle] Accessing lift_definition from the ML-level</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294316430"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Accessing%20lift_definition%20from%20the%20ML-level/near/294316430" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Accessing.20lift_definition.20from.20the.20ML-level.html#294316430">(Aug 19 2022 at 16:13)</a>:</h4>
+<p>From: René Thiemann &lt;<a href="mailto:rene.thiemann@uibk.ac.at">rene.thiemann@uibk.ac.at</a>&gt;<br>
+Dear all,</p>
+<p>playing a little bit further, I could establish part of what I wanted by using lift_def_cmd and<br>
+converting types and terms back to strings (which are immediately parsed again in lift_def_cmd)</p>
+<p>fun lift_def_ml (binding,mixfix) ty rhs ctxt tactic = <br>
+        let val ctxt' = Config.put show_markup false ctxt<br>
+            val term_to_string = Print_Mode.setmp [] (Syntax.string_of_term ctxt')<br>
+            val typ_to_string = Print_Mode.setmp [] (Syntax.string_of_typ ctxt')<br>
+            val state = Lifting_Def.lift_def_cmd <br>
+                 ((binding, SOME (typ_to_string ty), mixfix), term_to_string rhs, []) ctxt<br>
+        in <br>
+          state<br>
+        end</p>
+<p>However, now I am left with turning a Proof.state into a context again (which should be done<br>
+via the provided tactic). So, is there some common function of type</p>
+<p>state -&gt; tactic -&gt; context</p>
+<p>In proof.ML I only found functions like </p>
+<p>global_qed which take "Method.text_range option * bool", but no tactics.</p>
+<p>Kind regards,<br>
+René</p>
+
+
+
+<a name="294317173"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Accessing%20lift_definition%20from%20the%20ML-level/near/294317173" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Accessing.20lift_definition.20from.20the.20ML-level.html#294317173">(Aug 19 2022 at 16:16)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Just syntactically, this one works out, but I did not try it on concrete<br>
+examples:</p>
+<p>val term_to_string = YXML.string_of_body o Term_XML.Encode.term;<br>
+   val typ_to_string = YXML.string_of_body o Term_XML.Encode.typ;</p>
+<p>fun lift_def_ml (binding, mx) ty rhs tactic lthy =<br>
+     let<br>
+       val method = (Method.Basic (SIMPLE_METHOD o tactic), Position.no_range);<br>
+     in<br>
+       lthy<br>
+       |&gt; Lifting_Def.lift_def_cmd<br>
+         ((binding, SOME (typ_to_string ty), mx), term_to_string rhs, [])<br>
+      |&gt; Proof.global_terminal_proof (method, NONE)<br>
+     end</p>
+<p>I have made this a bit more canonical according to Isabelle/ML standards, <br>
+concerning names and argument order. In particular, a lthy: local_theory <br>
+value should not be called "ctxt".  See the "implementation" manual for <br>
+further important information on Isabelle/ML.</p>
+<p>The YXML representation of typ/term values should help to circumvent the <br>
+accidental omission of proper ML programming interfaces: the inner syntax <br>
+parser understands that funny machine-oriented notation.  Printing terms <br>
+for parsing them again should never be done in real life.</p>
+<p>The Proof.global_terminal_proof is "by method" in Isar syntax.</p>
+<p>You've put the term "ML-level of Isabelle" into the subject line.  This is <br>
+leading to bad things as encountered here: people then wrongly think that <br>
+Isabelle/ML somehow happens in a cold and damp cellar, and "users" are <br>
+only found in Isar syntax (but I call the second category "end-users").</p>
+<p>The comments in $ISABELLE_HOME/src/HOL/Tools/Lifting/lifting.ML use the <br>
+term "user-friendly" for lift_def_cmd in this defective sense: only a <br>
+source text interface, without a regular ML entry point (without the <br>
+"_cmd" suffix). It is quite awkward to imitate surface Isar syntax <br>
+wrapping in ML.</p>
+<p>Isabelle/ML programming is a normal Isabelle user activity, happing at the <br>
+main user-level of Isabelle.  Any package should provide normal ML <br>
+programming interfaces in parallel to the end-user version -- there are <br>
+standard patterns to fold the two implementations into one.</p>
+<p>Makarius</p>
+<hr>
+<p><a href="http://stop-ttip.org">http://stop-ttip.org</a></p>
+<hr>
+
+
+
+<a name="294317318"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Accessing%20lift_definition%20from%20the%20ML-level/near/294317318" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Accessing.20lift_definition.20from.20the.20ML-level.html#294317318">(Aug 19 2022 at 16:17)</a>:</h4>
+<p>From: René Thiemann &lt;<a href="mailto:rene.thiemann@uibk.ac.at">rene.thiemann@uibk.ac.at</a>&gt;<br>
+Dear Makarius,</p>
+<blockquote>
+<blockquote>
+<p>However, now I am left with turning a Proof.state into a context again (which should be done via the provided tactic). So, is there some common function of type</p>
+<p>state -&gt; tactic -&gt; context</p>
+<p>In proof.ML I only found functions like</p>
+<p>global_qed which take "Method.text_range option * bool", but no tactics.</p>
+</blockquote>
+<p>Just syntactically, this one works out, but I did not try it on concrete<br>
+examples:</p>
+<p>val term_to_string = YXML.string_of_body o Term_XML.Encode.term;<br>
+ val typ_to_string = YXML.string_of_body o Term_XML.Encode.typ;</p>
+<p>fun lift_def_ml (binding, mx) ty rhs tactic lthy =<br>
+   let<br>
+     val method = (Method.Basic (SIMPLE_METHOD o tactic), Position.no_range);<br>
+   in<br>
+     lthy<br>
+     |&gt; Lifting_Def.lift_def_cmd<br>
+       ((binding, SOME (typ_to_string ty), mx), term_to_string rhs, [])<br>
+    |&gt; Proof.global_terminal_proof (method, NONE)<br>
+   end</p>
+</blockquote>
+<p>thanks a lot, that works perfectly in my setting.</p>
+<blockquote>
+<p>I have made this a bit more canonical according to Isabelle/ML standards, concerning names and argument order. In particular, a lthy: local_theory value should not be called "ctxt".  See the "implementation" manual for further important information on Isabelle/ML.<br>
+done.</p>
+</blockquote>
+<blockquote>
+<p>You've put the term "ML-level of Isabelle" into the subject line.  </p>
+</blockquote>
+<p>I'll try to use Isabelle/ML the next time.</p>
+<p>Cheers,<br>
+René</p>
+
+
+
+<a name="294318406"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Accessing%20lift_definition%20from%20the%20ML-level/near/294318406" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Accessing.20lift_definition.20from.20the.20ML-level.html#294318406">(Aug 19 2022 at 16:23)</a>:</h4>
+<p>From: René Thiemann &lt;<a href="mailto:rene.thiemann@uibk.ac.at">rene.thiemann@uibk.ac.at</a>&gt;<br>
+Dear all,</p>
+<p>I have a question regarding the lifting package.<br>
+Is there some canonical way of simulating</p>
+<p>lift_definition name :: typ is term &lt;proof&gt; </p>
+<p>on the ML-level (where &lt;proof&gt; might be replaced by some tactic)</p>
+<p>In the current interface I only found</p>
+<p>val add_lift_def:<br>
+    (binding * mixfix) -&gt; typ -&gt; term -&gt; thm -&gt; thm list -&gt; local_theory -&gt; local_theory</p>
+<p>val lift_def_cmd:<br>
+    (binding * string option * mixfix) * string * (Facts.ref * Args.src list) list -&gt; local_theory -&gt; Proof.state</p>
+<p>where add_list_def seems more closely to what I need, but I have no clue what "thm" and "thm list" are good for.<br>
+If there would be something like the following, then everything is clear,</p>
+<p>val add_lift_def:<br>
+    (binding * mixfix) -&gt; typ -&gt; term -&gt; tactic -&gt; local_theory -&gt; local_theory</p>
+<p>but with the current add_lift_def and passing some thm and an empty thm list, I got complaints that</p>
+<p>exception THM 1 raised (line 332 of "drule.ML"):<br>
+  RSN: no unifiers<br>
+  P defau<br>
+  rel_fun (eq_onp (λx. x ∈ {(b, c). c ⟶ P b})) (eq_onp P) ?c ?c ⟹<br>
+  ?c' ≡ map_fun Test.Rep_restricted_cond Abs_restricted ?c ⟹<br>
+  rel_fun Test.cr_restricted_cond cr_restricted ?c ?c'</p>
+<p>Do I really have to create a theorem that unifies against internals in the lifting construction?</p>
+<p>rel_fun (eq_onp (λx. x ∈ {(b, c). c ⟶ P b})) (eq_onp P) ?c ?c ⟹<br>
+  ?c' ≡ map_fun Test.Rep_restricted_cond Abs_restricted ?c ⟹<br>
+  rel_fun Test.cr_restricted_cond cr_restricted ?c ?c' ?</p>
+<p>To compare with, if I invoke the lift_definition command manually, the proof goal is</p>
+<p>⋀prod. prod ∈ {(b, c). c ⟶ P b} ⟹ P (case prod of (b, c) ⇒ if c then b else defau)</p>
+<p>so, some proof goal that I can easily discharge using "P defau" by (simp split: prod.splits)</p>
+<p>Kind regards,<br>
+René</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,93 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] More parenthesis for generated Haskell code · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20More.20parenthesis.20for.20generated.20Haskell.20code.html">[isabelle] More parenthesis for generated Haskell code</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294078405"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20More%20parenthesis%20for%20generated%20Haskell%20code/near/294078405" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20More.20parenthesis.20for.20generated.20Haskell.20code.html#294078405">(Aug 18 2022 at 13:36)</a>:</h4>
+<p>From: Christian Sternagel &lt;<a href="mailto:christian.sternagel@uibk.ac.at">christian.sternagel@uibk.ac.at</a>&gt;<br>
+Hi there,</p>
+<p>I ran into the following problem when generating Haskell code from an <br>
+Isabelle theory.</p>
+<p>I use a custom error monad that has an infix `bind' operator &gt;&gt;=, with <br>
+corresponding &gt;&gt;.</p>
+<p>In Isabelle I have a function with the following structure:</p>
+<p>fun foo :: "_" where "<br>
+foo args = (<br>
+   (let x = somethig_of args in (<br>
+     monadic_function_on args<br>
+   )) &gt;&gt; (<br>
+     additional_monadic_stuff_on args<br>
+   )<br>
+)"</p>
+<p>This is in turn translated to Haskell code that does not have <br>
+parentheses around the `let' construct, i.e., part of the code looks as <br>
+follows</p>
+<p>bind let {<br>
+     x = something_of args;<br>
+   } in monadic_function_on args<br>
+   (\xa -&gt; additional_monadic_stuff_on args)</p>
+<p>but it should be</p>
+<p>bind (let {<br>
+     x = something_of args;<br>
+   } in monadic_function_on args)<br>
+   (\xa -&gt; additional_monadic_stuff_on args)</p>
+<p>How can I tell the code-generator to add the missing parentheses?</p>
+<p>cheers</p>
+<p>chris</p>
+
+
+
+<a name="294078512"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20More%20parenthesis%20for%20generated%20Haskell%20code/near/294078512" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20More.20parenthesis.20for.20generated.20Haskell.20code.html#294078512">(Aug 18 2022 at 13:37)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Christian,</p>
+<p>the printing of let-expressions for Haskell in Isabelle 2009 is indeed<br>
+broken.</p>
+<p>There is a possibility to circumvent this.  One is to use the built-in<br>
+monad pretty printing of the Haskell code generator:</p>
+<blockquote>
+<p>theory Scratch<br>
+imports Main<br>
+begin</p>
+<p>typedecl 'a M</p>
+<p>axiomatization bind :: "'a M =&gt; ('a =&gt; 'b M) =&gt; 'b M" (infixl "»=" 54)</p>
+</blockquote>
+<p>Specification of the monad (here, just an axiomatic placeholder)</p>
+<blockquote>
+<p>abbreviation<br>
+  chainM :: "'a M =&gt; 'b M =&gt; 'b M" (infixl "»" 54) where<br>
+  "f » g =&gt; f »= (%_. g)"</p>
+</blockquote>
+<p>Means: &gt;&gt; is just syntax for &gt;&gt;=</p>
+<blockquote>
+<p>code_monad bind Haskell</p>
+</blockquote>
+<p>Here "bind" is declared as monad operator.</p>
+<blockquote>
+<p>definition "foo x y = (x »= (%. let z = y a a in z))"</p>
+<p>export_code foo in Haskell file -</p>
+</blockquote>
+<p>The example yield the following code:</p>
+<p>foo :: forall b a. M b -&gt; (b -&gt; b -&gt; M a) -&gt; M a;<br>
+foo x y = do {a &lt;- x; let z = y a a; z};</p>
+<p>Do not hesitate to ask further question if you need further hints on this.</p>
+<p>Alternatively, we can use special syntax for bind (which I will explain<br>
+on demand).</p>
+<p>If this does not solve your problem either, I will provide you with a<br>
+patch for the Haskell code generator.  The issue will be solved in next<br>
+Isabelle release (though there is no official schedule for this).</p>
+<p>Hope this helps<br>
+    Florian<br>
+<a href="/user_uploads/14278/hwl9RMlA2hNZcbUNJHIJbewx/signature.asc">signature.asc</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

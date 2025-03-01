@@ -1,0 +1,115 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Type variables, locale import and notation · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Type.20variables.2C.20locale.20import.20and.20notation.html">[isabelle] Type variables, locale import and notation</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294672887"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Type%20variables%2C%20locale%20import%20and%20notation/near/294672887" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Type.20variables.2C.20locale.20import.20and.20notation.html#294672887">(Aug 22 2022 at 13:12)</a>:</h4>
+<p>From: Ferdinand Vesely &lt;<a href="mailto:csfvesely@swansea.ac.uk">csfvesely@swansea.ac.uk</a>&gt;<br>
+Dear List,</p>
+<p>I have a problem with using (infix) notation inside a locale in<br>
+combination with type variables. In summary, I'm trying to introduce a<br>
+binary abbreviation of a ternary predicate, where the type of the<br>
+omitted parameter is a type variable (restricted by a sort). On the<br>
+top-level, such a binary abbreviation is generalised to three<br>
+parameters again by introducing a "type parameter" (e.g., "'a itself").<br>
+I've figured out that by using locales I can fix the (abstract) type<br>
+locally and use the binary predicate inside the locale as I've<br>
+intended. However, this does not play well when I also want to use<br>
+infix notation for the abbreviation in a specialised locale (= import<br>
+with instantiated parameter). Here is a contrived example of my<br>
+problem. First the basic definitions:</p>
+<blockquote>
+<p>class a = fixes pred :: "'a ⇒ bool"</p>
+<p>locale s = <br>
+  fixes foo :: "'a ⇒ ('b :: a) ⇒ 'a ⇒ bool"<br>
+begin<br>
+  definition bar :: "'a ⇒ 'a ⇒ bool" (infix "→" 50) where<br>
+  "x → y = (∃(l  :: 'b). foo x l y ∧ pred l)"<br>
+end</p>
+<p>class b = a +<br>
+  assumes b_pred: "∃l. pred l"</p>
+<p>definition ex :: "nat ⇒ ('b :: b) ⇒ nat ⇒ bool" where<br>
+"ex x l y = (y = x + 1 ∧ pred l)"</p>
+</blockquote>
+<p>Now if I create a new locale where I only import locale s above, the<br>
+types are as expected:</p>
+<blockquote>
+<p>locale s1 = s<br>
+begin<br>
+  term bar (* "op →"  :: "'a ⇒ 'a ⇒ bool" *)<br>
+  term "op →" (* "op →" :: "'a ⇒ 'a ⇒ bool" *)<br>
+end</p>
+</blockquote>
+<p>But if I want to specialise the locale with the above definition of 'ex,<br>
+the type parameter is re-introduced even inside the locale and the infix<br>
+notation does not work anymore (Isabelle does not warn about this). I'm<br>
+not sure why the parameter is introduced inside the locale. Why is this<br>
+the case? Shouldn't the types of the corresponding parameters of 'foo'<br>
+and 'ex' be unified?</p>
+<blockquote>
+<p>locale s2 = s where foo = ex<br>
+begin<br>
+  term bar (* "λtype. <a href="http://spec.bar">spec.bar</a> ex" :: "'a itself ⇒ nat ⇒ nat ⇒ bool", where "'a :: b" *)<br>
+  term "op →" (* Inner lexical error. Failed to parse term *)<br>
+end</p>
+</blockquote>
+<p>Anyway, I've found out that if I add a new locale parameter with the<br>
+same sort constraint on the type as in the type of 'ex', the additional<br>
+"itself parameter" is not introduced. However, the infix notation still<br>
+does not work.</p>
+<blockquote>
+<p>locale s3 = s where foo = "ex :: nat ⇒ ('b :: b) ⇒ nat ⇒ bool" +<br>
+  fixes t :: "('b :: b) itself"<br>
+begin<br>
+  term bar (* "<a href="http://s.bar">s.bar</a> ex" :: "nat ⇒ nat ⇒ bool" *)<br>
+  term "op →" (* Inner lexical error. Failed to parse term *)</p>
+<p>lemma "1 → 2" (* Inner lexical error. Failed to parse term *)</p>
+<p>lemma "bar 1 2" (* OK *)<br>
+  by (simp add: bar_def ex_def b_pred)</p>
+<p>lemma "¬bar 2 1" (* OK *)<br>
+  by (simp add: bar_def ex_def)<br>
+end</p>
+</blockquote>
+<p>Why is the infix notation for bar silently dropped in locale s3? Is<br>
+there any way around this, i.e., using the infix notation introduced<br>
+in locale s?</p>
+<p>My other question is if there is a better way to introduce such an<br>
+abbreviation without implicitly adding the extra "type parameter" and<br>
+to keep the infix notation.</p>
+<p>Kind regards,<br>
+Ferdinand</p>
+
+
+
+<a name="294672926"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Type%20variables%2C%20locale%20import%20and%20notation/near/294672926" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Type.20variables.2C.20locale.20import.20and.20notation.html#294672926">(Aug 22 2022 at 13:12)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear Ferdinand,</p>
+<p>Any notation is dropped when you instantiate the parameters of a locale beyond renaming. <br>
+The reason is that in general the number of arguments changes, so the notation does not <br>
+make much sense any more. You can always reintroduce the notations using the command <br>
+<code>notation</code> as follows:</p>
+<p>context s3 begin<br>
+   notation bar (infix "→" 50)</p>
+<p>The reason for the type token 'b itself for bar is as follows: In HOL, all type variables <br>
+in the definition of a constant must appear in the type of the constant. Otherwise, <br>
+inconsistencies could be introduced. In Isabelle, abbreviations must also obey this rule. <br>
+Now, the locale constant bar gets translated to a foundational constant <a href="http://s.bar">s.bar</a> with the <br>
+locale parameters as additional ones. This can be seen when pretty-printing bar in s3: you <br>
+get "<a href="http://s.bar">s.bar</a> ex". Now, <a href="http://s.bar">s.bar</a> ex contains the type variable 'b, which does not show up in the <br>
+fixed parameters of the locale (in fact s2 does not fix any parameters at all). Therefore, <br>
+Isabelle introduces the type token for <a href="http://s2.bar">s2.bar</a>.</p>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

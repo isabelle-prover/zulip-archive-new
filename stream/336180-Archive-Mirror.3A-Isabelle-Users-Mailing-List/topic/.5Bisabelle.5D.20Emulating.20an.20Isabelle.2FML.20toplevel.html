@@ -1,0 +1,97 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Emulating an Isabelle/ML toplevel · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Emulating.20an.20Isabelle.2FML.20toplevel.html">[isabelle] Emulating an Isabelle/ML toplevel</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294657225"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Emulating%20an%20Isabelle/ML%20toplevel/near/294657225" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Emulating.20an.20Isabelle.2FML.20toplevel.html#294657225">(Aug 22 2022 at 11:42)</a>:</h4>
+<p>From: Aleks Kissinger &lt;<a href="mailto:aleks0@gmail.com">aleks0@gmail.com</a>&gt;<br>
+I maintain a graph rewriting library that can run either inside of<br>
+Isabelle or standalone. In the latter case, it needs to emulate a<br>
+fragment of the Isabelle/ML toplevel in poly/ML. I'm currently in the<br>
+process of updating this for Isabelle 2015.</p>
+<p>It's mostly working, except Future.fork is throwing a mysterious<br>
+exception. The emulation is done via:</p>
+<p><a href="https://github.com/Quantomatic/quantomatic/blob/isabelle2015/core/isabelle_env.ML">https://github.com/Quantomatic/quantomatic/blob/isabelle2015/core/isabelle_env.ML</a></p>
+<p>which expects the "Pure" directory from Isabelle 2015 to be a<br>
+subdirectory. Here's what happens:</p>
+<p>$ ML_SYSTEM=polyml ML_PLATFORM=unknown poly --use isabelle_env.ML</p>
+<p>...</p>
+<blockquote>
+<p>Future.fork (fn() =&gt; 0);</p>
+</blockquote>
+<p>Exception trace for exception - ERROR raised in library.ML line 257</p>
+<p>End of trace</p>
+<p>val it =<br>
+   Future<br>
+    {task =<br>
+     Task<br>
+      {id = 3, pos = Pos ((0, 0, 0), []), pri = SOME 0, name = "fork",<br>
+       group =<br>
+       Group<br>
+        {id = 2, parent = NONE, status =<br>
+         Var {var = ref NONE, cond = ?, lock = ?, name = "group_status"}},<br>
+       timing = NONE}, result =<br>
+     Var {var = ref NONE, cond = ?, lock = ?, name = "future"}, promised =<br>
+     false}: int future</p>
+<p>Any ideas? Also, is there some way to coerce Future.fork to give a<br>
+more informative stacktrace? I've tried various combinations with<br>
+PolyML.exception_trace to little effect. I assume this has to do with<br>
+how futures capture exceptions until they are join'ed.</p>
+<p>Aleks</p>
+
+
+
+<a name="294657296"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Emulating%20an%20Isabelle/ML%20toplevel/near/294657296" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Emulating.20an.20Isabelle.2FML.20toplevel.html#294657296">(Aug 22 2022 at 11:42)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+The exception trace is already in Simple_Thread.fork, but it does not <br>
+print the exception value, only names.  I've changed that temporarily to <br>
+print General.exnMessage, and it reveals that some future worker thread <br>
+complains about the absence of system option "threads_stack_limit".</p>
+<p>Since there might be more subtle additions in Isabelle2015, I've carefully <br>
+looked through isabelle_env.ML, after putting it into the canonical order <br>
+of that release.  The result is attached here.</p>
+<p>More notes on your original version:</p>
+<p>* exception Interrupt was created afresh (!) independently on the one<br>
+     special exception SML90.Interrupt</p>
+<p>* the Poly/ML bootstrap file has a version, for Isabelle2015 it is<br>
+     "ML-Systems/polyml-5.5.2.ML"</p>
+<p>* tracing was unsynchronized, and in fact a duplicate from output.ML<br>
+     loaded later</p>
+<p>Makarius<br>
+<a href="/user_uploads/14278/YHC-XWt6or_KXom_wFT0rwra/isabelle_env.ML">isabelle_env.ML</a></p>
+
+
+
+<a name="294657301"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Emulating%20an%20Isabelle/ML%20toplevel/near/294657301" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Emulating.20an.20Isabelle.2FML.20toplevel.html#294657301">(Aug 22 2022 at 11:42)</a>:</h4>
+<p>From: Aleks Kissinger &lt;<a href="mailto:aleks0@gmail.com">aleks0@gmail.com</a>&gt;<br>
+Excellent! Probably the issue came from using poly/ML 5.5.0, which<br>
+became clear as soon as "poly-5.5.2.ML" understandably failed to<br>
+typecheck....</p>
+<p>For future ref, how can I reconstruct "canonical" order from the<br>
+sources? Is it (roughly) the bootstrap file, followed by Pure/ROOT.ML<br>
+?</p>
+
+
+
+<a name="294657313"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Emulating%20an%20Isabelle/ML%20toplevel/near/294657313" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Emulating.20an.20Isabelle.2FML.20toplevel.html#294657313">(Aug 22 2022 at 11:43)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Yes, Pure/ROOT.ML defines the order.  It is often re-shuffled in subtle <br>
+ways as years are coming and going.</p>
+<p>I merely walked through your isabelle_env.ML, and re-ordered it according <br>
+to what was written in Isabelle2015/ROOT.ML.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

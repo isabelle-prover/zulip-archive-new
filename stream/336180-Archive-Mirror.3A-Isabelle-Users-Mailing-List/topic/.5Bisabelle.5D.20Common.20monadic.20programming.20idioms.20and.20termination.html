@@ -1,0 +1,137 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Common monadic programming idioms and termination · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Common.20monadic.20programming.20idioms.20and.20termination.html">[isabelle] Common monadic programming idioms and termination</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294655870"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Common%20monadic%20programming%20idioms%20and%20termination/near/294655870" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Common.20monadic.20programming.20idioms.20and.20termination.html#294655870">(Aug 22 2022 at 11:33)</a>:</h4>
+<p>From: Dominic Mulligan via Cl-isabelle-users &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Hi all,</p>
+<p>I have a problem with a development that I am working on (in Isabelle<br>
+2015).  A slimmed down and simplified version of the problematic code<br>
+has been attached in a dedicated theory file to this e-mail with the<br>
+problem annotated with an (* XXX *) comment.</p>
+<p>The problem arises when trying to prove termination of recursive<br>
+functions that follow a fairly natural monadic programming style,<br>
+namely recursively calling your function on a decreasing argument that<br>
+is produced by earlier monadic code, hence lambda-bound following a<br>
+bind.  Here, the termination machinery seems to generate proof<br>
+obligations that are not solveable, demanding one prove that an<br>
+arbitrary list is shorter (according to the measure) than a non-empty<br>
+list, like so:</p>
+<p>⋀xs xa. xs ≠ [] ⟹ length xa &lt; length xs</p>
+<p>Interestingly, HOL4's termination machinery also seems to behave<br>
+similarly, and with the help of Anthony Fox the issue has been<br>
+reported to Konrad Slind.</p>
+<p>Does anybody have any suggestions on how to proceed other than<br>
+completely rewriting all of my monadic code?  The problematic code is<br>
+automatically generated, and comes from a rather large model, so I'd<br>
+rather not have to rewrite everything.</p>
+<p>Many thanks for any help proffered,<br>
+Dominic<br>
+<a href="/user_uploads/14278/kVxrncODgGk-NSJJUC74pirf/Strange_Termination.thy">Strange_Termination.thy</a></p>
+
+
+
+<a name="294655888"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Common%20monadic%20programming%20idioms%20and%20termination/near/294655888" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Common.20monadic.20programming.20idioms.20and.20termination.html#294655888">(Aug 22 2022 at 11:33)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:eberlm@in.tum.de">eberlm@in.tum.de</a>&gt;<br>
+The problem is that you have a recursive call in an argument of the <br>
+‘bind’ function, and the function package has no idea what kind of <br>
+parameter this call will get.</p>
+<p>For instance, the ‘bind’ function could simply double the list it gets <br>
+as the first input and call the function it gets as second input on it – <br>
+then your function would never terminate.</p>
+<p>So, what you need to do is you need to tell the function package a <br>
+little bit about what kinds of inputs the ‘bind’ function will give to <br>
+its function parameter. You can do that with a congruence rule:</p>
+<p>lemma error_bind_cong [fundef_cong]:<br>
+   "(map_error f x = map_error f' x') ⟹ error_bind x f = error_bind x' f'"<br>
+   by (cases x; cases x') simp_all</p>
+<p>This essentially implies that bind only calls the function you give it <br>
+with a value contained in the error object you give it. Once you have <br>
+proven this lemma and declared it as [fundef_cong], your proof <br>
+obligation in the termination proof will look a lot saner.</p>
+<p>Add two more simp lemmas…</p>
+<p>lemma set_error_fail [simp]: "set_error (error_fail m) = {}"<br>
+   by (simp add: error_fail_def)</p>
+<p>lemma set_error_return [simp]: "set_error (error_return s) = {s}"<br>
+   by (simp add: error_return_def)</p>
+<p>…and everything works automagically.</p>
+<p>Cheers,</p>
+<p>Manuel</p>
+<p>the function package does not know anything about your ‘bind’ function.</p>
+
+
+
+<a name="294655901"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Common%20monadic%20programming%20idioms%20and%20termination/near/294655901" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Common.20monadic.20programming.20idioms.20and.20termination.html#294655901">(Aug 22 2022 at 11:33)</a>:</h4>
+<p>From: Dominic Mulligan via Cl-isabelle-users &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Hi Manuel,</p>
+<p>Thanks for your help.  The fundef_cong attribute is what I had been missing!</p>
+<p>Dominic</p>
+
+
+
+<a name="294656242"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Common%20monadic%20programming%20idioms%20and%20termination/near/294656242" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Common.20monadic.20programming.20idioms.20and.20termination.html#294656242">(Aug 22 2022 at 11:35)</a>:</h4>
+<p>From: Dominic Mulligan via Cl-isabelle-users &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Hi,</p>
+<p>Actually, after returning to this subject after unfortunately getting<br>
+distracted doing something else, I'm afraid that the lemmas that<br>
+Manuel suggested do not seem to work in transforming the termination<br>
+conditions generated by Isabelle into something that looks provable.<br>
+I've attached the same stripped down Isabelle theory file as last time<br>
+with the suggested lemmas added, marked as fundef_cong, and the issue<br>
+remains at the point marked XXX.  This persists after trying to use<br>
+some alternative congruence rules, also.</p>
+<p>Part of the issue is that I have no idea what the need for the rather<br>
+mysterious set_error_fail and set_error_return lemmas is in Manuel's<br>
+previous e-mail, or how I would even go about finding the need for<br>
+those lemmas.  From what I understand the "set_error" constant is<br>
+automatically generated by the new datatype machinery, but how this<br>
+interacts with termination is not clearly documented in either of the<br>
+Datatype or Function PDFs bundled with Isabelle.</p>
+<p>Lastly, is there any way to get Isabelle to spit out which congruence<br>
+rules it is trying to apply when constructing these proof obligations,<br>
+or which congruence rules it at least has knowledge of other than<br>
+grepping the Isabelle library source?</p>
+<p>Many thanks for any help,<br>
+Dominic<br>
+<a href="/user_uploads/14278/4oGUTgCrLxV_8Ywrpywz74p5/Strange_Termination.thy">Strange_Termination.thy</a></p>
+
+
+
+<a name="294656269"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Common%20monadic%20programming%20idioms%20and%20termination/near/294656269" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Common.20monadic.20programming.20idioms.20and.20termination.html#294656269">(Aug 22 2022 at 11:35)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear Dominic.</p>
+<p>The congruence rules must be declared as [fundef_cong] before the function definition <br>
+takes place. In your example, they are declared between the definition and the termination <br>
+proof.</p>
+<p>The theorems about set_error help to automate the termination proof. You can discover such <br>
+lemmas when you try to do the proof manually.</p>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<a name="294656285"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Common%20monadic%20programming%20idioms%20and%20termination/near/294656285" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Common.20monadic.20programming.20idioms.20and.20termination.html#294656285">(Aug 22 2022 at 11:35)</a>:</h4>
+<p>From: Dominic Mulligan via Cl-isabelle-users &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Dear Andreas,</p>
+<p>Thanks!  That was obvious in hindsight.  I now have termination<br>
+conditions that look much more amenable.</p>
+<p>Many thanks,<br>
+Dominic</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

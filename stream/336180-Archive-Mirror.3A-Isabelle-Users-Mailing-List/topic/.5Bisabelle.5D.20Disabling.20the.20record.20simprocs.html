@@ -1,0 +1,97 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Disabling the record simprocs · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Disabling.20the.20record.20simprocs.html">[isabelle] Disabling the record simprocs</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294324815"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Disabling%20the%20record%20simprocs/near/294324815" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Disabling.20the.20record.20simprocs.html#294324815">(Aug 19 2022 at 16:56)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear list,</p>
+<p>For debugging purposes, I'd like to disable the simprocs from the record package. <br>
+Otherwise, the simplifier trace with [[simp_debug]] is obfuscated by the trace of these <br>
+simprocs. I tried [[simproc del: "record" record_eq record_upd]], but I only get the error <br>
+message that none of the simprocs exist. Next, I tried</p>
+<p>local_setup {*<br>
+   fn ctxt =&gt; ctxt delsimprocs [Record.simproc, Record.eq_simproc, Record.upd_simproc]<br>
+*}</p>
+<p>Then, print_simpset no longer lists these simprocs. Nevertheless, they still show up in <br>
+the trace. Here's an example:</p>
+<p>lemma "foo" using [[simp_debug]] apply(simp)</p>
+<p>So, how can I get rid of these simprocs?</p>
+<p>By the way, does the new tracing facility for the simplifier provide control over <br>
+simprocs, too?</p>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<a name="294324827"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Disabling%20the%20record%20simprocs/near/294324827" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Disabling.20the.20record.20simprocs.html#294324827">(Aug 19 2022 at 16:56)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On Thu, 15 Jan 2015, Andreas Lochbihler wrote:</p>
+<blockquote>
+<p>I tried</p>
+<p>local_setup {*<br>
+ fn ctxt =&gt; ctxt delsimprocs [Record.simproc, Record.eq_simproc, <br>
+Record.upd_simproc]<br>
+*}</p>
+<p>Then, print_simpset no longer lists these simprocs.</p>
+</blockquote>
+<p>The 'local_setup' command operates on a local_theory, but above you merely <br>
+downgrade it to a Proof.context, i.e. only the so-called "auxiliary <br>
+context" is affected, and the update is not really persistent.</p>
+<p>In contrast, the 'declaration' command is the usual way to update a <br>
+local_theory via ML declarations.  This is how it works for the above <br>
+application:</p>
+<p>declaration ‹<br>
+   K (Simplifier.map_ss<br>
+       (fn ctxt =&gt; ctxt delsimprocs [Record.simproc, Record.eq_simproc, Record.upd_simproc]))<br>
+›</p>
+<p>Since the canonical way to maintain the Simplifier context via ML has <br>
+changed several times over the years, I had to do myself a standard <br>
+hypersearch to find current applications in the sources, e.g. addsimprocs, <br>
+addloop.</p>
+<p>In a global theory situation it is also possible to use this form:</p>
+<p>setup ‹map_theory_simpset<br>
+   (fn ctxt =&gt; ctxt delsimprocs [Record.simproc, Record.eq_simproc, Record.upd_simproc])›</p>
+<blockquote>
+<p>By the way, does the new tracing facility for the simplifier provide <br>
+control over simprocs, too?</p>
+</blockquote>
+<p>Not yet.</p>
+<p>Makarius</p>
+
+
+
+<a name="294324861"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Disabling%20the%20record%20simprocs/near/294324861" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Disabling.20the.20record.20simprocs.html#294324861">(Aug 19 2022 at 16:57)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear Makarius,</p>
+<p>Thanks a lot, this works fine. Just out of curiosity: Why does the Isar declaration <br>
+[[simproc del: record_eq]] not work?</p>
+<p>Cheers,<br>
+Andreas</p>
+
+
+
+<a name="294324874"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Disabling%20the%20record%20simprocs/near/294324874" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Disabling.20the.20record.20simprocs.html#294324874">(Aug 19 2022 at 16:57)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+The record package is not localized, which means it uses quite old <br>
+operations like Simplifier.simproc_global (or Simplifier.mk_simproc and <br>
+the bottom of it).</p>
+<p>In order to show up in the simproc name space within the context, tools <br>
+need to use Simplifier.def_simproc or the corresponding Isar command <br>
+'simproc_setup'.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

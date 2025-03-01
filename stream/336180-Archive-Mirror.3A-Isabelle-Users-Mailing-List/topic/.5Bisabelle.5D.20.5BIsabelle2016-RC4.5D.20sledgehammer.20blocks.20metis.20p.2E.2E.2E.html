@@ -1,0 +1,105 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] [Isabelle2016-RC4] sledgehammer blocks metis p... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20.5BIsabelle2016-RC4.5D.20sledgehammer.20blocks.20metis.20p.2E.2E.2E.html">[isabelle] [Isabelle2016-RC4] sledgehammer blocks metis p...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294666384"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20%5BIsabelle2016-RC4%5D%20sledgehammer%20blocks%20metis%20p.../near/294666384" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20.5BIsabelle2016-RC4.5D.20sledgehammer.20blocks.20metis.20p.2E.2E.2E.html#294666384">(Aug 22 2022 at 12:38)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On Wed, 10 Feb 2016, Andreas Lochbihler wrote:</p>
+<blockquote>
+<p>Consider the following scenario in Isabelle2016-RC4:</p>
+<ol>
+<li>I run sledgehammer via the sledgehammer panel,</li>
+<li>One of the provers comes back with a metis proof while the others are <br>
+still running.</li>
+<li>I click on the metis proof which gets inserted into the main text area.</li>
+</ol>
+<p>The metis proof is not run until all other provers have finished or I <br>
+manually cancel them. In Isabelle2015, metis used to check while the other <br>
+provers are still working. Is there any setting to prioritize Isabelle proof <br>
+methods over sledgehammer provers?</p>
+</blockquote>
+<p>Note that priorities don't help, when all worker threads are already busy <br>
+working on tasks. So the usual working hypothesis is that sledgehammer is <br>
+already saturating all threads, and the PIDE execution task (after an <br>
+edit) is still waiting in the queue.</p>
+<blockquote>
+<p>List of provers: cvc4 z3 spass e remote_vampire<br>
+Try methods checkbox in Sledgehammer panel: enabled<br>
+System: Ubuntu 14.04 LTS<br>
+Hardware: Intel(R) Core(TM) i7-3630QM CPU @ 2.40GHz, 16GB RAM</p>
+</blockquote>
+<p>This hardware provides 4 active worker threads by default.</p>
+<p>I have experimented a bit with threads=4 and<br>
+~~/src/HOL/Metis_Examples/Big_O.thy: lemma <br>
+bigo_elt_subset (after the "rule_tac" and before the "metis"), both in <br>
+Isabelle2015 and Isabelle2016-RC4.</p>
+<p>After pushing the Sledgehammer button, I waited for the first result and <br>
+copied that into the text:</p>
+<p>apply (smt less_imp_le less_le_trans mult.assoc mult.commute<br>
+     mult_less_cancel_right not_less zero_less_mult_iff)</p>
+<p>Later I also let Sledgehammer provers run and just copied the same text to <br>
+see what happens.</p>
+<p>This uniformly leads to a "pink" (i.e. queued, not yet evaluated) 'apply' <br>
+command. Both for Isabelle2015 and Isabelle2016-RC4.</p>
+<p>The key difference: Isabelle2015 with default configuration immediately <br>
+says: "remote_vampire": Error: SystemOnTPTP is not available. In that <br>
+situation, the 'apply' line was checked earlier, probably because one <br>
+thread became free on time to continue the PIDE execution.</p>
+<p>In Isabelle2015 with proper remote_vampire, I've seen the unchecked pink <br>
+'apply' again.</p>
+<p>In all situations with threads=6, I see immediate checking of the 'apply' <br>
+line.</p>
+<p>So unless there is a clear indication that something changed to the worse, <br>
+I would say it is the normal state of affairs.</p>
+<p>BTW, with 4 cores and hyperthreading you could experiment with threads=5 <br>
+or threads=6; threads=8 will probably make the machine very hot without <br>
+much benefit.</p>
+<p>Makarius</p>
+
+
+
+<a name="294666854"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20%5BIsabelle2016-RC4%5D%20sledgehammer%20blocks%20metis%20p.../near/294666854" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20.5BIsabelle2016-RC4.5D.20sledgehammer.20blocks.20metis.20p.2E.2E.2E.html#294666854">(Aug 22 2022 at 12:40)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Makarius,</p>
+<p>You are right. With threads=5, the metis proof is being processed while the other provers <br>
+are still running. So this was really just a coincidence that Isabelle2015 has one thread <br>
+available for processing.</p>
+<p>Thanks,<br>
+Andreas</p>
+
+
+
+<a name="294668879"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20%5BIsabelle2016-RC4%5D%20sledgehammer%20blocks%20metis%20p.../near/294668879" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20.5BIsabelle2016-RC4.5D.20sledgehammer.20blocks.20metis.20p.2E.2E.2E.html#294668879">(Aug 22 2022 at 12:52)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear Jasmin and Makarius,</p>
+<p>Consider the following scenario in Isabelle2016-RC4:</p>
+<ol>
+<li>I run sledgehammer via the sledgehammer panel,</li>
+<li>One of the provers comes back with a metis proof while the others are still running.</li>
+<li>I click on the metis proof which gets inserted into the main text area.</li>
+</ol>
+<p>The metis proof is not run until all other provers have finished or I manually cancel <br>
+them. In Isabelle2015, metis used to check while the other provers are still working. Is <br>
+there any setting to prioritize Isabelle proof methods over sledgehammer provers?</p>
+<p>Some configuration data:</p>
+<p>List of provers: cvc4 z3 spass e remote_vampire<br>
+Try methods checkbox in Sledgehammer panel: enabled<br>
+System: Ubuntu 14.04 LTS<br>
+Hardware: Intel(R) Core(TM) i7-3630QM CPU @ 2.40GHz, 16GB RAM</p>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

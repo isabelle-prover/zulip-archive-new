@@ -1,0 +1,148 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Please make OCaml and Ruby part of the Cygwin ... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Please.20make.20OCaml.20and.20Ruby.20part.20of.20the.20Cygwin.20.2E.2E.2E.html">[isabelle] Please make OCaml and Ruby part of the Cygwin ...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294274005"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Please%20make%20OCaml%20and%20Ruby%20part%20of%20the%20Cygwin%20.../near/294274005" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Please.20make.20OCaml.20and.20Ruby.20part.20of.20the.20Cygwin.20.2E.2E.2E.html#294274005">(Aug 19 2022 at 14:09)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On Tue, 22 Apr 2014, Gottfried Barrow wrote:</p>
+<blockquote>
+<p>I went through lots of iterations looking for the right language.</p>
+</blockquote>
+<p>The "right language" depends a lot on what you want to do with it, but <br>
+that should be common folklore anyway.</p>
+<blockquote>
+<p>Part of first passing over OCaml was that it doesn't come installed with <br>
+Cygwin, where Perl and Python do.</p>
+</blockquote>
+<p>As a Windows user you might be interested in F# <a href="http://fsharp.org/">http://fsharp.org/</a> which <br>
+seems to have taken over most of the potential market share of OCaml in <br>
+recent years.  OCaml was once a big thing, but now it is just another <br>
+scripting language performance-wise, since it is still not multicore <br>
+capable.</p>
+<blockquote>
+<p>But, though It's very easy for me to install OCaml and Ruby on Cygwin, <br>
+with Cygwin-Setup.bat, it might not be easy for someone who has never <br>
+done it before.</p>
+<p>If OCaml and Ruby came as part of Cygwin, in the contrib folder, then <br>
+things would be closer to working by magic, if someone was trying to do <br>
+what I'm doing.</p>
+</blockquote>
+<p>I don't see the point.  The Cygwin-Setup.bat is there to add whatever <br>
+might be interesting in addition to the default packages that are <br>
+necessary to run Isabelle and its standard tools.  The Cygwin installation <br>
+dialog is not ultra user-friendly, but any requests for improvements <br>
+should be directed to the Cygwin guys and gals, especially Corinna <br>
+Vinschen.</p>
+<blockquote>
+<p>I attach a zip file. I don't expect anyone to look at it, but I attach <br>
+it to show, as part of the request, that my request has something behind <br>
+it.</p>
+</blockquote>
+<p>I did look at it, but not very systematically.  Here are a few notes:</p>
+<ul>
+<li>
+<p>Load all files relatively to the implicit master directory of the<br>
+   enclosing theory.  This avoids absolute file-system references, and<br>
+   keeps your application "portable", i.e. you don't have to ask people to<br>
+   put things into a specific place.</p>
+</li>
+<li>
+<p>Watch out for global side-effects of Isar command declarations<br>
+   ('keywords') and their subsequent definitions in ML part of a theory.<br>
+   This implicit statefulness of the command table is TTY / Proof General<br>
+   legacy and easily leads to mistakes in the Prover IDE.</p>
+</li>
+<li>
+<p>Instead of fragile echo within the shell and its complicated rules for<br>
+   quoting, better use a temp file and stdin redirection (via "&lt;").  See<br>
+   also the Isabelle/ML operation Isabelle_System.create_tmp_path or<br>
+   better the higher-order wrapper Isabelle_System.with_tmp_file.</p>
+</li>
+<li>
+<p>The type 'a Unsynchronized.ref in Isabelle/ML is just an alias of<br>
+   regular 'a ref, to empasize its unsynchronized nature, and to make it<br>
+   easier to get old ML code right with the help of static analysis: fewer<br>
+   ref operations are pervasive by default, so it is easier to locate its<br>
+   remaining uses.  The easiest way to give that up that discipline is ML<br>
+   "open Unsynchronized", but you should not do this in production code.</p>
+</li>
+<li>
+<p>A mutable HashArray is a very old-fashioned (and in general inefficient)<br>
+   data structure. Mutability belongs into the bucket with the label<br>
+   "premature optimization is the root of all evil".  On today's parallel<br>
+   hardware it is often less efficient by default, and actually plain wrong<br>
+   without special precautions.  See @{file "~~/src/Pure/General/table.ML"}<br>
+   for an efficient immutable data structure that can be used by default<br>
+   almost everywhere, without requiring extra thinking about correctness or<br>
+   efficiency.</p>
+<p>If you want to make a global cache of certain items, the canonical way<br>
+ is via some immutable table that is stored within a Synchronized.var.<br>
+ Moving mutability away from the data structures to some topmost position<br>
+ is the first step to get things right (correct and efficient).</p>
+</li>
+</ul>
+<blockquote>
+<p>Part of the work is related to dealing with the statelessness of the <br>
+PIDE. It's not that complex to implement, but my current is idea is to <br>
+use a hash table along with a random number generator to get a name. <br>
+There's a number of them available, but I guess I'll use the one from <br>
+Larry Paulson's book that I acquired recently from the SML/NJ import. <br>
+The SML/NJ Library manual has some things to say about it.</p>
+</blockquote>
+<p>Much could be said about random numbers, e.g. see <br>
+<a href="http://dilbert.com/strips/comic/2001-10-25/">http://dilbert.com/strips/comic/2001-10-25/</a> what Scott Adams says.  We <br>
+have our own old jokes and running gags about the various random <br>
+generators that are floating around in the Isabelle sources.</p>
+<p>It is generally difficult to produce unique indentifiers that are actually <br>
+unique in a sufficiently large scope.  Within a running Isabelle/ML <br>
+process you can use "serial ()" or "serial_string ()" for that, but it is <br>
+also not 100% fool-proof if such ids persist over unrelated Isabelle <br>
+sessions.</p>
+<p>Makarius</p>
+
+
+
+<a name="294274519"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Please%20make%20OCaml%20and%20Ruby%20part%20of%20the%20Cygwin%20.../near/294274519" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Please.20make.20OCaml.20and.20Ruby.20part.20of.20the.20Cygwin.20.2E.2E.2E.html#294274519">(Aug 19 2022 at 14:11)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+My hint was more basic that this.  Your ML_file references where all <br>
+absolute, but by just removing a prefix it becaume relative to the master <br>
+directory of the enclosing theory, and thus became "portable".</p>
+<p>Makarius</p>
+
+
+
+<a name="294274617"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Please%20make%20OCaml%20and%20Ruby%20part%20of%20the%20Cygwin%20.../near/294274617" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Please.20make.20OCaml.20and.20Ruby.20part.20of.20the.20Cygwin.20.2E.2E.2E.html#294274617">(Aug 19 2022 at 14:12)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+It is about HOL-Zero and Ocaml as unsafe programming language etc.<br>
+A very entangled variant of several related and unrelated threads around <br>
+this can be seen here on the HOL mailing list:</p>
+<p><a href="http://sourceforge.net/p/hol/mailman/hol-info/thread/E1SN77r-0007Os-05%40mta0.cl.cam.ac.uk/#msg29180495">http://sourceforge.net/p/hol/mailman/hol-info/thread/E1SN77r-0007Os-05%40mta0.cl.cam.ac.uk/#msg29180495</a></p>
+<p>Title of the thread: "Re: rigorous axiomatic geometry proof in HOL Light".</p>
+<p>Makarius</p>
+
+
+
+<a name="294274637"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Please%20make%20OCaml%20and%20Ruby%20part%20of%20the%20Cygwin%20.../near/294274637" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Please.20make.20OCaml.20and.20Ruby.20part.20of.20the.20Cygwin.20.2E.2E.2E.html#294274637">(Aug 19 2022 at 14:12)</a>:</h4>
+<p>From: Michael Norrish &lt;<a href="mailto:Michael.Norrish@nicta.com.au">Michael.Norrish@nicta.com.au</a>&gt;<br>
+Incidentally, the gmane interface to the mailing list, at for example</p>
+<p><a href="http://article.gmane.org/gmane.comp.mathematics.hol/1605/">http://article.gmane.org/gmane.comp.mathematics.hol/1605/</a></p>
+<p>is much nicer than the antiquated UI available through sourceforge.</p>
+<p>Michael</p>
+<hr>
+<p>The information in this e-mail may be confidential and subject to legal professional privilege and/or copyright. National ICT Australia Limited accepts no liability for any damage caused by this email or its attachments.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

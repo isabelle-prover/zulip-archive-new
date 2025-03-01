@@ -1,0 +1,102 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] interpretations and lambda terms · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20interpretations.20and.20lambda.20terms.html">[isabelle] interpretations and lambda terms</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294068735"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20interpretations%20and%20lambda%20terms/near/294068735" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20interpretations.20and.20lambda.20terms.html#294068735">(Aug 18 2022 at 12:40)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi David,</p>
+<p>In such cases extensionality is the way to go: thm ext.  Attached I have<br>
+two ways to employ it: either directly as (rule ext), which I recommend<br>
+in cases which require an Isar proof, or by means thm expand_fun_eq<br>
+which is handy for proofs which can be done automatically by simp (or<br>
+auto or clarsimp or ...).</p>
+<p>Hope this helps<br>
+    Florian</p>
+<p>--</p>
+<p>theory Hold<br>
+imports Main<br>
+begin</p>
+<p>locale D_po =<br>
+  fixes le :: "'a \&lt;Rightarrow&gt; 'a \&lt;Rightarrow&gt; bool"<br>
+  fixes D :: "'a set"<br>
+begin</p>
+<p>abbreviation lle :: "'a \&lt;Rightarrow&gt; 'a \&lt;Rightarrow&gt; bool" (infixl<br>
+"\&lt;sqsubseteq&gt;" 100) where<br>
+  "x \&lt;sqsubseteq&gt; y \&lt;equiv&gt; le x y"</p>
+<p>definition downclosed where<br>
+  "downclosed I \&lt;longleftrightarrow&gt; I \&lt;subseteq&gt; D \&lt;and&gt; (\&lt;forall&gt;x<br>
+y . (x \&lt;in&gt; I \&lt;and&gt; y \&lt;in&gt; D \&lt;and&gt; y \&lt;sqsubseteq&gt; x)<br>
+\&lt;longrightarrow&gt; y \&lt;in&gt; I)"</p>
+<p>definition ub where<br>
+  "ub S a \&lt;longleftrightarrow&gt;  a \&lt;in&gt; D \&lt;and&gt; (\&lt;forall&gt;x\&lt;in&gt;S. x<br>
+\&lt;sqsubseteq&gt; a)"</p>
+<p>definition lub where<br>
+  "lub S d \&lt;longleftrightarrow&gt; ub S d \&lt;and&gt; (\&lt;forall&gt;a. ub S a<br>
+\&lt;longrightarrow&gt; d \&lt;sqsubseteq&gt; a)"</p>
+<p>definition Directed where<br>
+  "Directed S \&lt;longleftrightarrow&gt; S \&lt;noteq&gt; {} \&lt;and&gt; S \&lt;subseteq&gt; D<br>
+\&lt;and&gt; (\&lt;forall&gt;f g. (f \&lt;in&gt; S \&lt;and&gt; g \&lt;in&gt; S) \&lt;longrightarrow&gt;<br>
+(\&lt;exists&gt;l. ub {f, g} l \&lt;and&gt; l \&lt;in&gt; S))"</p>
+<p>definition ideal where<br>
+  "ideal I \&lt;longleftrightarrow&gt; Directed I \&lt;and&gt; downclosed I"</p>
+<p>end</p>
+<p>locale D_bpo  = D_po +<br>
+  fixes idall :: "('a \&lt;Rightarrow&gt; bool) \&lt;Rightarrow&gt; bool"<br>
+  and my_subset:: "('a \&lt;Rightarrow&gt; bool) \&lt;Rightarrow&gt; ('a<br>
+\&lt;Rightarrow&gt; bool) \&lt;Rightarrow&gt; bool"<br>
+  defines Ideals: "idall \&lt;equiv&gt; {I:: ('a \&lt;Rightarrow&gt; bool) .<br>
+(D_po.ideal le D I)}"<br>
+  defines relative: "my_subset x y \&lt;equiv&gt; x \&lt;subseteq&gt; y \&lt;and&gt; x<br>
+\&lt;in&gt; idall \&lt;and&gt; y \&lt;in&gt; idall"</p>
+<p>locale D_cpo = D_bpo +<br>
+  assumes compass: "\&lt;forall&gt;S. D_po.Directed le D S \&lt;longrightarrow&gt;<br>
+(\&lt;exists&gt; l. D_po.lub le D S l)"</p>
+<p>locale bpo_ideal = D_bpo le D idall my_subset + D_cpo my_subset idall<br>
+idid ididsub</p>
+<p>interpretation bpo_ideal \&lt;subseteq&gt; D_bpo .</p>
+<p>interpretation D_bpo \&lt;subseteq&gt; bpo_ideal<br>
+proof -<br>
+  show bopi: "bpo_ideal op \&lt;sqsubseteq&gt; D"<br>
+  proof<br>
+    show "\&lt;forall&gt;S. D_po.Directed (\&lt;lambda&gt;x y. x \&lt;subseteq&gt; y<br>
+\&lt;and&gt; x \&lt;in&gt; {I. D_po.ideal op \&lt;sqsubseteq&gt; D I} \&lt;and&gt; y \&lt;in&gt; {I.<br>
+D_po.ideal op \&lt;sqsubseteq&gt; D I})<br>
+         {I. D_po.ideal op \&lt;sqsubseteq&gt; D I} S \&lt;longrightarrow&gt;<br>
+        (\&lt;exists&gt;l. D_po.lub (\&lt;lambda&gt;x y. x \&lt;subseteq&gt; y \&lt;and&gt; x<br>
+\&lt;in&gt; {I. D_po.ideal op \&lt;sqsubseteq&gt; D I} \&lt;and&gt; y \&lt;in&gt; {I. D_po.ideal<br>
+op \&lt;sqsubseteq&gt; D I})<br>
+              {I. D_po.ideal op \&lt;sqsubseteq&gt; D I} S l)" sorry<br>
+  qed</p>
+<p>-- {* Alt. 1: rule ext *}<br>
+  have "my_subset = (\&lt;lambda&gt;x y. x \&lt;subseteq&gt; y \&lt;and&gt; x \&lt;in&gt; idall<br>
+\&lt;and&gt; y \&lt;in&gt; idall)"<br>
+  proof (rule ext)+<br>
+    fix x y<br>
+    show "my_subset x y \&lt;longleftrightarrow&gt; x \&lt;subseteq&gt; y \&lt;and&gt; x<br>
+\&lt;in&gt; idall \&lt;and&gt; y \&lt;in&gt; idall"<br>
+      by (simp add: relative)<br>
+  qed</p>
+<p>-- {* Alt. 2: expand_fun_eq *}<br>
+  have "my_subset = (\&lt;lambda&gt;x y. x \&lt;subseteq&gt; y \&lt;and&gt; x \&lt;in&gt; idall<br>
+\&lt;and&gt; y \&lt;in&gt; idall)"<br>
+    by (simp add: expand_fun_eq relative)</p>
+<p>qed</p>
+<p>-- </p>
+<p>Home:<br>
+<a href="http://wwwbroy.in.tum.de/~haftmann">http://wwwbroy.in.tum.de/~haftmann</a></p>
+<p>PGP available:<br>
+<a href="http://home.informatik.tu-muenchen.de/haftmann/pgp/florian_haftmann_at_informatik_tu_muenchen_de">http://home.informatik.tu-muenchen.de/haftmann/pgp/florian_haftmann_at_informatik_tu_muenchen_de</a><br>
+<a href="/user_uploads/14278/Wb2zzWeZ8pzHGOVctrxEWOMb/signature.asc">signature.asc</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

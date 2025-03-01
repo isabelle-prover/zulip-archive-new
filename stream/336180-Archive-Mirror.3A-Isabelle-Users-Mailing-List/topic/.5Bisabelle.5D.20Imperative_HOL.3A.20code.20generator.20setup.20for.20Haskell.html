@@ -1,0 +1,113 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Imperative_HOL: code generator setup for Haskell · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Imperative_HOL.3A.20code.20generator.20setup.20for.20Haskell.html">[isabelle] Imperative_HOL: code generator setup for Haskell</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294316903"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Imperative_HOL%3A%20code%20generator%20setup%20for%20Haskell/near/294316903" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Imperative_HOL.3A.20code.20generator.20setup.20for.20Haskell.html#294316903">(Aug 19 2022 at 16:15)</a>:</h4>
+<p>From: Christian Sternagel &lt;<a href="mailto:c.sternagel@gmail.com">c.sternagel@gmail.com</a>&gt;<br>
+Dear Imperative HOLers,</p>
+<p>maybe you could enlighten me on the following points:</p>
+<p>1) In Heap_Monad.thy there is a Haskell preamble including</p>
+<p>lengthArray :: STArray s a -&gt; ST s Integer;<br>
+lengthArray a = Control.Monad.liftM snd (Data.Array.ST.getBounds a);</p>
+<p>Shouldn't that be the above +1? I thought in Haskell the bounds state <br>
+the lowest and highest <em>index</em> of an array. So an array created with <br>
+bound (0, k) should have length k+1. Maybe I'm wrong?</p>
+<p>2) How would we actually use an "imperative" function from inside some <br>
+pure function? Can there be a mapping to runST for Haskell (I guess that <br>
+would not be safe, since there's no rank-2 types in Isabelle/HOL)? Any <br>
+thoughts or further explanations?</p>
+<p>thanks in advance</p>
+<p>chris</p>
+
+
+
+<a name="294316908"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Imperative_HOL%3A%20code%20generator%20setup%20for%20Haskell/near/294316908" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Imperative_HOL.3A.20code.20generator.20setup.20for.20Haskell.html#294316908">(Aug 19 2022 at 16:15)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Christian,</p>
+<p>With the current setup, you cannot. If you look at the code_printing declarations in <br>
+Heap_Monad, you will see that the heap type is mapped to ST RealWorld. That means that <br>
+heap values are meant to be used with stToIO rather than runST.</p>
+<p>However, one could think of a different serialisation for Haskell. I see three problems:</p>
+<ol>
+<li>
+<p>The type of runST requires that the ST parameter is polymorphic, but Heap in <br>
+Imperative_HOL does not have such a type parameter. You could replace Heap.RealWorld in <br>
+the Heap's serialisation with some literal type variable. To avoid clashes, this type <br>
+variable must not be used by the code generator. For example, you could use some fancy <br>
+unicode characters that the code generator does not use. I have not tried this, but I <br>
+would expect that the types of the generated functions are general enough to be passed to <br>
+runST.</p>
+</li>
+<li>
+<p>execute takes an initial state, runST does not. Hence, you would have to implement some <br>
+glue code that converts the initial state accordingly. The easiest way is probably to <br>
+define a function runST as "runST f = map_option fst (execute f s)" and serialise that.</p>
+</li>
+<li>
+<p>References into the heap must not be passed between different invocations of runST. <br>
+AFAIK, reference types are tagged with the state type in Haskell. That is, if you <br>
+nevertheless serialise a function that returns a reference, Haskell's type system should <br>
+prevent you from applying runST to it. Hence, you can generate code that does not compile <br>
+afterwards. From the point of view on partial correctness, this is sound.</p>
+</li>
+</ol>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<a name="294316932"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Imperative_HOL%3A%20code%20generator%20setup%20for%20Haskell/near/294316932" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Imperative_HOL.3A.20code.20generator.20setup.20for.20Haskell.html#294316932">(Aug 19 2022 at 16:15)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Christian,</p>
+<p>well, experimentally the second position of getBounds seems indeed to be<br>
+the <em>length</em>, not the highest index.  You may want to make two, three<br>
+examples to convince yourself.</p>
+<p>Florian<br>
+<a href="/user_uploads/14278/T0D_o6b9r1lcoDkSM9c8U-uz/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294316949"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Imperative_HOL%3A%20code%20generator%20setup%20for%20Haskell/near/294316949" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Imperative_HOL.3A.20code.20generator.20setup.20for.20Haskell.html#294316949">(Aug 19 2022 at 16:15)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;</p>
+<blockquote>
+<blockquote>
+<p>2) How would we actually use an "imperative" function from inside some<br>
+pure function? Can<br>
+there be a mapping to runST for Haskell (I guess that would not be<br>
+safe, since there's no<br>
+rank-2 types in Isabelle/HOL)? Any thoughts or further explanations?<br>
+With the current setup, you cannot. If you look at the code_printing<br>
+declarations in Heap_Monad, you will see that the heap type is mapped to<br>
+ST RealWorld. That means that heap values are meant to be used with<br>
+stToIO rather than runST.</p>
+</blockquote>
+</blockquote>
+<p>[...]</p>
+<blockquote>
+<p>That is, if you nevertheless serialise a function that<br>
+returns a reference, Haskell's type system should prevent you from<br>
+applying runST to it. Hence, you can generate code that does not compile<br>
+afterwards. From the point of view on partial correctness, this is sound.</p>
+</blockquote>
+<p>Initially I have been so optimistic to follow that »let Haskell moan if<br>
+it is not linear« approach, but there have been technical problems which<br>
+could not been solved within the existing infrastructure.  The details I<br>
+do not remember, but maybe the hg history knows more.</p>
+<p>Florian<br>
+<a href="/user_uploads/14278/m3vCXzuMkOagQVWpy7ngxvM_/signature.asc">signature.asc</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

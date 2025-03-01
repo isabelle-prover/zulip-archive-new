@@ -1,0 +1,57 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] case in LaTeX output · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20case.20in.20LaTeX.20output.html">[isabelle] case in LaTeX output</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294714282"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20case%20in%20LaTeX%20output/near/294714282" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20case.20in.20LaTeX.20output.html#294714282">(Aug 22 2022 at 15:47)</a>:</h4>
+<p>From: "Siek, Jeremy" &lt;<a href="mailto:jsiek@indiana.edu">jsiek@indiana.edu</a>&gt;<br>
+I’m seeing a case turn into a call to the datatype’s case function in the LaTeX output<br>
+(see case-val below), but I’d prefer it to stay as a case.</p>
+<p>In particular, I have the following equation in a fun definition.</p>
+<p>"E (EIf e1 e2 e3) ρ = (v1 ← E e1 ρ;<br>
+                              case v1 of<br>
+                                (VNat n) ⇒ if n ≠ 0 then E e2 ρ else E e3 ρ<br>
+                              | (VFun t) ⇒ zero)”</p>
+<p>But it’s producing the following in the LaTeX (PDF):</p>
+<p>E (if e1 then e2 else e3) ρ = set-bind (E e1 ρ) (case-val (λn. if n   0 then E e2 ρ else E e3 ρ) (λt. zero))</p>
+<p>I’m wondering if the set-bind is somehow triggering this behavior… It’s the bind for a<br>
+non-determinism monad that I define as follows.</p>
+<p>definition set_bind :: "'a M ⇒ ('a ⇒ 'b M) ⇒ 'b M" where<br>
+  "set_bind m f ≡ { v. ∃ v'. v' ∈ m ∧ v ∈ f v' }"<br>
+declare set_bind_def[simp]</p>
+<p>syntax "_set_bind" :: "[pttrns,'a M,'b] ⇒ 'c" ("(_ ← _;//_)" 0)<br>
+translations "P ← E; F" ⇌ "CONST set_bind E (λP. F)”</p>
+<p>Any help is appreciated!</p>
+<p>Cheers,<br>
+Jeremy</p>
+
+
+
+<a name="294714304"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20case%20in%20LaTeX%20output/near/294714304" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20case.20in.20LaTeX.20output.html#294714304">(Aug 22 2022 at 15:47)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear Jeremy,</p>
+<p>An eta-contraction is happening here, because the bound variable v1 is the last argument <br>
+to the case operator, so Isabelle sees "%v1. case_val ... ... v1" here. Have you tried to <br>
+disable locally eta-contraction, e.g., by declare [[eta_contract = false]]?</p>
+<p>Alternatively, you can install a print_translation to avoid the eta-contraction for set_bind:</p>
+<p>print_translation {*<br>
+    Syntax_Trans.preserve_binder_abs2_tr'<br>
+      @{const_syntax set_bind} @{syntax_const "_set_bind"}<br>
+*}</p>
+<p>Disclaimer: I've just adapted this from the setup for Ball/Bex, but I haven't tried <br>
+whether this works for your specific bind operation.</p>
+<p>Hope this helps,<br>
+Andreas</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

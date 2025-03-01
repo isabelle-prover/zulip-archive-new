@@ -1,0 +1,32 @@
+[
+    {
+        "content": "<p>From: Lars Hupel &lt;<a href=\"mailto:hupel@in.tum.de\">hupel@in.tum.de</a>&gt;<br>\nDear Makarius,</p>\n<p>what is the official way (from Isabelle/Scala) to invoke an Isabelle<br>\ntool without exiting the JVM? For example, if I want to invoke a<br>\nsequence of tools.</p>\n<p>Cheers<br>\nLars</p>",
+        "id": 294720642,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661184676
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nMost Isabelle command-line tools are indeed implemented in<br>\nIsabelle/Scala today, but the tool wrapper assumes that it is the only<br>\n(or last) thing that this JVM runs. Thus the JVM will finally exit,<br>\nafter printing exceptions properly without \"Java vomit\". See also the<br>\nmodule Command_Line (both in Scala and ML).</p>\n<p>So multiple invocations of the tool wrapper require a separate process<br>\neach time. This can be done in Isabelle/Scala by the<br>\nIsabelle_System.bash operation, e.g. like this:</p>\n<p>Isabelle_System.bash(\"isabelle build\").check</p>\n<p>Note that PATH within the Isabelle environment has $ISABELLE_HOME/bin<br>\nfirst, so \"isabelle\" above refers to the running Isabelle installation.</p>\n<p>Further not that operations like File.bash_path and Bash.string help to<br>\ncompose bash scripts reliably.</p>\n<p>Another possibility (often better) is to invoke the underlying Scala<br>\noperations within the running JVM process. Every Isabelle tool should<br>\nhave such an entry as a regular function, with typed interface and<br>\nnormal exception behavior.</p>\n<p>E.g. for the above that is <a href=\"http://Build.build\">Build.build</a>, which I often use in the<br>\nIsabelle/Scala console of Isabelle/jEdit, in the absence of proper IDE<br>\nsupport for the build process.</p>\n<p>Makarius</p>",
+        "id": 294720662,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661184682
+    },
+    {
+        "content": "<p>From: Lars Hupel &lt;<a href=\"mailto:hupel@in.tum.de\">hupel@in.tum.de</a>&gt;</p>\n<blockquote>\n<p>So multiple invocations of the tool wrapper require a separate process<br>\neach time. This can be done in Isabelle/Scala by the<br>\nIsabelle_System.bash operation, e.g. like this:</p>\n<p>Isabelle_System.bash(\"isabelle build\").check</p>\n</blockquote>\n<p>Thanks, I have used that now.</p>\n<blockquote>\n<p>Another possibility (often better) is to invoke the underlying Scala<br>\noperations within the running JVM process. Every Isabelle tool should<br>\nhave such an entry as a regular function, with typed interface and<br>\nnormal exception behavior.</p>\n</blockquote>\n<p>In this particular case it is about invoking a \"dynamic\" Scala script<br>\nfrom the AFP, so there's no Scala entry point visible statically.</p>\n<p>With the ever-increasing importance of Isabelle/Scala as a systems<br>\nlanguage (and thus, for the AFP), we should consider a more robust and<br>\nless ad-hoc way of adding Scala tools to the classpath from within<br>\ncomponents.</p>\n<p>Lars</p>",
+        "id": 294720726,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661184707
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nOn 04/10/17 16:01, Lars Hupel wrote:</p>\n<blockquote>\n<p>In this particular case it is about invoking a \"dynamic\" Scala script<br>\nfrom the AFP, so there's no Scala entry point visible statically.</p>\n</blockquote>\n<p>That is particularly slow, because the full Scala compiler needs to make<br>\na cold start.</p>\n<blockquote>\n<p>With the ever-increasing importance of Isabelle/Scala as a systems<br>\nlanguage (and thus, for the AFP), we should consider a more robust and<br>\nless ad-hoc way of adding Scala tools to the classpath from within<br>\ncomponents.</p>\n</blockquote>\n<p>That is an old problem. Presently, I only know some partial solutions:</p>\n<p>* Isolate general tool functionality and move that to the<br>\nIsabelle/Pure.jar (after the usual process of \"change elimination\" to<br>\ntrim it down to the very core).</p>\n<p>* Maintain an external tool-specific jar (e.g. via \"isabelle scalac\")<br>\nand add the result to the Isabelle classpath in the etc/settings of the<br>\ntool component directory. The Bash function \"classpath\" does that<br>\nproperly; the only problem is to build the jar on the spot. Maybe the<br>\nbuild process is better done offline.</p>\n<p>Makarius</p>",
+        "id": 294720741,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661184713
+    },
+    {
+        "content": "<p>From: Lars Hupel &lt;<a href=\"mailto:hupel@in.tum.de\">hupel@in.tum.de</a>&gt;</p>\n<blockquote>\n<p>That is particularly slow, because the full Scala compiler needs to make<br>\na cold start.</p>\n</blockquote>\n<p>Right. I don't know whether I have mentioned this before or not, but<br>\n&lt;<a href=\"https://github.com/martylamb/nailgun\">https://github.com/martylamb/nailgun</a>&gt; is a prime candidate to avoid<br>\nsuch problems.</p>\n<blockquote>\n<p>* Isolate general tool functionality and move that to the<br>\nIsabelle/Pure.jar (after the usual process of \"change elimination\" to<br>\ntrim it down to the very core).</p>\n</blockquote>\n<p>Possibly. Feel free to have a look at \"$AFP_BASE/tools\" for what is<br>\nhappening there.</p>\n<blockquote>\n<p>* Maintain an external tool-specific jar (e.g. via \"isabelle scalac\")<br>\nand add the result to the Isabelle classpath in the etc/settings of the<br>\ntool component directory. The Bash function \"classpath\" does that<br>\nproperly; the only problem is to build the jar on the spot. Maybe the<br>\nbuild process is better done offline.</p>\n</blockquote>\n<p>I just tried doing that out of curiosity, but it seems that \"$JAVA_HOME\"<br>\nis not set in \"etc/settings\"; consequently, \"isabelle_scala scalac\"<br>\nfails. I'm not yet sure whether I'm doing something wrong there.</p>\n<p>Lars</p>",
+        "id": 294720755,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661184719
+    }
+]

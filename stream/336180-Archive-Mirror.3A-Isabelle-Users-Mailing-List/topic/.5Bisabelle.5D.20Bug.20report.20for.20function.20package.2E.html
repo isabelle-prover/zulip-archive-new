@@ -1,0 +1,110 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Bug report for function package. · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Bug.20report.20for.20function.20package.2E.html">[isabelle] Bug report for function package.</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294049194"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Bug%20report%20for%20function%20package./near/294049194" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Bug.20report.20for.20function.20package.2E.html#294049194">(Aug 18 2022 at 10:30)</a>:</h4>
+<p>From: Thomas Arthur Leck Sewell &lt;<a href="mailto:tsewell@cse.unsw.EDU.AU">tsewell@cse.unsw.EDU.AU</a>&gt;<br>
+Hi there. I normally push this sort of thing via Gerwin, but he's away at <br>
+the moment, so here's a direct bug report from me. He also maintains our <br>
+local Isabelle version, and I'm afraid I can't be more specific that <br>
+Isabelle2005.</p>
+<p>It seems that the function package has a real issue with a True or False <br>
+term turning up as an explicit assumption thanks to a congruence rule.<br>
+For example, try running the following code:</p>
+<p>function<br>
+   recursive :: "nat =&gt; nat" where<br>
+  "recursive (Suc n) = (if True then arbitrary else recursive n)"<br>
+  "recursive 0 = 0"</p>
+<p>In quick-and-dirty mode, this works immediately for me, but when attempted <br>
+in strict mode I get a thoroughly self-explanatory "Tactic failed" error. <br>
+I haven't looked at any code, but I assume that the problem here is that<br>
+the True/Not True assumptions introduced by if's congruence rule are then <br>
+eliminated by one of the more interesting simplification rules that <br>
+explicitly manipulates PROP. This results in a simpler recursion graph <br>
+from which a subsequent tactic has failed to produce the desired recursion <br>
+rule.</p>
+<p>Obviously, the example above is useless. The example I'm interested in <br>
+uses a let expression to put a wrapper around a recursive call, allowing <br>
+certain code to be pasted in unmodified but still use the wrapper. In at <br>
+least one call site, False is passed as an argument and thus finds its way <br>
+into the congruence assumptions. I think I can work around this by <br>
+inventing some wrapping constants to befuddle the simplifier, but it would <br>
+be nice to see this fixed in future versions.</p>
+<p>Yours,<br>
+    Thomas.</p>
+
+
+
+<a name="294049202"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Bug%20report%20for%20function%20package./near/294049202" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Bug.20report.20for.20function.20package.2E.html#294049202">(Aug 18 2022 at 10:30)</a>:</h4>
+<p>From: Alexander Krauss &lt;<a href="mailto:krauss@in.tum.de">krauss@in.tum.de</a>&gt;<br>
+Hi Thomas,</p>
+<p>Thanks for reporting this. I'll have a closer look.</p>
+<p>Alex</p>
+
+
+
+<a name="294049260"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Bug%20report%20for%20function%20package./near/294049260" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Bug.20report.20for.20function.20package.2E.html#294049260">(Aug 18 2022 at 10:31)</a>:</h4>
+<p>From: Thomas Arthur Leck Sewell &lt;<a href="mailto:tsewell@cse.unsw.EDU.AU">tsewell@cse.unsw.EDU.AU</a>&gt;<br>
+I'd like to widen my previous bug report. Having boiled down my example to <br>
+a simple construction and explained it, I went and worked around the <br>
+problem only to have the system continue to fail ... sigh.</p>
+<p>It seems that some of the simps in simp_thms are applied in a simpset deep <br>
+in the bowels of the function package, and that if <em>any</em> of them <br>
+manipulate the term, it will result in a tactic failure later (when not in <br>
+quick-and-dirty mode) when the package tries to produce derivative <br>
+results.</p>
+<p>For example:<br>
+function recursive :: "bool =&gt; nat" where<br>
+  "recursive x = recursive (Not True)"</p>
+<p>function recursive :: "bool =&gt; nat" where<br>
+  "recursive x = recursive (Not False)"</p>
+<p>function recursive :: "bool =&gt; nat" where<br>
+  "recursive x = recursive (True &amp; x)"</p>
+<p>function recursive :: "bool =&gt; nat" where<br>
+  "recursive x = recursive (x &amp; True)"</p>
+<p>But not (x | False). This is all rather amusing, and I hope someone has an <br>
+idea what I might have come across.</p>
+<p>Yours,<br>
+    Thomas.</p>
+
+
+
+<a name="294049282"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Bug%20report%20for%20function%20package./near/294049282" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Bug.20report.20for.20function.20package.2E.html#294049282">(Aug 18 2022 at 10:31)</a>:</h4>
+<p>From: Alexander Krauss &lt;<a href="mailto:krauss@in.tum.de">krauss@in.tum.de</a>&gt;<br>
+Thomas,</p>
+<blockquote>
+<p>I'd like to widen my previous bug report. Having boiled down my example<br>
+to a simple construction and explained it, I went and worked around the<br>
+problem only to have the system continue to fail ... sigh.</p>
+</blockquote>
+<p>You are using a development snapshot of Isabelle, so errors like this<br>
+can happen from time to time.</p>
+<p>Please send further bug reports for the function package directly to me.<br>
+It is good if you produce small self-contained examples like you did, but<br>
+you shouldn't try to guess what happens internally, since that  <br>
+probably just wastes your time.</p>
+<blockquote>
+<p>function recursive :: "bool =&gt; nat" where<br>
+ "recursive x = recursive (Not True)"</p>
+<p>[...]</p>
+</blockquote>
+<p>These were all instances of the same problem. We fixed this in the  <br>
+CVS, and the fix should be in tomorrow's development snapshot.</p>
+<p>Cheers,<br>
+Alex</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

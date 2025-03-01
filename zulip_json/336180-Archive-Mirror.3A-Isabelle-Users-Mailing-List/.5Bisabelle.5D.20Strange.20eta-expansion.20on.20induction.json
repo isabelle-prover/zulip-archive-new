@@ -1,0 +1,50 @@
+[
+    {
+        "content": "<p>From: Peter Lammich &lt;<a href=\"mailto:lammich@in.tum.de\">lammich@in.tum.de</a>&gt;<br>\nHi,</p>\n<p>[Referring to Isabelle-2011-1]</p>\n<p>I recently encountered a quite strange behavior of the induct method. It<br>\nseems to arbitrarily eta-expand its subgoals under certain conditions<br>\n(If the induction variable is nested inside higher-order context ???).</p>\n<p>In the boiled-down example below, the first induct method fully<br>\neta-expands its subgoals. In the second induct-method, the subgoals are<br>\nnot eta-expanded, but the generated cases are. That is, on apply-style<br>\nscripts, you see eta-contracted goals, and when switching to ISAR, using<br>\ncase-commands, you get eta-expanded goals.</p>\n<p>Is this behavior somehow documented? Can I switch it off? <br>\nIn my concrete application, it kills my simplifier setup, as the<br>\nsimplifier applies rules inside the eta-expanded terms that I do not<br>\nexpect to be applied there.</p>\n<p>Regards,<br>\n  Peter</p>\n<hr>\n<p>declare [[eta_contract = false ]] (* Configure pretty-printer not to<br>\neta-contract on pretty-printing *)</p>\n<p>consts<br>\n  f :: \"('a \\&lt;Rightarrow&gt; 'b \\&lt;Rightarrow&gt; bool) \\&lt;Rightarrow&gt; bool\"<br>\n  i :: \"('a list \\&lt;Rightarrow&gt; 'a set \\&lt;Rightarrow&gt; 'a \\&lt;Rightarrow&gt; 'b<br>\n\\&lt;Rightarrow&gt; bool)\"</p>\n<p>lemma \"f (i xs s)\"<br>\n  apply (induct xs)   (* Subgoals are fully eta-expanded here *)<br>\n  print_cases (* Cases are eta-expanded, too*)<br>\n  oops</p>\n<p>lemma \"f (i xs s)\"<br>\n  apply (induct xs arbitrary: s) (* Subgoals are <em>NOT</em> eta-expanded here<br>\n*)<br>\n  print_cases  (* Cases are eta-expanded *)<br>\n  oops</p>",
+        "id": 294153524,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660850242
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nThis is the normal order of things.  Combinations of simplification with <br>\nrule applications of the resolution family (intro/elim/dest) can lead to <br>\neta-expansion and thus more reductions than first anticipated.</p>\n<p>The above simpset is a bit fragile in that sense, as you have observed <br>\nalready.  If you do not want to add more rules, but want to retain control <br>\nof lambda equivalences, you can try to wrap up some App or Abs nodes in <br>\nauxiliary operators; similar to Collect/member for 'a set in HOL.</p>\n<p>Makarius</p>",
+        "id": 294153653,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660850284
+    },
+    {
+        "content": "<p>From: Tobias Nipkow &lt;<a href=\"mailto:nipkow@in.tum.de\">nipkow@in.tum.de</a>&gt;<br>\nThe induct method itself does not eta-contract or expand. It merely uses<br>\nprimitives, in particular resolution, which in turn uses higher-order<br>\nunification. And higher-order unification does indeed eta-expand. In<br>\ncertain situations. This is intentionally not fixed and you should not<br>\nexpect or rely on a particular behaviour. That is, you may have to<br>\nensure eta-contraction yourself if some part of your proof method is<br>\nsensitive to it.</p>\n<p>Tobias</p>",
+        "id": 294153748,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660850313
+    },
+    {
+        "content": "<p>From: Brian Huffman &lt;<a href=\"mailto:huffman@in.tum.de\">huffman@in.tum.de</a>&gt;<br>\nI have complained at length about this issue before. See this thread<br>\nfrom August of last year:</p>\n<p><a href=\"https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2011-August/msg00080.html\">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2011-August/msg00080.html</a><br>\n<a href=\"https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2011-August/msg00089.html\">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2011-August/msg00089.html</a></p>\n<p>To summarize: In my opinion, having a proof kernel that does<br>\neta-expansion willy-nilly is an embarrassment; I also have similar<br>\nfeelings about the \"eta-contract\" option in the pretty-printer, which<br>\nour eta-expanding kernel makes necessary.</p>\n<p>Unfortunately, fixing the problem properly would require modifying the<br>\nunification code in the kernel, which hardly anybody understands. It<br>\nwould be hard to get anyone to trust a modified version of it.</p>\n<p>As a workaround, perhaps someone could write a wrapper around the<br>\ninduct method that would do its own unification outside the kernel,<br>\nand pre-instantiate the induction rule before applying it. This would<br>\navoid using the kernel's unification code, thus preventing the<br>\neta-expansion.</p>\n<ul>\n<li>Brian</li>\n</ul>",
+        "id": 294153869,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660850377
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nAs Tobias points out, the Pure Isabelle system conceptually works modulo <br>\neta (and beta and alpha) conversion -- although there are well known <br>\ntraps.  So to continue the thread, I would also like to see the other part <br>\n-- the proof tool by Peter that fails here.</p>\n<p>Makarius</p>",
+        "id": 294154028,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660850444
+    },
+    {
+        "content": "<p>From: Lawrence Paulson &lt;<a href=\"mailto:lp15@cam.ac.uk\">lp15@cam.ac.uk</a>&gt;<br>\nEta-expansion is an intrinsic part of the higher-order unification algorithm. Following each unification by an eta-contraction step would be inefficient, and equally arbitrary. The “problem\" that must be “fixed\" is any code that cannot exist with this basic fact of nature.</p>\n<p>Larry Paulson</p>",
+        "id": 294154164,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660850511
+    },
+    {
+        "content": "<p>From: Brian Huffman &lt;<a href=\"mailto:huffman@in.tum.de\">huffman@in.tum.de</a>&gt;<br>\nOn Fri, Mar 2, 2012 at 9:28 AM, Lawrence Paulson &lt;<a href=\"mailto:lp15@cam.ac.uk\">lp15@cam.ac.uk</a>&gt; wrote:</p>\n<blockquote>\n<p>Eta-expansion is an intrinsic part of the higher-order unification algorithm. Following each unification by an eta-contraction step would be inefficient, and equally arbitrary. The “problem\" that must be “fixed\" is any code that cannot exist with this basic fact of nature.</p>\n</blockquote>\n<p>By this reasoning, the Isabelle simplifier is a \"problem\" that must be \"fixed\".</p>\n<p>The simplifier does not respect eta-equivalence of terms. I don't<br>\nthink I would want one that did.</p>\n<ul>\n<li>Brian</li>\n</ul>\n<blockquote>\n<p>On 1 Mar 2012, at 20:15, Brian Huffman wrote:</p>\n<blockquote>\n<p>I have complained at length about this issue before. See this thread<br>\nfrom August of last year:</p>\n<p><a href=\"https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2011-August/msg00080.html\">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2011-August/msg00080.html</a><br>\n<a href=\"https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2011-August/msg00089.html\">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2011-August/msg00089.html</a></p>\n<p>To summarize: In my opinion, having a proof kernel that does<br>\neta-expansion willy-nilly is an embarrassment; I also have similar<br>\nfeelings about the \"eta-contract\" option in the pretty-printer, which<br>\nour eta-expanding kernel makes necessary.</p>\n<p>Unfortunately, fixing the problem properly would require modifying the<br>\nunification code in the kernel, which hardly anybody understands. It<br>\nwould be hard to get anyone to trust a modified version of it.<br>\n</p>\n</blockquote>\n</blockquote>",
+        "id": 294154334,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660850580
+    },
+    {
+        "content": "<p>From: Peter Lammich &lt;<a href=\"mailto:lammich@in.tum.de\">lammich@in.tum.de</a>&gt;<br>\nIt's no custom \"proof tool\" involved here. My setting is roughly like<br>\nthis:</p>\n<p>I have assertions of type \"heap =&gt; addr set =&gt; bool\", and hoare-tripels<br>\nof type \"assertion =&gt; program =&gt; assertion =&gt; bool\" (syntax: {P} S {Q})</p>\n<p>I defined the assertion <br>\n  definition [simp]: \"false h as == False\"</p>\n<p>Moreover, I have a rule <br>\n  lemma [simp]: \"{false} S {Q}\"</p>\n<p>The proof that fails has the form:<br>\n  lemma \"{is_list xs p} S Q\" proof (induct xs arbitrary: p)<br>\n    case Nil show ?case by (cases p, simp_all)<br>\n    ...</p>\n<p>Here, depending on the case for p, \"is_list [] p\" simplifies to false,<br>\nwhich is then simplified to \\lambda _ _. False, before the rule for<br>\n{false} S {Q} is applied.</p>\n<p>So, if I have to expect eta-expansion at any point, I have to add<br>\nadditional rules to the simpset to make it confluent again. This<br>\ncertainly works, but may blow up the simpset.</p>\n<p>Just as a remark: The simpset setup from the standard library has such<br>\nproblems, too --- for example there is id_apply, that happily simplifies<br>\n\"%x. id x\" to \"%x. x\", but not \"id\" (I already had problems with that).</p>",
+        "id": 294154436,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660850634
+    }
+]

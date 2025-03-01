@@ -1,0 +1,228 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Query towards pseudo constructors · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Query.20towards.20pseudo.20constructors.html">[isabelle] Query towards pseudo constructors</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294306185"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Query%20towards%20pseudo%20constructors/near/294306185" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Query.20towards.20pseudo.20constructors.html#294306185">(Aug 19 2022 at 15:52)</a>:</h4>
+<p>From: Wenda Li &lt;<a href="mailto:wl302@cam.ac.uk">wl302@cam.ac.uk</a>&gt;<br>
+Hi Florian and Andreas,</p>
+<p>Many thanks for your previous emails. I now have some further <br>
+confusions.</p>
+<p>Suppose I have a type A:</p>
+<p>consts P:: "real ⇒ bool"<br>
+typedef A="{x::real. P x}" sorry</p>
+<p>Then, I provide a pseudo constructor C for A:</p>
+<p>consts C:: "nat ⇒ A"<br>
+consts C':: "A ⇒ nat"<br>
+lemma [code abstype]:"C (C' x) = x" sorry</p>
+<p>After that, I define a function g and provide an code equation:</p>
+<p>consts g::"A ⇒ bool"<br>
+lemma [code]:  "g (C 0) = True" sorry</p>
+<p>Now, I want to check code equations for g and see evaluation of g (C 0):</p>
+<p>code_thms g<br>
+value "g (C 0)"</p>
+<p>but both fail due to</p>
+<p>"C" is not a constructor, on left hand side of equation, in theorem:<br>
+g (C zero_nat_inst.zero_nat) ≡ True</p>
+<p>However, if I specify</p>
+<p>code_datatype C</p>
+<p>then everything goes as expected. I am a little confused by the <br>
+behaviour, since I was assuming both "code abstype" and "code_datatype" <br>
+provide a way to construct a pseudo constructor.</p>
+<p>Many thanks for any advice,<br>
+Wenda</p>
+
+
+
+<a name="294306220"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Query%20towards%20pseudo%20constructors/near/294306220" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Query.20towards.20pseudo.20constructors.html#294306220">(Aug 19 2022 at 15:53)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear Wenda,</p>
+<p>If you declare a pseudo-constructor via code_abstype, then the pseudo-constructor is must <br>
+not occur in any code equation. Instead, you have to phrase all theorems using the <br>
+destructor. The reason behind this is that such pseudo-constructors are normally used for <br>
+types with invariants, and these invariants cannot be expressed by pattern matching. In <br>
+this style, your example should be written as follows:</p>
+<p>lemma [code]: "g x = (case C x' of 0 =&gt; True)"</p>
+<p>If your function returns another value of an code_abstype type, you have to apply the <br>
+destructor to the left-hand side.</p>
+<p>Hope this helps,<br>
+Andreas</p>
+
+
+
+<a name="294306546"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Query%20towards%20pseudo%20constructors/near/294306546" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Query.20towards.20pseudo.20constructors.html#294306546">(Aug 19 2022 at 15:54)</a>:</h4>
+<p>From: Wenda Li &lt;<a href="mailto:wl302@cam.ac.uk">wl302@cam.ac.uk</a>&gt;<br>
+Dear data refinement experts,</p>
+<p>I am trying to learn something about code generation. Based on what I <br>
+have seen so far, there are two ways to introduce a pseudo constructor <br>
+for an abstract type A:<br>
+     1) define constant f:: C =&gt; A and g::A =&gt; C, and then prove<br>
+            lemma [code abstype]: f (g x) = x<br>
+        ,and f becomes a pseudo constructor for the abstract type A<br>
+     2) define constant f:: C =&gt; A, and then declare<br>
+            code_datatype f<br>
+Based on my observations, only one of them is used at a time:<br>
+     "Int.thy": code_datatype "0::int" Pos Neg<br>
+     "Real.thy": code_datatype Ratreal<br>
+     "Multiset.thy": code_datatype multiset_of<br>
+have adopted the second approach, while<br>
+     "Rat.thy": lemma [code abstype]:"Frct (quotient_of q) = q"<br>
+     "Polynomial.thy": lemma Poly_coeffs [simp, code abstype]: "Poly <br>
+(coeffs p) = p"<br>
+have adopted the first approach.</p>
+<p>It seems that the "code_datatype" approach is more flexible than the <br>
+"abstype" approach, as multiple constructors can be introduced (I am not <br>
+sure if it is not case for the "abstype" approach) and the cardinality <br>
+of C can be smaller than that of A (e.g. Ratreal in "Real.thy").</p>
+<p>My question is: what is the main difference between these two <br>
+approaches? When shall I choose one over the other?</p>
+<p>Many thanks in advance,<br>
+Wenda</p>
+
+
+
+<a name="294307092"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Query%20towards%20pseudo%20constructors/near/294307092" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Query.20towards.20pseudo.20constructors.html#294307092">(Aug 19 2022 at 15:58)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Wenda,</p>
+<p>I am not sure which documentation you have read so far.  The »Tutorial<br>
+on code generation« contains some explanations and examples concerning<br>
+datatype abstraction.  There is also a substantial publication »Data<br>
+Refinement in Isabelle/HOL«.</p>
+<p>In short, it is helpful to thinkg about pseudo constructors as<br>
+morphisms.  A pseudo constructor declared using »code_datatype« must be<br>
+surjective.  A pseudo constructor declared using »[code abstype]« must<br>
+be injective.</p>
+<p>Cheers,<br>
+    Florian<br>
+<a href="/user_uploads/14278/zTMVi5rBL6F2DBwbfijq_gJV/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294307419"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Query%20towards%20pseudo%20constructors/near/294307419" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Query.20towards.20pseudo.20constructors.html#294307419">(Aug 19 2022 at 15:59)</a>:</h4>
+<p>From: Wenda Li &lt;<a href="mailto:wl302@cam.ac.uk">wl302@cam.ac.uk</a>&gt;<br>
+Hi Florian,</p>
+<p>Many thanks for your clarification, it helps a lot.</p>
+
+
+
+<a name="294307510"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Query%20towards%20pseudo%20constructors/near/294307510" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Query.20towards.20pseudo.20constructors.html#294307510">(Aug 19 2022 at 16:00)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Wenda,</p>
+<p>On 04.09.2014 14:12, Wenda Li wrote:</p>
+<blockquote>
+<p>Hi Florian,</p>
+<p>Many thanks for your clarification, it helps a lot.</p>
+<blockquote>
+<p>A pseudo constructor declared using »code_datatype« must be<br>
+surjective.  A pseudo constructor declared using »[code abstype]« must<br>
+be injective.</p>
+</blockquote>
+<p>Do you mean the other way around? Ratreal::"rat =&gt; real" in "Real.thy"<br>
+(declared using "code_datatype") is an injective but not surjective<br>
+function, while Frct:: "int \times int =&gt; rat" (declared using "[code<br>
+abstype]") is a surjective but not injective function. Sorry if I have<br>
+messed with any definitions.</p>
+</blockquote>
+<p>thanks for clarifying, I have made a slip here.</p>
+<p>Cheers,<br>
+    Florian</p>
+<blockquote>
+<p>Best,<br>
+Wenda</p>
+<p>On 2014-09-04 08:14, Florian Haftmann wrote:</p>
+<blockquote>
+<p>Hi Wenda,</p>
+<p>I am not sure which documentation you have read so far.  The »Tutorial<br>
+on code generation« contains some explanations and examples concerning<br>
+datatype abstraction.  There is also a substantial publication »Data<br>
+Refinement in Isabelle/HOL«.</p>
+<p>In short, it is helpful to thinkg about pseudo constructors as<br>
+morphisms.  A pseudo constructor declared using »code_datatype« must be<br>
+surjective.  A pseudo constructor declared using »[code abstype]« must<br>
+be injective.</p>
+<p>Cheers,<br>
+    Florian<br>
+</p>
+</blockquote>
+<p>On 03.09.2014 21:41, Wenda Li wrote:</p>
+<blockquote>
+<blockquote>
+<p>Dear data refinement experts,</p>
+<p>I am trying to learn something about code generation. Based on what I<br>
+have seen so far, there are two ways to introduce a pseudo constructor<br>
+for an abstract type A:<br>
+    1) define constant f:: C =&gt; A and g::A =&gt; C, and then prove<br>
+           lemma [code abstype]: f (g x) = x<br>
+       ,and f becomes a pseudo constructor for the abstract type A<br>
+    2) define constant f:: C =&gt; A, and then declare<br>
+           code_datatype f<br>
+Based on my observations, only one of them is used at a time:<br>
+    "Int.thy": code_datatype "0::int" Pos Neg<br>
+    "Real.thy": code_datatype Ratreal<br>
+    "Multiset.thy": code_datatype multiset_of<br>
+have adopted the second approach, while<br>
+    "Rat.thy": lemma [code abstype]:"Frct (quotient_of q) = q"<br>
+    "Polynomial.thy": lemma Poly_coeffs [simp, code abstype]: "Poly<br>
+(coeffs p) = p"<br>
+have adopted the first approach.</p>
+<p>It seems that the "code_datatype" approach is more flexible than the<br>
+"abstype" approach, as multiple constructors can be introduced (I am not<br>
+sure if it is not case for the "abstype" approach) and the cardinality<br>
+of C can be smaller than that of A (e.g. Ratreal in "Real.thy").</p>
+<p>My question is: what is the main difference between these two<br>
+approaches? When shall I choose one over the other?</p>
+<p>Many thanks in advance,<br>
+Wenda<br>
+</p>
+</blockquote>
+</blockquote>
+<p><a href="/user_uploads/14278/7TDmkWhyR1nQfZf2E9kj3Ubi/signature.asc">signature.asc</a></p>
+</blockquote>
+
+
+
+<a name="294307537"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Query%20towards%20pseudo%20constructors/near/294307537" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Query.20towards.20pseudo.20constructors.html#294307537">(Aug 19 2022 at 16:00)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Wenda and Florian,</p>
+<p>Just my 50 cents: pseudo-constructors with code_datatype can be neither injective nor <br>
+surjective. List.set and List.coset are examples of this case.</p>
+<p>Andreas</p>
+
+
+
+<a name="294307617"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Query%20towards%20pseudo%20constructors/near/294307617" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Query.20towards.20pseudo.20constructors.html#294307617">(Aug 19 2022 at 16:00)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi all,</p>
+<p>this time I strongly hope that I am more awake than when I wrote the<br>
+other two mails ;-).</p>
+<p>It's indeed not about surjective vs. injective, but about surjective vs.<br>
+total.</p>
+<p>Have C :: s =&gt; t</p>
+<p>If C is a total function, then it is suitable for code_datatype.<br>
+If C is surjective (but not necessarily total), then it is suitable for<br>
+[code abstype].</p>
+<p>Note that in the sense of HOL each function is total.  »C is partial«<br>
+here means that in generated code C will only be applied to certain<br>
+values of s (»abstract datatype«).</p>
+<p>Hope this helps,<br>
+    Florian<br>
+<a href="/user_uploads/14278/74j7WU6WAqLjlkV91t3FbIFm/signature.asc">signature.asc</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,159 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Code equations for &quot;power&quot; · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20equations.20for.20.22power.22.html">[isabelle] Code equations for &quot;power&quot;</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294664615"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20equations%20for%20%22power%22/near/294664615" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20equations.20for.20.22power.22.html#294664615">(Aug 22 2022 at 12:27)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:eberlm@in.tum.de">eberlm@in.tum.de</a>&gt;<br>
+Hallo,</p>
+<p>I just noticed that the "power" function is exported as</p>
+<p>power :: forall a. (Power a) =&gt; a -&gt; Nat -&gt; a;<br>
+power a n =<br>
+   (if equal_nat n zero_nat then one<br>
+     else times a (power a (minus_nat n one_nat)));</p>
+<p>This looks pretty inefficient to me; something like iterated squaring <br>
+should be much faster, and it's pretty easy to do. However, this only <br>
+works in the type class mult_monoid; power, on the other hand, is <br>
+defined in the type class "power". (the difference is essentially that <br>
+the latter does not demand associativity, if I am not mistaken)</p>
+<p>Is it still possible to use the more efficient iterative squaring when <br>
+applicable? I attached something using code_unfold, but I'm not sure if <br>
+that really does what one would want it to do.</p>
+<p>Moreover, for rational numbers, one could optimise this even futher: <br>
+multiplication on rational numbers reduces the numerator and denominator <br>
+after the multiplication. In the case of "power", this is unnecessary, <br>
+since the numerator and denominator of the result will always be coprime <br>
+if they were coprime before. Perhaps this would be a worthwhile <br>
+optimisation?</p>
+<p>Lastly, I was wondering whether there was something like "divmod" in <br>
+Isabelle, i.e. an operation that returns both the quotient and the <br>
+remainder, since most languages have a corresponding operation that is <br>
+more efficient than computing the two separately.</p>
+<p>Cheers,</p>
+<p>Manuel<br>
+<a href="/user_uploads/14278/VwnyElQEWtKvOL9rAijddBvn/MyPower.thy">MyPower.thy</a></p>
+
+
+
+<a name="294664715"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20equations%20for%20%22power%22/near/294664715" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20equations.20for.20.22power.22.html#294664715">(Aug 22 2022 at 12:28)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear Manuel,</p>
+<blockquote>
+<p>I just noticed that the "power" function is exported as</p>
+<p>power :: forall a. (Power a) =&gt; a -&gt; Nat -&gt; a;<br>
+power a n =<br>
+   (if equal_nat n zero_nat then one<br>
+     else times a (power a (minus_nat n one_nat)));</p>
+<p>This looks pretty inefficient to me; something like iterated squaring should be much<br>
+faster, and it's pretty easy to do. However, this only works in the type class<br>
+mult_monoid; power, on the other hand, is defined in the type class "power". (the<br>
+difference is essentially that the latter does not demand associativity, if I am not<br>
+mistaken)<br>
+mult_monoid assumes associativity of and neutrality of 1 for times. power does not impose <br>
+any constraints; it is a superclass of mult_monoid.</p>
+</blockquote>
+<blockquote>
+<p>Is it still possible to use the more efficient iterative squaring when applicable? I<br>
+attached something using code_unfold, but I'm not sure if that really does what one would<br>
+want it to do.<br>
+The code_unfold works if the call to power in the code equations is types with something <br>
+of sort mult_monoid. So if the code equation uses power on one of the standard numeric <br>
+types, everything is fine. But if you use power polymorphically for some 'a, then this <br>
+does not work if mult_monoid is not a supersort of 'a's sort. For example, if you have <br>
+something like</p>
+</blockquote>
+<p>definition map_power :: "'a :: power list =&gt; 'a list"<br>
+   where "map_power = map power"</p>
+<p>then if you use map_power, you will end up with the original slow implementation.</p>
+<blockquote>
+<p>Moreover, for rational numbers, one could optimise this even futher: multiplication on<br>
+rational numbers reduces the numerator and denominator after the multiplication. In the<br>
+case of "power", this is unnecessary, since the numerator and denominator of the result<br>
+will always be coprime if they were coprime before. Perhaps this would be a worthwhile<br>
+optimisation?<br>
+Custom implementations for power are not possible with the current setup. You can have <br>
+type-dependent implementations for a function only if that function is a type class <br>
+parameter (unless you play some sophisticated tricks like in the Containers AFP entry). <br>
+ From what I can see, it does not seem reasonable to make power a type class parameter, <br>
+because then power cannot be a superclass of mult_monoid any more (you'd have to add power <br>
+as a type class parameter to the whole algebraic type class hierarchy). But you could <br>
+achieve something similar like this:</p>
+</blockquote>
+<p>class power_impl = power +<br>
+   fixes power_impl :: "'a =&gt; nat =&gt; 'a"<br>
+   assumes power_impl: "power = power_impl"</p>
+<p>declare power_impl [code]</p>
+<p>Then, of course, you have to instantiate the new class power_impl for all types that <br>
+instantiate power and all users have to do the same for their own types. Unfortunately, we <br>
+do not (yet) have a mechanism to instantiate such definitional type classes automatically. <br>
+With this approach, you could declare custom code equations for instances like rat.</p>
+<blockquote>
+<p>Lastly, I was wondering whether there was something like "divmod" in Isabelle, i.e. an<br>
+operation that returns both the quotient and the remainder, since most languages have a<br>
+corresponding operation that is more efficient than computing the two separately.<br>
+There are various specialised divmod constants in HOL, e.g., divmod_integer, <br>
+semiring_numeral_div_class.divmod and Divides.divmod_nat, but no systematic, algebraic <br>
+treatment.</p>
+</blockquote>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<a name="294664737"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20equations%20for%20%22power%22/near/294664737" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20equations.20for.20.22power.22.html#294664737">(Aug 22 2022 at 12:28)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:eberlm@in.tum.de">eberlm@in.tum.de</a>&gt;<br>
+I guess that's a pretty good compromise, isn't it? Most of the time, <br>
+exported code using the "power" operation will probably be dealing with <br>
+types that fulfil at least monoid_mult, and then this fast variant could <br>
+be used.</p>
+<p>Perhaps this should be put in the library?</p>
+<p>Cheers,</p>
+<p>Manuel</p>
+
+
+
+<a name="294664757"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20equations%20for%20%22power%22/near/294664757" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20equations.20for.20.22power.22.html#294664757">(Aug 22 2022 at 12:28)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Manuel,</p>
+<p>I think that this can work for power, but it can also lead to surprises because the <br>
+rewrite does not trigger always and users then have to understand the whole setup to find <br>
+out. I had experimented with such rewrites for subset tests (end of theory <br>
+Library/Cardinality), but this never worked as well as I had hoped, because the rewrite <br>
+needed the sort card_UNIV, which was hardly present in any code equation.</p>
+<p>René Thiemann and Christian Sternagel faced the same problem for linorders and <br>
+comparators. They have implemented a custom function in ML that transforms the code <br>
+equations, but users have to call this manually (see their ITP2015 paper). This approach <br>
+is less convenient, but more robust.</p>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<a name="294664874"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20equations%20for%20%22power%22/near/294664874" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20equations.20for.20.22power.22.html#294664874">(Aug 22 2022 at 12:29)</a>:</h4>
+<p>From: "Thiemann, Rene" &lt;<a href="mailto:Rene.Thiemann@uibk.ac.at">Rene.Thiemann@uibk.ac.at</a>&gt;<br>
+Dear Manuel,</p>
+<p>If you care about efficiency, you might also have a look at improved code equations for divmod, e.g., under</p>
+<p><a href="http://afp.sourceforge.net/browser_info/current/AFP/Algebraic_Numbers/Improved_Code_Equations.html">http://afp.sourceforge.net/browser_info/current/AFP/Algebraic_Numbers/Improved_Code_Equations.html</a></p>
+<p>for Isabelle 2015</p>
+<p>and under </p>
+<p><a href="http://afp.sourceforge.net/browser_info/devel/AFP/Algebraic_Numbers/Improved_Code_Equations.html">http://afp.sourceforge.net/browser_info/devel/AFP/Algebraic_Numbers/Improved_Code_Equations.html</a><br>
+<a href="http://afp.sourceforge.net/browser_info/devel/AFP/Algebraic_Numbers/Divmod_Int.html">http://afp.sourceforge.net/browser_info/devel/AFP/Algebraic_Numbers/Divmod_Int.html</a></p>
+<p>for Isabelle 2016-RC0.</p>
+<p>Best,<br>
+René</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

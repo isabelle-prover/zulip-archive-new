@@ -1,0 +1,207 @@
+<html>
+<head><meta charset="utf-8"><title>Equivalence relation and the simplifier · Beginner Questions · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/index.html">Beginner Questions</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Equivalence.20relation.20and.20the.20simplifier.html">Equivalence relation and the simplifier</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="336524500"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Equivalence%20relation%20and%20the%20simplifier/near/336524500" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Hernán Rajchert <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Equivalence.20relation.20and.20the.20simplifier.html#336524500">(Feb 24 2023 at 16:16)</a>:</h4>
+<p>Hi! I'm refactoring some proofs I have in a language interpreter that uses associative-list as a concrete representation for Maps. </p>
+<p>The current version is thought with performance in mind, so the <code>insert</code>, <code>delete</code> and <code>lookup</code> assumes that the keys are distinct and sorted. This is useful when comparing two associative-list, as two <code>AssocMap</code> are equal if the list is equal, but they are troublesome when proving other stuff as I need to combine list induction with linorder_cases.</p>
+<p>The partially refactored version (presented below) makes some tests easier, but now I can't just use equality, as two <code>AssocMap</code> with different sorting are different. This is made obvious in the <code>insert_swap</code> lemma, for which nitpick finds a counter-example.</p>
+<p>I was able to express an equivalence relationship, and the <code>insert_swap</code> is proved automatically. But I fear that the simplifier won't be able to use this lemma as it is. I think the solution involves congruence rules, so I read the corresponding sections in the tutorial and in isar-ref, but I wasn't able to express a <code>[cong]</code> rule.</p>
+<h1>Refactored version without sorting</h1>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">theory</span><span class="w"> </span><span class="n">AssocMap</span>
+
+<span class="w">  </span><span class="kp">imports</span><span class="w"> </span><span class="n">Main</span>
+
+<span class="k">begin</span>
+
+<span class="k">fun</span><span class="w"> </span><span class="n">unique_keys</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">"('k × 'v) list ⇒ bool"</span><span class="w"> </span><span class="kp">where</span>
+<span class="w">  </span><span class="s">"unique_keys m = distinct (map fst m)"</span>
+
+<span class="kn">lemma</span><span class="w"> </span><span class="n">filterOfUniqueIsUnique</span><span class="w"> </span><span class="o">:</span>
+<span class="w">  </span><span class="kp">assumes</span><span class="w"> </span><span class="s">"unique_keys m"</span>
+<span class="w">  </span><span class="kp">shows</span><span class="w"> </span><span class="s">"unique_keys (filter P m)"</span>
+<span class="k">using</span><span class="w"> </span><span class="n">assms</span><span class="w"> </span><span class="k">proof</span><span class="w"> </span><span class="o">(</span><span class="n">induction</span><span class="w"> </span><span class="n">m</span><span class="o">)</span>
+<span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="n">Nil</span>
+<span class="w">  </span><span class="k">then</span><span class="w"> </span><span class="k">show</span><span class="w"> </span><span class="o">?</span><span class="k">case</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">simp</span>
+<span class="k">next</span>
+<span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="o">(</span><span class="n">Cons</span><span class="w"> </span><span class="n">head</span><span class="w"> </span><span class="n">tail</span><span class="o">)</span>
+
+<span class="w">  </span><span class="k">then</span><span class="w"> </span><span class="k">show</span><span class="w"> </span><span class="o">?</span><span class="k">case</span>
+<span class="w">    </span><span class="k">using</span><span class="w"> </span><span class="n">Cons.prems</span><span class="w"> </span><span class="n">distinct_map_filter</span><span class="w"> </span><span class="n">unique_keys.simps</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">blast</span>
+<span class="k">qed</span>
+
+
+<span class="kn">typedef</span>
+<span class="w"> </span><span class="o">(</span><span class="n n-Type">'k</span><span class="o">,</span><span class="w"> </span><span class="n n-Type">'v</span><span class="o">)</span><span class="w"> </span><span class="n">AssocMap</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"{m :: ('k × 'v) list. unique_keys m}"</span>
+<span class="w">  </span><span class="k">by</span><span class="w"> </span><span class="o">(</span><span class="n">rule_tac</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"[]"</span><span class="w"> </span><span class="kp">in</span><span class="w"> </span><span class="n">exI</span><span class="o">)</span><span class="w"> </span><span class="n">auto</span>
+
+<span class="k">setup_lifting</span><span class="w"> </span><span class="n">type_definition_AssocMap</span>
+
+<span class="kn">lift_definition</span><span class="w"> </span><span class="n">empty</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">"('k, 'v) AssocMap"</span>
+<span class="w">  </span><span class="kp">is</span><span class="w"> </span><span class="s">"[]"</span>
+<span class="w">  </span><span class="k">by</span><span class="w"> </span><span class="n">simp</span>
+
+
+<span class="k">fun</span><span class="w"> </span><span class="n">delete'</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">"'k ⇒ ('k × 'v) list ⇒  ('k × 'v) list"</span><span class="w"> </span><span class="kp">where</span>
+<span class="w">  </span><span class="s">"delete' k m = filter (λ(mK, mV). mK ≠ k) m"</span>
+
+<span class="kn">lift_definition</span>
+<span class="w">  </span><span class="n">delete</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">"'k ⇒ ('k, 'v) AssocMap ⇒ ('k, 'v) AssocMap"</span>
+<span class="w">  </span><span class="kp">is</span><span class="w"> </span><span class="n">delete'</span>
+<span class="w">  </span><span class="k">by</span><span class="w"> </span><span class="o">(</span><span class="n">simp</span><span class="w"> </span><span class="n">add</span><span class="o">:</span><span class="w"> </span><span class="n">distinct_map_filter</span><span class="o">)</span>
+
+
+<span class="kn">lift_definition</span>
+<span class="w">  </span><span class="n">insert</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">"'k ⇒ 'v ⇒ ('k, 'v) AssocMap ⇒ ('k, 'v) AssocMap"</span>
+<span class="w">  </span><span class="kp">is</span><span class="w"> </span><span class="s">"λk v m. (k, v) # (delete' k m)"</span>
+<span class="w">  </span><span class="k">using</span><span class="w"> </span><span class="n">distinct_map_filter</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">auto</span>
+
+
+<span class="kn">lemma</span><span class="w"> </span><span class="n">insert_swap</span><span class="w"> </span><span class="o">:</span>
+<span class="w">  </span><span class="s">"k1 ≠ k2 ⟹ insert k1 v1 (insert k2 v2 m) = insert k2 v2 (insert k1 v1 m)"</span>
+<span class="w">  </span><span class="c">(* nitpick finds the following counter-example, and it makes sense,</span>
+<span class="c">     they are not equal, they are equivalent.</span>
+<span class="c">     k1 = a⇩1</span>
+<span class="c">     k2 = a⇩2</span>
+<span class="c">     m = «[(a⇩2, b⇩1)]»</span>
+<span class="c">     v1 = b⇩2</span>
+<span class="c">     v2 = b⇩1</span>
+<span class="c">  *)</span>
+<span class="w">  </span><span class="gr">oops</span>
+
+<span class="kn">lift_definition</span><span class="w"> </span><span class="n">assocMapEquiv</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">"('k, 'v) AssocMap ⇒ ('k, 'v) AssocMap ⇒ bool"</span><span class="w">  </span><span class="o">(</span><span class="kp">infix</span><span class="w"> </span><span class="s">"≡⇩a"</span><span class="w"> </span><span class="n">50</span><span class="o">)</span>
+<span class="w">  </span><span class="kp">is</span>
+<span class="w">  </span><span class="s">"λa b. (∀e. e ∈ set a ⟷ e ∈ set b)"</span><span class="w"> </span><span class="ow">.</span>
+
+<span class="kn">lemma</span><span class="w"> </span><span class="n">insert_swap</span><span class="w"> </span><span class="o">:</span>
+<span class="w">  </span><span class="s">"k1 ≠ k2 ⟹ insert k1 v1 (insert k2 v2 m) ≡⇩a insert k2 v2 (insert k1 v1 m)"</span>
+<span class="w">  </span><span class="k">by</span><span class="w"> </span><span class="n">transfer</span><span class="w"> </span><span class="n">auto</span>
+
+<span class="c">(* How can I define a congruence rule so that the simplifier is able to make the swap? *)</span>
+</code></pre></div>
+<h1>Refactored version with sorting</h1>
+<p>My initial attempt was to refactor the <a href="https://github.com/input-output-hk/marlowe/blob/7314e680d05f80660ecdf8c1e327ed191119e533/isabelle/Util/MList.thy">current theory</a>, which requires manual passing of the <code>valid_map</code> assumption, into a typedef, but as I mentioned before some proofs are harder than need to because of the sorting.</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">theory</span><span class="w"> </span><span class="n">AssocMap</span>
+<span class="kp">imports</span><span class="w"> </span><span class="n">Main</span>
+<span class="k">begin</span>
+
+
+<span class="gu">section</span><span class="w"> </span><span class="s">"Associative Map"</span>
+
+<span class="k">fun</span><span class="w"> </span><span class="n">unique_keys</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">"('k × 'v) list ⇒ bool"</span><span class="w"> </span><span class="kp">where</span>
+<span class="w">  </span><span class="s">"unique_keys m = distinct (map fst m)"</span>
+
+<span class="k">fun</span><span class="w"> </span><span class="n">sorted_keys</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">"('k::linorder × 'v) list ⇒ bool"</span><span class="w"> </span><span class="kp">where</span>
+<span class="w">  </span><span class="s">"sorted_keys m = sorted (map fst m)"</span>
+
+<span class="kn">lemma</span><span class="w"> </span><span class="n">sorted_keys_cons</span><span class="w"> </span><span class="o">:</span>
+<span class="w">  </span><span class="kp">assumes</span><span class="w"> </span><span class="s">"sorted_keys (tail)"</span>
+<span class="w">      </span><span class="kp">and</span><span class="w"> </span><span class="s">"⋀tK tV. (tK, tV) ∈ set tail ⟹ hK &lt; tK"</span>
+<span class="w">    </span><span class="kp">shows</span><span class="w"> </span><span class="s">"sorted_keys ((hK, hV) # tail)"</span>
+<span class="k">proof</span><span class="w"> </span><span class="o">-</span>
+<span class="w">  </span><span class="k">have</span><span class="w"> </span><span class="s">"⋀tK tV. (tK, tV) ∈ set tail ⟹ hK ≤ tK"</span>
+<span class="w">    </span><span class="k">by</span><span class="w"> </span><span class="o">(</span><span class="n">simp</span><span class="w"> </span><span class="n">add</span><span class="o">:</span><span class="w"> </span><span class="n">assms</span><span class="o">(</span><span class="n">2</span><span class="o">)</span><span class="w"> </span><span class="n">dual_order.order_iff_strict</span><span class="o">)</span>
+<span class="w">  </span><span class="k">then</span><span class="w"> </span><span class="k">show</span><span class="w"> </span><span class="o">?</span><span class="n">thesis</span>
+<span class="w">    </span><span class="k">using</span><span class="w"> </span><span class="n">assms</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">auto</span>
+<span class="k">qed</span>
+
+
+
+<span class="kn">typedef</span><span class="w"> </span><span class="o">(</span><span class="kp">overloaded</span><span class="o">)</span>
+<span class="w">  </span><span class="o">(</span><span class="n n-Type">'k</span><span class="o">::</span><span class="n">linorder</span><span class="o">,</span><span class="w"> </span><span class="n n-Type">'v</span><span class="o">)</span><span class="w"> </span><span class="n">AssocMap</span><span class="w"> </span><span class="c">(*&lt;*)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"{m :: ('k × 'v) list.</span>
+<span class="s">                                          (unique_keys m ∧ sorted_keys m)</span>
+<span class="s">                                       }"</span>
+<span class="w">  </span><span class="k">by</span><span class="w"> </span><span class="o">(</span><span class="n">rule_tac</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"[]"</span><span class="w"> </span><span class="kp">in</span><span class="w"> </span><span class="n">exI</span><span class="o">)</span><span class="w"> </span><span class="n">auto</span>
+
+
+<span class="k">setup_lifting</span><span class="w"> </span><span class="n">type_definition_AssocMap</span>
+
+<span class="kn">lift_definition</span><span class="w"> </span><span class="n">empty</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">"('k::linorder, 'v) AssocMap"</span>
+<span class="w">  </span><span class="kp">is</span><span class="w"> </span><span class="s">"[]"</span>
+<span class="w">  </span><span class="k">by</span><span class="w"> </span><span class="n">simp</span>
+
+
+<span class="k">fun</span><span class="w"> </span><span class="n">insert'</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">"'k::linorder ⇒ 'v ⇒ ('k × 'v) list ⇒ ('k × 'v) list"</span><span class="w"> </span><span class="kp">where</span>
+<span class="w">  </span><span class="s">"insert' k v [] = [(k, v)]"</span>
+<span class="o">|</span><span class="w"> </span><span class="s">"insert' k v ((hK, hV) # tail) =</span>
+<span class="s">    (if      k &lt; hK then (k, v) # [(hK, hV)] @ tail</span>
+<span class="s">     else if k = hK then (k, v) # tail</span>
+<span class="s">     else                (hK, hV) # insert' k v tail</span>
+<span class="s">    )"</span>
+
+
+<span class="kn">lemma</span><span class="w"> </span><span class="n">pInsert_union</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s">"set (map fst (insert' k v m)) = set [k] ∪ set (map fst m)"</span>
+<span class="k">proof</span><span class="w"> </span><span class="o">(</span><span class="n">induction</span><span class="w"> </span><span class="n">m</span><span class="o">)</span>
+<span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="n">Nil</span>
+<span class="w">  </span><span class="k">then</span><span class="w"> </span><span class="k">show</span><span class="w"> </span><span class="o">?</span><span class="k">case</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">simp</span>
+<span class="k">next</span>
+<span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="o">(</span><span class="n">Cons</span><span class="w"> </span><span class="n">head</span><span class="w"> </span><span class="n">tail</span><span class="o">)</span>
+<span class="w">  </span><span class="k">then</span><span class="w"> </span><span class="k">obtain</span><span class="w"> </span><span class="n">hK</span><span class="w"> </span><span class="n">hV</span><span class="w"> </span><span class="kp">where</span><span class="w"> </span><span class="s">"head = (hK, hV)"</span>
+<span class="w">    </span><span class="k">by</span><span class="w"> </span><span class="n">fastforce</span>
+
+<span class="w">  </span><span class="k">then</span><span class="w"> </span><span class="k">show</span><span class="w"> </span><span class="o">?</span><span class="k">case</span>
+<span class="w">    </span><span class="k">using</span><span class="w"> </span><span class="n">list.simps</span><span class="o">(</span><span class="n">9</span><span class="o">)</span><span class="w"> </span><span class="n">local.Cons</span><span class="w"> </span><span class="n">set_append</span><span class="w"> </span><span class="n">sup.left_idem</span><span class="w"> </span><span class="n">sup_left_commute</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">force</span>
+<span class="k">qed</span>
+
+
+<span class="kn">lift_definition</span><span class="w"> </span><span class="n">insert</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">"'k::linorder ⇒ 'v ⇒ ('k, 'v) AssocMap ⇒ ('k, 'v) AssocMap"</span>
+<span class="w">  </span><span class="kp">is</span><span class="w"> </span><span class="n">insert'</span>
+<span class="w">  </span><span class="n">subgoal</span><span class="w"> </span><span class="kp">for</span><span class="w"> </span><span class="n">k</span><span class="w"> </span><span class="n">v</span><span class="w"> </span><span class="n">m</span>
+<span class="w">  </span><span class="k">proof</span><span class="w"> </span><span class="o">(</span><span class="n">induction</span><span class="w"> </span><span class="n">m</span><span class="o">)</span>
+<span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="n">Nil</span>
+<span class="w">    </span><span class="k">then</span><span class="w"> </span><span class="k">show</span><span class="w"> </span><span class="o">?</span><span class="k">case</span>
+<span class="w">      </span><span class="k">by</span><span class="w"> </span><span class="n">simp</span>
+<span class="w">  </span><span class="k">next</span>
+<span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="o">(</span><span class="n">Cons</span><span class="w"> </span><span class="n">head</span><span class="w"> </span><span class="n">tail</span><span class="o">)</span>
+<span class="w">    </span><span class="k">then</span><span class="w"> </span><span class="k">obtain</span><span class="w"> </span><span class="n">hK</span><span class="w"> </span><span class="n">hV</span><span class="w"> </span><span class="kp">where</span><span class="w"> </span><span class="n">pHead</span><span class="o">:</span><span class="w"> </span><span class="s">"head = (hK, hV)"</span>
+<span class="w">      </span><span class="k">by</span><span class="w"> </span><span class="n">fastforce</span>
+
+<span class="w">    </span><span class="k">then</span><span class="w"> </span><span class="k">show</span><span class="w"> </span><span class="o">?</span><span class="k">case</span>
+<span class="w">      </span><span class="k">proof</span><span class="w"> </span><span class="o">(</span><span class="n">cases</span><span class="w"> </span><span class="n">rule</span><span class="o">:</span><span class="w"> </span><span class="n">linorder_cases</span><span class="o">[</span><span class="n">of</span><span class="w"> </span><span class="n">k</span><span class="w"> </span><span class="n">hK</span><span class="o">])</span>
+<span class="w">        </span><span class="k">assume</span><span class="w"> </span><span class="s">"k &lt; hK"</span>
+<span class="w">        </span><span class="k">then</span><span class="w"> </span><span class="k">show</span><span class="w"> </span><span class="o">?</span><span class="n">thesis</span>
+<span class="w">          </span><span class="k">using</span><span class="w"> </span><span class="n">pHead</span><span class="w"> </span><span class="n">Cons.prems</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">auto</span>
+<span class="w">      </span><span class="k">next</span>
+<span class="w">        </span><span class="k">assume</span><span class="w"> </span><span class="s">"k = hK"</span>
+<span class="w">        </span><span class="k">then</span><span class="w"> </span><span class="k">show</span><span class="w"> </span><span class="o">?</span><span class="n">thesis</span>
+<span class="w">          </span><span class="k">using</span><span class="w"> </span><span class="n">pHead</span><span class="w"> </span><span class="n">Cons.prems</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">force</span>
+<span class="w">      </span><span class="k">next</span>
+<span class="w">        </span><span class="k">assume</span><span class="w"> </span><span class="s">"k &gt; hK"</span>
+<span class="w">        </span><span class="k">moreover</span><span class="w"> </span><span class="k">note</span><span class="w"> </span><span class="n">Cons.IH</span><span class="w"> </span><span class="n">Cons.prems</span><span class="w"> </span><span class="n">pHead</span>
+
+<span class="w">        </span><span class="k">moreover</span><span class="w"> </span><span class="k">have</span><span class="w"> </span><span class="s">"⋀tK tV. (tK, tV) ∈ set (insert' k v tail) ⟹ hK ≤ tK"</span>
+<span class="w">          </span><span class="k">using</span><span class="w"> </span><span class="n">calculation</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="o">(</span><span class="n">metis</span><span class="w"> </span><span class="o">(</span><span class="n">no_types</span><span class="o">,</span><span class="w"> </span><span class="n">opaque_lifting</span><span class="o">)</span><span class="w"> </span><span class="n">append_Cons</span><span class="w"> </span><span class="n">append_Nil</span><span class="w"> </span><span class="n">fst_conv</span><span class="w"> </span><span class="n">insert_iff</span><span class="w"> </span><span class="n">list.set_map</span><span class="w"> </span><span class="n">list.simps</span><span class="o">(</span><span class="n">15</span><span class="o">)</span><span class="w"> </span><span class="n">list.simps</span><span class="o">(</span><span class="n">9</span><span class="o">)</span><span class="w"> </span><span class="n">map_of_eq_None_iff</span><span class="w"> </span><span class="n">option.distinct</span><span class="o">(</span><span class="n">1</span><span class="o">)</span><span class="w"> </span><span class="n">order_less_imp_le</span><span class="w"> </span><span class="n">pInsert_union</span><span class="w"> </span><span class="n">set_append</span><span class="w"> </span><span class="n">sorted_keys.elims</span><span class="o">(</span><span class="n">2</span><span class="o">)</span><span class="w"> </span><span class="n">sorted_simps</span><span class="o">(</span><span class="n">2</span><span class="o">)</span><span class="w"> </span><span class="n">weak_map_of_SomeI</span><span class="o">)</span>
+
+<span class="w">        </span><span class="k">moreover</span><span class="w"> </span><span class="k">have</span><span class="w"> </span><span class="s">"sorted_keys (insert' k v tail)"</span>
+<span class="w">          </span><span class="k">using</span><span class="w"> </span><span class="n">calculation</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">force</span>
+
+<span class="w">        </span><span class="k">moreover</span><span class="w"> </span><span class="k">have</span><span class="w"> </span><span class="s">"sorted_keys ((hK, hV) # insert' k v tail)"</span>
+<span class="w">          </span><span class="k">using</span><span class="w"> </span><span class="n">calculation</span><span class="w">  </span><span class="k">by</span><span class="w"> </span><span class="n">auto</span>
+
+<span class="w">        </span><span class="k">moreover</span><span class="w"> </span><span class="k">have</span><span class="w"> </span><span class="s">"unique_keys ((hK, hV) # insert' k v tail)"</span>
+<span class="w">          </span><span class="kp">apply</span><span class="w"> </span><span class="n">auto</span>
+<span class="w">          </span><span class="k">using</span><span class="w"> </span><span class="n">calculation</span><span class="w"> </span><span class="kp">apply</span><span class="w"> </span><span class="o">(</span><span class="n">metis</span><span class="w"> </span><span class="o">(</span><span class="n">no_types</span><span class="o">,</span><span class="w"> </span><span class="n">lifting</span><span class="o">)</span><span class="w">  </span><span class="n">UnE</span><span class="w"> </span><span class="n">empty_iff</span><span class="w"> </span><span class="n">fst_conv</span><span class="w"> </span><span class="n">list.set</span><span class="o">(</span><span class="n">1</span><span class="o">)</span><span class="w"> </span><span class="n">list.set_map</span><span class="w"> </span><span class="n">list.simps</span><span class="o">(</span><span class="n">9</span><span class="o">)</span><span class="w"> </span><span class="n">map_of_eq_None_iff</span><span class="w"> </span><span class="n">not_less_iff_gr_or_eq</span><span class="w"> </span><span class="n">option.distinct</span><span class="o">(</span><span class="n">1</span><span class="o">)</span><span class="w"> </span><span class="n">pInsert_union</span><span class="w"> </span><span class="n">set_ConsD</span><span class="w"> </span><span class="n">sorted_keys.elims</span><span class="o">(</span><span class="n">2</span><span class="o">)</span><span class="w"> </span><span class="n">strict_sorted_iff</span><span class="w"> </span><span class="n">strict_sorted_simps</span><span class="o">(</span><span class="n">2</span><span class="o">)</span><span class="w"> </span><span class="n">unique_keys.elims</span><span class="o">(</span><span class="n">2</span><span class="o">)</span><span class="w"> </span><span class="n">weak_map_of_SomeI</span><span class="o">)</span>
+<span class="w">          </span><span class="k">using</span><span class="w"> </span><span class="n">calculation</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">simp</span>
+
+<span class="w">        </span><span class="k">ultimately</span><span class="w"> </span><span class="k">show</span><span class="w"> </span><span class="o">?</span><span class="n">thesis</span>
+<span class="w">          </span><span class="k">by</span><span class="w"> </span><span class="o">(</span><span class="n">metis</span><span class="w"> </span><span class="n">insert'.simps</span><span class="o">(</span><span class="n">2</span><span class="o">)</span><span class="w"> </span><span class="n">order_less_imp_not_less</span><span class="o">)</span>
+<span class="w">      </span><span class="k">qed</span>
+
+<span class="w">    </span><span class="k">qed</span>
+<span class="w">    </span><span class="k">done</span>
+<span class="k">end</span>
+</code></pre></div>
+<p>As a bonus question, if I define the two versions of AssocMap (performant and not performant), I should be able to prove that <code>insert</code>, <code>lookup</code> and <code>delete</code> are equivalent, but can I interchange them? Maybe to be able to prove stuff using the not performant representation but to use <code>code equations</code> to the performant implementation when I'm generating Haskell code.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

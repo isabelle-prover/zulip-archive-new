@@ -1,0 +1,227 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] How powerful are trans rules? · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20How.20powerful.20are.20trans.20rules.3F.html">[isabelle] How powerful are trans rules?</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294277557"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20How%20powerful%20are%20trans%20rules%3F/near/294277557" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20How.20powerful.20are.20trans.20rules.3F.html#294277557">(Aug 19 2022 at 14:28)</a>:</h4>
+<p>From: Joachim Breitner &lt;<a href="mailto:breitner@kit.edu">breitner@kit.edu</a>&gt;<br>
+Hi,</p>
+<p>I’m quite fond of "also ... also ... finally" chains, as they tend to<br>
+remove a lot of distracting technicalities from a proof.</p>
+<p>When working with HOLCF proofs, I would like to do proofs like this:</p>
+<p>notepad<br>
+        begin<br>
+          fix a b c d f g<br>
+          have "a ⊑ f ⋅ b" sorry<br>
+          also have "b ⊑ g ⋅ c" sorry<br>
+          also have "c ⊑ d" sorry<br>
+          finally<br>
+          have "a ⊑ f ⋅ (g ⋅ d)".<br>
+        end</p>
+<p>I currently do that by hard-coding all the variants of the trans rule<br>
+that I need:</p>
+<p>lemma [trans]:  "a ⊑ f ⋅ b ⟹ b ⊑ c ⟹ a ⊑ f ⋅ c"<br>
+          by (erule below_trans) (intro monofun_cfun_fun monofun_cfun_arg)<br>
+        lemma [trans]:  "a ⊑ f ⋅ b ⟹ f ⊑ g ⟹ a ⊑ g ⋅ b"<br>
+          by (erule below_trans) (intro monofun_cfun_fun monofun_cfun_arg)<br>
+        lemma [trans]:  "a ⊑ f ⋅ (g ⋅ b) ⟹ b ⊑ c ⟹ a ⊑ f ⋅ (g ⋅ c)"<br>
+          by (erule below_trans) (intro monofun_cfun_fun monofun_cfun_arg)<br>
+        lemma [trans]: "a ⊑ f ⋅ b ⋅ c ⋅ d ⟹ b ⊑ b' ⟹ a ⊑ f ⋅ b' ⋅ c ⋅ d"<br>
+          by (erule below_trans) (intro monofun_cfun_fun monofun_cfun_arg)<br>
+        lemma [trans]:  "a ⊑ f ⋅ b ⋅ c ⋅ d ⟹ c ⊑ c' ⟹ a ⊑ f ⋅ b ⋅ c' ⋅ d"<br>
+          by (erule below_trans) (intro monofun_cfun_fun monofun_cfun_arg)<br>
+        lemma [trans]:  "a ⊑ f ⋅ (g ⋅ b) ⋅ c ⋅ d ⟹ g ⊑ g' ⟹ a ⊑ f ⋅ (g' ⋅ b) ⋅ c ⋅ d"<br>
+          by (erule below_trans) (intro monofun_cfun_fun monofun_cfun_arg)<br>
+        lemma [trans]:  "a ⊑ f ⋅ b ⋅ (g ⋅ c ⋅ d) ⋅ e ⟹ d ⊑ d' ⟹ a ⊑ f ⋅ b ⋅ (g ⋅ c ⋅ d') ⋅ e"<br>
+          by (erule below_trans) (intro monofun_cfun_fun monofun_cfun_arg)</p>
+<p>This works, but is rather inflexible and does not scale. And note that<br>
+all those trans rules are solved by the same set of rules.</p>
+<p>How can I improve that?</p>
+<p>One thing I tried was to use</p>
+<p>lemma strong_trans[trans]:<br>
+          "a ⊑ f x ⟹ x ⊑ y ⟹ cont f ⟹ a ⊑ f y " sorry</p>
+<p>This way, the calculation above become</p>
+<p>cont (Rep_cfun f) ⟹ cont (λa. f⋅(g⋅a)) ⟹ a ⊑ f⋅(g⋅d)</p>
+<p>so using "by simp" instead of "." finishes this. But I find this<br>
+annoying (I really like to finish with "finally ?something.").</p>
+<p>Is there a way to have the side-condition already checked by "trans" (by<br>
+solving it with "intro cont2cont", for example), so that that they never<br>
+show up to the user?</p>
+<p>That rule also breaks antisymmetry proofs like</p>
+<p>notepad<br>
+        begin<br>
+          fix a b c :: "'a ::cpo"<br>
+          have "a ⊑ b" sorry<br>
+          also have "b ⊑ c" sorry<br>
+          also have "c ⊑ a" sorry<br>
+          finally<br>
+          have "a = c".<br>
+        end</p>
+<p>as the calculation at the end will be the unhelpful theorem</p>
+<p>cont (λa. a) ⟹ cont (λa. a) ⟹ a ⊑ a.</p>
+<p>can I avoid that?</p>
+<p>Thanks<br>
+Joachim<br>
+<a href="/user_uploads/14278/0TdzW_IffVJNRS9ji4e_eGcM/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294277652"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20How%20powerful%20are%20trans%20rules%3F/near/294277652" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20How.20powerful.20are.20trans.20rules.3F.html#294277652">(Aug 19 2022 at 14:28)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On Wed, 14 May 2014, Joachim Breitner wrote:</p>
+<blockquote>
+<p>One thing I tried was to use</p>
+<p>lemma strong_trans[trans]:<br>
+         "a ⊑ f x ⟹ x ⊑ y ⟹ cont f ⟹ a ⊑ f y " sorry</p>
+<p>This way, the calculation above become</p>
+<p>cont (Rep_cfun f) ⟹ cont (λa. f⋅(g⋅a)) ⟹ a ⊑ f⋅(g⋅d)</p>
+<p>so using "by simp" instead of "." finishes this. But I find this<br>
+annoying (I really like to finish with "finally ?something.").</p>
+</blockquote>
+<p>If the final "by simp" (or "by simp_all") for accumulated side-conditions <br>
+does the job, why not use it?  If all Isar calculations were to end with <br>
+"." I could have omitted that flexibility in the language.</p>
+<p>Formally, you did not explain the annoyance nor why you like to do it only <br>
+like that.  There can be technical problems in some situations, but if <br>
+that is the case here it needs to be made specific.</p>
+<blockquote>
+<p>Is there a way to have the side-condition already checked by "trans" (by <br>
+solving it with "intro cont2cont", for example), so that that they never <br>
+show up to the user?</p>
+</blockquote>
+<p>That is just the standard question about all structure proof elements: Is <br>
+it sufficient to have some fixed scheme of rule application that is <br>
+parameterized by facts from the library?  Or is there a need to allow <br>
+arbitrary tool implementations in that slot (in Isabelle/ML).  15 years <br>
+ago the question was on the table, and the answer was that plain rules for <br>
+'also' are usually sufficient.</p>
+<blockquote>
+<p>That rule also breaks antisymmetry proofs like</p>
+<p>notepad<br>
+       begin<br>
+         fix a b c :: "'a ::cpo"<br>
+         have "a ⊑ b" sorry<br>
+         also have "b ⊑ c" sorry<br>
+         also have "c ⊑ a" sorry<br>
+         finally<br>
+         have "a = c".<br>
+       end</p>
+<p>as the calculation at the end will be the unhelpful theorem</p>
+<p>cont (λa. a) ⟹ cont (λa. a) ⟹ a ⊑ a.</p>
+<p>can I avoid that?</p>
+</blockquote>
+<p>Did you try to specify some particular rules for particular 'also' steps? <br>
+There is a notation with round parenthese described in the isar-ref <br>
+manual.</p>
+<p>Makarius</p>
+
+
+
+<a name="294277665"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20How%20powerful%20are%20trans%20rules%3F/near/294277665" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20How.20powerful.20are.20trans.20rules.3F.html#294277665">(Aug 19 2022 at 14:28)</a>:</h4>
+<p>From: Joachim Breitner &lt;<a href="mailto:breitner@kit.edu">breitner@kit.edu</a>&gt;<br>
+Dear Makarius,</p>
+<p>Am Mittwoch, den 14.05.2014, 20:56 +0200 schrieb Makarius:</p>
+<blockquote>
+<p>On Wed, 14 May 2014, Joachim Breitner wrote:</p>
+<blockquote>
+<p>One thing I tried was to use</p>
+<p>lemma strong_trans[trans]:<br>
+         "a ⊑ f x ⟹ x ⊑ y ⟹ cont f ⟹ a ⊑ f y " sorry</p>
+<p>This way, the calculation above become</p>
+<p>cont (Rep_cfun f) ⟹ cont (λa. f⋅(g⋅a)) ⟹ a ⊑ f⋅(g⋅d)</p>
+<p>so using "by simp" instead of "." finishes this. But I find this<br>
+annoying (I really like to finish with "finally ?something.").</p>
+</blockquote>
+<p>If the final "by simp" (or "by simp_all") for accumulated side-conditions <br>
+does the job, why not use it?  If all Isar calculations were to end with <br>
+"." I could have omitted that flexibility in the language.</p>
+</blockquote>
+<p>I’m not sure. Last time I tried it I was not satisfied for some reason,<br>
+although that reason did not show up when preparing the small example<br>
+for my mailing list mail. Maybe I should simply re-evaluate that option.</p>
+<blockquote>
+<p>Formally, you did not explain the annoyance nor why you like to do it only <br>
+like that.  There can be technical problems in some situations, but if <br>
+that is the case here it needs to be made specific.</p>
+</blockquote>
+<p>I think my annoyance is purely aesthetically, and – picky as I get – the<br>
+aesthetics of the intermediate calculations. To me, the "cont" side<br>
+conditions above feel out of place, as they hold already by the types<br>
+and simple rule of composition.</p>
+<p>Also, to the reader, a "by simp" at the end could potentially do many<br>
+things, where a "finally show ?thesis." tells the reader that nothing<br>
+fancy is happening at the end.</p>
+<p>But as I said, its mostly code aesthetics: worth asking if there is a<br>
+nicer way – not worth worrying about if there is not.</p>
+<blockquote>
+<blockquote>
+<p>as the calculation at the end will be the unhelpful theorem</p>
+<p>cont (λa. a) ⟹ cont (λa. a) ⟹ a ⊑ a.</p>
+<p>can I avoid that?</p>
+</blockquote>
+<p>Did you try to specify some particular rules for particular 'also' steps? <br>
+There is a notation with round parenthese described in the isar-ref <br>
+manual.</p>
+</blockquote>
+<p>Thanks, I didn’t know that before (and I must have overread that part in<br>
+the docs). I think I’ll play around with that.</p>
+<p>Greetings,<br>
+Joachim<br>
+<a href="/user_uploads/14278/oPfFtKwT69FlMz2i6VACjt7x/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294277680"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20How%20powerful%20are%20trans%20rules%3F/near/294277680" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20How.20powerful.20are.20trans.20rules.3F.html#294277680">(Aug 19 2022 at 14:28)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+In some sense the side conditions are deferred to the very end, and thus <br>
+displaced.  The final "by simp" can make this feel a bit wobbly, since it <br>
+dilutes the application of the last fact, with the solving of the side <br>
+conditions.</p>
+<p>This can be refined: a "." merely abbreviates "by this", and the latter <br>
+can have a terminal method for the solving of the remainder:</p>
+<p>...<br>
+   finally show ?thesis by this simp_all</p>
+<p>or</p>
+<p>...<br>
+   finally show ?thesis by this auto</p>
+<p>The proof method "this" does not appear very often under its proper name <br>
+in Isar proofs, but it is a perfectly normal structured method like <br>
+"rule".</p>
+<p>Makarius</p>
+
+
+
+<a name="294277692"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20How%20powerful%20are%20trans%20rules%3F/near/294277692" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20How.20powerful.20are.20trans.20rules.3F.html#294277692">(Aug 19 2022 at 14:28)</a>:</h4>
+<p>From: Joachim Breitner &lt;<a href="mailto:breitner@kit.edu">breitner@kit.edu</a>&gt;<br>
+Hi,</p>
+<p>that’s a good suggestion. I now use</p>
+<p>finally show ?thesis by this (intro cont2cont)+</p>
+<p>everywhere, and (at least to the adept reader), this signals „The<br>
+conclusion of the calculation is used unmodified, while the accumulated<br>
+side conditions are all of the form "cont something" and solved using<br>
+the usual cont2cont rules.</p>
+<p>This even composes well with the few cases where I had<br>
+        finally show ?thesis by (rule foobar)<br>
+which now simply become<br>
+        finally show ?thesis by (rule foobar) (intro cont2cont)+</p>
+<p>(I am a big fan of "intro"; I find it the most predictable method beyond<br>
+single-stepping with rule and subst).</p>
+<p>Greetings,<br>
+Joachim<br>
+<a href="/user_uploads/14278/6ec-BHvrCE13Kize-T029HC-/signature.asc">signature.asc</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

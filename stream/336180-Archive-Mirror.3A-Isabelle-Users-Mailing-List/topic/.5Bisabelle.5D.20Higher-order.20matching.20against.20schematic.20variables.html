@@ -1,0 +1,222 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Higher-order matching against schematic variables · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Higher-order.20matching.20against.20schematic.20variables.html">[isabelle] Higher-order matching against schematic variables</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294122083"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Higher-order%20matching%20against%20schematic%20variables/near/294122083" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Higher-order.20matching.20against.20schematic.20variables.html#294122083">(Aug 18 2022 at 16:29)</a>:</h4>
+<p>From: Michael Chan &lt;<a href="mailto:mchan@inf.ed.ac.uk">mchan@inf.ed.ac.uk</a>&gt;<br>
+Hi all,</p>
+<p>I have a question with higher-order matching against schematic <br>
+variables. I can't figure out why the pattern trm1 can't be matched <br>
+against lem if lem was "A x y --&gt; x y = 0". However, if the RHS contains <br>
+constants instead, e.g., "A x y --&gt; g a = 0", a matcher is found. Since <br>
+x and y have the same types of g and a respectively, how come there <br>
+isn't a matcher in the former case? A difference is that x and y are <br>
+schematic variables, but why can't schematic variables be matched against?</p>
+<p>Here's the code:</p>
+<p>locale A =<br>
+   fixes f :: "nat =&gt; nat"<br>
+   and a :: nat<br>
+   assumes ax: "f a = 0"</p>
+<p>consts<br>
+   g :: "nat =&gt; nat"<br>
+   a :: nat</p>
+<p>lemma lem: "A x y --&gt; x y = 0"<br>
+sorry</p>
+<p>ML {*</p>
+<p>val trm1 = term_of @{cpat "?P --&gt; (?f::((?'a=&gt;?'b)=&gt;?'c)) ?stuff = ?v"};<br>
+val trm2 = Thm.prop_of @{thm lem};</p>
+<p>val mtch_seq = let<br>
+   val init = Envir.empty 0<br>
+   val ctxt = @{context}<br>
+   val (Const ("Trueprop",_) $ trm2) = Thm.prop_of (ProofContext.get_thm <br>
+ctxt "lem")<br>
+in<br>
+   Unify.matchers @{theory} [(trm1,trm2)]<br>
+end;</p>
+<p>val seq as SOME (mtch,_) = nthseq 0 mtch_seq;<br>
+pretty_env @{context} (Envir.term_env mtch);<br>
+*}</p>
+<p>Thanks<br>
+Michael</p>
+
+
+
+<a name="294122124"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Higher-order%20matching%20against%20schematic%20variables/near/294122124" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Higher-order.20matching.20against.20schematic.20variables.html#294122124">(Aug 18 2022 at 16:29)</a>:</h4>
+<p>From: Michael Chan &lt;<a href="mailto:mchan@inf.ed.ac.uk">mchan@inf.ed.ac.uk</a>&gt;<br>
+On 18/11/10 16:07, Lawrence Paulson wrote:</p>
+<blockquote>
+<p>I can't see the answer to this, but something complicated is going on when you match  (?f::((?'a=&gt;?'b)=&gt;?'c)) ?stuff against x y where x :: nat =&gt;  nat.</p>
+</blockquote>
+<p>Thanks, Larry. Indeed, even without the predicate, it gives the same <br>
+problem when using that pattern, i.e.</p>
+<p>lemma lem: "g a = 0"<br>
+sorry</p>
+<p>vs</p>
+<p>lemma lem: "(x::nat=&gt;nat) y = 0"<br>
+sorry</p>
+<p>Now, if we instead use a simpler pattern:</p>
+<p>val trm1 = term_of @{cpat "(?f::?'a=&gt;?'b) ?stuff = ?v"};</p>
+<p>matching it against "g a = 0" gives 4 matchers:</p>
+<ol>
+<li>
+<p>[?f::nat =&gt; nat := %a::nat. a, ?v::nat := 0::nat, ?stuff::nat := g a]</p>
+</li>
+<li>
+<p>[?f::nat =&gt; nat := g, ?v::nat := 0::nat, ?stuff::nat := a]</p>
+</li>
+<li>
+<p>[?f::?'a =&gt; nat := %b::?'a. g a, ?v::nat := 0::nat,<br>
+    ?stuff::?'a := ?stuff::?'a]</p>
+</li>
+<li>
+<p>[?f::?'a =&gt; ?'b := g, ?v::?'b := 0::nat, ?stuff::?'a := a]</p>
+</li>
+</ol>
+<p>But matching it against "(x::nat=&gt;nat) y = 0", gives only 1 matcher:</p>
+<ol>
+<li>[?f::?'a =&gt; ?'b := ?x::nat =&gt; nat, ?v::?'b := 0::nat,<br>
+    ?stuff::?'a := ?y::nat]</li>
+</ol>
+<p>which is of the same shape of the first lemma's 4th matcher.</p>
+<p>Perhaps the higher-order matcher somehow fails, since 1. and 3. should <br>
+be returned by it. 2. is essentially 4., but with the schematic type <br>
+variables instantiated. Now, is 4. a valid matcher even when ?'a and ?'b <br>
+can be clearly instantiated (to become 2.)? If it is valid, isn't it <br>
+redundant to have a separate matcher with the type variables uninstantiated?</p>
+<p>Thanks<br>
+Michael</p>
+<blockquote>
+<p>Larry Paulson</p>
+<p>On 18 Nov 2010, at 13:37, Michael Chan wrote:</p>
+<blockquote>
+<p>Hi all,</p>
+<p>I have a question with higher-order matching against schematic variables. I can't figure out why the pattern trm1 can't be matched against lem if lem was "A x y --&gt;  x y = 0". However, if the RHS contains constants instead, e.g., "A x y --&gt;  g a = 0", a matcher is found. Since x and y have the same types of g and a respectively, how come there isn't a matcher in the former case? A difference is that x and y are schematic variables, but why can't schematic variables be matched against?</p>
+<p>Here's the code:</p>
+<p>locale A =<br>
+  fixes f :: "nat =&gt;  nat"<br>
+  and a :: nat<br>
+  assumes ax: "f a = 0"</p>
+<p>consts<br>
+  g :: "nat =&gt;  nat"<br>
+  a :: nat</p>
+<p>lemma lem: "A x y --&gt;  x y = 0"<br>
+sorry</p>
+<p>ML {*</p>
+<p>val trm1 = term_of @{cpat "?P --&gt;  (?f::((?'a=&gt;?'b)=&gt;?'c)) ?stuff = ?v"};<br>
+val trm2 = Thm.prop_of @{thm lem};</p>
+<p>val mtch_seq = let<br>
+  val init = Envir.empty 0<br>
+  val ctxt = @{context}<br>
+  val (Const ("Trueprop",_) $ trm2) = Thm.prop_of (ProofContext.get_thm ctxt "lem")<br>
+in<br>
+  Unify.matchers @{theory} [(trm1,trm2)]<br>
+end;</p>
+<p>val seq as SOME (mtch,_) = nthseq 0 mtch_seq;<br>
+pretty_env @{context} (Envir.term_env mtch);<br>
+*}</p>
+<p>Thanks<br>
+Michael</p>
+<p>--<br>
+Postal Address: School of Informatics, University of Edinburgh,<br>
+Room 2.05, Informatics Forum, 10 Crichton Street,<br>
+Edinburgh EH8 9AB, UK.<br>
+Telephone Number: +44-131-651-3077,<br>
+Fax Number: +44-131-650-6899,<br>
+Email: <a href="mailto:M.Chan@ed.ac.uk">M.Chan@ed.ac.uk</a><br>
+Web Page: <a href="http://homepages.inf.ed.ac.uk/mchan/">http://homepages.inf.ed.ac.uk/mchan/</a></p>
+<p>The University of Edinburgh is a charitable body, registered in<br>
+Scotland, with registration number SC005336.</p>
+</blockquote>
+</blockquote>
+
+
+
+<a name="294122223"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Higher-order%20matching%20against%20schematic%20variables/near/294122223" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Higher-order.20matching.20against.20schematic.20variables.html#294122223">(Aug 18 2022 at 16:30)</a>:</h4>
+<p>From: Michael Chan &lt;<a href="mailto:mchan@inf.ed.ac.uk">mchan@inf.ed.ac.uk</a>&gt;</p>
+<blockquote>
+<p>Perhaps the higher-order matcher somehow fails, since 1. and 3. should<br>
+be returned by it. 2. is essentially 4., but with the schematic type<br>
+variables instantiated. Now, is 4. a valid matcher even when ?'a and ?'b<br>
+can be clearly instantiated (to become 2.)? If it is valid, isn't it<br>
+redundant to have a separate matcher with the type variables<br>
+uninstantiated?<br>
+</p>
+</blockquote>
+<p>I can confirm that the first lemma's matcher 4. and the second lemma's <br>
+only matcher are results of the FO matcher. So, I guess the above <br>
+question becomes: how come the FO matcher doesn't instantiate the type <br>
+variables? Of course, this is a different question to why the HO matcher <br>
+doesn't return matchers to the second lemma.</p>
+<p>Michael</p>
+<blockquote>
+<p>Thanks<br>
+Michael</p>
+<blockquote>
+<p>Larry Paulson</p>
+</blockquote>
+<p>On 18 Nov 2010, at 13:37, Michael Chan wrote:</p>
+<blockquote>
+<blockquote>
+<p>Hi all,</p>
+<p>I have a question with higher-order matching against schematic<br>
+variables. I can't figure out why the pattern trm1 can't be matched<br>
+against lem if lem was "A x y --&gt; x y = 0". However, if the RHS<br>
+contains constants instead, e.g., "A x y --&gt; g a = 0", a matcher is<br>
+found. Since x and y have the same types of g and a respectively, how<br>
+come there isn't a matcher in the former case? A difference is that x<br>
+and y are schematic variables, but why can't schematic variables be<br>
+matched against?</p>
+<p>Here's the code:</p>
+<p>locale A =<br>
+fixes f :: "nat =&gt; nat"<br>
+and a :: nat<br>
+assumes ax: "f a = 0"</p>
+<p>consts<br>
+g :: "nat =&gt; nat"<br>
+a :: nat</p>
+<p>lemma lem: "A x y --&gt; x y = 0"<br>
+sorry</p>
+<p>ML {*</p>
+<p>val trm1 = term_of @{cpat "?P --&gt; (?f::((?'a=&gt;?'b)=&gt;?'c)) ?stuff = ?v"};<br>
+val trm2 = Thm.prop_of @{thm lem};</p>
+<p>val mtch_seq = let<br>
+val init = Envir.empty 0<br>
+val ctxt = @{context}<br>
+val (Const ("Trueprop",_) $ trm2) = Thm.prop_of (ProofContext.get_thm<br>
+ctxt "lem")<br>
+in<br>
+Unify.matchers @{theory} [(trm1,trm2)]<br>
+end;</p>
+<p>val seq as SOME (mtch,_) = nthseq 0 mtch_seq;<br>
+pretty_env @{context} (Envir.term_env mtch);<br>
+*}</p>
+<p>Thanks<br>
+Michael</p>
+<p>--<br>
+Postal Address: School of Informatics, University of Edinburgh,<br>
+Room 2.05, Informatics Forum, 10 Crichton Street,<br>
+Edinburgh EH8 9AB, UK.<br>
+Telephone Number: +44-131-651-3077,<br>
+Fax Number: +44-131-650-6899,<br>
+Email: <a href="mailto:M.Chan@ed.ac.uk">M.Chan@ed.ac.uk</a><br>
+Web Page: <a href="http://homepages.inf.ed.ac.uk/mchan/">http://homepages.inf.ed.ac.uk/mchan/</a></p>
+<p>The University of Edinburgh is a charitable body, registered in<br>
+Scotland, with registration number SC005336.</p>
+</blockquote>
+</blockquote>
+</blockquote>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

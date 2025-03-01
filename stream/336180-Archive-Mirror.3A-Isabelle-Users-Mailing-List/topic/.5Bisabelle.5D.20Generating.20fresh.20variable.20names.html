@@ -1,0 +1,101 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Generating fresh variable names · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Generating.20fresh.20variable.20names.html">[isabelle] Generating fresh variable names</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294329879"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Generating%20fresh%20variable%20names/near/294329879" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Generating.20fresh.20variable.20names.html#294329879">(Aug 19 2022 at 17:24)</a>:</h4>
+<p>From: Andrew Gacek &lt;<a href="mailto:andrew.gacek@gmail.com">andrew.gacek@gmail.com</a>&gt;<br>
+I'm trying to write a function in Isabelle/HOL to generate a fresh<br>
+variable name (given a finite set of used names). I'm having trouble,<br>
+in part, because proving termination for the function requires knowing<br>
+that the set is finite (I don't care about the function output when<br>
+infinite). Does anybody have a suggestion about how to proceed?</p>
+<p>I was hoping to create a function like</p>
+<p>fresh_string :: string set =&gt; string =&gt; string</p>
+<p>That might work like</p>
+<p>fresh_string {''A'', ''B'', ''A0'', ''A1''} ''A'' = ''A2''</p>
+<p>That is, the second argument is used as a base for the generated<br>
+variable name. And the theorem I'd want to prove is</p>
+<p>finite xs ==&gt; fresh_string xs y \notin xs</p>
+<p>This is the closest I've come, but I'm not hopeful about being able to<br>
+prove termination:</p>
+<p>fun string_of_nat :: "nat ⇒ string"<br>
+where<br>
+  "string_of_nat n = (if n &lt; 10 then [char_of_nat (48 + n)] else<br>
+     string_of_nat (n div 10) @ [char_of_nat (48 + (n mod 10))])"</p>
+<p>fun fresh_string_aux :: "string set ⇒ string ⇒ nat ⇒ string" where<br>
+  "fresh_string_aux xs y n = (if finite xs then<br>
+                               (if y @ string_of_nat n ∈ xs then<br>
+                                  fresh_string_aux xs y (Suc n)<br>
+                                else<br>
+                                  y @ string_of_nat n)<br>
+                              else<br>
+                                undefined)"</p>
+<p>fun fresh_string :: "string set ⇒ string ⇒ string" where<br>
+  "fresh_string xs y = fresh_string_aux xs y 0"</p>
+<p>The reason for all this is that I'm writing a function that will<br>
+require fresh variable names and I'd like to be able to actually<br>
+execute that function and get readable results.</p>
+<p>Thanks,<br>
+Andrew</p>
+
+
+
+<a name="294330067"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Generating%20fresh%20variable%20names/near/294330067" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Generating.20fresh.20variable.20names.html#294330067">(Aug 19 2022 at 17:25)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:lammich@in.tum.de">lammich@in.tum.de</a>&gt;<br>
+Hi,</p>
+<p>find attached what we use in CoCon<br>
+(<a href="http://www21.in.tum.de/~popescua/rs3/CoCon.html">http://www21.in.tum.de/~popescua/rs3/CoCon.html</a>) to generate fresh IDs.<br>
+The function "fresh" there exactly matches your signature, and<br>
+is executable.</p>
+<p>The formalization of "fresh" is mostly by Andrei Popescu.<br>
+<a href="/user_uploads/14278/OBcZYHP3gW3mtK4hFnjqtsAK/Fresh.thy">Fresh.thy</a></p>
+
+
+
+<a name="294330295"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Generating%20fresh%20variable%20names/near/294330295" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Generating.20fresh.20variable.20names.html#294330295">(Aug 19 2022 at 17:26)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+My recommendation in such situations is to use a list rather than a set. Of <br>
+course the callers of fresh_string will also need to use lists, and so on. But <br>
+since function "set" converts a list into a set, the change is usually not very <br>
+painful.</p>
+<p>Tobias<br>
+<a href="/user_uploads/14278/MndL0wCTlFcP24VPiSrQ-Q0d/smime.p7s">smime.p7s</a></p>
+
+
+
+<a name="294330508"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Generating%20fresh%20variable%20names/near/294330508" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Generating.20fresh.20variable.20names.html#294330508">(Aug 19 2022 at 17:27)</a>:</h4>
+<p>From: "Thiemann, Rene" &lt;<a href="mailto:Rene.Thiemann@uibk.ac.at">Rene.Thiemann@uibk.ac.at</a>&gt;<br>
+Dear Andrew,</p>
+<p>you can find a theory "Name" in the IsaFoR-repository.<br>
+It contains fresh-name generators for strings like the ones you desire.<br>
+(fresh_string, fresh_string_list, ...)</p>
+<p>Hope this helps,<br>
+René</p>
+<p>PS: IsaFoR/CeTA is freely available under <a href="http://cl-informatik.uibk.ac.at/software/ceta/">http://cl-informatik.uibk.ac.at/software/ceta/</a></p>
+
+
+
+<a name="294330703"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Generating%20fresh%20variable%20names/near/294330703" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Generating.20fresh.20variable.20names.html#294330703">(Aug 19 2022 at 17:29)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:lammich@in.tum.de">lammich@in.tum.de</a>&gt;</p>
+<blockquote>
+<p>The function "fresh" there exactly matches your signature</p>
+</blockquote>
+<p>Oops, function fresh there actually uses a list, rather than a set:<br>
+  fresh :: string list =&gt; string =&gt; string</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,182 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Function definition · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Function.20definition.html">[isabelle] Function definition</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294683229"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Function%20definition/near/294683229" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Function.20definition.html#294683229">(Aug 22 2022 at 14:10)</a>:</h4>
+<p>From: Edward Pierzchalski &lt;<a href="mailto:e.a.pierzchalski@gmail.com">e.a.pierzchalski@gmail.com</a>&gt;<br>
+Hi, I'm running into issues delegating the "boring"/homomorphic parts of<br>
+recursion over a datatype. Consider the following:</p>
+<p>datatype t = N nat | A t | B t t</p>
+<p>fun boring :: "(t =&gt; t) =&gt; t =&gt; t" where<br>
+  "boring f (N n) = N n"<br>
+| "boring f (A t) = A (f (boring f t))"<br>
+| "boring f (B t1 t2) = B (f (boring f t1)) (f (boring f t2))"</p>
+<p>function (sequential) interesting :: "nat =&gt; t =&gt; t" where<br>
+  "interesting k (N n) = N (n + k)"<br>
+| "interesting k (A t) = A (interesting (k + 1) t)"<br>
+| "interesting k t = boring (interesting k) t"<br>
+by pat_completeness auto</p>
+<p>I hope you can convince yourself that <code>interesting</code> should terminate by<br>
+size of the second recursive call argument. Unfortunately, since the<br>
+recursive call is hidden by <code>boring</code>, the standard <code>relation "measure ..."</code><br>
+technique doesn't work (you end up with a goal like <code>!!k x l r. ((k, x),
+(k, B l r)) \in measure ...</code> for arbitrary x, which doesn't look provable).</p>
+<p>Does anyone know how to proceed?</p>
+<p>Regards,<br>
+--Ed</p>
+
+
+
+<a name="294683237"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Function%20definition/near/294683237" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Function.20definition.html#294683237">(Aug 22 2022 at 14:10)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:eberlm@in.tum.de">eberlm@in.tum.de</a>&gt;<br>
+Unfortunately, it's not that easy.</p>
+<p>You pass the "interesting" function to the "boring" function as a<br>
+parameter, and the "boring" function applies that function that it is<br>
+given to things. In order for this to work, you need to essentially show<br>
+that the "interesting" function that you are defining is only called on<br>
+values for which it terminates (i.e. that are smaller than the original<br>
+argument that it got)</p>
+<p>Normally, this is done with a fundef_cong rule, but in this case, I<br>
+don't see how that is possible, because the values that "interesting" is<br>
+called on by "boring" are "boring f t1" and "boring f t2" – that means<br>
+that you are relying on the fact that the "interesting" function does<br>
+not increase the size of its argument.</p>
+<p>Showing that "interesting" is size-preserving is actually straightforward:</p>
+<p>lemma same_size_boring:<br>
+  assumes "⋀y. size (f y) = size y"<br>
+  shows   "size (boring f x) = size x"<br>
+  using assms by (induction x) simp_all</p>
+<p>lemma size_interesting_aux:<br>
+  assumes "interesting_dom (k, t)"<br>
+  shows   "size (interesting k t) = size t"<br>
+  using assms<br>
+  by (induction rule: interesting.pinduct) (simp_all add:<br>
+interesting.psimps same_size_boring)</p>
+<p>However, I have no idea how you would then go on and prove termination.<br>
+Termination proofs depend on the call graph that is computed for the<br>
+recursive definition, and if you don't have a fundef_cong rule for<br>
+boring, that call graph – as you discovered yourself – will be too<br>
+coarse (i.e. you will not have the information that you need in your<br>
+termination proof). However, as I see it, any cong rule for "boring"<br>
+would have to be conditional, which is, as far as I am aware, not<br>
+possible for fundef_cong rules.</p>
+<p>What you are trying to do may therefore very well be outside of what the<br>
+function package can do. (although I'm not 100% sure about that – still,<br>
+even if it is possible, I would bet it will be ugly)</p>
+<p>My advice would be: try to define your functions in a simpler way.<br>
+Proofs involving nested recursion tend to get very ugly very quickly,<br>
+because the termination of your function depends on the semantics of<br>
+your function, and semantic properties are difficult to use without a<br>
+full termination proof.</p>
+<p>Cheers,</p>
+<p>Manuel</p>
+
+
+
+<a name="294683248"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Function%20definition/near/294683248" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Function.20definition.html#294683248">(Aug 22 2022 at 14:10)</a>:</h4>
+<p>From: Christian Sternagel &lt;<a href="mailto:c.sternagel@gmail.com">c.sternagel@gmail.com</a>&gt;<br>
+Dear Ed,</p>
+<p>as Manuel indicated, you'll likely have to define your function in<br>
+another way.</p>
+<p>One way would be to use mutual recursion:</p>
+<p>function (sequential)<br>
+  interesting :: "nat ⇒ t ⇒ t" and<br>
+  boring :: "nat ⇒ t ⇒ t"<br>
+where<br>
+  "interesting k (N n) = N (n + k)"<br>
+| "interesting k (A t) = A (interesting (k + 1) t)"<br>
+| "interesting k t = boring k t"<br>
+| "boring k (N n) = N n"<br>
+| "boring k (A t) = A (interesting k (boring k t))"<br>
+| "boring k (B t1 t2) = B (interesting k (boring k t1)) (interesting k<br>
+(boring k t2))"<br>
+by (pat_completeness) auto</p>
+<p>where your "boring" is replaced by a variant that only takes "k" as<br>
+parameter. Then we can prove that both functions are size-preserving, as<br>
+already suggested by Manuel.</p>
+<p>lemma [termination_simp]:<br>
+  shows "interesting_boring_dom (Inl (k, t)) ⟹ size (interesting k t) =<br>
+size t"<br>
+    and "interesting_boring_dom (Inr (k, t)) ⟹ size (boring k t) = size t"<br>
+by (induct k t and k t rule: interesting_boring.pinduct)<br>
+   (simp_all add: interesting.psimps boring.psimps)</p>
+<p>Which incidentally suffices for termination:</p>
+<p>termination by (lexicographic_order)</p>
+<p>It remains to show that this actually corresponds to your original<br>
+function specification. Here, I use "boring'" for your "boring".</p>
+<p>fun boring' :: "(t ⇒ t) ⇒ t ⇒ t" where<br>
+  "boring' f (N n) = N n"<br>
+| "boring' f (A t) = A (f (boring' f t))"<br>
+| "boring' f (B t1 t2) = B (f (boring' f t1)) (f (boring' f t2))"</p>
+<p>Your definition of "interesting" (modulo "case" on the right vs.<br>
+pattern-matching on the left) can be obtained by mutual induction:</p>
+<p>lemma<br>
+  shows "interesting k s =<br>
+    (case s of<br>
+      N n ⇒ N (n + k)<br>
+    | A t ⇒ A (interesting (k + 1) t)<br>
+    | t ⇒ boring' (interesting k) t)"<br>
+    and "boring k s = boring' (interesting k) s"<br>
+by (induct k s and k s rule: interesting_boring.induct) auto</p>
+<p>cheers</p>
+<p>chris</p>
+<p>PS: For those who care and know what I'm talking about: termination of<br>
+the TRS corresponding to "interesting" and "boring" is trivial for<br>
+modern termination tools. Maybe a reason to revive IsaFoR/TermFun? ;)</p>
+
+
+
+<a name="294683260"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Function%20definition/near/294683260" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Function.20definition.html#294683260">(Aug 22 2022 at 14:10)</a>:</h4>
+<p>From: <a href="mailto:Thomas.Sewell@data61.csiro.au">Thomas.Sewell@data61.csiro.au</a><br>
+With some extra thought, you can make these definitions work by<br>
+explicitly forcing "boring" to be size-preserving.</p>
+<p>datatype t = N nat | A t | B t t</p>
+<p>definition<br>
+    "size_constrain f v = (if size (f v) = size v then f v else v)"</p>
+<p>lemma size_size_constrain[simp]:<br>
+    "size (size_constrain f v) = size v"<br>
+    by (simp add: size_constrain_def)</p>
+<p>fun boring :: "(t =&gt; t) =&gt; t =&gt; t" where<br>
+    "boring f (N n) = N n"<br>
+| "boring f (A t) = A (size_constrain f (boring f t))"<br>
+| "boring f (B t1 t2) = B (size_constrain f (boring f t1))<br>
+(size_constrain f (boring f t2))"</p>
+<p>lemma boring_size[simp]:<br>
+    "size (boring f t) = size t"<br>
+    by (induct t, simp_all)</p>
+<p>lemma boring_fundef_cong[fundef_cong]:<br>
+    "⟦ ⋀t'. size t' &lt; size t ⟹ f t' = f' t' ⟧<br>
+      ⟹ boring f t = boring f' t"<br>
+    by (induct t, simp_all add: size_constrain_def)</p>
+<p>fun interesting :: "nat =&gt; t =&gt; t" where<br>
+    "interesting k (N n) = N (n + k)"<br>
+| "interesting k (A t) = A (interesting (k + 1) t)"<br>
+| "interesting k t = boring (interesting k) t"</p>
+<p>lemma interesting_size[simp]:<br>
+    "size (interesting k t) = size t"<br>
+    by (induct t arbitrary: k , simp_all)</p>
+<p>lemma interesting_size_constrain[simp]:<br>
+    "size_constrain (interesting k) = interesting k"<br>
+    by (simp add: size_constrain_def fun_eq_iff)</p>
+<p>That's a bit of a pain but it works with standard tools and gets you<br>
+roughly what you want.</p>
+<p>It might also be possible to relax the size constraint slightly to allow<br>
+size reduction, for instance.</p>
+<p>Cheers,<br>
+     Thomas.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

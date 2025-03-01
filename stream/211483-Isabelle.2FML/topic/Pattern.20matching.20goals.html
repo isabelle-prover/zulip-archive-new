@@ -1,0 +1,218 @@
+<html>
+<head><meta charset="utf-8"><title>Pattern matching goals · Isabelle/ML · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/index.html">Isabelle/ML</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Pattern.20matching.20goals.html">Pattern matching goals</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="351595578"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Pattern%20matching%20goals/near/351595578" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Hanno Becker <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Pattern.20matching.20goals.html#351595578">(Apr 21 2023 at 11:39)</a>:</h4>
+<p>Hi! I'd like to do some goal-dependent branching in my tactics, but run into some issue with unification. The following is a minimal example illustrating the issue:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">theory</span><span class="w"> </span><span class="n">Scratch</span>
+<span class="w">  </span><span class="kp">imports</span><span class="w"> </span><span class="n">Main</span>
+<span class="k">begin</span>
+
+<span class="k">ML</span><span class="s">‹</span>
+<span class="s">  fun strip_trueprop ((Const (@{const_name HOL.Trueprop}, _)) $ c) = c</span>
+<span class="s">    | strip_trueprop c = c</span>
+
+<span class="s">  val pattern = Syntax.parse_term @{context} "?x = ?y" |&gt; Type.strip_constraints</span>
+
+<span class="s">  fun is_unifiable_pair (ctxt : Proof.context) (t0 : term) (t1 : term) =</span>
+<span class="s">      Unify.unifiers (Context.Proof ctxt, Envir.empty 0, [(t0,t1)])</span>
+<span class="s">   |&gt; Seq.pull</span>
+<span class="s">   |&gt; Option.isSome</span>
+
+<span class="s">  fun is_equality (ctxt : Proof.context) (goal : term) : bool =</span>
+<span class="s">     goal |&gt; Type.strip_constraints |&gt; is_unifiable_pair ctxt pattern</span>
+
+
+<span class="s">  val term0 = @{term "x=y"} |&gt; Type.strip_constraints</span>
+<span class="s">  val term1 = Syntax.parse_term @{context} "x=y" |&gt; Type.strip_constraints</span>
+
+<span class="s">  val compare0 = is_equality @{context} term0 (* false *)</span>
+<span class="s">  val compare1 = is_equality @{context} term1 (* true  *)</span>
+<span class="s">›</span>
+
+<span class="kn">lemma</span><span class="w"> </span><span class="n">test</span><span class="o">:</span><span class="w"> </span><span class="s">‹x=y›</span>
+<span class="w">  </span><span class="kp">apply</span><span class="w"> </span><span class="o">(</span><span class="n">tactic‹SUBGOAL</span><span class="w"> </span><span class="o">(</span><span class="n">fn</span><span class="w"> </span><span class="o">(</span><span class="n">goal</span><span class="o">,</span><span class="w"> </span><span class="o">_)</span><span class="w"> </span><span class="o">=</span><span class="n">&gt;</span>
+<span class="w">     </span><span class="kp">if</span><span class="w"> </span><span class="n">goal</span><span class="w"> </span><span class="o">|</span><span class="n">&gt;</span><span class="w"> </span><span class="n">strip_trueprop</span><span class="w"> </span><span class="o">|</span><span class="n">&gt;</span><span class="w"> </span><span class="n">is_equality</span><span class="w"> </span><span class="n">@</span><span class="ow">{</span><span class="k">context</span><span class="ow">}</span>
+<span class="w">        </span><span class="k">then</span><span class="w"> </span><span class="n">print_tac</span><span class="w"> </span><span class="n">@</span><span class="ow">{</span><span class="k">context</span><span class="ow">}</span><span class="w"> </span><span class="s">"match"</span>
+<span class="w">        </span><span class="n">else</span><span class="w"> </span><span class="n">print_tac</span><span class="w"> </span><span class="n">@</span><span class="ow">{</span><span class="k">context</span><span class="ow">}</span><span class="w"> </span><span class="s">"no match"</span><span class="o">)</span><span class="w"> </span><span class="n">1›</span><span class="o">)</span><span class="w"> </span><span class="c">(* no match *)</span>
+<span class="w">  </span><span class="gr">oops</span>
+
+<span class="k">end</span>
+</code></pre></div>
+
+
+
+<a name="351595781"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Pattern%20matching%20goals/near/351595781" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Hanno Becker <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Pattern.20matching.20goals.html#351595781">(Apr 21 2023 at 11:40)</a>:</h4>
+<p>Can someone explain why the match isn't succeeding in all cases?</p>
+
+
+
+<a name="351609656"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Pattern%20matching%20goals/near/351609656" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Wolfgang Jeltsch <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Pattern.20matching.20goals.html#351609656">(Apr 21 2023 at 12:32)</a>:</h4>
+<p>Not an answer but a question: Why don’t you use Eisbach with its <code>match</code> method?</p>
+
+
+
+<a name="351611329"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Pattern%20matching%20goals/near/351611329" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Hanno Becker <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Pattern.20matching.20goals.html#351611329">(Apr 21 2023 at 12:38)</a>:</h4>
+<p>I'm working in the context of a quite performance sensitive proof automation and found that circumventing Eisbach by writing tactics directly in ML both gives me more control and leads to slightly better performance.</p>
+
+
+
+<a name="351612709"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Pattern%20matching%20goals/near/351612709" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Kevin Kappelmann <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Pattern.20matching.20goals.html#351612709">(Apr 21 2023 at 12:43)</a>:</h4>
+<p>The problem is that you only parsed the terms but did not check them. This left you with some placeholders <code>_</code> in your types, which it cannot unify against any other type other than <code>_</code> itself.<br>
+In particular, the concrete representation of  your term <code>pattern</code> is the following:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="n">Const</span><span class="w"> </span><span class="o">(</span><span class="s">"HOL.eq"</span><span class="o">,</span><span class="w"> </span><span class="s">"_"</span><span class="o">)</span><span class="w"> </span><span class="n">$</span><span class="w"> </span><span class="n">Var</span><span class="w"> </span><span class="o">((</span><span class="s">"x"</span><span class="o">,</span><span class="w"> </span><span class="n">0</span><span class="o">),</span><span class="w"> </span><span class="s">"_"</span><span class="o">)</span><span class="w"> </span><span class="n">$</span><span class="w"> </span><span class="n">Var</span><span class="w"> </span><span class="o">((</span><span class="s">"y"</span><span class="o">,</span><span class="w"> </span><span class="n">0</span><span class="o">),</span><span class="w"> </span><span class="s">"_"</span><span class="o">)</span>
+</code></pre></div>
+<p>while what you actually want is this:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="n">Const</span><span class="w"> </span><span class="o">(</span><span class="s">"HOL.eq"</span><span class="o">,</span><span class="w"> </span><span class="s">"?'a ⇒ ?'a ⇒ bool"</span><span class="o">)</span><span class="w"> </span><span class="n">$</span><span class="w"> </span><span class="n">Var</span><span class="w"> </span><span class="o">((</span><span class="s">"x"</span><span class="o">,</span><span class="w"> </span><span class="n">0</span><span class="o">),</span><span class="w"> </span><span class="s">"?'a"</span><span class="o">)</span><span class="w"> </span><span class="n">$</span><span class="w"> </span><span class="n">Var</span><span class="w"> </span><span class="o">((</span><span class="s">"y"</span><span class="o">,</span><span class="w"> </span><span class="n">0</span><span class="o">),</span><span class="w"> </span><span class="s">"?'a"</span><span class="o">)</span>
+</code></pre></div>
+<p>You should use <code>read_term</code> rather than <code>parse_term</code> to get a type-checked term.<br>
+In the words of the <a href="https://isabelle.in.tum.de/doc/implementation.pdf">implementation manual, page 94</a>: <code>read = parse; check</code>.</p>
+<p>Gimme a second to adapt your code...</p>
+
+
+
+<a name="351613291"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Pattern%20matching%20goals/near/351613291" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Hanno Becker <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Pattern.20matching.20goals.html#351613291">(Apr 21 2023 at 12:45)</a>:</h4>
+<p>Wow, super.</p>
+
+
+
+<a name="351613936"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Pattern%20matching%20goals/near/351613936" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Hanno Becker <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Pattern.20matching.20goals.html#351613936">(Apr 21 2023 at 12:47)</a>:</h4>
+<p><code>Syntax.read_term</code> complains about the schematic variable, but <code>Proof_Context.read_term_pattern</code> seems to work fine?</p>
+
+
+
+<a name="351615060"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Pattern%20matching%20goals/near/351615060" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Kevin Kappelmann <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Pattern.20matching.20goals.html#351615060">(Apr 21 2023 at 12:51)</a>:</h4>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">ML</span><span class="s">‹</span>
+<span class="s">  val ctxt = Proof_Context.set_mode Proof_Context.mode_schematic @{context}</span>
+<span class="s">  val pattern = Syntax.read_term ctxt "(?x :: ?'a) = ?y"</span>
+
+<span class="s">  fun maxidx_of_terms terms = fold (Integer.max o Term.maxidx_of_term) terms (~1)</span>
+
+<span class="s">  fun is_unifiable_pair (ctxt : Proof.context) (t0 : term) (t1 : term) =</span>
+<span class="s">      Unify.unifiers (Context.Proof ctxt, Envir.empty (maxidx_of_terms [t0, t1] + 1), [(t0, t1)])</span>
+<span class="s">   |&gt; Seq.pull</span>
+<span class="s">   |&gt; Option.isSome</span>
+
+<span class="s">  fun is_equality (ctxt : Proof.context) (goal : term) : bool =</span>
+<span class="s">    goal |&gt; is_unifiable_pair ctxt pattern</span>
+
+<span class="s">  val term0 = @{term "x=y"}</span>
+<span class="s">  val term1 = Syntax.read_term @{context} "x=y"</span>
+
+<span class="s">  val compare0 = is_equality @{context} term0 (* true *)</span>
+<span class="s">  val compare1 = is_equality @{context} term1 (* true  *)</span>
+<span class="s">›</span>
+
+<span class="kn">lemma</span><span class="w"> </span><span class="n">test</span><span class="o">:</span><span class="w"> </span><span class="s">‹x=y›</span>
+<span class="w">  </span><span class="kp">apply</span><span class="w"> </span><span class="o">(</span><span class="n">tactic‹SUBGOAL</span><span class="w"> </span><span class="o">(</span><span class="n">fn</span><span class="w"> </span><span class="o">(</span><span class="n">goal</span><span class="o">,</span><span class="w"> </span><span class="o">_)</span><span class="w"> </span><span class="o">=</span><span class="n">&gt;</span>
+<span class="w">     </span><span class="kp">if</span><span class="w"> </span><span class="n">goal</span><span class="w"> </span><span class="o">|</span><span class="n">&gt;</span><span class="w"> </span><span class="n">HOLogic.dest_Trueprop</span><span class="w"> </span><span class="o">|</span><span class="n">&gt;</span><span class="w"> </span><span class="n">is_equality</span><span class="w"> </span><span class="n">@</span><span class="ow">{</span><span class="k">context</span><span class="ow">}</span>
+<span class="w">        </span><span class="k">then</span><span class="w"> </span><span class="n">print_tac</span><span class="w"> </span><span class="n">@</span><span class="ow">{</span><span class="k">context</span><span class="ow">}</span><span class="w"> </span><span class="s">"match"</span>
+<span class="w">        </span><span class="n">else</span><span class="w"> </span><span class="n">print_tac</span><span class="w"> </span><span class="n">@</span><span class="ow">{</span><span class="k">context</span><span class="ow">}</span><span class="w"> </span><span class="s">"no match"</span><span class="o">)</span><span class="w"> </span><span class="n">1›</span><span class="o">)</span><span class="w"> </span><span class="c">(* match *)</span>
+<span class="w">  </span><span class="gr">oops</span>
+</code></pre></div>
+
+
+
+<a name="351615733"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Pattern%20matching%20goals/near/351615733" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Hanno Becker <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Pattern.20matching.20goals.html#351615733">(Apr 21 2023 at 12:53)</a>:</h4>
+<p>Awesome, thanks a lot! Is there meaningful difference between <code>read_term</code> in <code>mode_schematic</code>, and <code>Proof_Context.read_term_pattern</code>?</p>
+
+
+
+<a name="351616403"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Pattern%20matching%20goals/near/351616403" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Kevin Kappelmann <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Pattern.20matching.20goals.html#351616403">(Apr 21 2023 at 12:55)</a>:</h4>
+<p>BTW. if you really just want to look whether some term matches the equality constant, you can simply do this:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="w">  </span><span class="k">fun</span><span class="w"> </span><span class="n">try_bool</span><span class="w"> </span><span class="n">f</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">try</span><span class="w"> </span><span class="n">f</span><span class="w"> </span><span class="n">#&gt;</span><span class="w"> </span><span class="o">(</span><span class="n">Option.getOpt</span><span class="w"> </span><span class="n">o</span><span class="w"> </span><span class="n">rpair</span><span class="w"> </span><span class="n">false</span><span class="o">)</span>
+<span class="w">  </span><span class="n">val</span><span class="w"> </span><span class="n">is_equality</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">try_bool</span><span class="w"> </span><span class=" -Symbol">\&lt;^Const_fn&gt;</span><span class="s">‹HOL.eq _ for _ _ =&gt; true›</span>
+</code></pre></div>
+
+
+
+<a name="351616655"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Pattern%20matching%20goals/near/351616655" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Hanno Becker <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Pattern.20matching.20goals.html#351616655">(Apr 21 2023 at 12:56)</a>:</h4>
+<p>Thanks! No, my actual use is more complicated and will require the general version</p>
+
+
+
+<a name="351617975"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Pattern%20matching%20goals/near/351617975" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Kevin Kappelmann <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Pattern.20matching.20goals.html#351617975">(Apr 21 2023 at 13:00)</a>:</h4>
+<p><span class="user-mention silent" data-user-id="233154">Kevin Kappelmann</span> <a href="#narrow/stream/211483-Isabelle.2FML/topic/Pattern.20matching.20goals/near/351615060">said</a>:</p>
+<blockquote>
+<p><div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">ML</span><span class="s">‹</span>
+<span class="s">  val ctxt = Proof_Context.set_mode Proof_Context.mode_schematic @{context}</span>
+<span class="s">  val pattern = Syntax.read_term ctxt "(?x :: ?'a) = ?y"</span>
+
+<span class="s">  fun maxidx_of_terms terms = fold (Integer.max o Term.maxidx_of_term) terms (~1)</span>
+
+<span class="s">  fun is_unifiable_pair (ctxt : Proof.context) (t0 : term) (t1 : term) =</span>
+<span class="s">      Unify.unifiers (Context.Proof ctxt, Envir.empty (maxidx_of_terms [t0, t1] + 1), [(t0, t1)])</span>
+<span class="s">   |&gt; Seq.pull</span>
+<span class="s">   |&gt; Option.isSome</span>
+
+<span class="s">  fun is_equality (ctxt : Proof.context) (goal : term) : bool =</span>
+<span class="s">    goal |&gt; is_unifiable_pair ctxt pattern</span>
+
+<span class="s">  val term0 = @{term "x=y"}</span>
+<span class="s">  val term1 = Syntax.read_term @{context} "x=y"</span>
+
+<span class="s">  val compare0 = is_equality @{context} term0 (* true *)</span>
+<span class="s">  val compare1 = is_equality @{context} term1 (* true  *)</span>
+<span class="s">›</span>
+
+<span class="kn">lemma</span><span class="w"> </span><span class="n">test</span><span class="o">:</span><span class="w"> </span><span class="s">‹x=y›</span>
+<span class="w">  </span><span class="kp">apply</span><span class="w"> </span><span class="o">(</span><span class="n">tactic‹SUBGOAL</span><span class="w"> </span><span class="o">(</span><span class="n">fn</span><span class="w"> </span><span class="o">(</span><span class="n">goal</span><span class="o">,</span><span class="w"> </span><span class="o">_)</span><span class="w"> </span><span class="o">=</span><span class="n">&gt;</span>
+<span class="w">     </span><span class="kp">if</span><span class="w"> </span><span class="n">goal</span><span class="w"> </span><span class="o">|</span><span class="n">&gt;</span><span class="w"> </span><span class="n">HOLogic.dest_Trueprop</span><span class="w"> </span><span class="o">|</span><span class="n">&gt;</span><span class="w"> </span><span class="n">is_equality</span><span class="w"> </span><span class="n">@</span><span class="ow">{</span><span class="k">context</span><span class="ow">}</span>
+<span class="w">        </span><span class="k">then</span><span class="w"> </span><span class="n">print_tac</span><span class="w"> </span><span class="n">@</span><span class="ow">{</span><span class="k">context</span><span class="ow">}</span><span class="w"> </span><span class="s">"match"</span>
+<span class="w">        </span><span class="n">else</span><span class="w"> </span><span class="n">print_tac</span><span class="w"> </span><span class="n">@</span><span class="ow">{</span><span class="k">context</span><span class="ow">}</span><span class="w"> </span><span class="s">"no match"</span><span class="o">)</span><span class="w"> </span><span class="n">1›</span><span class="o">)</span><span class="w"> </span><span class="c">(* match *)</span>
+<span class="w">  </span><span class="gr">oops</span>
+</code></pre></div><br>
+</p>
+</blockquote>
+<p>Small update: it should actually be <code>val pattern = Syntax.read_term ctxt "(?x :: ?'a) = ?y"</code></p>
+
+
+
+<a name="351620660"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Pattern%20matching%20goals/near/351620660" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Hanno Becker <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Pattern.20matching.20goals.html#351620660">(Apr 21 2023 at 13:09)</a>:</h4>
+<p>Thanks again Kevin, this was very helpful</p>
+
+
+
+<a name="351621070"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Pattern%20matching%20goals/near/351621070" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Kevin Kappelmann <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Pattern.20matching.20goals.html#351621070">(Apr 21 2023 at 13:10)</a>:</h4>
+<p><span class="user-mention silent" data-user-id="570503">Hanno Becker</span> <a href="#narrow/stream/211483-Isabelle.2FML/topic/Pattern.20matching.20goals/near/351615733">said</a>:</p>
+<blockquote>
+<p>Awesome, thanks a lot! Is there meaningful difference between <code>read_term</code> in <code>mode_schematic</code>, and <code>Proof_Context.read_term_pattern</code>?</p>
+</blockquote>
+<p>There are some differences, but I do not know exactly what the differences are. One difference is that <code>mode_pattern</code> will create schematic types wherever possible whereas <code>mode_schematic</code> will create polymorphic types. Example:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">ML</span><span class="s">‹</span>
+<span class="s">  val pattern1 = Proof_Context.read_term_pattern @{context} "?x = ?y"</span>
+<span class="s">  val pattern2 = Proof_Context.read_term_schematic @{context} "?x = ?y"</span>
+<span class="s">›</span>
+</code></pre></div>
+<p>creates the concrete terms:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="n">val</span><span class="w"> </span><span class="n">pattern1</span><span class="w"> </span><span class="o">=</span>
+<span class="w">   </span><span class="n">Const</span><span class="w"> </span><span class="o">(</span><span class="s">"HOL.eq"</span><span class="o">,</span><span class="w"> </span><span class="s">"?'a1 ⇒ ?'a1 ⇒ bool"</span><span class="o">)</span><span class="w"> </span><span class="n">$</span><span class="w"> </span><span class="n">Var</span><span class="w"> </span><span class="o">((</span><span class="s">"x"</span><span class="o">,</span><span class="w"> </span><span class="n">0</span><span class="o">),</span><span class="w"> </span><span class="s">"?'a1"</span><span class="o">)</span><span class="w"> </span><span class="n">$</span><span class="w"> </span><span class="n">Var</span><span class="w"> </span><span class="o">((</span><span class="s">"y"</span><span class="o">,</span><span class="w"> </span><span class="n">0</span><span class="o">),</span><span class="w"> </span><span class="s">"?'a1"</span><span class="o">)</span>
+<span class="n">val</span><span class="w"> </span><span class="n">pattern2</span><span class="w"> </span><span class="o">=</span>
+<span class="w">   </span><span class="n">Const</span><span class="w"> </span><span class="o">(</span><span class="s">"HOL.eq"</span><span class="o">,</span><span class="w"> </span><span class="s">"'a ⇒ 'a ⇒ bool"</span><span class="o">)</span><span class="w"> </span><span class="n">$</span><span class="w"> </span><span class="n">Var</span><span class="w"> </span><span class="o">((</span><span class="s">"x"</span><span class="o">,</span><span class="w"> </span><span class="n">0</span><span class="o">),</span><span class="w"> </span><span class="s">"'a"</span><span class="o">)</span><span class="w"> </span><span class="n">$</span><span class="w">  </span><span class="n">Var</span><span class="w"> </span><span class="o">((</span><span class="s">"y"</span><span class="o">,</span><span class="w"> </span><span class="n">0</span><span class="o">),</span><span class="w"> </span><span class="s">"'a"</span><span class="o">)</span>
+</code></pre></div>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

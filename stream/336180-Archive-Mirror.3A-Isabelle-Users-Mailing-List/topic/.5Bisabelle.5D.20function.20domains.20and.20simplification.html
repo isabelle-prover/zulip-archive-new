@@ -1,0 +1,97 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] function domains and simplification · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20function.20domains.20and.20simplification.html">[isabelle] function domains and simplification</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294078211"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20function%20domains%20and%20simplification/near/294078211" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20function.20domains.20and.20simplification.html#294078211">(Aug 18 2022 at 13:35)</a>:</h4>
+<p>From: Chris Capel &lt;<a href="mailto:pdf23ds@gmail.com">pdf23ds@gmail.com</a>&gt;<br>
+theory test<br>
+imports Main<br>
+begin</p>
+<p>(* This function returns some nat based on a list of nats.<br>
+If there is a zero in the list, it will sometimes not terminate. *)<br>
+function testfun where<br>
+  "testfun list =<br>
+    (if (list!0) &lt; length list<br>
+    then testfun (drop (list ! 0) list)<br>
+    else length list)"<br>
+by pat_completeness auto</p>
+<p>lemma simp_loop: "testfun_dom ([0]) ==&gt; testfun [0] = 1"<br>
+(* apply (simp) loops *)<br>
+sorry</p>
+<p>lemma easy: "testfun_dom ([2]) ==&gt; testfun [2] = 1"<br>
+apply simp<br>
+done</p>
+<p>lemma weird: "testfun_dom ([1, 2]) ==&gt; testfun [1, 2] = 1"<br>
+apply (simp)</p>
+<p>Here the simplifier behaves quite strangely, in my opinion. It<br>
+simplifies testfun through one recursive iteration, leaving<br>
+"testfun_dom [1, 2] ==&gt; testfun [2] = 1". Why doesn't it simplify the<br>
+entire call?</p>
+<p>Not surprisingly, adding "testfun_dom ([2])" to the assumptions allows<br>
+it to complete. But it doesn't seem like that should be necessary,<br>
+since "testfun_dom ([1, 2]) ==&gt; testfun_dom ([2])" due directly to the<br>
+definition of testfun. Generally speaking, if arg is the argument to<br>
+fun x, for each recursive call x' in x, arg' is in the domain if arg<br>
+is. But Isabelle doesn't seem aware of this. Should it be, ideally?</p>
+<p>This makes reasoning about potentially non-terminating recursive<br>
+functions nearly impossible, in my quite limited experience. Is this<br>
+the experience of others?</p>
+<p>Chris Capel</p>
+
+
+
+<a name="294078219"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20function%20domains%20and%20simplification/near/294078219" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20function.20domains.20and.20simplification.html#294078219">(Aug 18 2022 at 13:35)</a>:</h4>
+<p>From: Alexander Krauss &lt;<a href="mailto:krauss@in.tum.de">krauss@in.tum.de</a>&gt;<br>
+Hi Chris,</p>
+<blockquote>
+<p>function testfun where<br>
+  "testfun list =<br>
+    (if (list!0) &lt; length list<br>
+    then testfun (drop (list ! 0) list)<br>
+    else length list)"</p>
+</blockquote>
+<p>[...]</p>
+<blockquote>
+<p>lemma weird: "testfun_dom ([1, 2]) ==&gt; testfun [1, 2] = 1"<br>
+apply (simp)</p>
+<p>Here the simplifier behaves quite strangely, in my opinion. It<br>
+simplifies testfun through one recursive iteration, leaving<br>
+"testfun_dom [1, 2] ==&gt; testfun [2] = 1". Why doesn't it simplify the<br>
+entire call?</p>
+<p>Not surprisingly, adding "testfun_dom ([2])" to the assumptions allows<br>
+it to complete. But it doesn't seem like that should be necessary,<br>
+since "testfun_dom ([1, 2]) ==&gt; testfun_dom ([2])" due directly to the<br>
+definition of testfun. Generally speaking, if arg is the argument to<br>
+fun x, for each recursive call x' in x, arg' is in the domain if arg<br>
+is. But Isabelle doesn't seem aware of this. Should it be, ideally?</p>
+</blockquote>
+<p>Ideally, yes. But it is not trivial to make the simplifier do this in <br>
+general, I think...</p>
+<blockquote>
+<p>This makes reasoning about potentially non-terminating recursive<br>
+functions nearly impossible, in my quite limited experience. Is this<br>
+the experience of others?</p>
+</blockquote>
+<p>In the proofs I did with partial functions, I never had to evaluate a <br>
+concrete function more than one or two steps, usually as part of an <br>
+induction proof.</p>
+<p>If you want to use the simplifier to evaluate a partial function on some <br>
+concrete input an arbitrary number of steps automatically, then I guess <br>
+you need a special simproc, which automates the domain reasoning along <br>
+the way... This hasn't been done yet, and I'd be interested in seeing a <br>
+motivating example...</p>
+<p>Alex</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

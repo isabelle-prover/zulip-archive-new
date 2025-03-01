@@ -1,0 +1,192 @@
+<html>
+<head><meta charset="utf-8"><title>Simple proof using Decision_Procs/Approximation · Beginner Questions · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/index.html">Beginner Questions</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Simple.20proof.20using.20Decision_Procs.2FApproximation.html">Simple proof using Decision_Procs/Approximation</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="277838452"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Simple%20proof%20using%20Decision_Procs/Approximation/near/277838452" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Heiko Becker <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Simple.20proof.20using.20Decision_Procs.2FApproximation.html#277838452">(Apr 05 2022 at 07:38)</a>:</h4>
+<p>Hi everyone,<br>
+I have been pointed at the Interval library in <code>Decision_Procs/Approximation</code> and I am trying to prove some simple examples with it.<br>
+Looking at <code>Decision_Procs/ex/Approximation_ex</code>, a goal like the following should be provable:</p>
+<div class="codehilite"><pre><span></span><code>theory Scratch
+  imports Complex_Main &quot;HOL-Library.Reflection&quot;
+    &quot;~~/src/HOL/Decision_Procs/Approximation&quot;
+begin
+lemma bar:
+  shows &quot;0 ≤ x ∧ x ≤ 1 ⟹ abs (sin (x)) &lt; 2&quot;
+  by (approximation 10)
+end
+</code></pre></div>
+<p>However, the proof of lemma <code>bar</code> fails with the error <code>Reification failed: Cannot find the atoms equation
+Approximation does not support "x ∈ {0..1} ⟶ ¦sin x¦ &lt; 2"</code><br>
+Can someone help me understand this error message?</p>
+
+
+
+<a name="277839185"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Simple%20proof%20using%20Decision_Procs/Approximation/near/277839185" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Simple.20proof.20using.20Decision_Procs.2FApproximation.html#277839185">(Apr 05 2022 at 07:46)</a>:</h4>
+<p>Hah, I can see why that might be confusing. The problem, as is so often the case in Isabelle when something that ought to work doesn't work, is polymorphism.</p>
+<p>The way you wrote it down, Isabelle infers the following type for <code>x</code>:</p>
+<div class="codehilite"><pre><span></span><code>&#39;a::{abs,ord,banach,real_normed_algebra_1}
+</code></pre></div>
+<p>You can find that out by doing a <code>declare [[show_sorts]]</code> above your lemma and ctrl+hovering over the <code>x</code>. The <code>banach</code> and <code>real_normed_algebra_1</code> comes from the <code>sin</code>, the <code>ord</code> comes from the <code>≤</code>, and the <code>abs</code> comes from the <code>abs</code>.</p>
+<p>If you add an explicit <code>:: real</code> constraint, it works without any problems.</p>
+
+
+
+<a name="277839212"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Simple%20proof%20using%20Decision_Procs/Approximation/near/277839212" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Simple.20proof.20using.20Decision_Procs.2FApproximation.html#277839212">(Apr 05 2022 at 07:46)</a>:</h4>
+<p>Someone ought to improve the error message for <code>approximation</code> to detect these cases…</p>
+
+
+
+<a name="277839233"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Simple%20proof%20using%20Decision_Procs/Approximation/near/277839233" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Simple.20proof.20using.20Decision_Procs.2FApproximation.html#277839233">(Apr 05 2022 at 07:47)</a>:</h4>
+<p>I'll put that on my to do list.</p>
+
+
+
+<a name="277839424"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Simple%20proof%20using%20Decision_Procs/Approximation/near/277839424" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Heiko Becker <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Simple.20proof.20using.20Decision_Procs.2FApproximation.html#277839424">(Apr 05 2022 at 07:49)</a>:</h4>
+<p>Thanks a lot for the explanation! That makes sense. I will add that explicitly. HOL4 does support something along the lines of <code>realsLib.prefer_reals()</code> which tells the parser to disambiguate into reals as much as possible. Is there maybe something similar for Isabelle?/HOL?</p>
+
+
+
+<a name="277840083"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Simple%20proof%20using%20Decision_Procs/Approximation/near/277840083" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Heiko Becker <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Simple.20proof.20using.20Decision_Procs.2FApproximation.html#277840083">(Apr 05 2022 at 07:57)</a>:</h4>
+<p>One more question: I was pointed at the <code>approximation</code> work by a reviewer whom suggested to look into it for polynomial inequalities. I am now trying a very simple goal from our evaluation, and the only error I get is <code>Failed to apply initial proof method⌂:[...]</code> when using <code>apply (approximation 30)</code> on this goal</p>
+<div class="codehilite"><pre><span></span><code>lemma foo:
+  assumes &quot;(0 ≤ x ∧ x &lt;= 2/5)&quot;
+  shows &quot;(abs(cos (x) - (50000000135927169520044799355673603713512420654297 /
+50000000000000000000000000000000000000000000000000 +
+(x *
+ (-1225409217893488553021618054153507593184713186929 /
+  2500000000000000000000000000000000000000000000000000000) +
+ (x * x *
+  (-24999283897945898114123508548800600692629814147949 /
+   50000000000000000000000000000000000000000000000000) +
+  (x * x * x *
+   (-3061900846609820763151443845373478325200267136097 /
+    20000000000000000000000000000000000000000000000000000) +
+   (x * x * x * x *
+    (21203466323626414535841178121700068004429340362549 /
+     500000000000000000000000000000000000000000000000000) +
+    x * x * x * x * x *
+    (-16524268822046756562821334668456074723508208990097 /
+     10000000000000000000000000000000000000000000000000000))))))):: real)
+    &lt;=
+    19552407163238115144356799930793053619830587160513/5000000000000000000000000000000000000000000000000000000000&quot;
+</code></pre></div>
+
+
+
+<a name="277844029"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Simple%20proof%20using%20Decision_Procs/Approximation/near/277844029" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Simple.20proof.20using.20Decision_Procs.2FApproximation.html#277844029">(Apr 05 2022 at 08:37)</a>:</h4>
+<p>That usually indicates that <code>approximation</code> wasn't able to verify the statement, either because it is false or because the precision wasn't high enough.</p>
+
+
+
+<a name="277844078"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Simple%20proof%20using%20Decision_Procs/Approximation/near/277844078" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Simple.20proof.20using.20Decision_Procs.2FApproximation.html#277844078">(Apr 05 2022 at 08:38)</a>:</h4>
+<p>(Or because there is a completeness bug in the code)</p>
+
+
+
+<a name="277844179"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Simple%20proof%20using%20Decision_Procs/Approximation/near/277844179" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Simple.20proof.20using.20Decision_Procs.2FApproximation.html#277844179">(Apr 05 2022 at 08:39)</a>:</h4>
+<p>But you shouldn't forget to chain in the assumption here.</p>
+
+
+
+<a name="277844189"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Simple%20proof%20using%20Decision_Procs/Approximation/near/277844189" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Simple.20proof.20using.20Decision_Procs.2FApproximation.html#277844189">(Apr 05 2022 at 08:39)</a>:</h4>
+<p>i.e. <code>using assms by (approximation …)</code></p>
+
+
+
+<a name="277844372"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Simple%20proof%20using%20Decision_Procs/Approximation/near/277844372" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Simple.20proof.20using.20Decision_Procs.2FApproximation.html#277844372">(Apr 05 2022 at 08:40)</a>:</h4>
+<p>I think it may also help to cut the interval a bit more</p>
+
+
+
+<a name="277845073"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Simple%20proof%20using%20Decision_Procs/Approximation/near/277845073" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Heiko Becker <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Simple.20proof.20using.20Decision_Procs.2FApproximation.html#277845073">(Apr 05 2022 at 08:46)</a>:</h4>
+<p>Ok, thanks for the explanations. I will try with <code>using assms</code> again and see what happens. We used CoqInterval on those examples too where we needed bisections and taylor models. I will experiment with the parameters to <code>approximation</code> a bit then.</p>
+
+
+
+<a name="277845134"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Simple%20proof%20using%20Decision_Procs/Approximation/near/277845134" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Simple.20proof.20using.20Decision_Procs.2FApproximation.html#277845134">(Apr 05 2022 at 08:47)</a>:</h4>
+<p>It does support Taylor stuff and bisections, have a look at the examples in the <code>HOL/Decision_Procs/ex</code> directory.</p>
+
+
+
+<a name="277845146"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Simple%20proof%20using%20Decision_Procs/Approximation/near/277845146" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Simple.20proof.20using.20Decision_Procs.2FApproximation.html#277845146">(Apr 05 2022 at 08:47)</a>:</h4>
+<p>but I wasn't able to get this one through, so it's possible that there is some problem there</p>
+
+
+
+<a name="277845204"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Simple%20proof%20using%20Decision_Procs/Approximation/near/277845204" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Simple.20proof.20using.20Decision_Procs.2FApproximation.html#277845204">(Apr 05 2022 at 08:48)</a>:</h4>
+<p>i.e. that what <code>approximation</code> does is simply not good enough</p>
+
+
+
+<a name="277845225"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Simple%20proof%20using%20Decision_Procs/Approximation/near/277845225" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Simple.20proof.20using.20Decision_Procs.2FApproximation.html#277845225">(Apr 05 2022 at 08:48)</a>:</h4>
+<p>there are Taylor Models in Isabelle as well; Fabian Immler will be able to help you with those (though he works at Apple now; not sure if he will reply)</p>
+
+
+
+<a name="277845332"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Simple%20proof%20using%20Decision_Procs/Approximation/near/277845332" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Heiko Becker <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Simple.20proof.20using.20Decision_Procs.2FApproximation.html#277845332">(Apr 05 2022 at 08:49)</a>:</h4>
+<p>Thanks a lot for all of the help. I will keep experimenting with it.</p>
+
+
+
+<a name="277850998"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Simple%20proof%20using%20Decision_Procs/Approximation/near/277850998" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Simple.20proof.20using.20Decision_Procs.2FApproximation.html#277850998">(Apr 05 2022 at 09:41)</a>:</h4>
+<p>I cobbled something together for you. <a href="/user_uploads/14278/zTpVZ5XPHLepYy1vq9qmkrWp/My_Experiment.thy">My_Experiment.thy</a></p>
+
+
+
+<a name="277851035"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Simple%20proof%20using%20Decision_Procs/Approximation/near/277851035" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Simple.20proof.20using.20Decision_Procs.2FApproximation.html#277851035">(Apr 05 2022 at 09:41)</a>:</h4>
+<p>Unless I messed something while copy-pasting, this verifies that your inequality holds using Taylor models, within about 1.7 seconds in my machine.</p>
+
+
+
+<a name="277851170"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Simple%20proof%20using%20Decision_Procs/Approximation/near/277851170" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Simple.20proof.20using.20Decision_Procs.2FApproximation.html#277851170">(Apr 05 2022 at 09:42)</a>:</h4>
+<p>It's a bit messy because Fabian never seems to have done the same kind of nice reification that exists for <code>approximation</code> and the interface to the Taylor Model library is a bit unpolished, but I think I figured out how to set it up correctly.</p>
+
+
+
+<a name="277851191"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Simple%20proof%20using%20Decision_Procs/Approximation/near/277851191" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Simple.20proof.20using.20Decision_Procs.2FApproximation.html#277851191">(Apr 05 2022 at 09:42)</a>:</h4>
+<p>You might want to run this by Fabian for a comment though.</p>
+
+
+
+<a name="277980262"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Simple%20proof%20using%20Decision_Procs/Approximation/near/277980262" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Heiko Becker <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Simple.20proof.20using.20Decision_Procs.2FApproximation.html#277980262">(Apr 06 2022 at 06:29)</a>:</h4>
+<p>Thank you very much for the file. I will look at it carefully. I will first check whether I can automatically generate inputs of the form described in the file before I start bugging more people.</p>
+
+
+
+<a name="277981461"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Simple%20proof%20using%20Decision_Procs/Approximation/near/277981461" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Simple.20proof.20using.20Decision_Procs.2FApproximation.html#277981461">(Apr 06 2022 at 06:49)</a>:</h4>
+<p>I mean you could contact him about what this <code>prove_pos</code> thing actually does and whether there is a correctness proof</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

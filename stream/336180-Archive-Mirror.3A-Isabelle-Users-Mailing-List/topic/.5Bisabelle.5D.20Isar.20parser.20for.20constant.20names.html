@@ -1,0 +1,99 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Isar parser for constant names · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isar.20parser.20for.20constant.20names.html">[isabelle] Isar parser for constant names</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294278114"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isar%20parser%20for%20constant%20names/near/294278114" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isar.20parser.20for.20constant.20names.html#294278114">(Aug 19 2022 at 14:30)</a>:</h4>
+<p>From: Moa Johansson &lt;<a href="mailto:moa.johansson@chalmers.se">moa.johansson@chalmers.se</a>&gt;<br>
+Hi,</p>
+<p>I'm defining a new Isar-command (called hipster) which should take a list of constant names as input. However, I seem to run into some problems. The parser I’ve written so far works fine, but requires me to pass the arguments as strings, which is somewhat ugly, like this:</p>
+<p>hipster "TreeDemo.mirror" "TreeDemo.tmap"</p>
+<p>It would be nice to be able to use similar syntax to generate_code, i.e. have the theory names deduced automatically, so I though I’d make use of the function Parse.const. However, although this function parses the constant name to a string, it appears it is not the same one as passing the function names explicitly as a string, which I would expect. <br>
+Checking what Parse.const does with print statements makes me no wiser, here it looks OK. </p>
+<p>Hipster uses the code generator, and this is where the problem manifests itself, when I use Parse.const instead of Parse.string: </p>
+<p>exception TYPE raised (line 97 of "consts.ML"): Unknown constant: "TreeDemo.mirror"</p>
+<p>despite being in the theory “TreeDemo”, where indeed there is a function mirror. Below is the code for my small parser, if anyone has any tips on some other function I can use to reliably parse constants names, please let me know! </p>
+<p>Best,<br>
+Moa</p>
+<p>let<br>
+fun call_hipster consts = <br>
+<a href="http://Local_Theory.target">Local_Theory.target</a> <br>
+  (fn ctxt =&gt; fst(Hipster_Explore.explore ctxt consts));<br>
+in<br>
+Outer_Syntax.local_theory  @{command_spec "hipster"} <br>
+      "Theory Exploration with Hipster”<br>
+     (* This works OK*)<br>
+      (* (Scan.repeat1 Parse.string &gt;&gt; call_hipster) *)<br>
+     (* This cause an error - unknown constant *)<br>
+       (Scan.repeat1 Parse.const &gt;&gt; call_hipster)<br>
+end</p>
+
+
+
+<a name="294278150"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isar%20parser%20for%20constant%20names/near/294278150" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isar.20parser.20for.20constant.20names.html#294278150">(Aug 19 2022 at 14:30)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Parse.const is the right thing, but only half of it, namely the outer <br>
+syntax parser.  You also need an inners syntax "read" function.</p>
+<p>Peeking at the implementation of the 'notation' command suggests the <br>
+following:</p>
+<p>Proof_Context.read_const ctxt false dummyT</p>
+<p>Makarius</p>
+
+
+
+<a name="294278197"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isar%20parser%20for%20constant%20names/near/294278197" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isar.20parser.20for.20constant.20names.html#294278197">(Aug 19 2022 at 14:31)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+Hi,</p>
+<p>here's what I do for my Isar command:</p>
+<p>fun const_raw (..., raw_const) thy =<br>
+   let<br>
+     val ctxt = Proof_Context.init_global thy<br>
+     val (name, _) = Syntax.parse_term ctxt raw_const<br>
+       |&gt; Type.strip_constraints<br>
+       |&gt; dest_Const</p>
+<p>(* ... *)<br>
+   in<br>
+     (* ... *)<br>
+   end</p>
+<p>val _ =<br>
+   Outer_Syntax.command<br>
+     @{command_spec "declassify"}<br>
+     "redefines a constant after applying the dictionary construction"<br>
+     ((* ... *) -- Parse.const &gt;&gt; (Toplevel.theory o const_raw))</p>
+<p>This works with proper markup in Isabelle/jEdit. I'm not sure whether <br>
+ this is the canonical solution, but so far I never got any "unknown <br>
+ constant" exceptions.</p>
+<p>Cheers<br>
+ Lars</p>
+
+
+
+<a name="294278235"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isar%20parser%20for%20constant%20names/near/294278235" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isar.20parser.20for.20constant.20names.html#294278235">(Aug 19 2022 at 14:31)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+It is better than working with raw uninterpreted strings.  Going through <br>
+the full term language is conceptually simple, and often adequate as <br>
+approximation.</p>
+<p>The business of reading just consts, not terms that are mean to be consts, <br>
+is more delicate.  For the next release I have brushed up the canonical <br>
+functions for that: it will also do the right thing for name space <br>
+completion.  For Isabelle2013-2 the given ProofContext.read_const should <br>
+do the job.</p>
+<p>Note that above the Proof_Context.init_global only makes sense in a global <br>
+theory context, which seems to be the case here, but that is a special <br>
+case.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

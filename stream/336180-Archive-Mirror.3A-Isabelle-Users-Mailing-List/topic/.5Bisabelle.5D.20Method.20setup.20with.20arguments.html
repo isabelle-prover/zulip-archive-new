@@ -1,0 +1,61 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Method setup with arguments · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Method.20setup.20with.20arguments.html">[isabelle] Method setup with arguments</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294699533"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Method%20setup%20with%20arguments/near/294699533" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Method.20setup.20with.20arguments.html#294699533">(Aug 22 2022 at 14:32)</a>:</h4>
+<p>From: Zhe Hou &lt;<a href="mailto:zhe.hou@hotmail.com">zhe.hou@hotmail.com</a>&gt;<br>
+Hi,</p>
+<p>Suppose I have already defined a ML function my_tac that takes a term as<br>
+input and returns a tactic, now I want to setup a method (here called<br>
+method1) to wrap it up. Is there a way to pass a term as an argument of the<br>
+method?</p>
+<p>For example, suppose I want to use method1 inside an Eisbach method called<br>
+method2:</p>
+<p>method method2 = (match premises in P:"?A /\ ?B" =&gt; &lt;method1 P&gt;)</p>
+<p>How should I define the setup and parser for method1 so that I can pass the<br>
+argument P as a term to my_tac?</p>
+<p>Thank you very much!</p>
+<p>Zhe</p>
+
+
+
+<a name="294700602"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Method%20setup%20with%20arguments/near/294700602" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Method.20setup.20with.20arguments.html#294700602">(Aug 22 2022 at 14:37)</a>:</h4>
+<p>From: <a href="mailto:Daniel.Matichuk@data61.csiro.au">Daniel.Matichuk@data61.csiro.au</a><br>
+The "classic" solution is to use the method_setup command and define a parser, here you'll most likely want "Args.term"</p>
+<p>However in you're example you aren't passing a term to method1, you're passing the fact P (now a fact as a result of the match subgoal focus). You would have to use the Attribs.thm parser to do that. So there are a few solutions to your problem:</p>
+<ol>
+<li>
+<p>Define a method that takes a fact and extracts its underlying term:</p>
+<p>method_setup method1 = <br>
+  ‹Attrib.thm &gt;&gt; (fn thm =&gt; fn ctxt =&gt; SIMPLE_METHOD (my_tac (Thm.prop_of thm)))›</p>
+<p>method method2 = (match premises in P:"?A ∧ ?B" ⇒ ‹method1 P›)</p>
+<p>However here "method1" can only work inside a match/focus (where P is an assumed fact).</p>
+</li>
+<li>
+<p>Define a method that takes a term and quote the premise back through to method1</p>
+<p>method_setup method1 = <br>
+  ‹Args.term &gt;&gt; (fn t =&gt; fn ctxt =&gt; SIMPLE_METHOD (my_tac t))›</p>
+<p>method method2 = (match premises in "A ∧ B" for A B ⇒ ‹method1 "A ∧ B"›)</p>
+</li>
+<li>
+<p>As above, but bind the premise to a separate name first:</p>
+<p>method method2 = (match premises in P for P ⇒ ‹match (P) in "?A ∧ ?B" ⇒ ‹method1 P››)</p>
+</li>
+</ol>
+<p>We can also define method1 with the "tactic" method, although it is maybe not as straightforward as it could be.</p>
+<p>method method1 for P = (tactic ‹my_tac (Morphism.term morphism @{term P})›)</p>
+<p>The implicitly bound "morphism" here instructs the tactic to re-evaluate "P" in the evaluation environment of "method1" when it is executed. Using a bare "@{term P}" will not give the expected result.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

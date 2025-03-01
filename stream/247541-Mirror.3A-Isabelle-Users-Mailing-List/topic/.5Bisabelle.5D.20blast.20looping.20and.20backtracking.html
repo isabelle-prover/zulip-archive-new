@@ -1,0 +1,95 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] blast looping and backtracking · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20blast.20looping.20and.20backtracking.html">[isabelle] blast looping and backtracking</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="262776212"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20blast%20looping%20and%20backtracking/near/262776212" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20blast.20looping.20and.20backtracking.html#262776212">(Nov 26 2021 at 09:35)</a>:</h4>
+<p>From: Kevin Kappelmann &lt;<a href="mailto:kevin.kappelmann@tum.de">kevin.kappelmann@tum.de</a>&gt;<br>
+Dear list,</p>
+<p>I like to tag unconditional facts (<code>0 &lt; 1</code>, <code>X ⊆ X</code>, <code>x ∈ {x}</code>) as<br>
+[intro!] rules. In combination with a suitable elim rule and goal<br>
+statement, this lead to a looping behaviour of blast that I did not<br>
+expect. Here is a minimal, contrived example:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">definition</span> <span class="s">"P x ≡ True"</span>
+
+<span class="kn">lemma</span> <span class="o">[</span><span class="n">intro</span><span class="o">]:</span> <span class="s">"P x"</span>
+  <span class="k">unfolding</span> <span class="n">P_def</span> <span class="ow">..</span>
+
+<span class="kn">lemma</span> <span class="o">[</span><span class="n">elim</span><span class="o">]:</span>
+  <span class="kp">assumes</span> <span class="s">"True"</span>
+  <span class="kp">obtains</span> <span class="s">"¬(P x)"</span> <span class="o">|</span> <span class="s">"P x"</span>
+  <span class="c">(*if we were to swap the order of the cases, blast does not loop*)</span>
+  <span class="c">(*obtains "P x" | "¬(P x)"*)</span>
+  <span class="k">by</span> <span class="n">blast</span>
+
+<span class="kn">lemma</span> <span class="s">"True ⟹ False"</span>
+  <span class="k">by</span> <span class="n">blast</span> <span class="c">(*loops*)</span>
+</code></pre></div>
+<p>Looking at the output of blast (<code>setup "Config.put_global Blast.trace
+true"</code>), it seems to me that</p>
+<ol>
+<li>the elim rule is applied</li>
+<li>the first subgoal closed by the intro rule</li>
+<li>the second subgoal cannot be closed and backtracking occurs</li>
+<li>repeat with 1.</li>
+</ol>
+<p>If, as written in the comment above, we were to swap the order of the<br>
+cases in the elim-rule, blast will not loop. Is this the expected<br>
+behaviour of blast? I would have expected that the elim-rule will not be<br>
+applied again after backtracking occurs.</p>
+<p>For the sake of completeness, here is a more realistic example of the<br>
+same problem:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">declare</span> <span class="n">insertI1</span><span class="o">[</span><span class="n">intro</span><span class="o">]</span> <span class="c">(*"a ∈ insert a A"*)</span>
+<span class="c">(*subsetCE is already declared as [elim] in the distro*)</span>
+<span class="k">declare</span> <span class="n">subsetCE</span><span class="o">[</span><span class="n">elim</span><span class="o">]</span> <span class="c">(*A ⊆ B ⟹ (c ∉ A ⟹ Q) ⟹ (c ∈ B ⟹ Q) ⟹ Q*)</span>
+
+<span class="kn">lemma</span> <span class="s">"(∀X. X ⊆ X) ⟹ 1 + 1 = 2"</span>
+  <span class="k">by</span> <span class="n">blast</span> <span class="c">(*loops*)</span>
+</code></pre></div>
+<p>Best wishes,</p>
+<p>Kevin</p>
+
+
+
+<a name="262783854"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20blast%20looping%20and%20backtracking/near/262783854" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20blast.20looping.20and.20backtracking.html#262783854">(Nov 26 2021 at 10:58)</a>:</h4>
+<p>From: Lawrence Paulson &lt;<a href="mailto:lp15@cam.ac.uk">lp15@cam.ac.uk</a>&gt;<br>
+Dear Kevin, thanks for an interesting email. In fact it turns out that</p>
+<p>lemma "(∀X. X ⊆ X) ⟹ 1 + 1 = 2"<br>
+ by blast </p>
+<p>loops right out of the box. Why is this?</p>
+<p>Blast doesn’t know anything about arithmetic, so it’s unable to prove 1 + 1 = 2. It will look at the assumptions and see that quantified formula, which it will try to use, creating instances of the form ?A ⊆ ?A, which are in effect other quantified formulas, giving blast lots of things to try. But of course, the assumption is equivalent to true and can’t prove anything.</p>
+<p>Blast isn’t a decision procedure and you should kill it if it doesn’t succeed in a couple of seconds.</p>
+<p>You should be cautious about tagging facts like the ones you list (<code>0 &lt; 1</code>, <code>X ⊆ X</code>, <code>x ∈ {x}</code>), simply because they refer to built-in primitives where the existing setup has undergone years of tuning (the set primitives in particular). By all means tag facts related to constants that lie further from the core, if that makes sense. But in fact it is quite easy to get blast to loop.</p>
+<p>Larry Paulson</p>
+
+
+
+<a name="262784756"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20blast%20looping%20and%20backtracking/near/262784756" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20blast.20looping.20and.20backtracking.html#262784756">(Nov 26 2021 at 11:08)</a>:</h4>
+<p>From: Kevin Kappelmann &lt;<a href="mailto:kevin.kappelmann@tum.de">kevin.kappelmann@tum.de</a>&gt;<br>
+Thanks Larry - do you also happen to know why blast stops looping if we<br>
+were to swap the cases in the first example I posted? That would maybe<br>
+help me to tag lemmas in a way that makes auto and blast more predictable.</p>
+<p>Kevin</p>
+
+
+
+<a name="262785718"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20blast%20looping%20and%20backtracking/near/262785718" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20blast.20looping.20and.20backtracking.html#262785718">(Nov 26 2021 at 11:19)</a>:</h4>
+<p>From: Lawrence Paulson &lt;<a href="mailto:lp15@cam.ac.uk">lp15@cam.ac.uk</a>&gt;<br>
+I don’t think that there is a simple explanation. In general, blast is an instance of a sort of technology that will keep trying if there is anything it can do, and therefore can be expected to loop rather than to terminate with failure.</p>
+<p>It would be more concerning to see examples that loop even though there is a proof (in logic, not something involving arithmetic say). And I am sure such examples also exist.</p>
+<p>Larry Paulson</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

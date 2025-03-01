@@ -1,0 +1,84 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] metis method and +-combinator · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20metis.20method.20and.20.2B-combinator.html">[isabelle] metis method and +-combinator</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294065853"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20metis%20method%20and%20%2B-combinator/near/294065853" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20metis.20method.20and.20.2B-combinator.html#294065853">(Aug 18 2022 at 12:23)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:peter.lammich@uni-muenster.de">peter.lammich@uni-muenster.de</a>&gt;<br>
+Hi all, I encounter the following problem with the metis-method and the <br>
++-combinator:</p>
+<p>lemma "a#b ~= b" "a#b ~= b" "a#b ~= b" "a#b ~= a#x#b"<br>
+    apply -<br>
+    apply (metis not_Cons_self)+<br>
+    apply (auto)</p>
+<p>The second apply-step will fail with the error message<br>
+*** Metis: No first-order proof with the lemmas supplied<br>
+*** At command "apply".</p>
+<p>However, I would have expected the meaning of + to be: Apply argument <br>
+method(ical) repeatedly until it fails, at least once.<br>
+Hence  "apply (metis not_Cons_self)+" should solve the first 3 subgoals.</p>
+<p>Regards,<br>
+  Peter</p>
+
+
+
+<a name="294065897"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20metis%20method%20and%20%2B-combinator/near/294065897" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20metis.20method.20and.20.2B-combinator.html#294065897">(Aug 18 2022 at 12:24)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+This is indeed slightly non-standard behaviour for a proof method.  The <br>
+reason is that the internal meson tactic does not fail cleanly (by <br>
+returning an empty result sequence), but emits spurious errors.</p>
+<p>Here is an adhoc version of the tactic that turns <em>all</em> ERROR exeptions <br>
+into a failed state (we do this by somewhat unusual operations on the <br>
+result sequence):</p>
+<p>ML {*<br>
+  fun my_metis_tac ctxt ths i st =<br>
+    Seq.of_list (Seq.list_of (MetisTools.metis_tac ctxt ths i st)<br>
+      handle ERROR _ =&gt; [])<br>
+*}</p>
+<p>(For a production-quality version, instead of handling all kinds of errors <br>
+blindly, one would have to go through the Meson/Isabelle linkup carefully <br>
+and refrain emitting errors in certain cases.)</p>
+<p>The above ML tactic may be turned into an Isar method like this:</p>
+<p>method_setup my_metis = {*<br>
+  Method.thms_ctxt_args (fn ths =&gt; fn ctxt =&gt;<br>
+    Method.SIMPLE_METHOD' (CHANGED_PROP o metis_tac ctxt ths))<br>
+*} "METIS"</p>
+<p>Example:</p>
+<p>lemma "a#b ~= b" "a#b ~= b" "a#b ~= b" "a#b ~= a#x#b"<br>
+  apply (my_metis not_Cons_self)+</p>
+<p>Now only the last goal remains.</p>
+<p>Makarius</p>
+
+
+
+<a name="294065907"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20metis%20method%20and%20%2B-combinator/near/294065907" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20metis.20method.20and.20.2B-combinator.html#294065907">(Aug 18 2022 at 12:24)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:peter.lammich@uni-muenster.de">peter.lammich@uni-muenster.de</a>&gt;<br>
+Makarius wrote:</p>
+<p>Thank you very much!</p>
+<p>I removed an obvious typo (replacing metis_tac by my_metis_tac, as <br>
+declared in the ML-code above) and now it seems to work:</p>
+<p>ML {*<br>
+  fun my_metis_tac ctxt ths i st =<br>
+    Seq.of_list (Seq.list_of (MetisTools.metis_tac ctxt ths i st)<br>
+      handle ERROR _ =&gt; [])<br>
+*}</p>
+<p>method_setup my_metis = {*<br>
+  Method.thms_ctxt_args (fn ths =&gt; fn ctxt =&gt;<br>
+    Method.SIMPLE_METHOD' (CHANGED_PROP o <em>my_</em>metis_tac ctxt ths))<br>
+*} "METIS"</p>
+<p>Regards,<br>
+  Peter</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

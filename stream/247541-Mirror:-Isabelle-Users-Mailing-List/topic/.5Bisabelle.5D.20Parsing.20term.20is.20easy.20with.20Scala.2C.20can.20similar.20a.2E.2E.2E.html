@@ -1,0 +1,121 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Parsing term is easy with Scala, can similar a... · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Parsing.20term.20is.20easy.20with.20Scala.2C.20can.20similar.20a.2E.2E.2E.html">[isabelle] Parsing term is easy with Scala, can similar a...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="233078681"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Parsing%20term%20is%20easy%20with%20Scala%2C%20can%20similar%20a.../near/233078681" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Parsing.20term.20is.20easy.20with.20Scala.2C.20can.20similar.20a.2E.2E.2E.html#233078681">(Apr 04 2021 at 12:37)</a>:</h4>
+<p>From: Alex Meyer &lt;<a href="mailto:alex153@outlook.lv">alex153@outlook.lv</a>&gt;<br>
+I have came up with the code (using <a href="https://github.com/dominique-unruh/scala-isabelle/">https://github.com/dominique-unruh/scala-isabelle/</a>) that parses term into tree-like structure:</p>
+<p>val setup = Isabelle.Setup(isabelleHome = Path.of(isabelleHome), logic = "HOL", build=false)<br>
+    implicit val isabelle: Isabelle = new Isabelle(setup)<br>
+    val ctxt = Context("HOL.Imperative_HOL.ex.Imperative_Quicksort")</p>
+<p>val test_term = Term(ctxt, "two_integer_max_case_def a b = (case a &gt; b of True \\&lt;Rightarrow&gt; a | False \\&lt;Rightarrow&gt; b)")<br>
+    println("After test term")<br>
+    println(test_term.getClass())<br>
+    println("test_term: " + test_term.pretty(ctxt))<br>
+    val jsonString = write(test_term)<br>
+    println("After write test term")</p>
+<p>def t_report2(term: Term, curr_string: String): String = term match {<br>
+      case Const(p_name, p_type) =&gt; curr_string + " [Const " + p_name + "] "<br>
+      case Free(p_name, p_type) =&gt; curr_string + " [Free " + p_name + "] "<br>
+      case Var(p_name, p_index, p_type) =&gt; curr_string + " [Var " + p_name + p_index + "] "<br>
+      case Abs(p_name, p_type, p_body_term) =&gt; curr_string + " [Abs " + p_name + p_body_term.pretty(ctxt) + t_report2(p_body_term, curr_string) + "] "<br>
+      case Bound(p_index) =&gt; curr_string + " [Bound " + p_index + "] "<br>
+      case App(p_term_1, p_term_2) =&gt; curr_string + " [App " + p_term_1.pretty(ctxt) + t_report2(p_term_1, curr_string) + " ||| " + p_term_2.pretty(ctxt) + t_report2(p_term_2, curr_string) + "] "<br>
+      //final case class Const(name: String, typ: Typ)            // Corresponds to ML constructor 'Const'<br>
+      //final case class Free(name: String, typ: Typ)             // Corresponds to ML constructor 'Free'<br>
+      //final case class Var(name: String, index: Int, typ: Typ)  // Corresponds to ML constructor 'Var'<br>
+      //final case class Abs(name: String, typ: Typ, body: Term)  // Corresponds to ML constructor 'Abs'<br>
+      //final case class Bound private (index: Int)               // Corresponds to ML constructor 'Bound'<br>
+      //final case class App private (fun: Term, arg: Term)       // Corresponds to ML constructor '$'<br>
+      case _ =&gt; curr_string + " [Other] "<br>
+    }<br>
+    println(t_report2(test_term, ""))</p>
+<p>The resulting string representation is something like (I am still doing the right indentation):</p>
+<p>[App (=) (two_integer_max_case_def a b)</p>
+<p>[App (=) [Const HOL.eq] |||</p>
+<p>two_integer_max_case_def a b</p>
+<p>[App two_integer_max_case_def a</p>
+<p>[App two_integer_max_case_def</p>
+<p>[Free two_integer_max_case_def] |||</p>
+<p>a [Free a]</p>
+<p>] |||</p>
+<p>b [Free b]</p>
+<p>]</p>
+<p>] |||</p>
+<p>case b &lt; a of True ⇒ a | False ⇒ b</p>
+<p>[App case_bool a b</p>
+<p>[App case_bool a</p>
+<p>[App case_bool</p>
+<p>[Const Product_Type.bool.case_bool] |||</p>
+<p>a [Free a]</p>
+<p>] ||| b [Free b] ] ||| b &lt; a [App (&lt;) b [App (&lt;) [Const Orderings.ord_class.less] ||| b [Free b] ] ||| a [Free a] ] ] ]</p>
+<p>This is the result which I tried to find all the time! And now I am wondering - what I am missing here? Why so many people have told me that this endeavour is so hard? But, currently, unfortunatly, it applies to the terms (inner syntax) only. Such can is possible because of the (from <a href="https://javadoc.io/doc/de.unruh/scala-isabelle_2.13/latest/de/unruh/isabelle/pure/Term.html">https://javadoc.io/doc/de.unruh/scala-isabelle_2.13/latest/de/unruh/isabelle/pure/Term.html</a>):</p>
+<p>sealed abstract class Term<br>
+final case class Const(name: String, typ: Typ)            // Corresponds to ML constructor 'Const'<br>
+final case class Free(name: String, typ: Typ)             // Corresponds to ML constructor 'Free'<br>
+final case class Var(name: String, index: Int, typ: Typ)  // Corresponds to ML constructor 'Var'<br>
+final case class Abs(name: String, typ: Typ, body: Term)  // Corresponds to ML constructor 'Abs'<br>
+final case class Bound private (index: Int)               // Corresponds to ML constructor 'Bound'<br>
+final case class App private (fun: Term, arg: Term)       // Corresponds to ML constructor '$'</p>
+<p>(And I am still digesting what it means because in Java someone has have introspection/reflection into the function name and arguments but not into function body/code content, but this Scala approach seemingly allows to dive into the content of the body of the class or function!).</p>
+<p>My question is - is there similar code (with mathc) possible for parsing theory? i.e. is there<br>
+sealed abstract class Theory (or MLValue)<br>
+final case class Theorem(...)<br>
+final case class Definition(...)</p>
+<p>Something like that? Or something completely different one should use for the theory (outer syntax)?</p>
+<p>Isabelle provides parsing and pretty-printing facilities for the terms.</p>
+<p>Alex</p>
+
+
+
+<a name="233122387"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Parsing%20term%20is%20easy%20with%20Scala%2C%20can%20similar%20a.../near/233122387" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Parsing.20term.20is.20easy.20with.20Scala.2C.20can.20similar.20a.2E.2E.2E.html#233122387">(Apr 05 2021 at 00:09)</a>:</h4>
+<p>From: Dominique Unruh &lt;<a href="mailto:unruh@ut.ee">unruh@ut.ee</a>&gt;<br>
+Hello,</p>
+<blockquote>
+<p>And now I am wondering - what I am missing here? Why so many people have<br>
+told me that this endeavour is so hard?</p>
+</blockquote>
+<p>I don't think anyone said that it is hard to parse a term. That is easy and<br>
+well-supported both in Isabelle/ML and via scala-isabelle.</p>
+<p>What is difficult is to translate a <em>theory</em> into a data-structure.</p>
+<p>So, to summarize, what is available is (both in ML and Scala):</p>
+<p>- Converting a string into a term object (parsing)<br>
+   - Inspecting a term (because a term is a datastructure).<br>
+   - Creating theorem objects (e.g., by proving them, or by loading them<br>
+   from an existing theory).</p>
+<p>- Inspecting a theorem object (namely by getting the term corresponding<br>
+   to it).</p>
+<p>- Creating theory objects (e.g., by executing a .thy file).<br>
+   - Getting all theorems from a theory. (And then inspecting them as<br>
+   above.)</p>
+<p>- Splitting a theory file into commands (like "lemma ..." or "apply<br>
+   ...").</p>
+<p>- Parsing a command (but not into an inspectable datastructure, you<br>
+   simply get a function that can be applied to the the current state of a<br>
+   theory)</p>
+<p>What is not available (to the best of my knowledge):</p>
+<p>- Get an AST-like datastructure from parsing a theory. That is because<br>
+   this is just never creating in the process of parsing a .thy file.</p>
+<p>What is available (but I don't know how to best extract it, for this<br>
+Makarius' emails are relevant):</p>
+<p>- Getting the PIDE markup of a theory. Basically, this is some<br>
+   annotation of the theory (e.g., it might say something like "characters<br>
+   5-15 are the name of a theorem" and "character 100-101 are the name of a<br>
+   variable of type nat"). I don't know the extent of information available<br>
+   here.</p>
+<p>Best wishes,<br>
+Dominique.</p>
+
+
+
+<hr><p>Last updated: Jul 15 2022 at 23:21 UTC</p>
+</html>

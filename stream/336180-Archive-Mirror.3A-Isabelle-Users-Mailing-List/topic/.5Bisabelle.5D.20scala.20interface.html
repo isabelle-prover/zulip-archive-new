@@ -1,0 +1,244 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] scala interface · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20scala.20interface.html">[isabelle] scala interface</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294152658"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20scala%20interface/near/294152658" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20scala.20interface.html#294152658">(Aug 18 2022 at 19:11)</a>:</h4>
+<p>From: Matthias Schmalz &lt;<a href="mailto:Matthias.Schmalz@inf.ethz.ch">Matthias.Schmalz@inf.ethz.ch</a>&gt;<br>
+Hi,</p>
+<p>I am trying to use the scala library Pure.jar to communicate with the <br>
+Isabelle process. A typical use case is to send a theory snipped like <br>
+the following and to check whether the proof attempt succeeds:</p>
+<p>theory Test imports Main begin</p>
+<p>lemma foo:<br>
+fixes x :: bool<br>
+assumes "x = True"<br>
+shows "x | x"<br>
+using assms<br>
+by simp</p>
+<p>I have already discovered the Isabelle_System.init method and I am aware <br>
+of the classes "Isabelle_Process" and "Session". My attempts to <br>
+communicate the above snippet to an Isabelle_Process failed due to my <br>
+unawareness of the input format of Isabelle_Process.input. (Perhaps, <br>
+this is not the intended interface anyway?)<br>
+I also tried to use Session.init_node, but I am not sure how to choose <br>
+the parameters and how to receive the result.</p>
+<p>I would appreciate any help on this very much!</p>
+<p>Best,<br>
+Matthias</p>
+
+
+
+<a name="294152717"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20scala%20interface/near/294152717" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20scala.20interface.html#294152717">(Aug 18 2022 at 19:11)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+First let's fix the Isabelle version for this thread: the latest release <br>
+Isabelle2011-1.  It does not make sense to use an older Isabelle version <br>
+with Isabelle/Scala, due to the many substantial improvements of the same <br>
+that went into Isabelle2011-1.</p>
+<p>Direct use of Isabelle_Process.input connects you with the protocol <br>
+interpreter on the other side.  It is theoretically possible to extend its <br>
+set of protocol commands in user space, but that would mean to produce <br>
+your own protocol implementation, which is a bit challenging to get really <br>
+right.</p>
+<p>It is better to use the official Isabelle/Scala document model, even <br>
+though its API in Isabelle2011-1 is still a bit rough, and there are more <br>
+details of the mechanics of the underlying interaction model still visible <br>
+than I would like to have after 4 years working on that.</p>
+<p>Attached is an example for doing the initial startup of the session <br>
+together with the theory context; see also <br>
+<a href="https://bitbucket.org/pide/pide_examples/src/2a4cfab96b3e/ex.scala">https://bitbucket.org/pide/pide_examples/src/2a4cfab96b3e/ex.scala</a> (that <br>
+repository might evolve further).</p>
+<p>This is how to build and run it with Isabelle2011-1:</p>
+<p>shell&gt; isabelle scalac ex.scala<br>
+   shell&gt; isabelle scala<br>
+   scala&gt; val session = PIDE_examples.Ex.Theory_Session()</p>
+<p>The Theory_Session.apply() function has some further optional arguments; <br>
+e.g. verbose = true gives you all the low-level protocol messages.</p>
+<p>What makes the implementation a bit delicate is the bias of Session <br>
+towards the current main application in the Isabelle/jEdit Prover IDE. <br>
+Here the user throws edits at the prover, which in turn answers them <br>
+incrementally in an fully asynchronous manner.  There is never a point <br>
+where a finished execution of some command transaction is enforced. I have <br>
+recovered the latter in the above Theory_Session for the first half of the <br>
+problem: prover startup and processing the theory header.</p>
+<p>So you will get synchrous errors on the command line if anything fails <br>
+here, say giving a bad logic image or imports.  If you have your own GUI, <br>
+you might reconsider asynchronous startup, see also <br>
+~~/src/Tools/jEdit/src/plugin.scala which should give an idea about the <br>
+specific wiring with the main jEdit event bus.</p>
+<p>What is still missing in the above ex.scala is the part about emitting the <br>
+statement and proof, and inspecting its results.  This requires some extra <br>
+care due to potential non-termination of that part of the document.</p>
+<p>We can discuss in further detail what your application really requires.</p>
+<p>Makarius<br>
+<a href="/user_uploads/14278/8Yq1vHBXOz7jLDB5lQfHDKux/ex.scala">ex.scala</a></p>
+
+
+
+<a name="294152869"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20scala%20interface/near/294152869" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20scala.20interface.html#294152869">(Aug 18 2022 at 19:12)</a>:</h4>
+<p>From: Matthias Schmalz &lt;<a href="mailto:Matthias.Schmalz@inf.ethz.ch">Matthias.Schmalz@inf.ethz.ch</a>&gt;</p>
+<blockquote>
+<p>First let's fix the Isabelle version for this thread: the latest release<br>
+Isabelle2011-1. It does not make sense to use an older Isabelle version<br>
+with Isabelle/Scala, due to the many substantial improvements of the<br>
+same that went into Isabelle2011-1.</p>
+</blockquote>
+<p>Sure.</p>
+<blockquote>
+<p>Attached is an example for doing the initial startup of the session<br>
+together with the theory context; see also<br>
+<a href="https://bitbucket.org/pide/pide_examples/src/2a4cfab96b3e/ex.scala">https://bitbucket.org/pide/pide_examples/src/2a4cfab96b3e/ex.scala</a> (that<br>
+repository might evolve further).</p>
+</blockquote>
+<p>Thanks for this example. It clarifies the situation a lot. So new output <br>
+by the Isabelle process is announced through the commands_changed bus <br>
+and the details on the new document state can be queried with the <br>
+snapshot method. I still have difficulties understanding what kind of <br>
+information a snapshot provides.</p>
+<p>My current view is the following; feel free to correct any <br>
+misinterpretations:</p>
+<ul>
+<li>A Document.Node is somehow the counterpart of a text buffer in jEdit.</li>
+<li>A Document.Snapshot is the response of the system to a Document.Node.</li>
+<li>
+<p>The Document.Snapshot.command_state field indicates the response to a <br>
+given Isar command within the document node.</p>
+</li>
+<li>
+<p>The Command.State.results field indicates what is usually displayed in <br>
+the Output Window of jEdit.</p>
+</li>
+<li>
+<p>The Command.State.status field gives the annotations displayed with <br>
+jEdit's theory buffer.</p>
+</li>
+</ul>
+<blockquote>
+<p>What makes the implementation a bit delicate is the bias of Session<br>
+towards the current main application in the Isabelle/jEdit Prover IDE.<br>
+Here the user throws edits at the prover, which in turn answers them<br>
+incrementally in an fully asynchronous manner. There is never a point<br>
+where a finished execution of some command transaction is enforced. I<br>
+have recovered the latter in the above Theory_Session for the first half<br>
+of the problem: prover startup and processing the theory header.</p>
+</blockquote>
+<p>Synchronizing input and output is one of the main challenges in my <br>
+application.</p>
+<blockquote>
+<p>What is still missing in the above ex.scala is the part about emitting<br>
+the statement and proof, and inspecting its results. This requires some<br>
+extra care due to potential non-termination of that part of the document.</p>
+</blockquote>
+<p>Sure.</p>
+<blockquote>
+<p>We can discuss in further detail what your application really requires.</p>
+</blockquote>
+<p>There is much more to say and I would appreciate to discuss this, but I <br>
+have a deadline for next weekend. I will come back to you after this.</p>
+<p>Best,<br>
+Matthias</p>
+
+
+
+<a name="294152890"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20scala%20interface/near/294152890" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20scala.20interface.html#294152890">(Aug 18 2022 at 19:12)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Document.Node identifies each document node in a semi-abstract manner. <br>
+It is indeed modeled after editor text buffers, can be used in other ways <br>
+as well.  In the example, I've identified the fresh theory node by some <br>
+something like /dummy-42/Theory.thy</p>
+<p>Document.Snapshot is the main access point of the totality of a collection <br>
+of document nodes in a document version, with semantic markup attached <br>
+(via the internal Command.State components).  This is the main programming <br>
+interface to access results.  It provides a defined point in space and <br>
+time of the ongoing process of continous checking of the sources.  The key <br>
+operation is Snapshot.select_markup, but in the present example I have <br>
+uses more low-level status and results fields from individual command <br>
+states.</p>
+<p>Command.State.results and Command.State.status are special cases of the <br>
+primary "markup" component of accumulated state information.  In fact, <br>
+after Isabelle2011-1 the focus is shifting further to that general markup <br>
+tree, and result messages and status information might have to be <br>
+retrieved via <a href="http://Snapshot.select">Snapshot.select</a> and some further variants of it.</p>
+<p>Makarius</p>
+
+
+
+<a name="294153101"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20scala%20interface/near/294153101" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20scala.20interface.html#294153101">(Aug 18 2022 at 19:14)</a>:</h4>
+<p>From: Holger Gast &lt;<a href="mailto:gast@informatik.uni-tuebingen.de">gast@informatik.uni-tuebingen.de</a>&gt;<br>
+Hi Matthias,</p>
+<p>since similar questions have popped up now and then on the list, I<br>
+have taken a closer look at your request on the basis of the implementation<br>
+of the I3P interface (see my web-page), because in principle<br>
+it already offers the required API to do "background proving".</p>
+<p>To explain: as desirable for user interface software (see the MVC pattern),<br>
+the functionality of I3P is implemented entirely in a self-contained<br>
+infrastructure layer that is independent of the Netbeans interface<br>
+that happens to access that functionality now.<br>
+As a result, extended unit tests can be run against the functionality<br>
+(which have greatly helped in maintainance and debugging through<br>
+the different Isabelle releases of the past 2 years) and the bulk of the<br>
+software becomes portable (e.g. to Eclipse, as done prototypically<br>
+in a bachelor thesis in Tübingen). For a fuller motivation and<br>
+architecture description, see my UITP '10 paper.</p>
+<p>In principle, the infrastructure layer thus enables running Isabelle<br>
+as a background prover directly, analogously to the existing unit tests<br>
+of the Isabelle driver module. At the core, the it provides a simple<br>
+execute/revoke model for commands (based on two methods of<br>
+CommandState), while I3P takes care of sending<br>
+appropriate Isabelle commands, interrupt signals, etc. as necessary.<br>
+(I3P even keeps sending INT until the command stops executing.)</p>
+<p>However, the abstractions built into the architecture lead to some<br>
+boilerplate code (see the @Before methods of the tests) that is not nice<br>
+for the specific application.</p>
+<p>I have now added a small IsabelleFacade class (in module APIAccess;<br>
+for Facade see Gamma et al. "Design Patterns", 1995),<br>
+which hopefully makes the procedure straightforward. The attachment<br>
+contains a demonstration of the following features:</p>
+<ul>
+<li>start &amp; stop the prover</li>
+<li>
+<p>execute theories / individual commands and</p>
+<ul>
+<li>check for sucess, failure, or non-termination</li>
+<li>access the command's results</li>
+<li>
+<p>interrupt (explicit or automatic) looping commands after<br>
+  some specified timeout.</p>
+</li>
+<li>
+<p>bulk proof of several proof attempts in different theories,<br>
+  with automatic switching between theories.</p>
+</li>
+</ul>
+</li>
+<li>
+<p>The SyncExec wrapper adapts the overall asynchronous<br>
+  architecture of I3P to the requirement of synchronous processing<br>
+  as necessary for testing or background proving. Its (straightforward)<br>
+  implementation shows how to work with the signalling mechanisms<br>
+  about changes in the processing state of some command in order to<br>
+  wait for the completion of processing.</p>
+</li>
+</ul>
+<p>The new facade, as well as the most important API classes of the<br>
+infrastructure module IAPP, have JavaDoc explanations attached. Please<br>
+get back to me if I omitted some lazily, such that I can supply them lazily.</p>
+<p>Hope this helps,</p>
+<p>Holger<br>
+<a href="/user_uploads/14278/oqJmtmif0wHLCrAWMHd9vlUT/RunningTheoriesTest.java">RunningTheoriesTest.java</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

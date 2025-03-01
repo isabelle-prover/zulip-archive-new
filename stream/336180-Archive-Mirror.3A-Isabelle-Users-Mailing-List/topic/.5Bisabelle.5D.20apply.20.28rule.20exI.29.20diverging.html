@@ -1,0 +1,135 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] apply (rule exI) diverging · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20apply.20.28rule.20exI.29.20diverging.html">[isabelle] apply (rule exI) diverging</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294072899"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20apply%20%28rule%20exI%29%20diverging/near/294072899" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20apply.20.28rule.20exI.29.20diverging.html#294072899">(Aug 18 2022 at 13:03)</a>:</h4>
+<p>From: Chris Capel &lt;<a href="mailto:pdf23ds@gmail.com">pdf23ds@gmail.com</a>&gt;<br>
+Isabelle is running for 30+ seconds when I try to apply (rule exI) in<br>
+the middle of my structured proof, eating memory at about 20 MB/sec. I<br>
+ran out of memory after that point. At first I thought it was<br>
+unification exploding but then I got rid of my function schematic<br>
+variable. Could this be a bug? (I'm running from rev<br>
+29862:17d1e32ef867, BTW. I can try updating if needed.)</p>
+<p>The below theory ought to reproduce this.</p>
+<p>Chris Capel</p>
+<p>theory Lojban<br>
+imports Main<br>
+begin</p>
+<p>datatype token =<br>
+    Start nat -- {* nat is phrase id *}<br>
+  | Trm nat bool -- {* phrase id, is elided *}</p>
+<p>-- {* Allowable phrase to phrase relations *}<br>
+consts<br>
+  mapPhPh :: "nat =&gt; nat set"<br>
+  mapMem :: "nat =&gt; nat =&gt; bool" (infix ":*" 50)<br>
+  mapNotMem :: "nat =&gt; nat =&gt; bool" (infix "~:*" 50)<br>
+translations<br>
+  "a :* b" == "a : mapPhPh b"<br>
+  "a ~:* b" == "a ~: mapPhPh b"</p>
+<p>-- {* ({({ } _) _} ) *}</p>
+<p>fun canAppend1 :: "token list =&gt; nat =&gt; bool" where<br>
+  "canAppend1 ((Trm pid el)#xs) p = (~el | p ~:* pid &amp; canAppend1 xs p)" |<br>
+  "canAppend1 ((Start _ )#xs) p = True"<br>
+fun canAppend :: "token list =&gt; nat =&gt; nat =&gt; bool" where<br>
+  "canAppend xs p outID  = (p :* outID &amp; canAppend1 (rev xs) p)"</p>
+<p>primrec insert_list :: "'a list =&gt; nat =&gt; 'a list =&gt; 'a list" where<br>
+  "insert_list list 0 outer = list @ outer" |<br>
+  "insert_list list (Suc n) os = (hd os) # (insert_list list n (tl os))"</p>
+<p>fun rmTrm where<br>
+  "rmTrm lst = filter (% y. case y of Trm _ _ =&gt; False | _ =&gt; True) lst"</p>
+<p>inductive_set P :: "token list set" where<br>
+  base:   "[Start tid, Trm tid el] : P" |<br>
+  beside: "[| base : P; take 2 (drop pos base) = [Trm aID el1, Trm oID el2];<br>
+              canAppend ((take pos base) @ [Trm aID el1]) newID oID |]<br>
+           ==&gt; insert_list [Start newID, Trm newID elided]<br>
+                           (Suc pos) base<br>
+                 : P" |</p>
+<p>inside: "[| base : P; 0 &lt; pos;<br>
+              take 2 (drop (pos - 1) base) = [Start oldID, Trm oldID oldEl];<br>
+          rmTrm (drop pos base) = [];<br>
+              newID :* oldID |]<br>
+           ==&gt; insert_list [Start newID, Trm newID elided] pos base : P"</p>
+<p>datatype 'tok prod =<br>
+    PTrm 'tok<br>
+  | Prod "nat list list"</p>
+<p>primrec powerlist :: "'a list =&gt; 'a list list" where<br>
+  "powerlist [] = []" |<br>
+  "powerlist (x # xs) = (x # xs) # powerlist xs"</p>
+<p>function<br>
+    parse_len :: "'tok prod list =&gt; 'tok prod =&gt; 'tok list =&gt; int" where</p>
+<p>"parse_len gr (PTrm tok) toks = (if ((hd toks) = tok) then 1 else -1)"<br>
+ | "parse_len gr (Prod pl) toks =<br>
+      last (sort (map (%p. foldl (% (len::int) (p, l).<br>
+                                    if len = -1 then -1<br>
+                                    else len + parse_len gr (gr!p) l)<br>
+                                 0 (zip p (powerlist toks)))<br>
+                  pl))"</p>
+<p>by pat_completeness auto</p>
+<p>fun getPhMap :: "(nat * nat) list =&gt; nat =&gt; nat set" where<br>
+  "getPhMap ls x = set (map snd (filter (%y. (fst y) = x) ls))"</p>
+<p>fun rm_elided :: "token list =&gt; token list" where<br>
+  "rm_elided st = filter (%s. case s of Start _ =&gt; True | Trm _ el =&gt; ~el) st"</p>
+<p>lemma assumes "st : P" and "mapt ~= []" and "mapPhPh = getPhMap mapt"<br>
+  shows "EX gr X Y. parse_len_dom (gr, gr!0, (rm_elided st)) --&gt;<br>
+             (nat (parse_len gr (gr!0) (rm_elided st)) = length (rm_elided st))<br>
+             &amp; size gr &lt; X * length (rm_elided st) * length mapt</p>
+<p>+ Y * length (rm_elided st)"<br>
+  (is "EX gr. ?LinGr gr")<br>
+using assms(1) proof (induct st rule: P.induct)<br>
+  fix gr tid el<br>
+  have "?LinGr [Prod [[1, 2]], PTrm (Start tid), PTrm (Trm tid el)]"<br>
+    sorry<br>
+  -- {* hence "EX gr. ?LinGr gr" ..*}<br>
+  thus "EX gr X Y.<br>
+       parse_len_dom (gr, gr ! 0, rm_elided [Start tid, Trm tid el]) --&gt;<br>
+       nat (parse_len gr (gr ! 0) (rm_elided [Start tid, Trm tid el])) =<br>
+       length (rm_elided [Start tid, Trm tid el]) &amp;<br>
+       length gr<br>
+       &lt; X * length (rm_elided [Start tid, Trm tid el]) * length mapt +<br>
+         Y * length (rm_elided [Start tid, Trm tid el])" apply (rule exI)<br>
+qed</p>
+
+
+
+<a name="294072928"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20apply%20%28rule%20exI%29%20diverging/near/294072928" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20apply.20.28rule.20exI.29.20diverging.html#294072928">(Aug 18 2022 at 13:03)</a>:</h4>
+<p>From: Lawrence Paulson &lt;<a href="mailto:lp15@cam.ac.uk">lp15@cam.ac.uk</a>&gt;<br>
+The inclusion of the previous result (by your use of "thus" rather  <br>
+than "show") seems to be part of the problem, though I am not sure why.</p>
+<p>Another part of your problem is that the previous result does not  <br>
+appear to match up with the new result that you want to prove. Higher- <br>
+order unification can get out of control quite quickly when you have a  <br>
+big search space but no solutions.</p>
+<p>I was able to make some progress with the following fragment:</p>
+<p>have l: "?LinGr [Prod [[1, 2]], PTrm (Start tid), PTrm (Trm tid el)]"<br>
+    sorry<br>
+  -- {* hence "EX gr. ?LinGr gr" ..*}<br>
+have "EX gr X Y.<br>
+       parse_len_dom (gr, gr ! 0, rm_elided st) --&gt;<br>
+       nat (parse_len gr (gr ! 0) (rm_elided st)) =<br>
+       length (rm_elided st) &amp;<br>
+       length gr<br>
+       &lt; X * length (rm_elided st) * length mapt +<br>
+         Y * length (rm_elided st)"<br>
+by (rule exI, rule l)</p>
+<p>The previous result is now labelled l. We no longer include it in the  <br>
+next proof (no "from"). I have corrected the statement to be proved so  <br>
+that it matches. Now the proof is instantaneous. Alternatively, you  <br>
+can include the previous result and prove the next one using blast  <br>
+with no arguments.</p>
+<p>So the problem appears to be the interaction between the rule method  <br>
+and piped in facts.</p>
+<p>Larry Paulson</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

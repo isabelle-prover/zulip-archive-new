@@ -1,0 +1,68 @@
+[
+    {
+        "content": "<p>From: Rafal Kolanski &lt;<a href=\"mailto:rafalk@cse.unsw.edu.au\">rafalk@cse.unsw.edu.au</a>&gt;<br>\nDear Isabelle Gurus,</p>\n<p>I am trying to find all theorems in a bunch of theories that don't <br>\n(deeply) depend on a set of theorems in another bunch of theories.</p>\n<p>Where I am completely lost is the definitions of constants. If I ask <br>\nIsabelle, constant definitions do not depend on anything. That is, <br>\nasking for the theorem dependencies of *_def usually results in nothing.<br>\nHowever, they do depend on other constants used in their definition.</p>\n<p>For example, False_def involves use of \"==\" \"False\" and \"All\", so I <br>\nargue that in my situation False_def depends on the definitions of \"==\" <br>\nand \"All\". If those definitions exist in theories which I've tagged, <br>\nthen I should tag False_def as well and anything that uses the constant <br>\n\"False\".</p>\n<p>What I want is some way of discovering (even really slowly) \"this is the <br>\nfirst occurrence of a given constant; before this theorem it did not <br>\nexist before\". In the case of \"False\" this would be HOL.False_def.<br>\nI realise that the concept of \"before\" may be problematic in a parallel <br>\nenvironment, but although theories may be processed in parallel, I <br>\nbelieve they still need to be put together in a specific order. The _def <br>\ntheorem for a definition cannot be successfully processed after a <br>\ntheorem that uses the definition's constant. If I could get a list of <br>\ntheorems in the order that they were defined/accepted/processed instead <br>\nof alphabetically, I'd be able to pull it off.</p>\n<p>I am not looking for elegance for now. Only: can this be done?</p>\n<p>Also, a simpler issue: for some reason I can't figure out the rules <br>\nabout fully-qualified names of constants in theorems. E.g. if I make a <br>\ndefinition \"zulu\" in theory Deps, @{const zulu} comes back as:<br>\n   Const (\"Dependencies.zulu\", \"nat \\&lt;Rightarrow&gt; bool\") : term<br>\nbut if I ask about \"False\" it comes back with:<br>\n   Const (\"False\", \"bool\") : term<br>\nWhat's more, HOL.False does not exist as a constant.<br>\nI'm confused about the rules for when I can count on a fully-qualified <br>\nname and when not. Can you offer any advice?</p>\n<p>I thank you in advance for any hints. Perhaps if I make this work, we <br>\ncan create a useful tool for automatically identifying generic lemmas. <br>\nIt may also improve the feature set of find_theorems.</p>\n<p>Sincerely,</p>\n<p>Rafal Kolanski.</p>",
+        "id": 294110941,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660836798
+    },
+    {
+        "content": "<p>From: Tobias Nipkow &lt;<a href=\"mailto:nipkow@in.tum.de\">nipkow@in.tum.de</a>&gt;<br>\nThis one is easy: for historical reasons certain basic constants are<br>\nunqualified. If you look into HOL.thy you'll find the keywords \"global\"<br>\nand \"local\" that control the naming. It is not advisable to use them<br>\nyourself.</p>\n<p>Tobias</p>",
+        "id": 294110988,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660836819
+    },
+    {
+        "content": "<p>From: Jasmin Blanchette &lt;<a href=\"mailto:jasmin.blanchette@gmail.com\">jasmin.blanchette@gmail.com</a>&gt;<br>\nHi Rafal,</p>\n<blockquote>\n<p>What I want is some way of discovering (even really slowly) \"this is the first occurrence of a given constant; before this theorem it did not exist before\". In the case of \"False\" this would be HOL.False_def.</p>\n</blockquote>\n<p>You might find the \"Defs\" table useful. E.g. try:</p>\n<p>ML {* Defs.all_specifications_of (Theory.defs_of @{theory}) *}</p>\n<p>Most if not all constants get registered in this table when they are defined (or introduced with the \"axiomatization\" command).</p>\n<p>A more recent and in many ways more powerful approach is to use</p>\n<p>ML {* Spec_Rules.get @{context} *}</p>\n<p>The advantage of Spec_Rules is that it returns simplification rules for recursive functions rather than the raw definition, intro rules for (co)inductive predicates, etc.</p>\n<p>I hope this helps.</p>\n<p>Jasmin</p>",
+        "id": 294110993,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660836821
+    },
+    {
+        "content": "<p>From: Jasmin Blanchette &lt;<a href=\"mailto:jasmin.blanchette@gmail.com\">jasmin.blanchette@gmail.com</a>&gt;<br>\nI don't know for sure. I haven't ported my \"Defs\"-based code to \"Spec_Rules\" yet. Lukas uses \"Spec_Rules\" for the predicate compiler; maybe he has some insights to share.</p>\n<p>I would definitely suggest you try with \"Spec_Rules\" first and use \"Defs\" as a fallback.</p>\n<p>Jasmin</p>",
+        "id": 294111053,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660836840
+    },
+    {
+        "content": "<p>From: Florian Haftmann &lt;<a href=\"mailto:florian.haftmann@informatik.tu-muenchen.de\">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>\nHi Rafal,</p>\n<p>it depends what you actually aiming it.  The Defs module represents the<br>\nproof theoretic aspect of definitions, i.e. constants which depend on<br>\nother constants.  The Spec_Rules represent more the end-user view of<br>\n\"initial specification\".</p>\n<p>Hope this helps,<br>\n    Florian<br>\n<a href=\"/user_uploads/14278/ps1jug-0UZOvSNqK4lbYJa9U/signature.asc\">signature.asc</a></p>",
+        "id": 294111116,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660836847
+    },
+    {
+        "content": "<p>From: Florian Haftmann &lt;<a href=\"mailto:florian.haftmann@informatik.tu-muenchen.de\">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>\nHi Rafal,</p>\n<p>the rules in the strictest sense are not fixed;  introducing new named<br>\nentities happens through ML functions in Pure/General/name_space.ML</p>\n<p>val declare: bool -&gt; naming -&gt; binding -&gt; Name_Space.T -&gt; string *\nName_Space.T</p>\n<p>Here \"binding\" is a name hint which is expanded to a full name according<br>\nto a policy set by a \"naming\";  the resulting full name and the updated<br>\nname space are returned.</p>\n<p>val define: bool -&gt; naming -&gt; binding * 'a -&gt; Name_Space.T * 'a<br>\nSymtab.table -&gt; string * Name_Space.T * 'a Symtab.table</p>\n<p>Usually the name space is coupled with a table which contains entry data<br>\nfor the newly defined named entity.</p>\n<p>Hope this helps,<br>\n    Florian<br>\n<a href=\"/user_uploads/14278/3EMCmj50ceerv0w-aHsPkaZo/signature.asc\">signature.asc</a></p>",
+        "id": 294111138,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660836853
+    },
+    {
+        "content": "<p>From: Jasmin Blanchette &lt;<a href=\"mailto:jasmin.blanchette@gmail.com\">jasmin.blanchette@gmail.com</a>&gt;<br>\nWhat??</p>\n<p>$ grep -l Spec_Rules ~/isabelle/src/HOL/Tools/<em>{,/</em>}<br>\n    /Users/blanchet/isabelle/src/HOL/Tools/inductive.ML<br>\n    /Users/blanchet/isabelle/src/HOL/Tools/old_primrec.ML<br>\n    /Users/blanchet/isabelle/src/HOL/Tools/primrec.ML<br>\n    /Users/blanchet/isabelle/src/HOL/Tools/recdef.ML<br>\n    /Users/blanchet/isabelle/src/HOL/Tools/Function/function.ML<br>\n    /Users/blanchet/isabelle/src/HOL/Tools/Function/size.ML<br>\n    /Users/blanchet/isabelle/src/HOL/Tools/Nitpick/nitpick_hol.ML<br>\n    /Users/blanchet/isabelle/src/HOL/Tools/Predicate_Compile/predicate_compile_data.ML</p>\n<p>I see primrec, recdef, and function/fun in there. Lukas's predicate compiler uses \"Spec_Rules\" to find equational specifications, so it must be working. Nitpick uses it already for the \"(co)inductive\" package and it's definitely working.</p>\n<p>Cheers,</p>\n<p>Jasmin</p>",
+        "id": 294111161,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660836861
+    },
+    {
+        "content": "<p>From: Gerwin Klein &lt;<a href=\"mailto:gerwin.klein@nicta.com.au\">gerwin.klein@nicta.com.au</a>&gt;<br>\nThe difference may be because we're working on Isabelle 2009-1.</p>\n<p>Cheers,<br>\nGerwin</p>",
+        "id": 294111170,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660836864
+    },
+    {
+        "content": "<p>From: Rafal Kolanski &lt;<a href=\"mailto:rafalk@cse.unsw.edu.au\">rafalk@cse.unsw.edu.au</a>&gt;<br>\nOn 23/06/10 18:05, Jasmin Blanchette wrote:</p>\n<blockquote>\n<blockquote>\n<p>What I want is some way of discovering (even really slowly) \"this<br>\nis the first occurrence of a given constant; before this theorem it<br>\ndid not exist before\". In the case of \"False\" this would be<br>\nHOL.False_def.</p>\n</blockquote>\n<p>You might find the \"Defs\" table useful. E.g. try:</p>\n<p>ML {* Defs.all_specifications_of (Theory.defs_of @{theory}) *}</p>\n<p>Most if not all constants get registered in this table when they are<br>\ndefined (or introduced with the \"axiomatization\" command).</p>\n<p>A more recent and in many ways more powerful approach is to use</p>\n<p>ML {* Spec_Rules.get @{context} *}</p>\n</blockquote>\n<p>That's amazing. I think it may be exactly what I've been looking for! I <br>\nreally should have asked the list sooner rather than banging my head <br>\nagainst the wall for hours.</p>\n<blockquote>\n<p>The advantage of Spec_Rules is that it returns simplification rules<br>\nfor recursive functions rather than the raw definition, intro rules<br>\nfor (co)inductive predicates, etc.</p>\n</blockquote>\n<p>Is there any disadvantage you know of? For example, non-bizarre ways of <br>\nintroducing constants that don't show up in this list?</p>\n<blockquote>\n<p>I hope this helps.</p>\n</blockquote>\n<p>Yes, it definitely does, thank you, Jasmin!</p>\n<p>Rafal Kolanski.</p>",
+        "id": 294111227,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660836889
+    },
+    {
+        "content": "<p>From: Rafal Kolanski &lt;<a href=\"mailto:rafalk@cse.unsw.edu.au\">rafalk@cse.unsw.edu.au</a>&gt;<br>\nI've investigated Spec_Rules. It works as advertised for \"definition\" <br>\nand \"constdefs\", however the primrec/recdef/function/fun sadly do not <br>\nregister their constants in this manner. I'll take a look at Defs now, <br>\nto see if those are workable.</p>\n<p>Perhaps one day all packages will register with Spec_Rules? Who knows. <br>\nStill, for definitions and constdefs, this is already a step forward.</p>\n<p>Cheers,</p>\n<p>Rafal Kolanski.</p>",
+        "id": 294111280,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660836907
+    },
+    {
+        "content": "<p>From: Rafal Kolanski &lt;<a href=\"mailto:rafalk@cse.unsw.edu.au\">rafalk@cse.unsw.edu.au</a>&gt;<br>\nI apologise, I failed to mention I'm on Isabelle 2009-1, working with on <br>\nthe L4.verified repository. To me it looked like this:</p>\n<p>[~/repos/l4.verified/isabelle]# rgrep -l Spec_Rules *\nsrc/Pure/Isar/specification.ML<br>\nsrc/Pure/Isar/spec_rules.ML<br>\nsrc/Pure/Isar/constdefs.ML<br>\nsrc/HOL/Tools/Predicate_Compile/predicate_compile_data.ML</p>\n<p>Sorry. I'm glad Isabelle is, as usual, headed in the right direction. <br>\nAlthough as usual I'm a few steps behind.</p>\n<p>I've finally hacked my way through the Defs interface. It was cryptic, <br>\nbut consistent. Thank you for your help!</p>\n<p>Sincerely,</p>\n<p>Rafal Kolanski.</p>",
+        "id": 294111301,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660836913
+    }
+]

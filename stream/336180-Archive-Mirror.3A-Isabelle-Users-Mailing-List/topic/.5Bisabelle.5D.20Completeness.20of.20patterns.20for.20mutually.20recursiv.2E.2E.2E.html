@@ -1,0 +1,113 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Completeness of patterns for mutually recursiv... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Completeness.20of.20patterns.20for.20mutually.20recursiv.2E.2E.2E.html">[isabelle] Completeness of patterns for mutually recursiv...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294238486"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Completeness%20of%20patterns%20for%20mutually%20recursiv.../near/294238486" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Completeness.20of.20patterns.20for.20mutually.20recursiv.2E.2E.2E.html#294238486">(Aug 19 2022 at 10:44)</a>:</h4>
+<p>From: Amy Furniss &lt;<a href="mailto:mjf29@leicester.ac.uk">mjf29@leicester.ac.uk</a>&gt;<br>
+Dear all,</p>
+<p>I have a pair of mutually-recursive functions which are defined using<br>
+the function command, and I'm struggling to prove the completeness of<br>
+patterns for the definition. If I remove one of the recursive calls (so<br>
+that they are no longer mutually recursive) and separate out the<br>
+functions, the completeness of patterns for both functions is easily<br>
+solved by atomize_elim, auto, but when they are defined together this no<br>
+longer works. Can anybody please suggest how I might go about solving<br>
+this pattern completeness subgoal?</p>
+<p>Thanks,</p>
+<p>Amy</p>
+<hr>
+<p>theory Example<br>
+imports Main<br>
+begin</p>
+<p>datatype type1 = CON | ABS type2 type1<br>
+and type2 = FCON | FAPP type2 type1</p>
+<p>definition regular1 :: "(type1 \&lt;Rightarrow&gt; type1) \&lt;Rightarrow&gt; bool"<br>
+where<br>
+"regular1 \&lt;equiv&gt; \&lt;lambda&gt;z. (z = (\&lt;lambda&gt;x. x))<br>
+  | (z = (\&lt;lambda&gt;x. CON))<br>
+  | (\&lt;exists&gt;f t. z = (\&lt;lambda&gt;x. ABS (t x) (f x)))"</p>
+<p>definition regular2:: "(type1 \&lt;Rightarrow&gt; type2) \&lt;Rightarrow&gt; bool" where<br>
+"regular2 \&lt;equiv&gt; \&lt;lambda&gt;z. (z = (\&lt;lambda&gt;x. FCON))<br>
+  | (\&lt;exists&gt;f t. z = (\&lt;lambda&gt;x. FAPP (t x) (f x)))"</p>
+<p>function fun1 :: "(type1 \&lt;Rightarrow&gt; type1) \&lt;Rightarrow&gt; type1"<br>
+and fun2 :: "(type1 \&lt;Rightarrow&gt; type2) \&lt;Rightarrow&gt; type2" where<br>
+"fun1 (\&lt;lambda&gt;x. x) = CON"<br>
+| "fun1 (\&lt;lambda&gt;x. CON) = CON"<br>
+| "fun1 (\&lt;lambda&gt;x. ABS (t x) (f x)) = ABS (fun2 t) (fun1 f)"<br>
+| "\&lt;not&gt;regular1 i \&lt;Longrightarrow&gt; fun1 i = CON"<br>
+| "fun2 (\&lt;lambda&gt;x. FCON) = FCON"<br>
+| "fun2 (\&lt;lambda&gt;x. FAPP (t x) (f x)) = FAPP (fun2 t) (fun1 f)"<br>
+| "\&lt;not&gt;regular2 i \&lt;Longrightarrow&gt; fun2 i = FCON"<br>
+apply(unfold regular1_def regular2_def)<br>
+apply(atomize_elim)<br>
+apply(auto)<br>
+sorry</p>
+<p>end</p>
+
+
+
+<a name="294238506"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Completeness%20of%20patterns%20for%20mutually%20recursiv.../near/294238506" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Completeness.20of.20patterns.20for.20mutually.20recursiv.2E.2E.2E.html#294238506">(Aug 19 2022 at 10:44)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Amy,</p>
+<p>For mutual recursive definitions, the function package combines the two <br>
+functions into one using a sum type. For your proof, you therefore first <br>
+have to distinguish whether you are in the left or right branch, e.g., <br>
+by case distinction on x. For the completeness part (first subgoal), the <br>
+following works:</p>
+<p>apply(unfold regular1_def regular2_def)<br>
+apply(atomize_elim)<br>
+apply(case_tac x) (* new *)<br>
+apply(auto)</p>
+<p>Mutual recursion also adds four new cases where you have to prove <br>
+consistency of the projections from the sum type. In your case,<br>
+the following solves all of them:</p>
+<p>apply(auto simp add: fun_eq_iff intro: arg_cong)</p>
+<p>Hope this helps,<br>
+Andreas</p>
+
+
+
+<a name="294238508"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Completeness%20of%20patterns%20for%20mutually%20recursiv.../near/294238508" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Completeness.20of.20patterns.20for.20mutually.20recursiv.2E.2E.2E.html#294238508">(Aug 19 2022 at 10:44)</a>:</h4>
+<p>From: René Thiemann &lt;<a href="mailto:rene.thiemann@uibk.ac.at">rene.thiemann@uibk.ac.at</a>&gt;<br>
+Dear Amy,</p>
+<p>If you prefer to do it manually, you can instead use the following proof via fun_cong.</p>
+<p>proof -<br>
+  fix t f assume "(λx. CON) = (λx. ABS (t x) (f x))"<br>
+  from fun_cong[OF this] show False by simp<br>
+next<br>
+  fix t f assume "(λx. FCON) = (λx. FAPP (t x) (f x))"<br>
+  from fun_cong[OF this] show False by simp<br>
+next<br>
+  fix t f assume "(λx. x) = (λx. ABS (t x) (f x))"<br>
+  from fun_cong[OF this, of CON] show False by simp<br>
+next<br>
+  fix t :: "type1 ⇒ type2" and f ta fa<br>
+  assume "(λx. FAPP (t x) (f x)) = (λx. FAPP (ta x) (fa x))"<br>
+  from fun_cong[OF this] have id: "t = ta" "f = fa" by (intro ext, auto)<br>
+  from id show "Sum_Type.Projl (fun1_fun2_sumC (Inl f)) = Sum_Type.Projl (fun1_fun2_sumC (Inl fa))" by simp<br>
+  from id show "Sum_Type.Projr (fun1_fun2_sumC (Inr t)) = Sum_Type.Projr (fun1_fun2_sumC (Inr ta))" by simp<br>
+next<br>
+  fix t :: "type1 ⇒ type2" and f ta fa<br>
+  assume "(λx. ABS (t x) (f x)) = (λx. ABS (ta x) (fa x))"<br>
+  from fun_cong[OF this] have id: "t = ta" "f = fa" by (intro ext, auto)<br>
+  from id show "Sum_Type.Projr (fun1_fun2_sumC (Inr t)) = Sum_Type.Projr (fun1_fun2_sumC (Inr ta))" by simp<br>
+  from id show "Sum_Type.Projl (fun1_fun2_sumC (Inl f)) = Sum_Type.Projl (fun1_fun2_sumC (Inl fa))" by simp<br>
+qed</p>
+<p>But of course, Andreas' proof is easier to type and maintain.</p>
+<p>Cheers,<br>
+René</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

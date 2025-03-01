@@ -1,0 +1,110 @@
+<html>
+<head><meta charset="utf-8"><title>Change theory data in proof · Isabelle/ML · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/index.html">Isabelle/ML</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Change.20theory.20data.20in.20proof.html">Change theory data in proof</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="352628047"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Change%20theory%20data%20in%20proof/near/352628047" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Hanno Becker <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Change.20theory.20data.20in.20proof.html#352628047">(Apr 25 2023 at 19:51)</a>:</h4>
+<p>Hi! I'd like to persist some information about a proof in the surrounding <code>theory</code>, but struggle. My attempt so far: Capture the desired data in a <code>Theory_Data</code>, model the data logging as a <code>theory -&gt; theory</code> transform, lift that to <code>Proof.context -&gt; Proof.context</code>, and perform the latter as part of a <code>Method.method</code> (which supports <code>Proof.context</code> transformation). However, while within the proof I do see the <code>Theory_Data</code> appropriately adjusted, after the proof the information is lost. I guess this is due to how <code>Proof.context</code> and surrounding <code>theory</code> are merged after a proof, but I can't figure out how to get it right. I also considered keeping the data as <code>Proof_Data</code> during the proof and transferring it to the <code>theory</code> when the proof concludes, but I don't know how/where one would add the desired 'merge hook'.</p>
+
+
+
+<a name="352628416"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Change%20theory%20data%20in%20proof/near/352628416" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Hanno Becker <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Change.20theory.20data.20in.20proof.html#352628416">(Apr 25 2023 at 19:53)</a>:</h4>
+<p>Here's the code for my failed attempt:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">theory</span><span class="w"> </span><span class="n">scratchpad</span>
+<span class="w">  </span><span class="kp">imports</span><span class="w"> </span><span class="n">Main</span>
+<span class="k">begin</span>
+
+
+<span class="k">ML</span><span class="s">‹</span>
+<span class="s">  structure Data = Theory_Data (</span>
+<span class="s">     type T = int</span>
+<span class="s">     val empty = 0</span>
+<span class="s">     fun merge (a,b) = let val _ = "merge" |&gt; tracing in a+b end</span>
+<span class="s">   )</span>
+
+
+<span class="s">  val lift: (Proof.context -&gt; Proof.context) -&gt; Method.method =</span>
+<span class="s">     fn f =&gt; fn _ =&gt; fn (ctxt, st) =&gt; (f ctxt, st) |&gt; Seq.single |&gt; Seq.make_results</span>
+
+<span class="s">  val lift' : (theory -&gt; theory) -&gt; Method.method =</span>
+<span class="s">     Proof_Context.background_theory #&gt; lift</span>
+<span class="s">›</span>
+
+
+<span class="k">method_setup</span><span class="w"> </span><span class="n">change_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">‹Scan.succeed ((fn i =&gt; i+1) |&gt; Data.map |&gt; lift' |&gt; K)›</span><span class="w"> </span><span class="s">""</span>
+<span class="k">method_setup</span><span class="w"> </span><span class="n">dump_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">‹Scan.succeed (fn ctxt =&gt;</span>
+<span class="s">     let val _ = ctxt |&gt; Proof_Context.theory_of |&gt; Data.get |&gt; Int.toString |&gt; tracing in</span>
+<span class="s">       Method.succeed end)›</span>
+
+
+<span class="k">ML</span><span class="s">‹val l = Data.get @{theory}›</span><span class="w"> </span><span class="c">(* 0 *)</span>
+
+
+<span class="kn">lemma</span><span class="w"> </span><span class="s">‹x=x›</span>
+<span class="w">  </span><span class="kp">apply</span><span class="w"> </span><span class="n">dump_state</span><span class="w">    </span><span class="c">(* 0 *)</span>
+<span class="w">  </span><span class="kp">apply</span><span class="w"> </span><span class="n">change_state</span>
+<span class="w">  </span><span class="kp">apply</span><span class="w"> </span><span class="n">dump_state</span><span class="w">    </span><span class="c">(* 1 *)</span>
+<span class="w">  </span><span class="kp">apply</span><span class="w"> </span><span class="n">change_state</span>
+<span class="w">  </span><span class="kp">apply</span><span class="w"> </span><span class="n">change_state</span>
+<span class="w">  </span><span class="kp">apply</span><span class="w"> </span><span class="n">dump_state</span><span class="w">    </span><span class="c">(* 3 *)</span>
+<span class="w">  </span><span class="k">by</span><span class="w"> </span><span class="n">simp</span>
+
+<span class="k">ML</span><span class="s">‹val l = Data.get @{theory}›</span><span class="w"> </span><span class="c">(* 0 *)</span>
+
+<span class="k">end</span>
+</code></pre></div>
+
+
+
+<a name="352805195"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Change%20theory%20data%20in%20proof/near/352805195" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Hanno Becker <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Change.20theory.20data.20in.20proof.html#352805195">(Apr 26 2023 at 13:44)</a>:</h4>
+<p>NB The reason I'm interested in this is tactic profiling. I'm gathering some metrics about specific tactic invocations, and would like to persist them in the <code>theory</code> to be able to have a single statistics in the end. Currently, I can only analyze the data from individual proofs.</p>
+
+
+
+<a name="354879406"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Change%20theory%20data%20in%20proof/near/354879406" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Hanno Becker <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Change.20theory.20data.20in.20proof.html#354879406">(May 01 2023 at 13:38)</a>:</h4>
+<p>Any ideas on this one?</p>
+
+
+
+<a name="354883590"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Change%20theory%20data%20in%20proof/near/354883590" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Lukas Stevens <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Change.20theory.20data.20in.20proof.html#354883590">(May 01 2023 at 13:58)</a>:</h4>
+<p>The best person to answer this would be Makarius but he only reads the mailing list. In general, this seems to go strongly against the idea of a local context.</p>
+
+
+
+<a name="354911319"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Change%20theory%20data%20in%20proof/near/354911319" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Change.20theory.20data.20in.20proof.html#354911319">(May 01 2023 at 15:49)</a>:</h4>
+<p>Isabelle has a timing panel</p>
+
+
+
+<a name="354911358"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Change%20theory%20data%20in%20proof/near/354911358" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Change.20theory.20data.20in.20proof.html#354911358">(May 01 2023 at 15:50)</a>:</h4>
+<p>that shows the timings from different tactics</p>
+
+
+
+<a name="354911539"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Change%20theory%20data%20in%20proof/near/354911539" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Change.20theory.20data.20in.20proof.html#354911539">(May 01 2023 at 15:50)</a>:</h4>
+<p>However, in my experience, the timings vary so widely, that it is completely useless</p>
+
+
+
+<a name="355029200"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Change%20theory%20data%20in%20proof/near/355029200" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Hanno Becker <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Change.20theory.20data.20in.20proof.html#355029200">(May 02 2023 at 05:21)</a>:</h4>
+<p>I have asked on the mailing list. In my case, I do get very valuable timing statistics from proof-local custom profiling, but it would be even more useful if the statistics could be merged across multiple proofs and theories.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

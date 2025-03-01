@@ -1,0 +1,123 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Code generator setup for lazy lists · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generator.20setup.20for.20lazy.20lists.html">[isabelle] Code generator setup for lazy lists</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294144388"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generator%20setup%20for%20lazy%20lists/near/294144388" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generator.20setup.20for.20lazy.20lists.html#294144388">(Aug 18 2022 at 18:22)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@kit.edu">andreas.lochbihler@kit.edu</a>&gt;<br>
+Dear all,</p>
+<p>I am wondering how I can efficiently implement a conversion function list_of <br>
+between the subset of finite lists from the type of possibly infinite lists (as <br>
+defined in AFP-Coinductive) and ordinary lists from the HOL image.</p>
+<p>At present, the code equations for list_of are as follows in the AFP:</p>
+<p>list_of LNil = []<br>
+list_of (LCons x xs) = (if lfinite xs then x # list_of xs else undefined)</p>
+<p>This way, the finiteness test is executed once for every element of the list, <br>
+which makes conversion quadratic in the length of the list. Now, I would like to <br>
+execute the finiteness test at most a constant number of times by exploiting <br>
+that finiteness is preserved through all recursive calls. I hope that I can do <br>
+this with the code generator's support for invariants. So far, I came up with <br>
+the following:</p>
+<p>(* Identify the subset of the type that is of interest *)<br>
+typedef (open) 'a llist_fin = "{xs :: 'a llist. lfinite xs}"<br>
+   morphisms llist_of_fin Abs_llist_fin<br>
+proof<br>
+   show "LNil : ?llist_fin" by simp<br>
+qed</p>
+<p>(* Setup the abstype *)<br>
+lemma llist_of_fin_Abs_llist_fin [simp, code abstype]:<br>
+   "Abs_llist_fin (llist_of_fin xs) = xs"<br>
+by(rule llist_fin.llist_of_fin_inverse)</p>
+<p>(* Define the abstract operation *)<br>
+definition list_of2 :: "'a llist_fin =&gt; 'a list"<br>
+where "list_of2 xs = list_of (llist_of_fin xs)"</p>
+<p>(* Prove a new code equation for list_of that uses the abstract operation *)<br>
+lemma list_of_code [code]:<br>
+   "list_of xs = (if lfinite xs then list_of2 (Abs_llist_fin xs) else undefined)"<br>
+by(simp add: list_of2_def Abs_llist_fin_inverse list_of_def Abs_llist_fin2_def)</p>
+<p>Now, I am stuck at two problems:</p>
+<ol>
+<li>
+<p>list_of_code uses the abstraction function Abs_llist_fin, which the code <br>
+generator does not allow. But from the calling context, I know that all <br>
+assumptions are satisfied.</p>
+</li>
+<li>
+<p>I have no idea how to state the code equations for list_of2. I would imagine <br>
+something like</p>
+</li>
+</ol>
+<p>"list_of2 (Abs_llist_fin LNil) = []"<br>
+"lfinite xs ==&gt; list_of2 (Abs_llist_fin (LCons x xs)) = x # llist_of2 <br>
+(Abs_llist_fin xs)"</p>
+<p>I have been going in circles here for quite some time. Can someone point me in <br>
+the right direction how to do this? Do I have the right approach? Or is it <br>
+impossible in general?</p>
+<p>Thanks in advance,<br>
+Andreas</p>
+
+
+
+<a name="294144436"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generator%20setup%20for%20lazy%20lists/near/294144436" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generator.20setup.20for.20lazy.20lists.html#294144436">(Aug 18 2022 at 18:23)</a>:</h4>
+<p>From: Brian Huffman &lt;<a href="mailto:brianh@cs.pdx.edu">brianh@cs.pdx.edu</a>&gt;<br>
+Hi Andreas,</p>
+<p>I have some suggestions that follow a different approach: Instead of<br>
+defining any new types or using invariants, you could just define an<br>
+auxiliary function to use with code generation for list_of.</p>
+<p>My first idea was to define a variation of list_of that returns an<br>
+option type instead of using the "undefined" value:</p>
+<p>definition opt_list_of :: "'a llist =&gt; 'a list option"<br>
+  where [code del]: "opt_list_of xs = (if lfinite xs then Some<br>
+(list_of xs) else None)"</p>
+<p>The code equations for opt_list_of are more efficient than the<br>
+standard ones for list_of, because they replace the expensive lfinite<br>
+test with a simple pattern match:</p>
+<p>lemma opt_list_of_code [code]:<br>
+  "opt_list_of LNil = Some Nil"<br>
+  "opt_list_of (LCons x xs) =<br>
+    (case opt_list_of xs of None =&gt; None | Some xs' =&gt; Some (x # xs'))"<br>
+  unfolding opt_list_of_def by simp_all</p>
+<p>Now you can declare a code equation for list_of so that it calls opt_list_of:</p>
+<p>lemma list_of_code [code]:<br>
+  "list_of xs = (case opt_list_of xs of None =&gt; undefined | Some xs' =&gt; xs')"<br>
+  unfolding list_of_def opt_list_of_def by simp</p>
+<p>My second idea is to define a function list_of_aux that uses an<br>
+accumulating parameter to store the list of elements seen so far:</p>
+<p>definition list_of_aux :: "'a list =&gt; 'a llist =&gt; 'a list" where<br>
+  "list_of_aux xs ys = (if lfinite ys then rev xs @ list_of ys else undefined)"</p>
+<p>lemma list_of_aux_code [code]:<br>
+  "list_of_aux xs LNil = rev xs"<br>
+  "list_of_aux xs (LCons y ys) = list_of_aux (y # xs) ys"<br>
+  unfolding list_of_aux_def by simp_all</p>
+<p>lemma list_of_eq_list_of_aux [code]:<br>
+  "list_of = list_of_aux []"<br>
+  unfolding fun_eq_iff list_of_def list_of_aux_def by simp</p>
+<p>I suppose that list_of_aux is more efficient than opt_list_of, since<br>
+it is actually tail-recursive.</p>
+<p>Hope this helps,</p>
+<ul>
+<li>Brian</li>
+</ul>
+
+
+
+<a name="294144458"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generator%20setup%20for%20lazy%20lists/near/294144458" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generator.20setup.20for.20lazy.20lists.html#294144458">(Aug 18 2022 at 18:23)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@kit.edu">andreas.lochbihler@kit.edu</a>&gt;<br>
+Hi Brian,</p>
+<p>thanks for your ideas, they are much simpler and more elegant than what I had in <br>
+mind. I'll add it to the AFP when I update Coinductive the next time.</p>
+<p>Andreas</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

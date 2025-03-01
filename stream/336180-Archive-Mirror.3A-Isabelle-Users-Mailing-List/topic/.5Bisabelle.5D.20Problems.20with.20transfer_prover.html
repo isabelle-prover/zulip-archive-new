@@ -1,0 +1,120 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Problems with transfer_prover · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20transfer_prover.html">[isabelle] Problems with transfer_prover</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294647288"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20transfer_prover/near/294647288" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20transfer_prover.html#294647288">(Aug 22 2022 at 10:37)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear experts of parametricity and the transfer package,</p>
+<p>I am struggling to prove parametricity of a big function defined by primitive recursion <br>
+over a largish tree datatype. I thought I'd use the transfer prover from the transfer <br>
+package. Unfortunately, it is driving me almost crazy as it appears as completely <br>
+non-deterministic to me when it is able to prove the parametricity statement and when not <br>
+(even if parametricity rules for all constants have been declared as [transfer_rule]).</p>
+<p>Here are two minimised examples which I do not understand. They are also in the attached <br>
+theory (tested with Isabelle2015 and Isabelle/c1b7793c23a3). Why does transfer_prover fail <br>
+to prove the rules? And what can I do to make transfer_prover work?</p>
+<ol>
+<li>The problem seems to be related to how "op =" is treated as a relation.</li>
+</ol>
+<p>interpretation lifting_syntax .<br>
+consts f :: "nat ⇒ nat"</p>
+<p>lemma<br>
+   "(op = ===&gt; B ===&gt; rel_option (rel_prod op = B))<br>
+      (λx y. Option.bind x (λx. Some (f x, y)))<br>
+      (λx y. Option.bind x (λx. Some (f x, y)))"<br>
+by transfer_prover (* fails *)</p>
+<p>lemma (* same lemma, but the first "op =" is expanded to "rel_option op =" *)<br>
+   "(rel_option op = ===&gt; B ===&gt; rel_option (rel_prod op = B))<br>
+      (λx y. Option.bind x (λx. Some (f x, y)))<br>
+      (λx y. Option.bind x (λx. Some (f x, y)))"<br>
+by transfer_prover (* succeeds *)</p>
+<ol start="2">
+<li>Transfer prover is not able to prove the parametricity rule at all, even though all <br>
+rules are available (as the manual proof shows).</li>
+</ol>
+<p>datatype nonce = PNonce nat | ANonce "bool list"<br>
+datatype ('a, 'b, dead 'c) gpv = Done 'a</p>
+<p>lemma case_nonce_transfer [transfer_rule]:<br>
+   "((op = ===&gt; A) ===&gt; (op = ===&gt; A) ===&gt; op = ===&gt; A) case_nonce case_nonce"<br>
+by(auto simp add: rel_fun_def split: nonce.split)</p>
+<p>consts pnonce :: "nat ⇒ 's ⇒ nat ⇒ (bool list × 's, 'call, 'ret) gpv"<br>
+consts η :: nat<br>
+lemma pnonce_transfer [transfer_rule]: "(op = ===&gt; S ===&gt; op = ===&gt; rel_gpv (rel_prod op = <br>
+S) C) pnonce pnonce" sorry</p>
+<p>lemma "(op = ===&gt; S ===&gt; rel_gpv (rel_prod op = S) C)<br>
+      (λnonce s. case nonce of PNonce x ⇒ pnonce η s x | ANonce bs ⇒ Done (bs, s))<br>
+      (λnonce s. case nonce of PNonce x ⇒ pnonce η s x | ANonce bs ⇒ Done (bs, s))"<br>
+apply transfer_prover</p>
+<p>apply(rule rel_funI)+<br>
+apply(rule case_nonce_transfer[THEN rel_funD, THEN rel_funD, THEN rel_funD])<br>
+apply(rule pnonce_transfer[THEN rel_funD, THEN rel_funD])<br>
+apply(rule refl)<br>
+apply assumption<br>
+apply(rule rel_funI)<br>
+apply(rule gpv.ctr_transfer[THEN rel_funD])<br>
+apply(erule (1) Pair_transfer[THEN rel_funD, THEN rel_funD])<br>
+apply assumption<br>
+done</p>
+<p>Best,<br>
+Andreas<br>
+<a href="/user_uploads/14278/iNDdjUHthmoHv1M7ipYF-3wK/Transfer_Prover_Problem.thy">Transfer_Prover_Problem.thy</a></p>
+
+
+
+<a name="294647304"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20transfer_prover/near/294647304" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20transfer_prover.html#294647304">(Aug 22 2022 at 10:37)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:lammich@in.tum.de">lammich@in.tum.de</a>&gt;<br>
+The first problem looks familiar to me.</p>
+<p>The type of option.bind is <br>
+  "'a option =&gt; ('a =&gt; 'b option) =&gt; 'b option"<br>
+and its transfer rule is accordingly.<br>
+However, in the first term, you specify just "op =" as relator, but bind<br>
+wants something of the form "rel_option A".</p>
+<p>One workaround is to expand the "op =" - relators, based on their type,<br>
+as much as possible, e.g., by simplification rules. </p>
+<p>Another workaround would be a custom "relator unification" procedure<br>
+built into transfer, which is able to handle those cases ... I tried<br>
+something similar for Autoref, but quickly gave up on it.</p>
+
+
+
+<a name="294647340"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20transfer_prover/near/294647340" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20transfer_prover.html#294647340">(Aug 22 2022 at 10:37)</a>:</h4>
+<p>From: Ondřej Kunčar &lt;<a href="mailto:kuncar@in.tum.de">kuncar@in.tum.de</a>&gt;<br>
+The problem2 is the same as the problem1.<br>
+If you write<br>
+  "(op = ===&gt; S ===&gt; rel_gpv (rel_prod (list_all2 op=) S) C)<br>
+for the relation, transfer_prover works.</p>
+<p>Funnily enough, Jasmin Blanchette sent me the same bug report two weeks ago.</p>
+<p>The transfer_prover should work for your examples. You shouldn't be <br>
+forced to expand op= in the statements of your theorems. I put some code <br>
+in transfer_prover to support this some time ago. Apparently, I made it <br>
+wrong.</p>
+<p>Since I'm at the (terminal) stage of writing my PhD thesis, it might <br>
+take some time before I get to fix this.</p>
+<p>Ondrej</p>
+
+
+
+<a name="294647361"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20transfer_prover/near/294647361" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20transfer_prover.html#294647361">(Aug 22 2022 at 10:37)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear Ondřej and Peter,</p>
+<p>Thanks for your quick replies. For the time being, I will expand the relator-equality <br>
+theorems manually before I invoke transfer_prover. Given your replies I assume that this <br>
+is a safe operation.</p>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

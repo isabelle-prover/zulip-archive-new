@@ -1,0 +1,607 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Monadic do notation for Isabelle · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Monadic.20do.20notation.20for.20Isabelle.html">[isabelle] Monadic do notation for Isabelle</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294108227"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Monadic%20do%20notation%20for%20Isabelle/near/294108227" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Monadic.20do.20notation.20for.20Isabelle.html#294108227">(Aug 18 2022 at 15:18)</a>:</h4>
+<p>From: Christian Sternagel &lt;<a href="mailto:christian.sternagel@uibk.ac.at">christian.sternagel@uibk.ac.at</a>&gt;<br>
+Hi there,</p>
+<p>I wrote a theory (plus accompanying ML file) that allows to use <br>
+do-notation (as in Haskell and where braces and semicolons are <br>
+mandatory) for arbitrary monads (in this case, arbitrary bind- and <br>
+then-functions), after a setup via:</p>
+<p>setup {*<br>
+   add_monad "List" {<br>
+     monad_bind = @{term "%xs f. concat (map f xs)"},<br>
+     monad_then = NONE<br>
+   }<br>
+*}</p>
+<p>(Here "monad_then = NONE" means that "bind m (%_. n)" is used instead of <br>
+"then m n".)</p>
+<p>setup {* use_monad "List" *}</p>
+<p>Now, we can write, e.g.,</p>
+<p>do {<br>
+   let xs = [0..2];<br>
+   x &lt;- xs;<br>
+   y &lt;- xs;<br>
+   [(x, y)]<br>
+}</p>
+<p>to obtain the list [(0, 0), (0, 1), (0, 2), ..., (2, 2)].</p>
+<p>So far so good :). In this setup it is not possible to combine different <br>
+monads. Consider for example the following option monad:</p>
+<p>setup {*<br>
+   add_monad "Option" {<br>
+     monad_bind = @{term "%m f. <a href="http://Option.map">Option.map</a> f m"},<br>
+     monad_then = NONE<br>
+   }<br>
+*}</p>
+<p>I would like to be able to write, e.g.,</p>
+<p>do {<br>
+   let xs = [Some 0, Some 1, None];<br>
+   x &lt;- xs;<br>
+   y &lt;- xs;<br>
+   let r = do {<br>
+     m &lt;- x;<br>
+     n &lt;- y;<br>
+     Some (x + y)<br>
+   };<br>
+   return [r]<br>
+}</p>
+<p>which is an admittedly contrived example. My first thought, was to give <br>
+"do" an optional argument (the name of the monad that should be used), as in</p>
+<p>do List { ... do Option { ... } ... }</p>
+<p>This brings me to my actual question ;)</p>
+<p>If I would use Theory_Data to store the "current monad", my <br>
+parse_translations would have to modify the current theory. I assume, <br>
+this is bad (furthermore, I have no clue how to do this :)). Would it be <br>
+okay to use a reference for this? What about potential problems?</p>
+<p>cheers</p>
+<p>chris</p>
+
+
+
+<a name="294108274"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Monadic%20do%20notation%20for%20Isabelle/near/294108274" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Monadic.20do.20notation.20for.20Isabelle.html#294108274">(Aug 18 2022 at 15:18)</a>:</h4>
+<p>From: Brian Huffman &lt;<a href="mailto:brianh@cs.pdx.edu">brianh@cs.pdx.edu</a>&gt;<br>
+Hi Christian,</p>
+<p>I can see that your parse_translation might need to read information<br>
+from the current theory, but I don't see why it would have to <em>modify</em><br>
+the current theory. The parse_translation for case syntax (function<br>
+case_tr in HOL/Tools/Datatype/datatype_case.ML) probably uses all the<br>
+relevant techniques that you would need to implement your generic<br>
+monadic syntax: it reads information about constructors from theory<br>
+data, and translates the case branches (built with the "_case1" and<br>
+"_case2" syntactic constructors) into the appropriate case<br>
+combinators. It does not modify any theory data during parsing.</p>
+<p>I'm not sure how your current parse_translation is implemented, but<br>
+here's the approach I would take: First, define some syntactic<br>
+constructors for the do-syntax, similar to how the case syntax is<br>
+defined in HOL.thy:</p>
+<p>nonterminals dobinds</p>
+<p>syntax<br>
+  "_do1" :: "'a =&gt; dobinds" ("_")<br>
+  "_do2" :: "[pttrn, 'a, dobinds] =&gt; dobinds" ("_ &lt;- _;/ _")<br>
+  "_do_syntax" :: "[string, dobinds] =&gt; 'a" ("do _ {_}")</p>
+<p>Then define a parse_translation for "_do_syntax" that would parse the<br>
+list of "_do2" and "_do1" constructors, then choose an appropriate<br>
+monad instance based on the value of the string argument (obtaining<br>
+the table of monad instances from the theory data).</p>
+<p>Alternatively you could omit the "string" argument to "_do_syntax" and<br>
+look up the monad instance based on the type of the last statement of<br>
+the do-block (except I'm not sure whether the type information would<br>
+be available yet). Or you could do a lookup based on what the<br>
+top-level constant of the last statement is, e.g. a term of the form<br>
+[_] indicates the list monad, and Some _ indicates the option monad.</p>
+<ul>
+<li>Brian</li>
+</ul>
+
+
+
+<a name="294108352"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Monadic%20do%20notation%20for%20Isabelle/near/294108352" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Monadic.20do.20notation.20for.20Isabelle.html#294108352">(Aug 18 2022 at 15:19)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+This is going in the right direction.</p>
+<p>Also note that Scala "for" comprehensions are officially explained as a <br>
+certain syntax translation on untyped expressions, which are later run <br>
+through the regular type-inference.</p>
+<p>If it turns out that you do need type information for your tanslation you <br>
+can organize it like that:</p>
+<p>* The translation functions (advanced parse translations etc.) only take<br>
+     care of producing proper binders.</p>
+<p>* Further transformations within the type-checking phase are done by<br>
+     your own "check" operation, which is installed via Syntax.add_term_check</p>
+<p>The latter gives you an opportunity to participate in a simultaneous <br>
+process to infer full type information.  The regular Hindley-Milner type <br>
+inference is only one part of that.  This relatively new and advanced <br>
+abstract syntax technology is still not use very much, but could open a <br>
+chance to get things really right that did not work so well with plain old <br>
+macros (aka translations).</p>
+<p>Makarius</p>
+
+
+
+<a name="294108387"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Monadic%20do%20notation%20for%20Isabelle/near/294108387" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Monadic.20do.20notation.20for.20Isabelle.html#294108387">(Aug 18 2022 at 15:19)</a>:</h4>
+<p>From: Alexander Krauss &lt;<a href="mailto:krauss@in.tum.de">krauss@in.tum.de</a>&gt;<br>
+Hi Chris,</p>
+<p>I am not a syntax wizard, so I cannot help much with the actual task, <br>
+but note that there are two monads in the library already, each with its <br>
+own syntax setup for do notation:</p>
+<p>HOL/Library/State_Monad.thy<br>
+HOL/Imperative_HOL/Heap_Monad.thy</p>
+<p>You might want to look at them if you haven't already. In the AFP there <br>
+is also MiniML/Maybe.thy, but with a rather basic syntax.</p>
+<p>If you manage to unify all this somehow, this would be a really cool thing.</p>
+<p>Alex</p>
+<p>Christian Sternagel wrote:</p>
+
+
+
+<a name="294108439"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Monadic%20do%20notation%20for%20Isabelle/near/294108439" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Monadic.20do.20notation.20for.20Isabelle.html#294108439">(Aug 18 2022 at 15:19)</a>:</h4>
+<p>From: Christian Sternagel &lt;<a href="mailto:christian.sternagel@uibk.ac.at">christian.sternagel@uibk.ac.at</a>&gt;<br>
+On 05/19/2010 10:22 AM, Makarius wrote:</p>
+<blockquote>
+<ul>
+<li>The translation functions (advanced parse translations etc.) only take<br>
+care of producing proper binders.<br>
+I am not sure what you mean by that... currently I first introduce:</li>
+</ul>
+</blockquote>
+<p>nonterminals<br>
+   do_expr</p>
+<p>syntax<br>
+   ...<br>
+   "_do_bind" :: "pttrn =&gt; 'a =&gt; do_expr =&gt; do_expr"<br>
+     ("_ &lt;- _;//_") [1000, 13, 12] 12)<br>
+   ...</p>
+<p>consts<br>
+   ...<br>
+   bindM :: "'a =&gt; ('b =&gt; 'c) =&gt; 'c"<br>
+   ...</p>
+<p>translations<br>
+   ...<br>
+   "_do_bind x m n" =&gt; "CONST bindM m (%x n)"<br>
+   ...</p>
+<p>and then use Syntax.add_term_check to register a transformation from <br>
+this general constants to specific ones (that have to be registered <br>
+first by e.g.,<br>
+setup {* Monad.add_monad "option" "option_bind" "Some" *}), depending on <br>
+the type.</p>
+<blockquote>
+<ul>
+<li>Further transformations within the type-checking phase are done by<br>
+your own "check" operation, which is installed via Syntax.add_term_check</li>
+</ul>
+<p>1) Are those term_checks applied bottom-up to all subterms or do I have <br>
+to use a recursive function that will be applied at the root?</p>
+</blockquote>
+<p>2) Further, I saw the "stage" parameter. Do I assume correctly that the <br>
+stage gives the order of the checks and that type checking is done at <br>
+stage 0?</p>
+<p>3) Is add_term_uncheck the symmetric operation before printing?</p>
+<p>4) I find this framework very convenient :D. With few lines of code I <br>
+seem to have a working solution (for the parsing direction and modulo <br>
+the fact that it is currently necessary to provide typing contraints at <br>
+the "right" places, but that is due to my lack of knowledge about how to <br>
+use types properly in Isabelle programming).</p>
+<p>cheers</p>
+<p>chris</p>
+
+
+
+<a name="294108460"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Monadic%20do%20notation%20for%20Isabelle/near/294108460" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Monadic.20do.20notation.20for.20Isabelle.html#294108460">(Aug 18 2022 at 15:19)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On Wed, 19 May 2010, Christian Sternagel wrote:</p>
+<blockquote>
+<blockquote>
+<ul>
+<li>Further transformations within the type-checking phase are done by<br>
+your own "check" operation, which is installed via Syntax.add_term_check</li>
+</ul>
+<p>1) Are those term_checks applied bottom-up to all subterms or do I have to <br>
+use a recursive function that will be applied at the root?</p>
+</blockquote>
+<p>2) Further, I saw the "stage" parameter. Do I assume correctly that the stage <br>
+gives the order of the checks and that type checking is done at stage 0?</p>
+<p>3) Is add_term_uncheck the symmetric operation before printing?</p>
+</blockquote>
+<p>Each check or uncheck operation operates on the whole textual situation, <br>
+i.e. a context and a collection of terms to be treated simultaneously. <br>
+Thus you do not only get the root of a single term, but the full chunk of <br>
+text to be processed, i.e. the super-root.  You can also keep information <br>
+in the result context for later -- in the very end it is discarded, <br>
+though.</p>
+<p>Stages progress from smaller to larger integer values for check, and <br>
+reverse for uncheck.  At stage 0 there are the "standard" check/uncheck <br>
+phases, there is also a final "fixate" check at stage 100 to finalize <br>
+type-inference parameters that are left over. Anything else can be defined <br>
+in the user context, and arbitrary things can be done here, i.e. this <br>
+powerful mechanism needs to be used with some care.</p>
+<p>Since the whole process iterates repeatedly over all stages, your part <br>
+might get invoked multiple times, until a global fixed-point is reached <br>
+(if it ever happens). This is a bit like a simplifier on abstract syntax, <br>
+but without any builtin strategy to traverse the terms.</p>
+<blockquote>
+<p>4) I find this framework very convenient :D. With few lines of code I <br>
+seem to have a working solution (for the parsing direction and modulo <br>
+the fact that it is currently necessary to provide typing contraints at <br>
+the "right" places, but that is due to my lack of knowledge about how to <br>
+use types properly in Isabelle programming).</p>
+</blockquote>
+<p>Somehow the standard type checking at phase 0 is special: it takes raw <br>
+parser output (where all names and binder scopes are already resolved, but <br>
+lacks type information apart from constraints that happen to be in the <br>
+input), and produces fully types terms according to the usual <br>
+Hindley-Milner scheme.  If you act before, you won't get proper type <br>
+information, but afterwards most of it is already finished.  Typically, <br>
+later check phases merely "improve" inferred types by specializing them, <br>
+as is usually done in advanced Haskell-style systems.</p>
+<p>Case 1: You operate after stage 0.  This means that your concrete syntax <br>
+needs to be mapped to auxiliary combinators etc. that will be accepted by <br>
+the standard type check.  That result can then be expanded to suitable <br>
+logical constants by your function. In other words you need to be able to <br>
+model your monad language using simply-typed higher-order abstract syntax.</p>
+<p>Case 2: You operate before stage 0.  This means you merely rearrange the <br>
+user input schematically such that the later stages will synthesize just <br>
+the right types accidentally.  This is a bit like "for" in Scala, where <br>
+the compiler expands nested comprehensions to certain combinators in an <br>
+untyped fashion.  (Maybe they now have some papers on the details, I did <br>
+not find any 1-2 years ago.  There are some basic explanations in the <br>
+Scala book by Odersky-et-al.)</p>
+<p>Makarius</p>
+
+
+
+<a name="294108613"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Monadic%20do%20notation%20for%20Isabelle/near/294108613" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Monadic.20do.20notation.20for.20Isabelle.html#294108613">(Aug 18 2022 at 15:20)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On Fri, 21 May 2010, Christian Sternagel wrote:</p>
+<blockquote>
+<p>Hence here is just my check function:</p>
+<p>fun check_monad ts ctxt =<br>
+   let</p>
+</blockquote>
+<blockquote>
+<p>| subst_monad_app ctxt (Const (@{const_name "thenM"}, T), [m, n]) =<br>
+           (case add_monad_type ctxt n (add_monad_type ctxt m []) of<br>
+             typ :: _ =&gt;<br>
+               let<br>
+                 val used = Term.add_free_names n [];<br>
+                 val v = Free (Name.variant used "x", dummyT);</p>
+</blockquote>
+<p>At this point it is important to use the proper context to invent fresh <br>
+names, not just the terms you hold in your hand.  Term.add_free_names and <br>
+Name.variant belong to a very old layer of the system.  Use <br>
+Variable.variant_frees or similar -- its implementation may even serve as <br>
+an example how it works with contexts:</p>
+<p>fun variant_frees ctxt ts frees =<br>
+   let<br>
+     val names = Variable.names_of (fold Variable.declare_names ts ctxt);<br>
+     val xs = fst (Name.variants (map #1 frees) names);<br>
+   in xs ~~ map snd frees end;</p>
+<blockquote>
+<p>I) Currently I'm going for Case 2 (of makarius suggestion) and <br>
+registered the check function at stage 0.</p>
+</blockquote>
+<p>I recommend to use a stage number &lt;&gt; 0.  While there are standard policies <br>
+about precedence of plugins at the same stage, it is better to make your <br>
+intention fully clear.</p>
+<p>I've heard that you have made some progress off-list.  If there is a nice <br>
+result emerging here, it is worth posting it again.</p>
+<p>Makarius</p>
+
+
+
+<a name="294108632"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Monadic%20do%20notation%20for%20Isabelle/near/294108632" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Monadic.20do.20notation.20for.20Isabelle.html#294108632">(Aug 18 2022 at 15:20)</a>:</h4>
+<p>From: Christian Sternagel &lt;<a href="mailto:christian.sternagel@uibk.ac.at">christian.sternagel@uibk.ac.at</a>&gt;<br>
+Hi again!</p>
+<p>I am still tinkering with the monad notation stuff, and since I have now <br>
+spent quite some time, I am not willing to give up anymore :D</p>
+<p>I thought that some code would be good this time, but I'm not sure <br>
+whether I am allowed to send attachments to the mailing list? Hence here <br>
+is just my check function:</p>
+<p>fun check_monad ts ctxt =<br>
+     let<br>
+       fun map_default f xs =<br>
+         let val ys = map f xs in<br>
+           if exists is_some ys<br>
+             then SOME (map2 the_default xs ys)<br>
+             else NONE<br>
+          end;</p>
+<p>fun subst_monad_app ctxt (Const (@{const_name "returnM"}, T), [x]) =<br>
+             let val typ = range_type T<br>
+             in if is_monad_type ctxt typ<br>
+               then SOME (Const (get_return typ ctxt, dummyT) $ x)<br>
+               else more_err ()<br>
+             end<br>
+         | subst_monad_app ctxt (Const (@{const_name "returnM"}, T), []) =<br>
+             let val typ = range_type T<br>
+             in if is_monad_type ctxt typ<br>
+               then SOME (Const (get_return typ ctxt, dummyT))<br>
+               else more_err ()<br>
+             end<br>
+         | subst_monad_app ctxt (Const (@{const_name "bindM"}, _), [m, f]) =<br>
+             (case add_monad_fun_type ctxt f (add_monad_type ctxt m []) of<br>
+               typ :: _ =&gt;<br>
+                 SOME (Const (get_bind typ ctxt, dummyT) $ m $ f)<br>
+             | [] =&gt; more_err ())<br>
+         | subst_monad_app ctxt (Const (@{const_name "thenM"}, T), [m, n]) =<br>
+             (case add_monad_type ctxt n (add_monad_type ctxt m []) of<br>
+               typ :: _ =&gt;<br>
+                 let<br>
+                   val used = Term.add_free_names n [];<br>
+                   val v = Free (Name.variant used "x", dummyT);<br>
+                 in<br>
+                   SOME (Const (get_bind typ ctxt, dummyT) $ m $ lambda v n)<br>
+                 end<br>
+               | [] =&gt; more_err ())<br>
+         | subst_monad_app ctxt (t, ts) =<br>
+             (case map_default (subst_monad ctxt) ts of<br>
+               SOME ts' =&gt; SOME (list_comb (t, ts'))<br>
+             | NONE =&gt; NONE)<br>
+       and subst_monad ctxt (Abs (v, T, t)) =<br>
+             (case subst_monad ctxt t of<br>
+               SOME t' =&gt; SOME (Abs (v, T, t'))<br>
+             | NONE =&gt; NONE)<br>
+         | subst_monad ctxt t = subst_monad_app ctxt (strip_comb t);<br>
+     in<br>
+       map_default (subst_monad ctxt) ts<br>
+       |&gt; <a href="http://Option.map">Option.map</a> (rpair ctxt)<br>
+     end;</p>
+<p>(Here, more_err () just tells the user that more type constraints are <br>
+needed in order to infer the current monad type.)</p>
+<p>I) Currently I'm going for Case 2 (of makarius suggestion) and <br>
+registered the check function at stage 0. When I add a type contraint <br>
+around a do block, this does always work, however I am not pleased with <br>
+the few examples that work without any type constraints.</p>
+<p>The tricky part is "bindM" (and "thenM" is analogeous). Here I know that <br>
+the arguments m and f (which are of type "'a m" and "'a =&gt; 'b m" for <br>
+some monad type "m") are already checked. Now, I want to find out, which <br>
+actual bind method I should use instead of "bindM" (the function <br>
+get_bind returns the corresponding constant for a given type in a given <br>
+context).</p>
+<p>The choice is based on the functions "add_monad_type" (for m) and <br>
+"add_monad_fun_type" (for f).</p>
+<p>I have mainly tried 2 versions (which do both not work in all cases):</p>
+<p>1) My first try was to collect all types occurring somewhere in a given <br>
+term (by folding a function that collects all Type's from a given typ, <br>
+over all typs of a term) that are registered as monadic. But then I get <br>
+typing problems when more than one monad type occurs inside a term, e.g.,</p>
+<p>do {<br>
+   x &lt;- map Some [0..2];<br>
+   return x<br>
+}</p>
+<p>assuming that "list" and "option" are registered as monadic, my function<br>
+finds "'a option" before "'a list" and hence substitutes "option_bind", <br>
+when "list_bind" was needed. It is not immediately clear to me which <br>
+strategy I should use for finding monad types.</p>
+<p>2) In the other extreme I do just check for the fastype of m and the <br>
+range type of the fastype of f to be monadic... but then I cannot handle <br>
+cases like, e.g.,</p>
+<p>do {<br>
+   x &lt;- xs;<br>
+   y &lt;- [0..2];<br>
+   return (x, y)<br>
+}</p>
+<p>although, the list monad is the only possibility.</p>
+<p>So I would need a better way to check for the current monad type, based <br>
+on m and f.</p>
+<p>A further problem are cases like</p>
+<p>do {<br>
+   let xs = [0 .. 2];<br>
+   x &lt;- xs;<br>
+   y &lt;- ys;<br>
+   return (x, y)<br>
+}</p>
+<p>which is parsed to (using the infix &gt;&gt;= instead of "bindM"):</p>
+<p>(%xs. xs &gt;&gt;= (%x. ys &gt;&gt;= (%y. returnM (x, y)))) [0 .. 2]</p>
+<p>So at the actual occurrences of &gt;&gt;= I would have to know the type of the <br>
+bound variable xs. But I do not know how to handle this in Isabelle <br>
+(since bound variables do not contain types).</p>
+<p>I do appreciate any comments and/or suggestions.</p>
+<p>II) I also have some design questions concerning printing for you :)</p>
+<p>I would like to allow both, the combinator notation using &gt;&gt;=, &gt;&gt;, and <br>
+return; and the do-notation. As input this is easy: just provide <br>
+notation for bindM, thenM, and returnM</p>
+<p>notation<br>
+   bindM (infixl "&gt;&gt;=" 54) and ...</p>
+<p>For printing it would be nice to let the user decide (or do you have <br>
+better suggestions?). Can this be handled with 'modes'? Also, return <br>
+should only be used when "monad printing" is on, since, seeing "return <br>
+x" everywhere instead of "Some x" (for the option monad) or "Inr x" (for <br>
+the error monad) does not seem to be nice.</p>
+<p>cheers</p>
+<p>chris</p>
+
+
+
+<a name="294108662"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Monadic%20do%20notation%20for%20Isabelle/near/294108662" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Monadic.20do.20notation.20for.20Isabelle.html#294108662">(Aug 18 2022 at 15:20)</a>:</h4>
+<p>From: Christian Sternagel &lt;<a href="mailto:christian.sternagel@uibk.ac.at">christian.sternagel@uibk.ac.at</a>&gt;<br>
+On 05/21/2010 09:11 PM, Makarius wrote:</p>
+<blockquote>
+<p>On Fri, 21 May 2010, Christian Sternagel wrote:</p>
+<blockquote>
+<p>Hence here is just my check function:</p>
+<p>fun check_monad ts ctxt =<br>
+let</p>
+</blockquote>
+<blockquote>
+<p>| subst_monad_app ctxt (Const (@{const_name "thenM"}, T), [m, n]) =<br>
+(case add_monad_type ctxt n (add_monad_type ctxt m []) of<br>
+typ :: _ =&gt;<br>
+let<br>
+val used = Term.add_free_names n [];<br>
+val v = Free (Name.variant used "x", dummyT);</p>
+</blockquote>
+<p>At this point it is important to use the proper context to invent fresh<br>
+names, not just the terms you hold in your hand. Term.add_free_names and<br>
+Name.variant belong to a very old layer of the system. Use<br>
+Variable.variant_frees or similar -- its implementation may even serve<br>
+as an example how it works with contexts:</p>
+<p>fun variant_frees ctxt ts frees =<br>
+let<br>
+val names = Variable.names_of (fold Variable.declare_names ts ctxt);<br>
+val xs = fst (Name.variants (map #1 frees) names);<br>
+in xs ~~ map snd frees end;</p>
+<blockquote>
+<p>I) Currently I'm going for Case 2 (of makarius suggestion) and<br>
+registered the check function at stage 0.</p>
+</blockquote>
+<p>I recommend to use a stage number &lt;&gt; 0. While there are standard<br>
+policies about precedence of plugins at the same stage, it is better to<br>
+make your intention fully clear.<br>
+The problem is that I have a solution that works when using stage 0. But <br>
+not on any other stage :). On stage ~1 I get a MATCH exception for a <br>
+call to range_type (to find out the specific "return" to use) and on <br>
+stage 1 I can not use dummyT without getting a TYPE exception.</p>
+</blockquote>
+<p>Here is my new check function (as I said, when registered at stage 0, <br>
+every example I have tried, did also work). Thanks to alex krauss, I am <br>
+now using Pattern.rewrite_term, which makes everthing much more <br>
+convenient. If I understand correctly, since I registered "check_monad" <br>
+at stage 0, it is interleaved with type inference... and that is exactly <br>
+what I need here.</p>
+<p>fun check_monad ts ctxt =<br>
+let<br>
+   val thy = ProofContext.theory_of ctxt;</p>
+<p>fun map_default f xs =<br>
+         let val ys = map f xs in<br>
+         if exists is_some ys<br>
+           then SOME (map2 the_default xs ys)<br>
+           else NONE<br>
+         end;</p>
+<p>fun subst_monad ctxt (Const (@{const_name "returnM"}, T)) =<br>
+       let val typ = range_type T<br>
+       in if is_monad_type ctxt typ<br>
+         then SOME (Const (get_return typ ctxt, dummyT))<br>
+         else NONE<br>
+       end<br>
+   | subst_monad ctxt (Const (@{const_name "bindM"}, T) $ m $ f) =<br>
+       let val mty :: fty :: rty = binder_types T in<br>
+         (case filter (is_monad_type ctxt) (mty :: range_type fty :: rty) of<br>
+           typ :: _ =&gt;<br>
+             SOME (Const (get_bind typ ctxt, dummyT) $ m $ f)<br>
+         | [] =&gt; NONE)<br>
+       end<br>
+   | subst_monad ctxt (Const (@{const_name "thenM"}, T) $ m $ n) =<br>
+       (case filter (is_monad_type ctxt) (binder_types T) of<br>
+         typ :: _ =&gt;<br>
+           let<br>
+             val used = Term.add_free_names n [];<br>
+             val v = Free (Name.variant used "x", dummyT);<br>
+           in<br>
+             SOME (Const (get_bind typ ctxt, dummyT) $ m $ lambda v n)<br>
+           end<br>
+        | [] =&gt; NONE)<br>
+   | subst_monad ctxt _ = NONE</p>
+<p>fun no_abstract_consts t =<br>
+       let<br>
+         val cs = Term.add_const_names t [];<br>
+         val taboos = [@{const_name "returnM"}, @{const_name "bindM"}, <br>
+@{const_name "thenM"}];<br>
+       in<br>
+         (case inter (op =) cs taboos of<br>
+           [] =&gt; true<br>
+         | _ =&gt; more_err ())<br>
+       end;</p>
+<p>fun check t =<br>
+       let val t' = Pattern.rewrite_term thy [] [subst_monad ctxt] t<br>
+         in if t = t' andalso no_abstract_consts t then NONE else SOME <br>
+t' end;<br>
+in<br>
+   map_default check ts<br>
+   |&gt; <a href="http://Option.map">Option.map</a> (rpair ctxt)<br>
+end;</p>
+<blockquote>
+<p>I've heard that you have made some progress off-list. If there is a nice<br>
+result emerging here, it is worth posting it again.<br>
+I will :)</p>
+<p>Makarius</p>
+<p>chris</p>
+</blockquote>
+<p>PS: I will change the variable stuff according to your comment... it is <br>
+sometimes difficult to see from the sources, which functions are <br>
+supposed to be used and which not :D</p>
+
+
+
+<a name="294108739"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Monadic%20do%20notation%20for%20Isabelle/near/294108739" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Monadic.20do.20notation.20for.20Isabelle.html#294108739">(Aug 18 2022 at 15:21)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On Fri, 21 May 2010, Christian Sternagel wrote:</p>
+<blockquote>
+<blockquote>
+<blockquote>
+<p>I) Currently I'm going for Case 2 (of makarius suggestion) and<br>
+registered the check function at stage 0.</p>
+</blockquote>
+<p>I recommend to use a stage number &lt;&gt; 0. While there are standard<br>
+policies about precedence of plugins at the same stage, it is better to<br>
+make your intention fully clear.<br>
+The problem is that I have a solution that works when using stage 0. But <br>
+not on any other stage :). On stage ~1 I get a MATCH exception for a <br>
+call to range_type (to find out the specific "return" to use) and on <br>
+stage 1 I can not use dummyT without getting a TYPE exception.</p>
+</blockquote>
+</blockquote>
+<p>Stage 0 is perfectly OK, if you really mean to be a peer of the standard <br>
+typecheck mechnism, which seems to be the case here.</p>
+<p>BTW, the exception raised by Term.range_type is the builtin Match of SML, <br>
+not MATCH (which some other modules define internally). It is important to <br>
+be hypercritical concerning the naming of any exception with unqualified <br>
+name and without argument, because mispelling will result in a dreaded <br>
+catch-all pattern.  This would make the meaning of the programm depend on <br>
+the weather, since various external events are injected as Interrupt <br>
+exception into the regular program executation.</p>
+<blockquote>
+<p>| subst_monad ctxt (Const (@{const_name "thenM"}, T) $ m $ n) =<br>
+     (case filter (is_monad_type ctxt) (binder_types T) of<br>
+       typ :: _ =&gt;<br>
+         let<br>
+           val used = Term.add_free_names n [];<br>
+           val v = Free (Name.variant used "x", dummyT);<br>
+         in<br>
+           SOME (Const (get_bind typ ctxt, dummyT) $ m $ lambda v n)<br>
+         end<br>
+      | [] =&gt; NONE)<br>
+ | subst_monad ctxt _ = NONE</p>
+</blockquote>
+<p>Back again to this part of inventing locally fresh names, which is <br>
+suprisingly hard to get right in many practical situations.</p>
+<p>In fact, the above is technically right, because you merely feed the name <br>
+to the Term.lambda function, which will then abstract over v that is not <br>
+in the body n.  It is also a bit confusing, because lambda terms work via <br>
+de-Bruijn indices, so you do not need to invent names in most situations <br>
+-- the pretty printer will take care of the renaming if required.</p>
+<p>Above you merely do a dummy abstraction, which usually works by <br>
+incrementing "loose bounds" in the body and adding an Abs constructor on <br>
+top, with a "comment" for the bound variable as you like, e.g. "x". The <br>
+incrementing can be skipped if the term is "closed", which is actually a <br>
+precondition for the lambda function.  Your subterms seem to be indeed <br>
+closed like that, because you operate as a plugin to Pattern.rewrite_term <br>
+which strips off abstractions before entering the body.</p>
+<p>Interestingly, Pattern.rewrite_term invents auxiliary free variables only <br>
+by looking at the visible term material.  This means there is an implicit <br>
+assumption that the rewrite process will not introduce other fixed <br>
+variables from the surrounding context.</p>
+<p>Anyway, to cut a long story short, you can just use Term.abs_dummy above <br>
+without your own inventing of variables.  Like lambda it assumes a closed <br>
+body.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

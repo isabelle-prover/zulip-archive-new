@@ -1,0 +1,220 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Bug report: Exception Option raised when using... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Bug.20report.3A.20Exception.20Option.20raised.20when.20using.2E.2E.2E.html">[isabelle] Bug report: Exception Option raised when using...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294730312"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Bug%20report%3A%20Exception%20Option%20raised%20when%20using.../near/294730312" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Bug.20report.3A.20Exception.20Option.20raised.20when.20using.2E.2E.2E.html#294730312">(Aug 22 2022 at 17:02)</a>:</h4>
+<p>From: Lukas Bulwahn &lt;<a href="mailto:lukas.bulwahn@gmail.com">lukas.bulwahn@gmail.com</a>&gt;<br>
+Hi all,</p>
+<p>as information for further analysis, I can confirm that this issue<br>
+also occurs on the recent development version of Isabelle with hg id:<br>
+9c31678d2139.</p>
+<p>Lukas</p>
+
+
+
+<a name="294731050"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Bug%20report%3A%20Exception%20Option%20raised%20when%20using.../near/294731050" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Bug.20report.3A.20Exception.20Option.20raised.20when.20using.2E.2E.2E.html#294731050">(Aug 22 2022 at 17:07)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On 06/04/18 10:00, Peter Zeller wrote:</p>
+<blockquote>
+<p>[I hope this is the right place for bug reports -- I did not find any<br>
+public issue tracker.]</p>
+</blockquote>
+<p>Yes, definitely.</p>
+<p>The isabelle-users mailing list is for all kinds of observations and<br>
+discussions of official Isabelle releases. Likewise the isabelle-dev<br>
+mailing list is for arbitrary repository snapshots (with indication of<br>
+the changeset id) and in particular the administrative process around it.</p>
+<p>Thus as a user of official Isabelle2017, anything posted on<br>
+isabelle-users is the correct place.</p>
+<blockquote>
+<p>When trying to use the smt method I am getting the error: exception<br>
+Option raised (line 82 of "General/basics.ML")</p>
+<p>Here is a minimized example where this happens:</p>
+<p>lemma<br>
+      assumes "⋀a . ∃!x. f x = [a]"<br>
+      shows "∃!x. ∃!y. f x = [a] ∧ f y = [b]"<br>
+   proof  -<br>
+      have ?thesis<br>
+        using assms by smt (* exception Option raised (line 82 of<br>
+   "General/basics.ML") *)<br>
+      show ?thesis<br>
+        using assms by metis (* works *)<br>
+   qed</p>
+<p>I am using Isabelle 2017 on Linux.</p>
+</blockquote>
+<p>Thanks for this clear example. It looks like a problem in the<br>
+post-processing of Z3 proofs by the "smt" proof method, but could be<br>
+also in Z3 itself. Included is an exception trace of the situation. The<br>
+exception is raised here<br>
+<a href="http://isabelle.in.tum.de/repos/isabelle/file/Isabelle2017/src/HOL/Tools/SMT/z3_proof.ML#l221">http://isabelle.in.tum.de/repos/isabelle/file/Isabelle2017/src/HOL/Tools/SMT/z3_proof.ML#l221</a></p>
+<p>val objTs = map (the o Symtab.lookup env) bounds</p>
+<p>with the following run-time values:</p>
+<p>bounds = ["?1", "?0"]<br>
+  env = {("?0", "'b")}</p>
+<p>The module Z3_Proof is by Sascha Böhme -- I hope he will have an idea<br>
+what is wrong.</p>
+<blockquote>
+<p>The error message is not very helpful, since the "the" function is<br>
+called in many places. If I want to understand this bug, what would be<br>
+the best way to debug it and find the problematic call to "the"?</p>
+</blockquote>
+<p>By default, Poly/ML provides hardly any exception trace information --<br>
+for performance reasons. In order to figure out the above, I did the<br>
+following:</p>
+<p>* Remove the existing HOL heap image (presumably in<br>
+$ISABELLE_HOME/heaps) and rebuild it with debugging enabled globally<br>
+(this can be slow):</p>
+<p>isabelle build -o ML_debugger -b HOL -s</p>
+<p>The option -s merely accommodates the typical situation for end-users<br>
+that ML heaps are built automatically inside the application directory<br>
+$ISABELLE_HOME, not the configuration directory $ISABELLE_HOME_USER.</p>
+<p>* Start Isabelle/jEdit with session "HOL" and run the above example in<br>
+a context with declare [[ML_exception_debugger]] -- it produces a full<br>
+exception trace for all modules that have been compiled with ML_debugger<br>
+enabled.</p>
+<p>* Optional: restarted Isabelle/jEdit with session "Pure" and<br>
+experiment directly with the relevant sources, limiting the debugging<br>
+information to the relevant module. I also tried the Isabelle/ML<br>
+source-level debugger IDE, but it turned out too awkward at this point.<br>
+Ultimately, I merely put in some print statements in the proper place:<br>
+see also the include changeset "ch" and Scratch.thy for the record.</p>
+<p>Such tinkering with Isabelle/ML sources and the Poly/ML runtime<br>
+environment can be quite tedious. The above is merely for information,<br>
+for anybody who is interested in that.</p>
+<p>When seeing a problem, there is no moral obligation to figure out all<br>
+its details. It is sufficient to present a clear example as you have<br>
+done above.</p>
+<p>Makarius<br>
+<a href="/user_uploads/14278/ZI2a6X-xEm7xdrsEnENllYun/exception_trace">exception_trace</a><br>
+<a href="/user_uploads/14278/3Kt9Tjo9FTp6wuV5rUX4EekG/ch">ch</a><br>
+<a href="/user_uploads/14278/WB43-bHT13QJmWicRGkSo-Lh/Scratch.thy">Scratch.thy</a></p>
+
+
+
+<a name="294731527"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Bug%20report%3A%20Exception%20Option%20raised%20when%20using.../near/294731527" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Bug.20report.3A.20Exception.20Option.20raised.20when.20using.2E.2E.2E.html#294731527">(Aug 22 2022 at 17:10)</a>:</h4>
+<p>From: Sascha Böhme &lt;<a href="mailto:boehmes@in.tum.de">boehmes@in.tum.de</a>&gt;<br>
+Hello,</p>
+<p>The exception is caused by a problem in the proof trace produced by Z3. I’ve slightly improved the error reporting issued by the smt method. This will be contained in next Isabelle release.</p>
+<p>I’m sorry to say that the smt method might fail to prove such goals. Prefer metis for tough problems that involve quantifiers.</p>
+<p>Cheers,<br>
+Sascha</p>
+<p>Von: Makarius<br>
+Gesendet: Mittwoch, 25. April 2018 14:36<br>
+An: Peter Zeller; <a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a><br>
+Cc: Sascha Boehme<br>
+Betreff: Re: [isabelle] Bug report: Exception Option raised when using smtmethod</p>
+<p>On 06/04/18 10:00, Peter Zeller wrote:</p>
+<blockquote>
+<p>[I hope this is the right place for bug reports -- I did not find any<br>
+public issue tracker.]</p>
+</blockquote>
+<p>Yes, definitely.</p>
+<p>The isabelle-users mailing list is for all kinds of observations and<br>
+discussions of official Isabelle releases. Likewise the isabelle-dev<br>
+mailing list is for arbitrary repository snapshots (with indication of<br>
+the changeset id) and in particular the administrative process around it.</p>
+<p>Thus as a user of official Isabelle2017, anything posted on<br>
+isabelle-users is the correct place.</p>
+<blockquote>
+<p>When trying to use the smt method I am getting the error: exception<br>
+Option raised (line 82 of "General/basics.ML")</p>
+<p>Here is a minimized example where this happens:</p>
+<p>lemma<br>
+      assumes "⋀a . ∃!x. f x = [a]"<br>
+      shows "∃!x. ∃!y. f x = [a] ∧ f y = [b]"<br>
+   proof  -<br>
+      have ?thesis<br>
+        using assms by smt (* exception Option raised (line 82 of<br>
+   "General/basics.ML") *)<br>
+      show ?thesis<br>
+        using assms by metis (* works *)<br>
+   qed</p>
+<p>I am using Isabelle 2017 on Linux.</p>
+</blockquote>
+<p>Thanks for this clear example. It looks like a problem in the<br>
+post-processing of Z3 proofs by the "smt" proof method, but could be<br>
+also in Z3 itself. Included is an exception trace of the situation. The<br>
+exception is raised here<br>
+<a href="http://isabelle.in.tum.de/repos/isabelle/file/Isabelle2017/src/HOL/Tools/SMT/z3_proof.ML#l221">http://isabelle.in.tum.de/repos/isabelle/file/Isabelle2017/src/HOL/Tools/SMT/z3_proof.ML#l221</a></p>
+<p>val objTs = map (the o Symtab.lookup env) bounds</p>
+<p>with the following run-time values:</p>
+<p>bounds = ["?1", "?0"]<br>
+  env = {("?0", "'b")}</p>
+<p>The module Z3_Proof is by Sascha Böhme -- I hope he will have an idea<br>
+what is wrong.</p>
+<blockquote>
+<p>The error message is not very helpful, since the "the" function is<br>
+called in many places. If I want to understand this bug, what would be<br>
+the best way to debug it and find the problematic call to "the"?</p>
+</blockquote>
+<p>By default, Poly/ML provides hardly any exception trace information --<br>
+for performance reasons. In order to figure out the above, I did the<br>
+following:</p>
+<p>* Remove the existing HOL heap image (presumably in<br>
+$ISABELLE_HOME/heaps) and rebuild it with debugging enabled globally<br>
+(this can be slow):</p>
+<p>isabelle build -o ML_debugger -b HOL -s</p>
+<p>The option -s merely accommodates the typical situation for end-users<br>
+that ML heaps are built automatically inside the application directory<br>
+$ISABELLE_HOME, not the configuration directory $ISABELLE_HOME_USER.</p>
+<p>* Start Isabelle/jEdit with session "HOL" and run the above example in<br>
+a context with declare [[ML_exception_debugger]] -- it produces a full<br>
+exception trace for all modules that have been compiled with ML_debugger<br>
+enabled.</p>
+<p>* Optional: restarted Isabelle/jEdit with session "Pure" and<br>
+experiment directly with the relevant sources, limiting the debugging<br>
+information to the relevant module. I also tried the Isabelle/ML<br>
+source-level debugger IDE, but it turned out too awkward at this point.<br>
+Ultimately, I merely put in some print statements in the proper place:<br>
+see also the include changeset "ch" and Scratch.thy for the record.</p>
+<p>Such tinkering with Isabelle/ML sources and the Poly/ML runtime<br>
+environment can be quite tedious. The above is merely for information,<br>
+for anybody who is interested in that.</p>
+<p>When seeing a problem, there is no moral obligation to figure out all<br>
+its details. It is sufficient to present a clear example as you have<br>
+done above.</p>
+<p>Makarius</p>
+
+
+
+<a name="294731692"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Bug%20report%3A%20Exception%20Option%20raised%20when%20using.../near/294731692" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Bug.20report.3A.20Exception.20Option.20raised.20when.20using.2E.2E.2E.html#294731692">(Aug 22 2022 at 17:11)</a>:</h4>
+<p>From: Peter Zeller &lt;<a href="mailto:p_zeller@cs.uni-kl.de">p_zeller@cs.uni-kl.de</a>&gt;<br>
+Hello,</p>
+<p>[I hope this is the right place for bug reports -- I did not find any <br>
+public issue tracker.]</p>
+<p>When trying to use the smt method I am getting the error: exception <br>
+Option raised (line 82 of "General/basics.ML")</p>
+<p>Here is a minimized example where this happens:</p>
+<p>lemma<br>
+       assumes "⋀a . ∃!x. f x = [a]"<br>
+       shows "∃!x. ∃!y. f x = [a] ∧ f y = [b]"<br>
+    proof  -<br>
+       have ?thesis<br>
+         using assms by smt (* exception Option raised (line 82 of<br>
+    "General/basics.ML") *)<br>
+       show ?thesis<br>
+         using assms by metis (* works *)<br>
+    qed</p>
+<p>I am using Isabelle 2017 on Linux.</p>
+<p>The error message is not very helpful, since the "the" function is <br>
+called in many places. If I want to understand this bug, what would be <br>
+the best way to debug it and find the problematic call to "the"?</p>
+<p>Regards,<br>
+Peter<br>
+<a href="/user_uploads/14278/LGtDy0D3OOmuRqkkjFj98BkU/Scratch.thy">Scratch.thy</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,138 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Strange interaction between Rewrite and Adhoc_... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Strange.20interaction.20between.20Rewrite.20and.20Adhoc_.2E.2E.2E.html">[isabelle] Strange interaction between Rewrite and Adhoc_...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294731374"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Strange%20interaction%20between%20Rewrite%20and%20Adhoc_.../near/294731374" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Strange.20interaction.20between.20Rewrite.20and.20Adhoc_.2E.2E.2E.html#294731374">(Aug 22 2022 at 17:09)</a>:</h4>
+<p>From: Dominique Unruh &lt;<a href="mailto:unruh@ut.ee">unruh@ut.ee</a>&gt;<br>
+Hello,</p>
+<p>I have a case where the combination of Rewrite and Adhoc_Overloading breaks<br>
+the subst tactic. It is probably simplest to just show the minimal example:</p>
+<p>theory Test3<br>
+  imports "HOL-Library.Rewrite" Main<br>
+begin</p>
+<p>end</p>
+<p>theory Test<br>
+  imports "HOL-Library.Adhoc_Overloading" Main Test3<br>
+begin</p>
+<p>lemma a: "x+(x::nat) = 2*x" by auto<br>
+lemma b: "(1::nat)+(1::nat) = 2"<br>
+  apply (subst a)<br>
+  by simp</p>
+<p>end</p>
+<p>(It has two be split into two theory files.)</p>
+<p>If I remove the imports for Rewrite or Adhoc_Overloading, the subst method<br>
+works as expected. If I move the import for Adhoc_Overloading to Test3, the<br>
+subst method works as well. But with this specific theory graph, subst does<br>
+not work.</p>
+<p>What is happening?</p>
+<p>And can this be fixed without adding Adhoc_Overloading as a dependency to<br>
+Test3?</p>
+<p>Best wishes,<br>
+Dominique.</p>
+
+
+
+<a name="294731394"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Strange%20interaction%20between%20Rewrite%20and%20Adhoc_.../near/294731394" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Strange.20interaction.20between.20Rewrite.20and.20Adhoc_.2E.2E.2E.html#294731394">(Aug 22 2022 at 17:09)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+Dear Dominique,</p>
+<p>the problem is actually independent of "Test3". Instead, it is based on <br>
+the import order.</p>
+<p>Namely, "Adhoc_Overloading" is itself based on "Pure", not "Main". That <br>
+means the import order matters.</p>
+<p>This one works:</p>
+<p>theory Test<br>
+   imports Main "HOL-Library.Adhoc_Overloading"<br>
+begin</p>
+<p>That one doesn't:</p>
+<p>theory Test<br>
+   imports "HOL-Library.Adhoc_Overloading" Main<br>
+begin</p>
+<p>As to why exactly the order wrt "Pure"/"Main" is relevant, I don't know. <br>
+But I've seen this in the past: <br>
+&lt;<a href="https://github.com/larsrh/libisabelle/commit/eaafee24a46dc9a99de75bcf55b7d3c8d27f71ca">https://github.com/larsrh/libisabelle/commit/eaafee24a46dc9a99de75bcf55b7d3c8d27f71ca</a>&gt;.</p>
+<p>Cheers<br>
+Lars</p>
+
+
+
+<a name="294732017"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Strange%20interaction%20between%20Rewrite%20and%20Adhoc_.../near/294732017" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Strange.20interaction.20between.20Rewrite.20and.20Adhoc_.2E.2E.2E.html#294732017">(Aug 22 2022 at 17:13)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Theory "HOL-Library.Adhoc_Overloading" extends Pure, so in a merge where<br>
+it is coming first, non-mergeable data components will have preference<br>
+over those from Main HOL -- notably operations from the Simplifier setup.</p>
+<p>The "subst" method uses Simplifier.mksimps here:<br>
+<a href="http://isabelle.in.tum.de/repos/isabelle/file/Isabelle2017/src/Tools/eqsubst.ML#l53">http://isabelle.in.tum.de/repos/isabelle/file/Isabelle2017/src/Tools/eqsubst.ML#l53</a><br>
+-- with the Pure version it cannot work with HOL equalities.<br>
+Consequently, the following variation of the example works:</p>
+<p>theory Test<br>
+  imports "HOL-Library.Adhoc_Overloading" Main Test3<br>
+begin</p>
+<p>lemma a: "x+(x::nat) ≡ 2*x" by (rule eq_reflection) auto<br>
+lemma b: "(1::nat)+(1::nat) = 2"<br>
+  apply (subst a)<br>
+  by simp</p>
+<p>end</p>
+<p>The session-qualified theory naming in Isabelle2017 causes some<br>
+confusion here: ~~/src/Tools/Adhoc_Overloading.thy becomes<br>
+"HOL-Library.Adhoc_Overloading", so it appears like it should be based<br>
+on Main HOL, but it isn't.</p>
+<p>Anything not based on theory Main (or Complex_Main) is subject to the<br>
+rather complex HOL bootstrap process, and should normally not occur in<br>
+user-space -- it provokes surprises as shown here.</p>
+<p>It is probably better to move Adhoc_Overloading.thy to<br>
+~~/src/HOL/Library and make it import Main. (I am in the process to try<br>
+this change of Isabelle + AFP.)</p>
+<p>At some later stage, it should all be assimilated into Pure -- this<br>
+would solve other known problems of the current setup, especially in<br>
+conjunction with abbreviations.</p>
+<p>Makarius</p>
+
+
+
+<a name="294732208"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Strange%20interaction%20between%20Rewrite%20and%20Adhoc_.../near/294732208" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Strange.20interaction.20between.20Rewrite.20and.20Adhoc_.2E.2E.2E.html#294732208">(Aug 22 2022 at 17:14)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+This change (Isabelle/81d90f830f99) broke HOLCF-Prelude in the AFP (see<br>
+attachment).</p>
+
+
+
+<a name="294732367"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Strange%20interaction%20between%20Rewrite%20and%20Adhoc_.../near/294732367" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Strange.20interaction.20between.20Rewrite.20and.20Adhoc_.2E.2E.2E.html#294732367">(Aug 22 2022 at 17:15)</a>:</h4>
+<p>From: Christian Sternagel &lt;<a href="mailto:c.sternagel@gmail.com">c.sternagel@gmail.com</a>&gt;<br>
+Dear all,</p>
+<p>The easy fix would be to add (but I didn't do anything in the repo,<br>
+because I wanted to avoid potential clashes with others).</p>
+<p>hide_const (open) List.nth</p>
+<p>at the top of Definedness.thy. The problem was just that we define our<br>
+own "nth" (in Data_List) function but since "nth" is also defined in<br>
+Main and Definedness imports Adhoc_Overloading after Data_List. No<br>
+suddenly "nth" referred to List.nth instead of Data_List.nth.</p>
+<p>cheers</p>
+<p>chris</p>
+
+
+
+<a name="294732793"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Strange%20interaction%20between%20Rewrite%20and%20Adhoc_.../near/294732793" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Strange.20interaction.20between.20Rewrite.20and.20Adhoc_.2E.2E.2E.html#294732793">(Aug 22 2022 at 17:18)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+There are further hide commands that getoverridden by the merge with<br>
+Main from the right. This is another example of merge fragility.</p>
+<p>I have now clarified the imports as in the included changeset.</p>
+<p>Makarius<br>
+<a href="/user_uploads/14278/R8k24vywj0lRcGWWRLi_btm9/ch">ch</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

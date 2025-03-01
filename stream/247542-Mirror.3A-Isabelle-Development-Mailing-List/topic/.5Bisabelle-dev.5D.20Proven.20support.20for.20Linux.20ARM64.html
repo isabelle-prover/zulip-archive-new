@@ -1,0 +1,406 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle-dev] Proven support for Linux ARM64 · Mirror: Isabelle Development Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/index.html">Mirror: Isabelle Development Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20Proven.20support.20for.20Linux.20ARM64.html">[isabelle-dev] Proven support for Linux ARM64</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="420132924"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20Proven%20support%20for%20Linux%20ARM64/near/420132924" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20Proven.20support.20for.20Linux.20ARM64.html#420132924">(Feb 06 2024 at 20:47)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+With Isabelle/37e57ac55559 we now have proven support for Linux ARM64, meaning <br>
+that there is a nightly "isabelle build -a" on a virtual server (from Netcup).</p>
+<p>The Admin/build_release now works on Linux ARM64, and can produce logic images <br>
+for Linux ARM64. Thus regular repository snapshots (and release candidates) <br>
+support that platform by default, e.g. see <br>
+<a href="https://isatest.sketis.net/devel/release_snapshot">https://isatest.sketis.net/devel/release_snapshot</a></p>
+<p>Still missing (to be investigated further) are the following external tools:</p>
+<p>* z3: stuck at the rather old version 4.4.0, which lacks arm64-linux <br>
+binaries; the 4.4.1 arm64 package from ancient Debian is somewhat unstable on <br>
+current Ubuntu 20.04, see also failure of HOL-SMT_Examples recorded on <br>
+<a href="https://isatest.sketis.net/devel/build_status/index.html">https://isatest.sketis.net/devel/build_status/index.html</a></p>
+<p>* cvc4 (or rather cvc5)</p>
+<p>* nunchaku</p>
+<p>* smbc</p>
+<p>* ocaml / opam</p>
+<p>Makarius</p>
+<hr>
+<p>isabelle-dev mailing list<br>
+<a href="mailto:isabelle-dev@in.tum.de">isabelle-dev@in.tum.de</a><br>
+<a href="https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev">https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev</a></p>
+
+
+
+<a name="421225811"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20Proven%20support%20for%20Linux%20ARM64/near/421225811" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20Proven.20support.20for.20Linux.20ARM64.html#421225811">(Feb 13 2024 at 11:37)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+I've spent a lot of time experimenting with z3 4.4.0pre (0482e7fe727c), but <br>
+did not succeed so far (as of Isabelle/6e5f40cfa877): The session <br>
+HOL-SMT_Examples fails with timeout, due to non-terminating invocations of z3 <br>
+on arm64-linux.</p>
+<p>For verit there was a similar problem, but rebuilding it from source (with <br>
+"docker run -it ubuntu:18.04 bash") made it work; see also see <br>
+Isabelle/b14c4cb37d99.</p>
+<p>For z3 the build instructions are as follows, using the attached z3.patch, <br>
+which is based on the Debian package and changes found in the z3 repository:</p>
+<p>"""<br>
+docker run -it ubuntu:16.04 bash<br>
+apt-get update &amp;&amp; apt-get upgrade -y &amp;&amp; apt autoremove -y<br>
+apt install -y curl less libfontconfig1 libgomp1 openssh-client perl pwgen <br>
+rlwrap make g++ python</p>
+<p>mkdir z3-4.4.0pre<br>
+cd z3-4.4.0pre<br>
+curl --location <a href="https://github.com/Z3Prover/z3/archive/0482e7fe727c.tar.gz">https://github.com/Z3Prover/z3/archive/0482e7fe727c.tar.gz</a> | <br>
+tar --strip-components=1 -xz -f -</p>
+<p>#inline z3.patch below<br>
+patch -p1 &lt;&lt;EOF<br>
+...<br>
+EOF</p>
+<p>python scripts/mk_make.py<br>
+cd build &amp;&amp; make<br>
+"""</p>
+<p>That is minor progress, because the build works at all, by using ubuntu:16.04 <br>
+instead of our official ubuntu:18.04 baseline.</p>
+<p>For the planned release of Isabelle2024 (May 2024), I tend to disable z3 on <br>
+arm64-linux by default (via etc/settings of the component), and no longer <br>
+pretend that we have something working, see also <br>
+<a href="https://isabelle-dev.sketis.net/rISABELLE796ae338eb9d">https://isabelle-dev.sketis.net/rISABELLE796ae338eb9d</a></p>
+<p>Makarius</p>
+<p><a href="/user_uploads/14278/jowy6rOovmCjQIarNVmKQPkC/z3.patch">z3.patch</a></p>
+
+
+
+<a name="421387268"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20Proven%20support%20for%20Linux%20ARM64/near/421387268" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20Proven.20support.20for.20Linux.20ARM64.html#421387268">(Feb 14 2024 at 07:47)</a>:</h4>
+<p>From: Jasmin Blanchette &lt;<a href="mailto:jasmin.blanchette@ifi.lmu.de">jasmin.blanchette@ifi.lmu.de</a>&gt;<br>
+Hi Makarius,</p>
+<p>Thanks for investigating this. The binary components are always a special source of worry.</p>
+<p>From what I understand, HOL-SMT_Examples will continue working thanks to the certificate caching mechanism that is used there. The mechanism isn't used in the AFP, though, which means arm64-linux users won't be able to load many AFP entries due to "smt" calls to Z3 in there. If this is too much of an issue, we could consider either of two solutions:</p>
+<ol>
+<li>
+<p>Replace the "smt" calls. Most of them could use the "(verit)" option instead, and for the others, we'd have to come up with alternative proofs. This possibly entails a lot of work, but it could be done by a "task force".</p>
+</li>
+<li>
+<p>Use certificates for the AFP (and require their use in the future). Certificates take the form of low-level (SMT input, SMT output) pairs, so that when "smt" generates a given SMT input in the cache, the SMT output is used directly instead of running the SMT solver.</p>
+</li>
+</ol>
+<p>Best,<br>
+Jasmin</p>
+<p><a href="/user_uploads/14278/Bwz3WG2ZK1liPxk0ssp08b1M/smime.p7s">smime.p7s</a></p>
+
+
+
+<a name="421390740"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20Proven%20support%20for%20Linux%20ARM64/near/421390740" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20Proven.20support.20for.20Linux.20ARM64.html#421390740">(Feb 14 2024 at 08:09)</a>:</h4>
+<p>From: Jasmin Blanchette &lt;<a href="mailto:jasmin.blanchette@ifi.lmu.de">jasmin.blanchette@ifi.lmu.de</a>&gt;<br>
+Hi Makarius,</p>
+<blockquote>
+<p>Still missing (to be investigated further) are the following external tools:</p>
+<ul>
+<li>z3: stuck at the rather old version 4.4.0, which lacks arm64-linux binaries; the 4.4.1 arm64 package from ancient Debian is somewhat unstable on current Ubuntu 20.04, see also failure of HOL-SMT_Examples recorded on <a href="https://isatest.sketis.net/devel/build_status/index.html">https://isatest.sketis.net/devel/build_status/index.html</a></li>
+</ul>
+</blockquote>
+<p>See my previous email.</p>
+<blockquote>
+<ul>
+<li>cvc4 (or rather cvc5)</li>
+</ul>
+</blockquote>
+<p>CVC4 would be nice to have, but it's not critical in the same way as Z3.</p>
+<p>cvc5 used to crash on Mac, but I'm told by Clark Barrett that with version 1.1.0 they've solved many Mac-specific bugs. I can experiment with it on my Mac and if it seems to work well, we could upgrade to that.</p>
+<blockquote>
+<ul>
+<li>
+<p>nunchaku</p>
+</li>
+<li>
+<p>smbc</p>
+</li>
+</ul>
+</blockquote>
+<p>Nunchaku (and its backend SMBC) never left the experimental stage. Maybe we could move them out of "HOL" and mark them more clearly as experimental? I haven't given up all hopes of developing Nunchaku further and indeed just this week I was talking with a candidate about doing this, but it shouldn't block Isabelle releases.</p>
+<blockquote>
+<ul>
+<li>ocaml / opam</li>
+</ul>
+</blockquote>
+<p>Thankfully somebody else's concern. :)</p>
+<p>Jasmin</p>
+<p><a href="/user_uploads/14278/FVbsvXWpDETALwdpQutRCfen/smime.p7s">smime.p7s</a></p>
+
+
+
+<a name="421417730"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20Proven%20support%20for%20Linux%20ARM64/near/421417730" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20Proven.20support.20for.20Linux.20ARM64.html#421417730">(Feb 14 2024 at 10:43)</a>:</h4>
+<p>From: Lawrence Paulson &lt;<a href="mailto:lp15@cam.ac.uk">lp15@cam.ac.uk</a>&gt;<br>
+Somewhat to my surprise, there seem to be 1004 occurrences of “smt(z3" in the libraries and repository (I've never allowed it personally). It is outnumbered by verit more than 3 to 1, again a surprisingly low ratio. </p>
+<p>Getting rid of them all would be a tedious business. One day we might consider automated tools to crawl over old the proofs and get rid of ugly things. </p>
+<p>Larry</p>
+<hr>
+<p>isabelle-dev mailing list<br>
+<a href="mailto:isabelle-dev@in.tum.de">isabelle-dev@in.tum.de</a><br>
+<a href="https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev">https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev</a></p>
+
+
+
+<a name="421431502"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20Proven%20support%20for%20Linux%20ARM64/near/421431502" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20Proven.20support.20for.20Linux.20ARM64.html#421431502">(Feb 14 2024 at 12:10)</a>:</h4>
+<p>From: Jasmin Blanchette &lt;<a href="mailto:jasmin.blanchette@ifi.lmu.de">jasmin.blanchette@ifi.lmu.de</a>&gt;<br>
+Hi Larry,</p>
+<p>"smt(z3" occurs seldom because z3 is the default for "smt", so often it's omitted. (I believe it used to be omitted and now it's explicit.)</p>
+<p>Jasmin</p>
+<p><a href="/user_uploads/14278/UKHSECJJ08UMqhisFUUpjr6r/smime.p7s">smime.p7s</a></p>
+
+
+
+<a name="421433445"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20Proven%20support%20for%20Linux%20ARM64/near/421433445" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20Proven.20support.20for.20Linux.20ARM64.html#421433445">(Feb 14 2024 at 12:23)</a>:</h4>
+<p>From: Lawrence Paulson &lt;<a href="mailto:lp15@cam.ac.uk">lp15@cam.ac.uk</a>&gt;<br>
+That picks up a further 428 occurrences <br>
+Larry</p>
+<hr>
+<p>isabelle-dev mailing list<br>
+<a href="mailto:isabelle-dev@in.tum.de">isabelle-dev@in.tum.de</a><br>
+<a href="https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev">https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev</a></p>
+
+
+
+<a name="421608626"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20Proven%20support%20for%20Linux%20ARM64/near/421608626" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20Proven.20support.20for.20Linux.20ARM64.html#421608626">(Feb 15 2024 at 09:04)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+I would say we just leave the status-quo for the Isabelle2024 release, i.e. <br>
+these tools are implicitly "experimental" and there is no arm64-linux support.</p>
+<p>Makarius</p>
+<hr>
+<p>isabelle-dev mailing list<br>
+<a href="mailto:isabelle-dev@in.tum.de">isabelle-dev@in.tum.de</a><br>
+<a href="https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev">https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev</a></p>
+
+
+
+<a name="421657498"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20Proven%20support%20for%20Linux%20ARM64/near/421657498" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20Proven.20support.20for.20Linux.20ARM64.html#421657498">(Feb 15 2024 at 13:51)</a>:</h4>
+<p>From: Jasmin Blanchette &lt;<a href="mailto:jasmin.blanchette@ifi.lmu.de">jasmin.blanchette@ifi.lmu.de</a>&gt;<br>
+Hi Makarius,</p>
+<p>Concerning cvc5: I tried downloading and running cvc5 1.1.1 for arm64 from</p>
+<p><a href="https://github.com/cvc5/cvc5/releases/">https://github.com/cvc5/cvc5/releases/</a></p>
+<p>and I still get errors in Isabelle. For example, adding the line</p>
+<p>sledgehammer[cvc5, mepo, slices=4]</p>
+<p>before line 318 of the file "$AFP/thys/Given_Clause_Loops/DISCOUNT_Loop.thy" produces this output (nondeterministically):</p>
+<p>Sledgehammering... <br>
+cvc5 found a proof... <br>
+cvc5 found a proof... <br>
+cvc5 found a proof... <br>
+cvc5 found a proof... <br>
+/tmp/isabelle-jasminblanchette/bash_script1894380443147744112: line 1: 30873 Abort trap: 6           /Users/jasminblanchette/.isabelle/contrib/cvc5-1.1.1/arm64-darwin/cvc5 --decision\=internal --simplification\=none --full-saturate-quant --proof-format-mode\=alethe --proof-granularity\=dsl-rewrite --no-stats --sat-random-seed\=1 --lang\=smt2 --tlimit 219 /tmp/isabelle-jasminblanchette/process10570530194278022654/cache-io-9904226 &gt; /tmp/isabelle-jasminblanchette/process10570530194278022654/cache-io-9904228 2&gt;&amp;1 <br>
+/tmp/isabelle-jasminblanchette/bash_script936180679870508119: line 1: 30876 Abort trap: 6           /Users/jasminblanchette/.isabelle/contrib/cvc5-1.1.1/arm64-darwin/cvc5 --trigger-sel\=max --full-saturate-quant --proof-format-mode\=alethe --proof-granularity\=dsl-rewrite --no-stats --sat-random-seed\=1 --lang\=smt2 --tlimit 222 /tmp/isabelle-jasminblanchette/process10570530194278022654/cache-io-9904284 &gt; /tmp/isabelle-jasminblanchette/process10570530194278022654/cache-io-9904286 2&gt;&amp;1 <br>
+/tmp/isabelle-jasminblanchette/bash_script2386389454125518978: line 1: 30882 Abort trap: 6           /Users/jasminblanchette/.isabelle/contrib/cvc5-1.1.1/arm64-darwin/cvc5 --full-saturate-quant --inst-when\=full-last-call --inst-no-entail --term-db-mode\=relevant --multi-trigger-linear --proof-format-mode\=alethe --proof-granularity\=dsl-rewrite --no-stats --sat-random-seed\=1 --lang\=smt2 --tlimit 221 /tmp/isabelle-jasminblanchette/process10570530194278022654/cache-io-9904420 &gt; /tmp/isabelle-jasminblanchette/process10570530194278022654/cache-io-9904422 2&gt;&amp;1 <br>
+cvc5: Try this: by (metis P0A_add_y_formula PYA_add_active_formula state.simps) (130 ms) <br>
+cvc5: Duplicate proof <br>
+cvc5: Duplicate proof <br>
+cvc5: Duplicate proof <br>
+Done</p>
+<p>I don't know what the "Abort trap" warnings mean, because the prover seems to succeed nevertheless. I need to investigate. But I don't get these errors with CVC4.</p>
+<p>Jasmin</p>
+<p><a href="/user_uploads/14278/fQSSUPAOBWDa8JDJbknraix1/smime.p7s">smime.p7s</a></p>
+
+
+
+<a name="421865509"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20Proven%20support%20for%20Linux%20ARM64/near/421865509" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20Proven.20support.20for.20Linux.20ARM64.html#421865509">(Feb 16 2024 at 14:10)</a>:</h4>
+<p>From: Jasmin Blanchette &lt;<a href="mailto:jasmin.blanchette@ifi.lmu.de">jasmin.blanchette@ifi.lmu.de</a>&gt;<br>
+Hi all,</p>
+<p>I've investigated further. The issue is hard to debug. It seems to arise only when minimizing proofs (where we call the solver repeatedly on often unprovable problems) and only when at least two solvers are run in parallel (i.e., when invoking Sledgehammer with "slices=2" or above).</p>
+<p>I thought I might make some progress by replacing the "cvc5" binary with this script:</p>
+<p>#!/bin/bash<br>
+    cp ${!#} "$(mktemp /tmp/foo.XXXXXXXXX).smt"<br>
+    /Users/jasminblanchette/.isabelle/contrib/cvc5-1.1.1/arm64-darwin/cvc5.bin $@</p>
+<p>where "cvc5.bin" is the ARM64 Darwin cvc5 binary. But then the issue doesn't arise anymore!</p>
+<p>As far as I can tell, the issue only arises with unprovable (sat) problems anyway, and it happens in such a way that it doesn't affect the workings of Sledgehammer. What's annoying is the yellow warning message in Isabelle/jEdit.</p>
+<p>It looks like we can suppress the yellow message by writing a small wrapper script like the above (but using the proper idiom for retrieving the path of "cvc5.bin"). Is that what we should do? It would be great to leave CVC4 behind and to move to cvc5.</p>
+<p>Jasmin</p>
+<p><a href="/user_uploads/14278/bnCX9qnaQ9qJu_r7mxMIPQq_/smime.p7s">smime.p7s</a></p>
+
+
+
+<a name="421869929"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20Proven%20support%20for%20Linux%20ARM64/near/421869929" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20Proven.20support.20for.20Linux.20ARM64.html#421869929">(Feb 16 2024 at 14:34)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+That could be some odd effect from switching between Intel and ARM on macOS, <br>
+maybe caused by our bash_process wrapper (which is for Intel in <br>
+Isabelle/0f01c575ff3e).</p>
+<p>Apart from that, are you satisfied with cvc5-1.1.1? Does everything work with <br>
+the current Intel setup?</p>
+<p>If so, I will see how to change our process wrappers such that everything <br>
+works again on all platforms.</p>
+<p>Makarius</p>
+<hr>
+<p>isabelle-dev mailing list<br>
+<a href="mailto:isabelle-dev@in.tum.de">isabelle-dev@in.tum.de</a><br>
+<a href="https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev">https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev</a></p>
+
+
+
+<a name="421994023"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20Proven%20support%20for%20Linux%20ARM64/near/421994023" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20Proven.20support.20for.20Linux.20ARM64.html#421994023">(Feb 17 2024 at 08:47)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi all,</p>
+<p>just my 5 cent: the certificates are helpful, but strictly relying on <br>
+them in distribution or AFP rules out people having no access to certain <br>
+provers to do work requiring potentially pervasive maintenance of proofs.</p>
+<p>Cheers,<br>
+    Florian</p>
+<p><a href="/user_uploads/14278/GYnJT3mWlJH4N1la5bDpYINT/OpenPGP_0xA707172232CFA4E9.asc">OpenPGP_0xA707172232CFA4E9.asc</a><br>
+<a href="/user_uploads/14278/b-yMafNzeU5Jkjk5dHTdqp8L/OpenPGP_signature.asc">OpenPGP_signature.asc</a></p>
+
+
+
+<a name="422216982"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20Proven%20support%20for%20Linux%20ARM64/near/422216982" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20Proven.20support.20for.20Linux.20ARM64.html#422216982">(Feb 19 2024 at 11:51)</a>:</h4>
+<p>From: Jasmin Blanchette &lt;<a href="mailto:jasmin.blanchette@ifi.lmu.de">jasmin.blanchette@ifi.lmu.de</a>&gt;<br>
+Hi Makarius,</p>
+<p>I'm very satisfied with cvc5. I ran an evaluation on hundreds of goals from the AFP and the success rate went up from 52% for CVC4 to 64% for cvc5.</p>
+<p>Jasmin</p>
+<p><a href="/user_uploads/14278/XxK5j8f4WaRUmC-U-lhdFuT6/smime.p7s">smime.p7s</a></p>
+
+
+
+<a name="424118081"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20Proven%20support%20for%20Linux%20ARM64/near/424118081" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20Proven.20support.20for.20Linux.20ARM64.html#424118081">(Feb 29 2024 at 22:12)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+OK, so here is the cvc5-1.1.1 component for further testing: <br>
+<a href="https://isabelle-dev.sketis.net/rISABELLEf8fb4384180e">https://isabelle-dev.sketis.net/rISABELLEf8fb4384180e</a></p>
+<p>I only made some basic tests with sledgehammer in <br>
+src/HOL/Metis_Examples/Big_O.thy --- it looks fine so far on all platforms.</p>
+<p>Note that arm64-linux is still missing from <br>
+<a href="https://github.com/cvc5/cvc5/releases/tag/cvc5-1.1.1">https://github.com/cvc5/cvc5/releases/tag/cvc5-1.1.1</a></p>
+<p>They claim that ARM64 is supported via cross compilation here: <br>
+<a href="https://github.com/cvc5/cvc5/blob/main/INSTALL.rst">https://github.com/cvc5/cvc5/blob/main/INSTALL.rst</a> --- but they don't provide <br>
+binaries for download.</p>
+<p>Maybe you can motivate the cvc5 guys to complete their set of downloads --- to <br>
+avoid "debianization" of this otherwise great tool --- meaning bad builds that <br>
+appear to work superficially.</p>
+<p>Makarius</p>
+<hr>
+<p>isabelle-dev mailing list<br>
+<a href="mailto:isabelle-dev@in.tum.de">isabelle-dev@in.tum.de</a><br>
+<a href="https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev">https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev</a></p>
+
+
+
+<a name="424119744"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20Proven%20support%20for%20Linux%20ARM64/near/424119744" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20Proven.20support.20for.20Linux.20ARM64.html#424119744">(Feb 29 2024 at 22:23)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Now I've found the problem report, that I was looking for, but too late: The <br>
+cvc5 distribution of Isabelle/f8fb4384180e has the same problem (it uses the <br>
+"static" versions).</p>
+<p>I've also updated all bash_process executables already in a861b0df74b4, now <br>
+with native arm64-darwin. This does not help here.</p>
+<p>Makarius</p>
+<hr>
+<p>isabelle-dev mailing list<br>
+<a href="mailto:isabelle-dev@in.tum.de">isabelle-dev@in.tum.de</a><br>
+<a href="https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev">https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev</a></p>
+
+
+
+<a name="424293405"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20Proven%20support%20for%20Linux%20ARM64/near/424293405" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20Proven.20support.20for.20Linux.20ARM64.html#424293405">(Mar 01 2024 at 17:22)</a>:</h4>
+<p>From: Haniel Barbosa &lt;<a href="mailto:hbarbosa@dcc.ufmg.br">hbarbosa@dcc.ufmg.br</a>&gt;<br>
+Hello,</p>
+<p>FYI inspired by this thread we started to look into adding arm64 into<br>
+our CI pipeline so we can provide this binary for users. Unclear when<br>
+that'll materialize though.</p>
+<p>Best,</p>
+<p>Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt; writes:</p>
+
+
+
+<a name="424300967"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20Proven%20support%20for%20Linux%20ARM64/near/424300967" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20Proven.20support.20for.20Linux.20ARM64.html#424300967">(Mar 01 2024 at 18:09)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Haniel,</p>
+<p>can you point to the place in the cvc5 repository (or elsewhere) where the <br>
+build happens? For now I could imitate that manually, e.g. on my own ARM64 <br>
+Linux node together with docker.</p>
+<p>Makarius</p>
+<hr>
+<p>isabelle-dev mailing list<br>
+<a href="mailto:isabelle-dev@in.tum.de">isabelle-dev@in.tum.de</a><br>
+<a href="https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev">https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev</a></p>
+
+
+
+<a name="424327949"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20Proven%20support%20for%20Linux%20ARM64/near/424327949" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20Proven.20support.20for.20Linux.20ARM64.html#424327949">(Mar 01 2024 at 21:24)</a>:</h4>
+<p>From: Haniel Barbosa &lt;<a href="mailto:hbarbosa@dcc.ufmg.br">hbarbosa@dcc.ufmg.br</a>&gt;<br>
+Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt; writes:</p>
+<blockquote>
+<p>On 01/03/2024 18:21, Haniel Barbosa wrote:</p>
+<blockquote>
+<p>FYI inspired by this thread we started to look into adding arm64<br>
+into<br>
+our CI pipeline so we can provide this binary for users. Unclear when<br>
+that'll materialize though.</p>
+</blockquote>
+<p>Haniel,</p>
+<p>can you point to the place in the cvc5 repository (or elsewhere) where<br>
+the build happens? For now I could imitate that manually, e.g. on my<br>
+own ARM64 Linux node together with docker.</p>
+</blockquote>
+<p>I'm not sure if I understand the question. The build system is based<br>
+on cmake and the code for it is here:</p>
+<p><a href="https://github.com/cvc5/cvc5/tree/main/cmake">https://github.com/cvc5/cvc5/tree/main/cmake</a></p>
+<p>There are a number of builds that happen during CI at GitHub that are<br>
+handled via the code here:</p>
+<p><a href="https://github.com/cvc5/cvc5/tree/main/.github/actions">https://github.com/cvc5/cvc5/tree/main/.github/actions</a></p>
+<p>There are also a number of builds that we run nightly but that is via<br>
+a private server (the binaries to download are generated from those,<br>
+and it's to that we will try to add arm64 builds).</p>
+<p>If you have specific questions about it, the best is to use<br>
+<a href="https://github.com/cvc5/cvc5/discussions">https://github.com/cvc5/cvc5/discussions</a>, where everybody in the team<br>
+will see it (I myself am no expert on the cvc5 build system hehe).</p>
+<p>Best,</p>
+<blockquote>
+<p>Makarius</p>
+</blockquote>
+
+
+
+<a name="427817899"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20Proven%20support%20for%20Linux%20ARM64/near/427817899" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20Proven.20support.20for.20Linux.20ARM64.html#427817899">(Mar 19 2024 at 21:53)</a>:</h4>
+<p>From: Haniel Barbosa &lt;<a href="mailto:hbarbosa@dcc.ufmg.br">hbarbosa@dcc.ufmg.br</a>&gt;<br>
+Hello,</p>
+<p>I'm happy to report that we got this working now (thanks to Daniel<br>
+Larraz):</p>
+<p><a href="https://github.com/cvc5/cvc5/releases/tag/latest">https://github.com/cvc5/cvc5/releases/tag/latest</a></p>
+<p>Best,</p>
+<p>Haniel Barbosa &lt;<a href="mailto:hbarbosa@dcc.ufmg.br">hbarbosa@dcc.ufmg.br</a>&gt; writes:</p>
+
+
+
+<a name="428089749"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20Proven%20support%20for%20Linux%20ARM64/near/428089749" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20Proven.20support.20for.20Linux.20ARM64.html#428089749">(Mar 21 2024 at 09:47)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Many thanks.</p>
+<p>I have tried it out briefly on all Isabelle platforms, see also <br>
+<a href="https://isabelle-dev.sketis.net/rISABELLE67d28b35c5d8">https://isabelle-dev.sketis.net/rISABELLE67d28b35c5d8</a> --- cvc5-latest versions <br>
+change quickly, so that precise version has disappeared already.</p>
+<p>The arm64-linux version basically works on my 2 test machines: virtual Ubuntu <br>
+22.04 and physical Raspberry PI with an old version of Debian.</p>
+<p>I did see a few crashes, though, when several cvc5 processes are running <br>
+concurrently. Maybe that is the same crash that Jasmin has observed on <br>
+arm64-darwin: I am including a test example as changeset for AFP. That can be <br>
+reproduced with the Isabelle component "cvc5-1.1.1" (e.g. edited into <br>
+Admin/components/main followed by "Admin/init").</p>
+<p>Makarius</p>
+<p><a href="/user_uploads/14278/c9jV6ssXv8EEfzCUwbARB6xK/ch-cvc5-Abort_trap_6">ch-cvc5-Abort_trap_6</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

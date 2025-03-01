@@ -1,0 +1,32 @@
+[
+    {
+        "content": "<p>From: Moa Johansson &lt;<a href=\"mailto:moa.johansson@chalmers.se\">moa.johansson@chalmers.se</a>&gt;<br>\nHi,</p>\n<p>I’m writing some code that should create a snippet of Isar script. However, as part of this endevour it would be very convenient if there was a function (or option) similar to Syntax.string_of_term which also would include simple type annotations for variables.<br>\nReading the documentation seems to suggest there is no such function ☹.</p>\n<p>A small example:<br>\nI get: \"z = Emp ⟹ app y z = y\"<br>\nI would like \"z = Emp ⟹ app (y :: 'a Lst) z = y\"</p>\n<p>I would like to have this because if the above term is appearing as an intermediate lemma in an Isar script, it is apparently necessary to explicitly state the types for y (and z), otherwise I cannot use the lemma. Or is it something else I’m missing?</p>\n<p>I know there’s some “tricks” to write the script differently, so I don’t need the annotations, but that made it a bit longer and harder to read imho.</p>\n<p>Best,<br>\nMoa</p>",
+        "id": 294750387,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661195213
+    },
+    {
+        "content": "<p>From: Peter Lammich &lt;<a href=\"mailto:lammich@in.tum.de\">lammich@in.tum.de</a>&gt;<br>\nHi Moa,</p>\n<p>the configuration option show_types should do.</p>\n<p>In ML:<br>\n  ML_val ‹<br>\n    val ctxt = Config.put show_types true @{context}<br>\n    val test = Syntax.string_of_term ctxt @{term \"a+b\"} |&gt; writeln<br>\n  ›</p>\n<p>As attribute:<br>\n  declare [[show_types]]<br>\n  term \"a+b\"</p>",
+        "id": 294750403,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661195219
+    },
+    {
+        "content": "<p>From: Dominique Unruh &lt;<a href=\"mailto:unruh@ut.ee\">unruh@ut.ee</a>&gt;<br>\nHi,</p>\n<p>show_types will add types to variable names but not to polymorphic<br>\nconstants.<br>\nSo something like \"card (UNIV::bool set) = 2\" would be rendered as the<br>\nfalse fact \"card UNIV = 2\".<br>\nThere is additionall show_consts, but that doesn't add the types inside the<br>\nterm which makes it hard for reparsing.<br>\n(Also, if UNIV occurs twice with different types, it will not be clear<br>\nwhich UNIV is which.)</p>\n<p>For example:</p>\n<p>declare [[show_types, show_consts]]<br>\nterm \"card (UNIV::bool set) = 2\"</p>\n<p>shows:</p>\n<p>\"card UNIV = (2::nat)\"<br>\n  :: \"bool\"</p>\n<p>in the output window. (I have no clue why 2 gets a type here.)</p>\n<p>I would be very interested myself in some ML-code that gives re-parseable<br>\ncode.<br>\n(Or at least, re-parseable most of the time. I don't think it's possible in<br>\ngeneral in the presence of custom print translations etc.)</p>\n<p>Best wishes,<br>\nDominique.</p>",
+        "id": 294750420,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661195226
+    },
+    {
+        "content": "<p>From: Dominique Unruh &lt;<a href=\"mailto:unruh@ut.ee\">unruh@ut.ee</a>&gt;<br>\nI discovered that there seems to be some code to print a term with<br>\nsufficient type information for reparsing, namely in the sledgehammer code.</p>\n<p>theory Scratch<br>\n  imports Main<br>\nbegin</p>\n<p>(* Function str_of converts a string into a term, but with some unwanted<br>\nboilerplate around *)<br>\nML ‹<br>\nfun str_of t = Sledgehammer_Isar_Proof.Proof<br>\n([],[(Sledgehammer_Isar_Proof.no_label,t)],[])<br>\n                |&gt; Sledgehammer_Isar_Proof.string_of_isar_proof \\&lt;^context&gt;<br>\n1 1<br>\n›</p>\n<p>ML ‹str_of \\&lt;^term&gt;‹card (UNIV::bool set)=2› |&gt; writeln›</p>\n<p>This will print<br>\nproof -<br>\n  assume \"card (UNIV::bool set) = 2\"<br>\nqed</p>\n<p>So it unfortunately has some extra stuff around, but it shows that it's<br>\npossible in principle by stealing the appropriate fragments of sledgehammer<br>\ncode.</p>\n<p>Best wishes,<br>\nDominique.</p>",
+        "id": 294750452,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661195238
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nThis is how Sledgehammer approximates this:</p>\n<p><a href=\"http://isabelle.in.tum.de/repos/isabelle/file/Isabelle2018/src/HOL/Tools/Sledgehammer/sledgehammer_isar_proof.ML#l299\">http://isabelle.in.tum.de/repos/isabelle/file/Isabelle2018/src/HOL/Tools/Sledgehammer/sledgehammer_isar_proof.ML#l299</a></p>\n<p>(The module name already shows that the proper terminology is \"Isar<br>\nproof\" (or \"Isar proof text\").  Proof scripts are a thing from the past,<br>\nbefore Isar. You can emulate old-style proof scripts via a sequence of<br>\n'apply' commands, but this is improper Isar.)</p>\n<p>Note that there is no standard function in Isabelle/Pure, because the<br>\nproblem to print just the right amount of type information is very<br>\ncomplex and not fully solved. One day, after 1 or 2 rounds of<br>\nrefinements over the above approach, it might become generally available.</p>\n<p>Instead of printing type constraints inside a term you can try an<br>\nalternative approach with \"eigen-context\" for free variables, e.g.</p>\n<p>have \"x + y = z\" for x y z :: nat</p>\n<p>Makarius</p>",
+        "id": 294750649,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661195299
+    }
+]

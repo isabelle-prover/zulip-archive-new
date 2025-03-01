@@ -1,0 +1,418 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Confusing Isar chained proofs · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Confusing.20Isar.20chained.20proofs.html">[isabelle] Confusing Isar chained proofs</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294821780"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Confusing%20Isar%20chained%20proofs/near/294821780" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Confusing.20Isar.20chained.20proofs.html#294821780">(Aug 23 2022 at 08:14)</a>:</h4>
+<p>From: Ian Hayes &lt;<a href="mailto:Ian.Hayes@uq.edu.au">Ian.Hayes@uq.edu.au</a>&gt;<br>
+I have some confusing behaviour in Isar proofs using chains of reasoning.<br>
+The theory below abstracts the issue (so that the proofs are (should be) <br>
+trivial).</p>
+<p>Lemma trans1 is fine (there is a much more direct proof but its the Isar <br>
+I'm concerned with).</p>
+<p>Lemma trans2 succeeds but looks like it should not.<br>
+Looking at the output of the proof state just after "u" it states "have <br>
+b ≤ a" and<br>
+then in the next step the "..." matches "a" rather than "b"<br>
+which is not what I assumed looking at the equivalent step in trans1.</p>
+<p>Lemma trans3 fails to prove the second step because<br>
+the first step actually shows "have b ≤ a" and hence<br>
+the "..." matches "a" rather than (what I assumed) "b".</p>
+<p>I think the issue is that "a ≥ b" is an /abbreviation/ that gets <br>
+replaced by "b ≤ a"<br>
+and that is what the Isar chaining proof sees.</p>
+<p>The problem is that in the context I'm working in, I want to use proofs that<br>
+are (sometimes long) chains of ≥ steps (which don't work as expected).<br>
+I know it is possible to reverse the proofs and use ≤, but in my context<br>
+that is not the style of presentation I desire.</p>
+<p>Is this really the intended behaviour of chained proofs for ≥ ?<br>
+Is there a way to do the chains of ≥ proofs?</p>
+<p>Thanks in advance<br>
+Ian</p>
+<hr>
+<p>theory Scratch<br>
+   imports Main</p>
+<p>begin</p>
+<p>locale test = order<br>
+begin</p>
+<p>lemma trans1:<br>
+   assumes x: "c ≤ b"<br>
+   assumes y: "b = a"<br>
+   shows "c ≤ a"<br>
+proof -<br>
+   have u: "c ≤ b"<br>
+     by (simp add: x)<br>
+   also have v: "… = a"<br>
+     by (simp add: y)<br>
+   show ?thesis<br>
+     using u v by auto<br>
+qed</p>
+<p>lemma trans2:<br>
+   assumes x: "a ≥ b"<br>
+   assumes y: "a = c"<br>
+   shows "c ≥ b"<br>
+proof -<br>
+   have u: "a ≥ b"<br>
+     by (simp add: x)<br>
+   moreover have v: "… = c"<br>
+     by (simp add: y)<br>
+   show ?thesis<br>
+     using u v by auto<br>
+qed</p>
+<p>lemma trans3:<br>
+   assumes x: "a ≥ b"<br>
+   assumes y: "b ≥ c"<br>
+   shows "a ≥ c"<br>
+proof -<br>
+   have "a ≥ b"<br>
+     by (simp add: x)<br>
+   moreover have "… ≥ c"<br>
+     sorry</p>
+<p>end</p>
+
+
+
+<a name="294821806"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Confusing%20Isar%20chained%20proofs/near/294821806" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Confusing.20Isar.20chained.20proofs.html#294821806">(Aug 23 2022 at 08:15)</a>:</h4>
+<p>From: Akihisa Yamada &lt;<a href="mailto:akihisayamada@nii.ac.jp">akihisayamada@nii.ac.jp</a>&gt;<br>
+Dear Ian,</p>
+<p>Isar's chained proofs are not about "...", but "also" that combines <br>
+facts by certain rules (AFAIK theorems given [trans] attribute) and <br>
+"finally" that gives the combined result as if you are "using" it.</p>
+<p>"..." is just a shorthand for the last argument of the previous <br>
+statement (if I understand correctly), so you can be explicit when it <br>
+doesn't refer to what you want.</p>
+<p>context order begin<br>
+lemma trans3:<br>
+   assumes x: "a ≥ b"<br>
+   assumes y: "b ≥ c"<br>
+   shows "a ≥ c"<br>
+proof -<br>
+   have "a ≥ b"<br>
+     by (simp add: x)<br>
+   also have "b ≥ c" using y.<br>
+   finally show ?thesis.<br>
+end</p>
+<p>Best regards,<br>
+Akihisa</p>
+
+
+
+<a name="294821867"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Confusing%20Isar%20chained%20proofs/near/294821867" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Confusing.20Isar.20chained.20proofs.html#294821867">(Aug 23 2022 at 08:15)</a>:</h4>
+<p>From: Wenda Li &lt;<a href="mailto:wl302@cam.ac.uk">wl302@cam.ac.uk</a>&gt;<br>
+Dear Ian,</p>
+<p>I know a way to do &gt;= style proofs, although I never used it in my own proofs:</p>
+<p>notepad<br>
+begin<br>
+  fix a b c d :: int<br>
+  have "a &gt; b" (is "_ &gt; ?rhs")  sorry<br>
+  also have "?rhs ≥ c" (is "_ ≥ ?rhs") sorry<br>
+  also (xtrans)have "?rhs = d" sorry<br>
+  finally (xtrans) have "a &gt; d" .<br>
+end</p>
+<p>The ‘xtrans’ trick has been briefly described in <a href="https://isabelle.in.tum.de/repos/isabelle/file/3ab52e4a8b45/src/HOL/Orderings.thy">https://isabelle.in.tum.de/repos/isabelle/file/3ab52e4a8b45/src/HOL/Orderings.thy</a></p>
+<p>Best,<br>
+Wenda</p>
+
+
+
+<a name="294821890"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Confusing%20Isar%20chained%20proofs/near/294821890" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Confusing.20Isar.20chained.20proofs.html#294821890">(Aug 23 2022 at 08:15)</a>:</h4>
+<p>From: Ian Hayes &lt;<a href="mailto:Ian.Hayes@uq.edu.au">Ian.Hayes@uq.edu.au</a>&gt;<br>
+Dear Akihisa,</p>
+<p>My understanding (like yours) of "..." /was/ that it matches the last <br>
+argument of the previous statement<br>
+but lemma trans2 shows that in the case of ≥ it matches the first <br>
+argument of the previous statement.<br>
+I think this is because "a ≥ b" is an abbreviation that gets expanded to <br>
+"b ≤ a" and<br>
+then it is the last argument of this (i.e. "a" rather than "b") that <br>
+"..." matches.<br>
+I found this counter intuitive.<br>
+The interaction between abbreviations and Isar's "..." seems broken to me.</p>
+<p>In our actual application the "b" can be quite large, so the chained <br>
+style with "..." makes it much more readable.</p>
+<p>Thanks for your feedback<br>
+Ian</p>
+
+
+
+<a name="294821893"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Confusing%20Isar%20chained%20proofs/near/294821893" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Confusing.20Isar.20chained.20proofs.html#294821893">(Aug 23 2022 at 08:15)</a>:</h4>
+<p>From: Ian Hayes &lt;<a href="mailto:Ian.Hayes@uq.edu.au">Ian.Hayes@uq.edu.au</a>&gt;<br>
+Dear Wenda,</p>
+<p>Many thanks for your feedback and the description of the pattern <br>
+matching trick.<br>
+Most useful.</p>
+<p>The link you gave confirms that "..." stands for the wrong thing for ≥.<br>
+It seems to me that the "..." needs to be instantiated with the right <br>
+argument<br>
+of the previous statement /before/ the abbreviation for ≥ is expanded.<br>
+But that is probably a non-trivial modification to Isabelle/Isar.</p>
+<p>Your link allowed me to find the following link<br>
+&lt;<a href="https://lists.cam.ac.uk/mailman/htdig/cl-isabelle-users/2011-September/msg00034.html">https://lists.cam.ac.uk/mailman/htdig/cl-isabelle-users/2011-September/msg00034.html</a>&gt;<br>
+which is a response from Makarius to the same issue I am having.</p>
+<hr>
+
+
+
+<a name="294821908"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Confusing%20Isar%20chained%20proofs/near/294821908" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Confusing.20Isar.20chained.20proofs.html#294821908">(Aug 23 2022 at 08:15)</a>:</h4>
+<p>From: Akihisa Yamada &lt;<a href="mailto:akihisayamada@nii.ac.jp">akihisayamada@nii.ac.jp</a>&gt;<br>
+Dear Ian, Wenda,</p>
+<p>it seems we don't have to learn the "(xtrans)" trick nowadays, maybe <br>
+we've got enough [trans] rules?</p>
+<p>And, yes, "..." is the last argument after normalization. What I wanted <br>
+to say is that it is so no matter you're in chaining proof or not. <br>
+General ways to avoid writing same thing twice (like "is") are <br>
+documented in Sec. 4.3.1 of the prog-prove document.</p>
+<p>Best regards,<br>
+Akihisa</p>
+
+
+
+<a name="294821955"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Confusing%20Isar%20chained%20proofs/near/294821955" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Confusing.20Isar.20chained.20proofs.html#294821955">(Aug 23 2022 at 08:16)</a>:</h4>
+<p>From: Akihisa Yamada &lt;<a href="mailto:akihisayamada@nii.ac.jp">akihisayamada@nii.ac.jp</a>&gt;<br>
+Dear Ian, Wenda,</p>
+<blockquote>
+<p>it seems we don't have to learn the "(xtrans)" trick nowadays, maybe <br>
+we've got enough [trans] rules?</p>
+</blockquote>
+<p>I'm sorry for the confusion, I was on a richer context than Main which <br>
+has nicer set of trans rules.</p>
+<p>Best regards,<br>
+Akihisa</p>
+<blockquote>
+<p>And, yes, "..." is the last argument after normalization. What I wanted <br>
+to say is that it is so no matter you're in chaining proof or not. <br>
+General ways to avoid writing same thing twice (like "is") are <br>
+documented in Sec. 4.3.1 of the prog-prove document.</p>
+<p>Best regards,<br>
+Akihisa</p>
+<p>On 2020/01/30 6:00, Ian Hayes wrote:</p>
+<blockquote>
+<p>Dear Wenda,</p>
+<p>Many thanks for your feedback and the description of the pattern <br>
+matching trick.<br>
+Most useful.</p>
+<p>The link you gave confirms that "..." stands for the wrong thing for ≥.<br>
+It seems to me that the "..." needs to be instantiated with the right <br>
+argument<br>
+of the previous statement /before/ the abbreviation for ≥ is expanded.<br>
+But that is probably a non-trivial modification to Isabelle/Isar.</p>
+<p>Your link allowed me to find the following link<br>
+&lt;<a href="https://lists.cam.ac.uk/mailman/htdig/cl-isabelle-users/2011-September/msg00034.html">https://lists.cam.ac.uk/mailman/htdig/cl-isabelle-users/2011-September/msg00034.html</a>&gt; </p>
+<p>which is a response from Makarius to the same issue I am having.</p>
+<hr>
+</blockquote>
+<p>On Fri, 9 Sep 2011, Peter Lammich wrote:</p>
+<blockquote>
+<p>I just wondered if it is possible to use the Isar-style transitivity<br>
+     reasoning with \ge, i.e.</p>
+<p>note <code>a\ge b</code> also note <code>... \ge c</code> finally have "a\ge c"</p>
+<p>There is still no proper way to do it.  When I've introduced the concept<br>
+of calculational reasoning in Isar the &gt;= abbreviations did not exist, <br>
+and<br>
+it was already known that it would not work. (The potential for confusion<br>
+when swapping order of concrete vs. abstract syntax was known long before<br>
+Isar, which was the reason for avoiding it in early Isabelle/HOL.)</p>
+<p>Later &gt;= was introduced nonetheless, when I was not looking / not quick<br>
+enough to explain the situation.  Since that time I have an item on my<br>
+TODO list to extend the "..." treatment of Isar to accomodate that<br>
+extension of the HOL library.  The &gt;= abbreviation is an example where<br>
+bug / feature are one and the same thing.</p>
+<hr>
+<p>I'm hoping this issue is moving up Makarius' TODO list :-)<br>
+In the meantime I think it should probably be documented in the Isar <br>
+manual<br>
+rather than hidden in a comment in Orderings.thy.</p>
+<p>Thanks again<br>
+Ian</p>
+</blockquote>
+<p>On 29/1/20 21:39, Wenda Li wrote:</p>
+<blockquote>
+<blockquote>
+<p>Dear Ian,</p>
+<p>I know a way to do &gt;= style proofs, although I never used it in my <br>
+own proofs:</p>
+<p>notepad<br>
+begin<br>
+   fix a b c d :: int<br>
+   have "a &gt; b" (is "_ &gt; ?rhs")  sorry<br>
+   also have "?rhs ≥ c" (is "_ ≥ ?rhs") sorry<br>
+   also (xtrans)have "?rhs = d" sorry<br>
+   finally (xtrans) have "a &gt; d" .<br>
+end</p>
+<p>The ‘xtrans’ trick has been briefly described in <br>
+<a href="https://isabelle.in.tum.de/repos/isabelle/file/3ab52e4a8b45/src/HOL/Orderings.thy">https://isabelle.in.tum.de/repos/isabelle/file/3ab52e4a8b45/src/HOL/Orderings.thy</a> </p>
+<p>Best,<br>
+Wenda</p>
+<p>On 29 Jan 2020, at 09:35, Ian Hayes &lt;<a href="mailto:Ian.Hayes@uq.edu.au">Ian.Hayes@uq.edu.au</a>&gt; wrote:</p>
+<blockquote>
+<p>I have some confusing behaviour in Isar proofs using chains of <br>
+reasoning.<br>
+The theory below abstracts the issue (so that the proofs are (should <br>
+be) trivial).</p>
+<p>Lemma trans1 is fine (there is a much more direct proof but its the <br>
+Isar I'm concerned with).</p>
+<p>Lemma trans2 succeeds but looks like it should not.<br>
+Looking at the output of the proof state just after "u" it states <br>
+"have b ≤ a" and<br>
+then in the next step the "..." matches "a" rather than "b"<br>
+which is not what I assumed looking at the equivalent step in trans1.</p>
+<p>Lemma trans3 fails to prove the second step because<br>
+the first step actually shows "have b ≤ a" and hence<br>
+the "..." matches "a" rather than (what I assumed) "b".</p>
+<p>I think the issue is that "a ≥ b" is an /abbreviation/ that gets <br>
+replaced by "b ≤ a"<br>
+and that is what the Isar chaining proof sees.</p>
+<p>The problem is that in the context I'm working in, I want to use <br>
+proofs that<br>
+are (sometimes long) chains of ≥ steps (which don't work as expected).<br>
+I know it is possible to reverse the proofs and use ≤, but in my <br>
+context<br>
+that is not the style of presentation I desire.</p>
+<p>Is this really the intended behaviour of chained proofs for ≥ ?<br>
+Is there a way to do the chains of ≥ proofs?</p>
+<p>Thanks in advance<br>
+Ian</p>
+<hr>
+<p>theory Scratch<br>
+   imports Main</p>
+<p>begin</p>
+<p>locale test = order<br>
+begin</p>
+<p>lemma trans1:<br>
+   assumes x: "c ≤ b"<br>
+   assumes y: "b = a"<br>
+   shows "c ≤ a"<br>
+proof -<br>
+   have u: "c ≤ b"<br>
+     by (simp add: x)<br>
+   also have v: "… = a"<br>
+     by (simp add: y)<br>
+   show ?thesis<br>
+     using u v by auto<br>
+qed</p>
+<p>lemma trans2:<br>
+   assumes x: "a ≥ b"<br>
+   assumes y: "a = c"<br>
+   shows "c ≥ b"<br>
+proof -<br>
+   have u: "a ≥ b"<br>
+     by (simp add: x)<br>
+   moreover have v: "… = c"<br>
+     by (simp add: y)<br>
+   show ?thesis<br>
+     using u v by auto<br>
+qed</p>
+<p>lemma trans3:<br>
+   assumes x: "a ≥ b"<br>
+   assumes y: "b ≥ c"<br>
+   shows "a ≥ c"<br>
+proof -<br>
+   have "a ≥ b"<br>
+     by (simp add: x)<br>
+   moreover have "… ≥ c"<br>
+     sorry</p>
+<p>end</p>
+<p>-- <br>
+Professor Ian Hayes<br>
+Mail: School of Information Technology and Electrical Engineering,<br>
+      University of Queensland, Brisbane, Queensland  4072, Australia<br>
+CRICOS Provider No: 00025B<br>
+E-mail: <a href="mailto:Ian.Hayes@uq.edu.au">Ian.Hayes@uq.edu.au</a><br>
+Work: (GMT+10 hours) +61 (7) 3365 2386 FAX: +61 (7) 3365 4999</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+
+
+
+<a name="294821980"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Confusing%20Isar%20chained%20proofs/near/294821980" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Confusing.20Isar.20chained.20proofs.html#294821980">(Aug 23 2022 at 08:16)</a>:</h4>
+<p>From: Dominique Unruh &lt;<a href="mailto:unruh@ut.ee">unruh@ut.ee</a>&gt;<br>
+Hi,</p>
+<p>one trick how to fix a situation like this without decreasing <br>
+readability is to write   (is "... &gt;= _")  after the have-command. Since <br>
+the automatic binding of ... happens before the binding via "is", this <br>
+will bind ... to the actual lhs of &gt;=. This way, you get the intuitive <br>
+meaning of ... with only small syntactic overhead.</p>
+<p>Best wishes,<br>
+Dominique.</p>
+
+
+
+<a name="294823642"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Confusing%20Isar%20chained%20proofs/near/294823642" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Confusing.20Isar.20chained.20proofs.html#294823642">(Aug 23 2022 at 08:29)</a>:</h4>
+<p>From: Lukas Stevens &lt;lukas.stevens+isabelle-users@in.tum.de&gt;<br>
+I just reviewed this thread and played around with some of the suggested<br>
+workarounds and encountered the following surprising behavior.</p>
+<p>lemma<br>
+  fixes a b c d :: int<br>
+  assumes "d ≥ c"<br>
+  assumes "c ≥ b"<br>
+  assumes "b ≥ a"<br>
+  shows "d ≥ a"<br>
+proof -<br>
+  note ‹a ≤ b›<br>
+  also note ‹b ≤ c›<br>
+  also have ‹… ≤ d› ― ‹Proof obligation: @{prop ‹b ≤ d›}› sorry<br>
+  finally show ?thesis sorry<br>
+qed</p>
+<p>lemma<br>
+  fixes a b c d :: int<br>
+  assumes "a ≤ b"<br>
+  assumes "b ≤ c"<br>
+  assumes "c ≤ d"<br>
+  shows "a ≤ d"<br>
+proof -<br>
+  note ‹a ≤ b›<br>
+  also note ‹b ≤ c›<br>
+  also have ‹… ≤ d› ― ‹Proof obligation: @{prop ‹d ≤ d›}› sorry<br>
+  finally show ?thesis sorry<br>
+qed</p>
+<p>The second proof is just like the first proof but with the direction of<br>
+≤ reversed. In the former one, the ellipsis seems to correspond to the<br>
+right-hand side of the initial note command (?). In the latter one, the<br>
+ellipsis seems to correspond to the right-hand side of the goal a ≤ d.</p>
+<p>-- Lukas Stevens</p>
+
+
+
+<a name="294823827"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Confusing%20Isar%20chained%20proofs/near/294823827" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Confusing.20Isar.20chained.20proofs.html#294823827">(Aug 23 2022 at 08:30)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:eberlm@in.tum.de">eberlm@in.tum.de</a>&gt;<br>
+In both cases, the … refers to the right-hand side of the last "assumes"<br>
+command. The "note" does not change what "…" refers to at all.</p>
+<p>I do find that behaviour a bit unfortunate myself. A related problem is<br>
+that when I show something like "f ∈ O(g)", then I would of course like<br>
+the "…" to refer to the "g" and not the "O(g)". But I can live with it,<br>
+and you can always pattern match to get the behaviour you really want.</p>
+<p>Manuel</p>
+
+
+
+<a name="294823868"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Confusing%20Isar%20chained%20proofs/near/294823868" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Confusing.20Isar.20chained.20proofs.html#294823868">(Aug 23 2022 at 08:30)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+That is a consequence of too many features stacking up over time, and not all<br>
+interactions have been ironed out yet.</p>
+<p>You can replace "note ‹prop›" to "have ‹prop› by fact" to get the standard<br>
+discipline of binding the three dots.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

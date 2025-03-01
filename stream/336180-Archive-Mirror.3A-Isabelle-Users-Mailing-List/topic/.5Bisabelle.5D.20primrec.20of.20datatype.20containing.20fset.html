@@ -1,0 +1,406 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] primrec of datatype containing fset · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20primrec.20of.20datatype.20containing.20fset.html">[isabelle] primrec of datatype containing fset</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294713413"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20primrec%20of%20datatype%20containing%20fset/near/294713413" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20primrec.20of.20datatype.20containing.20fset.html#294713413">(Aug 22 2022 at 15:42)</a>:</h4>
+<p>From: "Siek, Jeremy" &lt;<a href="mailto:jsiek@indiana.edu">jsiek@indiana.edu</a>&gt;<br>
+I’d like to write recursive functions over the following datatype:</p>
+<p>datatype val = VNat nat | VRel "(val × val) fset"</p>
+<p>As a simple example,</p>
+<p>primrec count :: "val ⇒ nat" where<br>
+  "count (VNat n) = 1" |<br>
+  "count (VRel t) = (ffold (λ (v1,v2). λ r. count v1 + count v2 + r) 0 t)"</p>
+<p>But this get’s rejected with the “Invalid map function” error.</p>
+<p>What’s the correct way to do this?</p>
+<p>Cheers,<br>
+Jeremy</p>
+<hr>
+<p>Jeremy G. Siek    &lt;jsiek@indiana.edu&lt;mailto:<a href="mailto:jsiek@indiana.edu">jsiek@indiana.edu</a>&gt;&gt;<br>
+Associate Professor<br>
+School of Informatics and Computing<br>
+Indiana University Bloomington<br>
+<a href="http://homes.soic.indiana.edu/jsiek/">http://homes.soic.indiana.edu/jsiek/</a></p>
+
+
+
+<a name="294713428"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20primrec%20of%20datatype%20containing%20fset/near/294713428" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20primrec.20of.20datatype.20containing.20fset.html#294713428">(Aug 22 2022 at 15:42)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+Dear Jeremy,</p>
+<blockquote>
+<p>I’d like to write recursive functions over the following datatype:</p>
+<p>datatype val = VNat nat | VRel "(val × val) fset"</p>
+<p>As a simple example,</p>
+<p>primrec count :: "val ⇒ nat" where<br>
+  "count (VNat n) = 1" |<br>
+  "count (VRel t) = (ffold (λ (v1,v2). λ r. count v1 + count v2 + r) 0<br>
+t)"</p>
+<p>But this get’s rejected with the “Invalid map function” error.</p>
+</blockquote>
+<p>this is a restriction of "primrec". What you're writing is not in fact a<br>
+primitive recursive specification. There are two ways around that:</p>
+<p>1) Rewrite it as primitive recursive<br>
+2) Use the "fun"/"function" command</p>
+<p>Here is option 1:</p>
+<p>primrec count :: "val ⇒ nat" where<br>
+"count (VNat n) = 1" |<br>
+"count (VRel t) = (ffold (λ (v1,v2). λ r. v1 + v2 + r) 0 (map_prod count<br>
+count |`| t))"</p>
+<p>Observe that the recursive calls of "count" must only occur within<br>
+suitable "map functions" of the involved type constructors. In your case,<br>
+the recursion of "val" is nested through a pair and an "fset". Hence, the<br>
+use of "|`|" (map for "fset") and "map_prod" (map for "prod").</p>
+<p>Option 2:</p>
+<p>fun count :: "val ⇒ nat" where<br>
+"count (VNat n) = 1" |<br>
+"count (VRel t) = (ffold (λ (v1,v2). λ r. count v1 + count v2 + r) 0 t)"</p>
+<p>The problem here is showing termination. The function package tries to<br>
+automatically derive a termination relation, which fails here.</p>
+<p>It can be specified manually as follows:</p>
+<p>function (sequential) count :: "val ⇒ nat" where<br>
+"count (VNat n) = 1" |<br>
+"count (VRel t) = (ffold (λ (v1,v2). λ r. count v1 + count v2 + r) 0 t)"<br>
+  by pat_completeness auto</p>
+<p>termination<br>
+  apply (relation "measure size")<br>
+  &lt;proof&gt;</p>
+<p>But as far as I can tell, the resulting goal is not actually provable. The<br>
+reason is that the function package has no idea how recursive calls nested<br>
+in "ffold" work. There are ways to explain to the function package how this<br>
+works, but I'm not sure if it's possible in this concrete case. One would<br>
+need a lemma like this:</p>
+<p>lemma ffold_cong[fundef_cong]:<br>
+  assumes "⋀x y. x |∈| S ⟹ f x y = g x y" "x = y" "S = T"<br>
+  shows "ffold f x S = ffold g y T"<br>
+sorry</p>
+<p>Using this lemma, we can successfully prove termination, but I'm not sure<br>
+whether it actually holds.</p>
+<p>In summary, I think you're left with either rewriting your function to be<br>
+primitive recursive, or avoid "non-deterministic" functions like "ffold".</p>
+<p>Cheers<br>
+Lars</p>
+
+
+
+<a name="294713450"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20primrec%20of%20datatype%20containing%20fset/near/294713450" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20primrec.20of.20datatype.20containing.20fset.html#294713450">(Aug 22 2022 at 15:42)</a>:</h4>
+<p>From: "Siek, Jeremy" &lt;<a href="mailto:jsiek@indiana.edu">jsiek@indiana.edu</a>&gt;<br>
+Dear Lars,</p>
+<p>Thank you for your very thorough answer! It looks like option 1 will suite my needs.</p>
+<p>Thank you!<br>
+Jeremy</p>
+
+
+
+<a name="294713474"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20primrec%20of%20datatype%20containing%20fset/near/294713474" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20primrec.20of.20datatype.20containing.20fset.html#294713474">(Aug 22 2022 at 15:42)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;</p>
+<blockquote>
+<p>Thank you for your very thorough answer! It looks like option 1 will<br>
+suite<br>
+my needs.</p>
+</blockquote>
+<p>On second thought, I realised that your use of "ffold" is merely to<br>
+compute the sum of some things in a set. Luckily, we can make "function"<br>
+cope with that. See attachment for a possible solution (also a version with<br>
+"primrec" that doesn't use "ffold").</p>
+<p>Cheers<br>
+Lars<br>
+<a href="/user_uploads/14278/yax_AY03iDOVL4gi_levVLqI/Scratch.thy">Scratch.thy</a></p>
+
+
+
+<a name="294713496"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20primrec%20of%20datatype%20containing%20fset/near/294713496" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20primrec.20of.20datatype.20containing.20fset.html#294713496">(Aug 22 2022 at 15:43)</a>:</h4>
+<p>From: Lawrence Paulson &lt;<a href="mailto:lp15@cam.ac.uk">lp15@cam.ac.uk</a>&gt;<br>
+These days, users should regard "primrec" as an internal feature necessary for bootstrapping the system but for implementers only.</p>
+<p>Larry Paulson</p>
+
+
+
+<a name="294713514"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20primrec%20of%20datatype%20containing%20fset/near/294713514" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20primrec.20of.20datatype.20containing.20fset.html#294713514">(Aug 22 2022 at 15:43)</a>:</h4>
+<p>From: Andrei Popescu &lt;<a href="mailto:A.Popescu@mdx.ac.uk">A.Popescu@mdx.ac.uk</a>&gt;<br>
+Hi Jeremy and Lars,</p>
+<p>Special care is needed when recursing through permutative structures like sets and multisets. For example, the primrec version discussed here is _not_ equal to the 'fun' version of 'count', since it recursively collapses the numbers coming from subtrees that happen to have the same count. The 'fun' version is the correct one.</p>
+<p>All the best,</p>
+<p>Andrei</p>
+<hr>
+<p>From: <a href="mailto:cl-isabelle-users-bounces@lists.cam.ac.uk">cl-isabelle-users-bounces@lists.cam.ac.uk</a> &lt;<a href="mailto:cl-isabelle-users-bounces@lists.cam.ac.uk">cl-isabelle-users-bounces@lists.cam.ac.uk</a>&gt; on behalf of Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+Sent: 09 July 2017 11:28<br>
+To: Siek, Jeremy<br>
+Cc: <a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a><br>
+Subject: Re: [isabelle] primrec of datatype containing fset</p>
+<blockquote>
+<p>Thank you for your very thorough answer! It looks like option 1 will<br>
+suite<br>
+my needs.</p>
+</blockquote>
+<p>On second thought, I realised that your use of "ffold" is merely to<br>
+compute the sum of some things in a set. Luckily, we can make "function"<br>
+cope with that. See attachment for a possible solution (also a version with<br>
+"primrec" that doesn't use "ffold").</p>
+<p>Cheers<br>
+Lars</p>
+
+
+
+<a name="294713534"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20primrec%20of%20datatype%20containing%20fset/near/294713534" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20primrec.20of.20datatype.20containing.20fset.html#294713534">(Aug 22 2022 at 15:43)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+Hi Andrei,</p>
+<blockquote>
+<p>Special care is needed when recursing through permutative structures like sets and multisets. For example, the primrec version discussed here is _not_ equal to the 'fun' version of 'count', since it recursively collapses the numbers coming from subtrees that happen to have the same count. The 'fun' version is the correct one.</p>
+</blockquote>
+<p>ah of course, you're right. Sorry for the mistake, Jeremy!</p>
+<p>Cheers<br>
+Lars</p>
+
+
+
+<a name="294713568"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20primrec%20of%20datatype%20containing%20fset/near/294713568" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20primrec.20of.20datatype.20containing.20fset.html#294713568">(Aug 22 2022 at 15:43)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:eberlm@in.tum.de">eberlm@in.tum.de</a>&gt;<br>
+I don't fully agree.</p>
+<p>There are some cases, like infinitely-branching datatypes, where<br>
+"primrec" works without problems, but "function" requires considerable<br>
+additional work (because there is no usable "size" function).</p>
+<p>Also, for datatypes with many constructors, I think "function" can be<br>
+quite slow due to the huge number of things it does and theorems that it<br>
+proves. "primrec" is a good light-weight alternative then.</p>
+<p>Personally, I tend to use primrec rather than fun whenever it is<br>
+possible to do so without significant effort.</p>
+<p>Manuel</p>
+
+
+
+<a name="294713585"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20primrec%20of%20datatype%20containing%20fset/near/294713585" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20primrec.20of.20datatype.20containing.20fset.html#294713585">(Aug 22 2022 at 15:43)</a>:</h4>
+<p>From: "Siek, Jeremy" &lt;<a href="mailto:jsiek@indiana.edu">jsiek@indiana.edu</a>&gt;<br>
+Hi Andrei,</p>
+<p>Good catch!</p>
+<p>But now I’m a bit unsatisfied… the function version of count required a fair bit of work and<br>
+looks like it’s rather specific, so I may have to repeat this amount of work for every<br>
+other recursive function on datatype val.</p>
+<p>I wonder if the termination argument involving fsum could be adapted to ffold?</p>
+<p>Cheers,<br>
+Jeremy</p>
+<p>On Jul 9, 2017, at 7:19 AM, Andrei Popescu &lt;A.Popescu@mdx.ac.uk&lt;mailto:<a href="mailto:A.Popescu@mdx.ac.uk">A.Popescu@mdx.ac.uk</a>&gt;&gt; wrote:</p>
+<p>Hi Jeremy and Lars,</p>
+<p>Special care is needed when recursing through permutative structures like sets and multisets. For example, the primrec version discussed here is _not_ equal to the 'fun' version of 'count', since it recursively collapses the numbers coming from subtrees that happen to have the same count. The 'fun' version is the correct one.</p>
+<p>All the best,</p>
+<p>Andrei</p>
+<hr>
+<p>From: cl-isabelle-users-bounces@lists.cam.ac.uk&lt;mailto:<a href="mailto:cl-isabelle-users-bounces@lists.cam.ac.uk">cl-isabelle-users-bounces@lists.cam.ac.uk</a>&gt; &lt;cl-isabelle-users-bounces@lists.cam.ac.uk&lt;mailto:<a href="mailto:cl-isabelle-users-bounces@lists.cam.ac.uk">cl-isabelle-users-bounces@lists.cam.ac.uk</a>&gt;&gt; on behalf of Lars Hupel &lt;hupel@in.tum.de&lt;mailto:<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;&gt;<br>
+Sent: 09 July 2017 11:28<br>
+To: Siek, Jeremy<br>
+Cc: cl-isabelle-users@lists.cam.ac.uk&lt;mailto:<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Subject: Re: [isabelle] primrec of datatype containing fset</p>
+<blockquote>
+<p>Thank you for your very thorough answer! It looks like option 1 will<br>
+suite<br>
+my needs.</p>
+</blockquote>
+<p>On second thought, I realised that your use of "ffold" is merely to<br>
+compute the sum of some things in a set. Luckily, we can make "function"<br>
+cope with that. See attachment for a possible solution (also a version with<br>
+"primrec" that doesn't use "ffold").</p>
+<p>Cheers<br>
+Lars</p>
+<hr>
+<p>Jeremy G. Siek    &lt;jsiek@indiana.edu&lt;mailto:<a href="mailto:jsiek@indiana.edu">jsiek@indiana.edu</a>&gt;&gt;<br>
+Associate Professor<br>
+School of Informatics and Computing<br>
+Indiana University Bloomington<br>
+<a href="http://homes.soic.indiana.edu/jsiek/">http://homes.soic.indiana.edu/jsiek/</a></p>
+
+
+
+<a name="294713595"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20primrec%20of%20datatype%20containing%20fset/near/294713595" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20primrec.20of.20datatype.20containing.20fset.html#294713595">(Aug 22 2022 at 15:43)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:eberlm@in.tum.de">eberlm@in.tum.de</a>&gt;<br>
+Personally, I would suggest something like this:</p>
+<p>lemma single_le_sumI:<br>
+  assumes "∃b∈A. a ≤ (f b :: nat)" "finite A"<br>
+  shows   "a ≤ (∑b∈A. f b)"<br>
+proof -<br>
+  from assms obtain b where "b ∈ A" "a ≤ f b" by blast<br>
+  note this(2)<br>
+  also from ‹b ∈ A› and ‹finite A›<br>
+    have "f b ≤ (∑b∈A. f b)" by (intro member_le_sum) auto<br>
+  finally show ?thesis .<br>
+qed</p>
+<p>function count :: "val ⇒ nat" where<br>
+  "count (VNat n) = 1" |<br>
+  "count (VRel A) = (∑(x,y)∈fset A. count x + count y)"<br>
+  by pat_completeness auto<br>
+termination by (relation "measure size") (force simp: less_Suc_eq_le<br>
+intro: single_le_sumI)+</p>
+<p>This reuses the summation function for sets, and I think that will be<br>
+much nicer to work with than a fold. The termination proof is still a<br>
+bit messy, unfortunately, and I don't know what can be done about it in<br>
+general, but at least similar cases should also work with this "one-liner".</p>
+<p>Manuel</p>
+
+
+
+<a name="294713617"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20primrec%20of%20datatype%20containing%20fset/near/294713617" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20primrec.20of.20datatype.20containing.20fset.html#294713617">(Aug 22 2022 at 15:43)</a>:</h4>
+<p>From: Andrei Popescu &lt;<a href="mailto:A.Popescu@mdx.ac.uk">A.Popescu@mdx.ac.uk</a>&gt;<br>
+Dear Larry,</p>
+<blockquote>
+<blockquote>
+<p>These days, users should regard "primrec" as an internal feature necessary for bootstrapping the system but for implementers only.</p>
+</blockquote>
+</blockquote>
+<p>While this is true in most cases, in complex situations involving nested recursion "primrec" can provide the most elegant solution. For example, compare the "function"-based definition with the following correct primrec definition:</p>
+<p>primrec count' :: "val ⇒ nat" where<br>
+"count' (VNat n) = 1" |<br>
+"count' (VRel t) = fsum (λ((_,v), (_,u)). v + u) (fimage (map_prod (λ v. (v,count' v)) (λ v. (v,count' v))) t)"</p>
+<p>(This is now correct since all subtrees are counted as separate entities, taking advantage of full primitive recursion as opposed to mere iteration.)</p>
+<p>With a proper setting for congruences and such, this can be handled by "function" as well, but this is tricky and quite laborious -- as the current thread shows.</p>
+<p>Best,</p>
+<p>Andrei</p>
+<p>Larry Paulson</p>
+<blockquote>
+<p>On 9 Jul 2017, at 11:15, Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt; wrote:</p>
+<p>this is a restriction of "primrec". What you're writing is not in fact a<br>
+primitive recursive specification. There are two ways around that:</p>
+<p>1) Rewrite it as primitive recursive<br>
+2) Use the "fun"/"function" command</p>
+</blockquote>
+
+
+
+<a name="294713656"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20primrec%20of%20datatype%20containing%20fset/near/294713656" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20primrec.20of.20datatype.20containing.20fset.html#294713656">(Aug 22 2022 at 15:43)</a>:</h4>
+<p>From: Andrei Popescu &lt;<a href="mailto:A.Popescu@mdx.ac.uk">A.Popescu@mdx.ac.uk</a>&gt;<br>
+Hi Jeremy,</p>
+<hr>
+<blockquote>
+<blockquote>
+<p>Hi Andrei,<br>
+Good catch!<br>
+But now I’m a bit unsatisfied… the function version of count required a fair bit of work and<br>
+looks like it’s rather specific, so I may have to repeat this amount of work for every<br>
+other recursive function on datatype val.<br>
+I wonder if the termination argument involving fsum could be adapted to ffold?</p>
+</blockquote>
+</blockquote>
+<p>It can, with some tricks.</p>
+<p>But for this particular function, primrec works:</p>
+<p>primrec count :: "val ⇒ nat" where<br>
+"count (VNat n) = 1" |<br>
+"count (VRel t) = fsum (λ((_,n), (_,m)). n + m) (fimage (map_prod (λ v. (v,count v)) (λ v. (v,count v))) t)"</p>
+<p>If you have a genuinely primitive recursion function and primrec seems to cause you trouble, you can always use the primtive recursive combinator</p>
+<p>rec_val :: (nat ⇒ 'a) ⇒ (((val × 'a) × val × 'a) fset ⇒ 'a) ⇒ val ⇒ 'a</p>
+<p>explicitly, and then infer the high-level equations, e.g.:</p>
+<p>definition count where "count = rec_val (λn. 1) (fsum (λ((_,n), (_,m)). n + m))"<br>
+lemma count_simps[simp]:<br>
+"count (VNat n) = 1"<br>
+and<br>
+"count (VRel t) = fsum (λ((_,n), (_,m)). n + m) (fimage (map_prod (λ v. (v,count v)) (λ v. (v,count v))) t)"<br>
+unfolding count_def by auto</p>
+<p>This is essentially what the primrec package does for you automatically, but sometimes, esp. for nested recursion, the combinator version is easier to get right.</p>
+<p>I would be curious to know what other functions you would like to define on val. These examples would help us devise the right support for ffold and friends in the finite set library.</p>
+<p>Best,</p>
+<p>Andrei</p>
+<p>On Jul 9, 2017, at 7:19 AM, Andrei Popescu &lt;A.Popescu@mdx.ac.uk&lt;mailto:<a href="mailto:A.Popescu@mdx.ac.uk">A.Popescu@mdx.ac.uk</a>&gt;&gt; wrote:</p>
+<p>Hi Jeremy and Lars,</p>
+<p>Special care is needed when recursing through permutative structures like sets and multisets. For example, the primrec version discussed here is _not_ equal to the 'fun' version of 'count', since it recursively collapses the numbers coming from subtrees that happen to have the same count. The 'fun' version is the correct one.</p>
+<p>All the best,</p>
+<p>Andrei</p>
+<hr>
+<p>From: cl-isabelle-users-bounces@lists.cam.ac.uk&lt;mailto:<a href="mailto:cl-isabelle-users-bounces@lists.cam.ac.uk">cl-isabelle-users-bounces@lists.cam.ac.uk</a>&gt; &lt;cl-isabelle-users-bounces@lists.cam.ac.uk&lt;mailto:<a href="mailto:cl-isabelle-users-bounces@lists.cam.ac.uk">cl-isabelle-users-bounces@lists.cam.ac.uk</a>&gt;&gt; on behalf of Lars Hupel &lt;hupel@in.tum.de&lt;mailto:<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;&gt;<br>
+Sent: 09 July 2017 11:28<br>
+To: Siek, Jeremy<br>
+Cc: cl-isabelle-users@lists.cam.ac.uk&lt;mailto:<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Subject: Re: [isabelle] primrec of datatype containing fset</p>
+<blockquote>
+<p>Thank you for your very thorough answer! It looks like option 1 will<br>
+suite<br>
+my needs.</p>
+</blockquote>
+<p>On second thought, I realised that your use of "ffold" is merely to<br>
+compute the sum of some things in a set. Luckily, we can make "function"<br>
+cope with that. See attachment for a possible solution (also a version with<br>
+"primrec" that doesn't use "ffold").</p>
+<p>Cheers<br>
+Lars</p>
+<hr>
+<p>Jeremy G. Siek    &lt;jsiek@indiana.edu&lt;mailto:<a href="mailto:jsiek@indiana.edu">jsiek@indiana.edu</a>&gt;&gt;<br>
+Associate Professor<br>
+School of Informatics and Computing<br>
+Indiana University Bloomington<br>
+<a href="http://homes.soic.indiana.edu/jsiek/">http://homes.soic.indiana.edu/jsiek/</a></p>
+
+
+
+<a name="294713708"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20primrec%20of%20datatype%20containing%20fset/near/294713708" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20primrec.20of.20datatype.20containing.20fset.html#294713708">(Aug 22 2022 at 15:44)</a>:</h4>
+<p>From: Andrei Popescu &lt;<a href="mailto:A.Popescu@mdx.ac.uk">A.Popescu@mdx.ac.uk</a>&gt;<br>
+Hi Manuel,</p>
+<p>Sorry, I had missed your message. I fully agree with your disagreement.  :-)</p>
+<p>Best,</p>
+<p>Andrei</p>
+
+
+
+<a name="294713735"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20primrec%20of%20datatype%20containing%20fset/near/294713735" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20primrec.20of.20datatype.20containing.20fset.html#294713735">(Aug 22 2022 at 15:44)</a>:</h4>
+<p>From: "Siek, Jeremy" &lt;<a href="mailto:jsiek@indiana.edu">jsiek@indiana.edu</a>&gt;<br>
+Thanks Andrei!</p>
+<p>Cheers,<br>
+Jeremy</p>
+<p>On Jul 9, 2017, at 8:16 AM, Andrei Popescu &lt;A.Popescu@mdx.ac.uk&lt;mailto:<a href="mailto:A.Popescu@mdx.ac.uk">A.Popescu@mdx.ac.uk</a>&gt;&gt; wrote:</p>
+<p>Dear Larry,</p>
+<blockquote>
+<blockquote>
+<p>These days, users should regard "primrec" as an internal feature necessary for bootstrapping the system but for implementers only.</p>
+</blockquote>
+</blockquote>
+<p>While this is true in most cases, in complex situations involving nested recursion "primrec" can provide the most elegant solution. For example, compare the "function"-based definition with the following correct primrec definition:</p>
+<p>primrec count' :: "val ⇒ nat" where<br>
+"count' (VNat n) = 1" |<br>
+"count' (VRel t) = fsum (λ((_,v), (_,u)). v + u) (fimage (map_prod (λ v. (v,count' v)) (λ v. (v,count' v))) t)"</p>
+<p>(This is now correct since all subtrees are counted as separate entities, taking advantage of full primitive recursion as opposed to mere iteration.)</p>
+<p>With a proper setting for congruences and such, this can be handled by "function" as well, but this is tricky and quite laborious -- as the current thread shows.</p>
+<p>Best,</p>
+<p>Andrei</p>
+<p>Larry Paulson</p>
+<blockquote>
+<p>On 9 Jul 2017, at 11:15, Lars Hupel &lt;hupel@in.tum.de&lt;mailto:<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;&gt; wrote:</p>
+<p>this is a restriction of "primrec". What you're writing is not in fact a<br>
+primitive recursive specification. There are two ways around that:</p>
+<p>1) Rewrite it as primitive recursive<br>
+2) Use the "fun"/"function" command</p>
+</blockquote>
+<hr>
+<p>Jeremy G. Siek    &lt;jsiek@indiana.edu&lt;mailto:<a href="mailto:jsiek@indiana.edu">jsiek@indiana.edu</a>&gt;&gt;<br>
+Associate Professor<br>
+School of Informatics and Computing<br>
+Indiana University Bloomington<br>
+<a href="http://homes.soic.indiana.edu/jsiek/">http://homes.soic.indiana.edu/jsiek/</a></p>
+
+
+
+<a name="294713754"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20primrec%20of%20datatype%20containing%20fset/near/294713754" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20primrec.20of.20datatype.20containing.20fset.html#294713754">(Aug 22 2022 at 15:44)</a>:</h4>
+<p>From: Dmitriy Traytel &lt;<a href="mailto:traytel@inf.ethz.ch">traytel@inf.ethz.ch</a>&gt;<br>
+And I agree with Andrei’s agreement to Manuel’s disagreement. :)</p>
+<p>The question of using primrec or fun shows up every now and then on this mailing list, e.g., here <a href="https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2016-May/msg00037.html">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2016-May/msg00037.html</a> &lt;<a href="https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2016-May/msg00037.html">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2016-May/msg00037.html</a>&gt;.</p>
+<p>Next to the reasons brought up by Manuel before, I also particularly agree with Florian’s advice to use the least powerful command as a means of documentation: <a href="https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2016-May/msg00044.html">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2016-May/msg00044.html</a> &lt;<a href="https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2016-May/msg00044.html">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2016-May/msg00044.html</a>&gt;</p>
+<p>Dmitriy</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,100 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Code generation for non-terminating functions · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20non-terminating.20functions.html">[isabelle] Code generation for non-terminating functions</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="217040838"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20for%20non-terminating%20functions/near/217040838" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20non-terminating.20functions.html#217040838">(Nov 17 2020 at 18:12)</a>:</h4>
+<p>From: David Kretzmer &lt;<a href="mailto:david.k@posteo.de">david.k@posteo.de</a>&gt;<br>
+Dear all,</p>
+<p>is it possible to generate code for a potentially non-terminating<br>
+function <code>f :: A =&gt; B</code> if I ensure that whenever I actually call <code>f a</code>,<br>
+then <code>f_dom a</code>?</p>
+<p>I sometimes have functions that are non-terminating in general but that<br>
+are only actually called with "safe" arguments. However, since I have to<br>
+prove termination in order for code generation to work (at least as far<br>
+as I know), I have to augment the function with additional checks that<br>
+ensure termination. This feels unsatisfactory, since I could<br>
+theoretically prove that these checks are never exercised during execution.</p>
+<p>A silly example:</p>
+<div class="codehilite"><pre><span></span><code>(* Does not terminate for n &lt; 0 *)
+function(domintros) factorial :: &quot;int ⇒ int&quot; where
+  &quot;factorial n = (if n = 0 then 1 else n * (factorial (n-1)))&quot;
+  by pat_completeness auto
+
+lemma factorial_termination: &quot;n ≥ 0 ⟹ factorial_dom n&quot;
+  by (metis add.commute add_diff_cancel_left&#39; factorial.domintros
+int_ge_induct)
+
+(* A safe (i.e., terminating) wrapper around `factorial` *)
+fun factorial_safe :: &quot;int ⇒ int option&quot; where
+  &quot;factorial_safe n = (if n ≥ 0 then Some (factorial n) else None)&quot;
+
+(* Does not work because there are no code equations for `factorial` *)
+export_code factorial_safe in SML
+</code></pre></div>
+<p>Here, <code>factorial_safe</code> checks the preconditions of <code>factorial</code> and only<br>
+actually makes the call if it is guaranteed to terminate. Unfortunately,<br>
+code generation for <code>factorial_safe</code> fails because there are no code<br>
+equations for <code>factorial</code>.</p>
+<p>Best regards,<br>
+David</p>
+
+
+
+<a name="217045511"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20for%20non-terminating%20functions/near/217045511" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20non-terminating.20functions.html#217045511">(Nov 17 2020 at 18:47)</a>:</h4>
+<p>From: "Thiemann, René" &lt;<a href="mailto:Rene.Thiemann@uibk.ac.at">Rene.Thiemann@uibk.ac.at</a>&gt;<br>
+Dear David,</p>
+<p>I know at least two possibilities:</p>
+<p>(* potential solution via typedef: specify separate type for domain of function *)</p>
+<p>typedef fun_input = "{n :: int. n ≥ 0}" by auto</p>
+<p>setup_lifting type_definition_fun_input</p>
+<p>lift_definition num :: "fun_input ⇒ int" is "λ x. x" .</p>
+<p>lift_definition sub1 :: "fun_input ⇒ fun_input” <br>
+  is "λ x. if x = 0 then 0 else x - 1"<br>
+  by auto</p>
+<p>function factorial :: "fun_input ⇒ int" where<br>
+  "factorial n = (if num n = 0 then 1 else num n * factorial (sub1 n))" <br>
+  by pat_completeness auto</p>
+<p>termination by (relation "measure (λ n. nat (num n))", auto; transfer, auto)</p>
+<p>lift_definition create_input :: "int ⇒ fun_input" is<br>
+  "λ n. if n ≥ 0 then n else 0" by auto</p>
+<p>definition factorial_safe :: "int ⇒ int option" where<br>
+  "factorial_safe n = (if n ≥ 0 then Some (factorial (create_input n)) else None)” </p>
+<p>(* during runtime you don’t execute the invariant “n &gt;= 0” in every iteration,<br>
+   but you repeat the abort-condition in the sub1 function *)</p>
+<p>export_code factorial_safe in Haskell</p>
+<p>(* or use partial_function and put everything into option-type *)</p>
+<p>lemma map_option_mono [partial_function_mono]:<br>
+  shows "mono_option (λf. map_option X (f y))"<br>
+  by (smt flat_ord_def fun_ord_def map_option_is_None monotoneI)</p>
+<p>partial_function (option) fact_option :: "int ⇒ int option" where<br>
+  [code]: "fact_option n = (if n = 0 then Some 1 else map_option ((*) n) (fact_option (n - 1)))" </p>
+<p>export_code fact_option in Haskell</p>
+<p>I hope this helps,<br>
+René</p>
+
+
+
+<a name="217053886"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20for%20non-terminating%20functions/near/217053886" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20non-terminating.20functions.html#217053886">(Nov 17 2020 at 19:57)</a>:</h4>
+<p>From: David Kretzmer &lt;<a href="mailto:david.k@posteo.de">david.k@posteo.de</a>&gt;<br>
+Dear René,</p>
+<p>thank you very much! I especially like the typedef-approach, as it<br>
+allows one to nicely specify the preconditions directly in the type,<br>
+which are then available to all users of that type. This is pretty much<br>
+exactly what I was looking for.</p>
+<p>Best regards,<br>
+David</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

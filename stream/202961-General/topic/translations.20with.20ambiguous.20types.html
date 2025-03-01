@@ -1,0 +1,117 @@
+<html>
+<head><meta charset="utf-8"><title>translations with ambiguous types · General · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/202961-General/index.html">General</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/translations.20with.20ambiguous.20types.html">translations with ambiguous types</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="268560723"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/translations%20with%20ambiguous%20types/near/268560723" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Kevin Kappelmann <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/translations.20with.20ambiguous.20types.html#268560723">(Jan 19 2022 at 16:01)</a>:</h4>
+<p>I am trying to define translations for function spaces. There are different function spaces for individuals <code>i</code> and types <code>t</code>.<br>
+Is there some way to make all of the following type? Sadly(?), there is no filtering/backtracking for translations according to the <a href="https://isabelle.in.tum.de/doc/isar-ref.pdf#attribute.syntax-ambiguity-warning">reference manual</a></p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">theory</span> <span class="n">Scratch</span>
+  <span class="kp">imports</span> <span class="n">HOL.HOL</span>
+<span class="k">begin</span>
+
+<span class="k">typedecl</span> <span class="n">i</span>
+<span class="k">typedecl</span> <span class="n">t</span>
+
+<span class="k">consts</span>
+  <span class="n">set_dep_fun</span> <span class="o">::</span> <span class="s">"i ⇒ (i ⇒ i) ⇒ i"</span>
+  <span class="n">type_dep_fun</span> <span class="o">::</span> <span class="s">"t ⇒ (i ⇒ t) ⇒ t"</span>
+  <span class="n">elem</span> <span class="o">::</span> <span class="s">"i ⇒ i ⇒ bool"</span> <span class="o">(</span><span class="kp">infix</span> <span class="s">"∈"</span> <span class="n">50</span><span class="o">)</span>
+  <span class="n">has_type</span> <span class="o">::</span> <span class="s">"i ⇒ t ⇒ bool"</span> <span class="o">(</span><span class="kp">infix</span> <span class="s">":"</span> <span class="n">50</span><span class="o">)</span>
+
+<span class="k">abbreviation</span> <span class="s">"set_fun A B ≡ set_dep_fun A (λ_. B)"</span>
+<span class="k">abbreviation</span> <span class="s">"type_fun A B ≡ type_dep_fun A (λ_. B)"</span>
+
+<span class="k">syntax</span>
+  <span class="s">"_telescope"</span> <span class="o">::</span> <span class="s">"logic ⇒ logic ⇒ logic"</span>  <span class="o">(</span><span class="kp">infixr</span> <span class="s">"→"</span> <span class="n">55</span><span class="o">)</span>
+<span class="k">translations</span>
+  <span class="s">"(x ∈ A) args → B"</span> <span class="err">⇀</span> <span class="s">"(x ∈ A) → args → B"</span>
+  <span class="s">"(x ∈ A) → B"</span> <span class="err">⇌</span> <span class="s">"CONST set_dep_fun A (λx. B)"</span>
+
+  <span class="s">"(x : A) args → B"</span> <span class="err">⇀</span> <span class="s">"(x : A) → args → B"</span>
+  <span class="s">"(x : A) → B"</span> <span class="err">⇌</span> <span class="s">"CONST type_dep_fun A (λx. B)"</span>
+  <span class="c">(* Optimally, instead of the next two translations, I would love to say:</span>
+<span class="c">     if `A → B` is of type `t` then use `type_fun` otherwise use `set_fun`. *)</span>
+  <span class="s">"(A :: t) → B"</span> <span class="err">⇌</span> <span class="s">"CONST type_fun A B"</span>
+  <span class="s">"A → B"</span> <span class="err">⇌</span> <span class="s">"CONST set_fun A B"</span>
+
+<span class="k">declare</span> <span class="o">[[</span><span class="n">show_types</span><span class="o">]]</span>
+<span class="kt">term</span> <span class="s">"(x ∈ A) → B x"</span>
+<span class="kt">term</span> <span class="s">"(x : A) → B x"</span>
+<span class="kt">term</span> <span class="s">"A → (x ∈ B) → (C x)"</span>
+<span class="kt">term</span> <span class="s">"(A :: i) → (x ∈ B) → C x"</span> <span class="c">(*same as line above*)</span>
+<span class="kt">term</span> <span class="s">"(A :: t) → (x : B) → (C x)"</span>
+<span class="kt">term</span> <span class="s">"(x ∈ A) → B → C x"</span>
+<span class="kt">term</span> <span class="s">"(x : A) → (B :: t) → C x"</span>
+<span class="kt">term</span> <span class="s">"(x : A) → B → C x"</span> <span class="c">(*fails*)</span>
+<span class="kt">term</span> <span class="s">"A → B"</span>
+<span class="kt">term</span> <span class="s">"(A :: i) → B"</span> <span class="c">(*same as line above*)</span>
+<span class="kt">term</span> <span class="s">"(A :: t) → B"</span>
+<span class="kt">term</span> <span class="s">"(A → B) :: t"</span> <span class="c">(*fails*)</span>
+<span class="kt">term</span> <span class="s">"(A → B) = ((x ∈ A) → B)"</span>
+<span class="kt">term</span> <span class="s">"((A :: t) → B) = ((x : A) → B)"</span>
+<span class="kt">term</span> <span class="s">"(A → B) = ((x ∈ A) → B)"</span>
+<span class="kt">term</span> <span class="s">"(A → B) = ((x : A) → B)"</span> <span class="c">(*fails*)</span>
+
+<span class="k">end</span>
+</code></pre></div>
+
+
+
+<a name="268562093"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/translations%20with%20ambiguous%20types/near/268562093" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Lukas Stevens <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/translations.20with.20ambiguous.20types.html#268562093">(Jan 19 2022 at 16:09)</a>:</h4>
+<p>I am not sure how this stuff works but could you use a parse translation? In a parse translation you can use arbitrary ML code to produce the result.</p>
+
+
+
+<a name="268564415"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/translations%20with%20ambiguous%20types/near/268564415" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/translations.20with.20ambiguous.20types.html#268564415">(Jan 19 2022 at 16:22)</a>:</h4>
+<p>I may be mistaken about this, but don't translations (including parse translations) work entirely on the syntactic stage, i.e. before the terms even have any type information at all?</p>
+
+
+
+<a name="268564671"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/translations%20with%20ambiguous%20types/near/268564671" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/translations.20with.20ambiguous.20types.html#268564671">(Jan 19 2022 at 16:24)</a>:</h4>
+<p>In that case, I think the only way to achieve what you want to do would be to add a checking stage that changes the placeholder constant of the input syntax into what you actually want it to be as soon as the type is known.</p>
+
+
+
+<a name="268564691"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/translations%20with%20ambiguous%20types/near/268564691" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/translations.20with.20ambiguous.20types.html#268564691">(Jan 19 2022 at 16:24)</a>:</h4>
+<p>This is pretty much what <code>adhoc_overloading</code> does.</p>
+
+
+
+<a name="268564827"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/translations%20with%20ambiguous%20types/near/268564827" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/translations.20with.20ambiguous.20types.html#268564827">(Jan 19 2022 at 16:25)</a>:</h4>
+<p>Of course, there is the fundamental problem of "what happens if the type is neither <code>i</code> nor <code>t</code>", or if the type is completely polymorphic. (<code>adhoc_overloading</code> then fails with an error message)</p>
+
+
+
+<a name="268564910"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/translations%20with%20ambiguous%20types/near/268564910" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/translations.20with.20ambiguous.20types.html#268564910">(Jan 19 2022 at 16:26)</a>:</h4>
+<p>Such additional checking phases are also notoriously problematic when you have several of them, since they can then interact with each other poorly (e.g. <code>adhoc_overloading</code> plus coercions)</p>
+
+
+
+<a name="268564966"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/translations%20with%20ambiguous%20types/near/268564966" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/translations.20with.20ambiguous.20types.html#268564966">(Jan 19 2022 at 16:26)</a>:</h4>
+<p>Then again I may also have completely misunderstood what you are trying to do; in that case just ignore my ramblings.</p>
+
+
+
+<a name="268566459"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/translations%20with%20ambiguous%20types/near/268566459" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Kevin Kappelmann <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/translations.20with.20ambiguous.20types.html#268566459">(Jan 19 2022 at 16:36)</a>:</h4>
+<p>As far as I can see (having skimmed the documentation), you are right Manuel and an additional phase during type checking would be necessary.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

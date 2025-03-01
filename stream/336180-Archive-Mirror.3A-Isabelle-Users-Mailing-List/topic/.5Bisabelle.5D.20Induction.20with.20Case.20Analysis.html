@@ -1,0 +1,227 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Induction with Case Analysis · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Induction.20with.20Case.20Analysis.html">[isabelle] Induction with Case Analysis</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294730917"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Induction%20with%20Case%20Analysis/near/294730917" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Induction.20with.20Case.20Analysis.html#294730917">(Aug 22 2022 at 17:06)</a>:</h4>
+<p>From: Jun Inoue &lt;<a href="mailto:jun.lambda@gmail.com">jun.lambda@gmail.com</a>&gt;<br>
+Dear all,</p>
+<p>Is there a good way to induct and case-analyze (like the cases method)<br>
+simultaneously?  Here's a stripped down example using a fragment of<br>
+propositional logic:</p>
+<p>{* begin example *}<br>
+theory PropLogic<br>
+imports Main<br>
+begin</p>
+<p>datatype formula =<br>
+  Atomic string ("^_" [150])<br>
+| Not formula<br>
+| And formula formula (infix "&amp;&amp;" 80)<br>
+| Or formula formula (infix "||" 70)</p>
+<p>abbreviation flip_insert (infixl "." 60) where<br>
+  "Γ . A ≡ insert A Γ"</p>
+<p>(* ⊢ Γ means at least one formula in Γ is true *)<br>
+inductive derivation :: "formula set ⇒ bool" ("⊢ _" [30] 30) where<br>
+  Assm: "⊢ Γ . Not A . A"<br>
+| AndI: "⟦ ⊢ Γ . A; ⊢ Γ . B ⟧ ⟹ ⊢ Γ . A &amp;&amp; B"<br>
+| OrI: "⟦ ⊢ Γ . A . B ⟧ ⟹ ⊢ Γ . A || B"</p>
+<p>lemma strong_inversion_And:<br>
+  assumes "⊢ Γ . A &amp;&amp; B"<br>
+    shows "⊢ Γ . A"<br>
+using assms<br>
+apply (induct rule: derivation.induct)<br>
+{* end example *}</p>
+<p>Here, my goal is to prove something like inversion for conjunction,<br>
+but the A &amp;&amp; B may not have been introduced by the last rule used in<br>
+the derivation, so it requires induction.</p>
+<p>Unfortunately, because the premise I'm inducting on (⊢ Γ . A &amp;&amp; B) has<br>
+a parameter of a very specific shape, the higher-order unifier can't<br>
+infer an appropriate instantiation of the derivation.induct, giving a<br>
+useless goal state:</p>
+<ol>
+<li>⋀Γ' Aa. ⊢ Γ . A</li>
+<li>⋀Γ' Aa B. ⊢ Γ' . Aa ⟹ ⊢ Γ . A ⟹ ⊢ Γ' . B ⟹ ⊢ Γ . A ⟹ ⊢ Γ . A</li>
+<li>⋀Γ' Aa B. ⊢ Γ' . Aa . B ⟹ ⊢ Γ . A ⟹ ⊢ Γ . A</li>
+</ol>
+<p>The first subgoal is the very lemma I'm trying to prove.  I rather<br>
+need something like</p>
+<p>⋀Γ' Aa. ⟦ Γ . A = Γ' . Not Aa . Aa⟧ ⟹ ⊢ Γ . A</p>
+<p>Using apply(induct rule: derivation.cases) instead of induct does give<br>
+something like this, but then in the other subgoals I won't have an<br>
+inductive hypothesis.</p>
+<p>How can I get around this problem?  Is there a method or attribute<br>
+that can combine cases and induct?</p>
+
+
+
+<a name="294730932"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Induction%20with%20Case%20Analysis/near/294730932" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Induction.20with.20Case.20Analysis.html#294730932">(Aug 22 2022 at 17:06)</a>:</h4>
+<p>From: Mathias Fleury &lt;<a href="mailto:mathias.fleury12@gmail.com">mathias.fleury12@gmail.com</a>&gt;<br>
+Hello Jun,</p>
+<p>you can specify the instantiation to perform to the induction method, for example:</p>
+<p>apply (induction "Γ . A &amp;&amp; B" rule: derivation.induct)</p>
+<p>However, I am not sure whether this helps you to perform the proof, since it gives you another non-trivial goal:</p>
+<p>⋀Γ' Aa. Γ' . formula.Not Aa . Aa = Γ . A &amp;&amp; B ⟹ ⊢ Γ . A</p>
+<blockquote>
+<p>Using apply(induct rule: derivation.cases) instead of induct does give<br>
+something like this, but then in the other subgoals I won't have an<br>
+inductive hypothesis.</p>
+<p>How can I get around this problem?  Is there a method or attribute<br>
+that can combine cases and induct?</p>
+</blockquote>
+<p>You can also write your own induction rule.</p>
+<p>Unless there are more rules that you have not shown, I am not sure that your theorem holds, because you have no semantic of Not in your predicate derivation: I expect ‹⊢ {} . formula.Not (A || B) . A› to be true in propositional logic, but you can't derive this from your predicate "derivation".</p>
+<p>Best,<br>
+Mathias</p>
+<blockquote>
+<p>On 21. Apr 2018, at 19:54, Jun Inoue &lt;<a href="mailto:jun.lambda@gmail.com">jun.lambda@gmail.com</a>&gt; wrote:</p>
+<p>Dear all,</p>
+<p>Is there a good way to induct and case-analyze (like the cases method)<br>
+simultaneously?  Here's a stripped down example using a fragment of<br>
+propositional logic:</p>
+<p>{* begin example *}<br>
+theory PropLogic<br>
+imports Main<br>
+begin</p>
+<p>datatype formula =<br>
+ Atomic string ("^_" [150])<br>
+| Not formula<br>
+| And formula formula (infix "&amp;&amp;" 80)<br>
+| Or formula formula (infix "||" 70)</p>
+<p>abbreviation flip_insert (infixl "." 60) where<br>
+ "Γ . A ≡ insert A Γ"</p>
+<p>(* ⊢ Γ means at least one formula in Γ is true *)<br>
+inductive derivation :: "formula set ⇒ bool" ("⊢ _" [30] 30) where<br>
+ Assm: "⊢ Γ . Not A . A"<br>
+| AndI: "⟦ ⊢ Γ . A; ⊢ Γ . B ⟧ ⟹ ⊢ Γ . A &amp;&amp; B"<br>
+| OrI: "⟦ ⊢ Γ . A . B ⟧ ⟹ ⊢ Γ . A || B"</p>
+<p>lemma strong_inversion_And:<br>
+ assumes "⊢ Γ . A &amp;&amp; B"<br>
+   shows "⊢ Γ . A"<br>
+using assms<br>
+apply (induct rule: derivation.induct)<br>
+{* end example *}</p>
+<p>Here, my goal is to prove something like inversion for conjunction,<br>
+but the A &amp;&amp; B may not have been introduced by the last rule used in<br>
+the derivation, so it requires induction.</p>
+<p>Unfortunately, because the premise I'm inducting on (⊢ Γ . A &amp;&amp; B) has<br>
+a parameter of a very specific shape, the higher-order unifier can't<br>
+infer an appropriate instantiation of the derivation.induct, giving a<br>
+useless goal state:</p>
+<ol>
+<li>⋀Γ' Aa. ⊢ Γ . A</li>
+<li>⋀Γ' Aa B. ⊢ Γ' . Aa ⟹ ⊢ Γ . A ⟹ ⊢ Γ' . B ⟹ ⊢ Γ . A ⟹ ⊢ Γ . A</li>
+<li>⋀Γ' Aa B. ⊢ Γ' . Aa . B ⟹ ⊢ Γ . A ⟹ ⊢ Γ . A</li>
+</ol>
+<p>The first subgoal is the very lemma I'm trying to prove.  I rather<br>
+need something like</p>
+<p>⋀Γ' Aa. ⟦ Γ . A = Γ' . Not Aa . Aa⟧ ⟹ ⊢ Γ . A</p>
+<p>Using apply(induct rule: derivation.cases) instead of induct does give<br>
+something like this, but then in the other subgoals I won't have an<br>
+inductive hypothesis.</p>
+<p>How can I get around this problem?  Is there a method or attribute<br>
+that can combine cases and induct?</p>
+<p>-- <br>
+Jun Inoue<br>
+</p>
+</blockquote>
+
+
+
+<a name="294730943"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Induction%20with%20Case%20Analysis/near/294730943" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Induction.20with.20Case.20Analysis.html#294730943">(Aug 22 2022 at 17:07)</a>:</h4>
+<p>From: Jun Inoue &lt;<a href="mailto:jun.lambda@gmail.com">jun.lambda@gmail.com</a>&gt;<br>
+Hello Mathias,</p>
+<p>Yes, that's exactly what I was looking for!  Thank you!</p>
+<p>On Sun, Apr 22, 2018 at 5:50 PM, Mathias Fleury<br>
+&lt;<a href="mailto:mathias.fleury12@gmail.com">mathias.fleury12@gmail.com</a>&gt; wrote:</p>
+<blockquote>
+<p>Hello Jun,</p>
+<p>you can specify the instantiation to perform to the induction method, for<br>
+example:</p>
+<p>apply (induction "Γ . A &amp;&amp; B" rule: derivation.induct)</p>
+<p>However, I am not sure whether this helps you to perform the proof, since it<br>
+gives you another non-trivial goal:</p>
+<p>⋀Γ' Aa. Γ' . formula.Not Aa . Aa = Γ . A &amp;&amp; B ⟹ ⊢ Γ . A</p>
+<p>Using apply(induct rule: derivation.cases) instead of induct does give<br>
+something like this, but then in the other subgoals I won't have an<br>
+inductive hypothesis.</p>
+<p>How can I get around this problem?  Is there a method or attribute<br>
+that can combine cases and induct?</p>
+<p>You can also write your own induction rule.</p>
+<p>Unless there are more rules that you have not shown, I am not sure that your<br>
+theorem holds, because you have no semantic of Not in your predicate<br>
+derivation: I expect ‹⊢ {} . formula.Not (A || B) . A› to be true in<br>
+propositional logic, but you can't derive this from your predicate<br>
+"derivation".</p>
+</blockquote>
+<p>That's right, what I showed was meant as a stripped down, (nearly)<br>
+minimal example, including just enough rules to make it desirable to<br>
+combine case analysis and induction.  The actual development I'm<br>
+working on has lots more stuff that I didn't want to force people to<br>
+wade through.  My apologies for the awkwardness.</p>
+<blockquote>
+<p>Best,<br>
+Mathias</p>
+<p>On 21. Apr 2018, at 19:54, Jun Inoue &lt;<a href="mailto:jun.lambda@gmail.com">jun.lambda@gmail.com</a>&gt; wrote:</p>
+<p>Dear all,</p>
+<p>Is there a good way to induct and case-analyze (like the cases method)<br>
+simultaneously?  Here's a stripped down example using a fragment of<br>
+propositional logic:</p>
+<p>{* begin example *}<br>
+theory PropLogic<br>
+imports Main<br>
+begin</p>
+<p>datatype formula =<br>
+ Atomic string ("^_" [150])<br>
+| Not formula<br>
+| And formula formula (infix "&amp;&amp;" 80)<br>
+| Or formula formula (infix "||" 70)</p>
+<p>abbreviation flip_insert (infixl "." 60) where<br>
+ "Γ . A ≡ insert A Γ"</p>
+<p>(* ⊢ Γ means at least one formula in Γ is true *)<br>
+inductive derivation :: "formula set ⇒ bool" ("⊢ _" [30] 30) where<br>
+ Assm: "⊢ Γ . Not A . A"<br>
+| AndI: "⟦ ⊢ Γ . A; ⊢ Γ . B ⟧ ⟹ ⊢ Γ . A &amp;&amp; B"<br>
+| OrI: "⟦ ⊢ Γ . A . B ⟧ ⟹ ⊢ Γ . A || B"</p>
+<p>lemma strong_inversion_And:<br>
+ assumes "⊢ Γ . A &amp;&amp; B"<br>
+   shows "⊢ Γ . A"<br>
+using assms<br>
+apply (induct rule: derivation.induct)<br>
+{* end example *}</p>
+<p>Here, my goal is to prove something like inversion for conjunction,<br>
+but the A &amp;&amp; B may not have been introduced by the last rule used in<br>
+the derivation, so it requires induction.</p>
+<p>Unfortunately, because the premise I'm inducting on (⊢ Γ . A &amp;&amp; B) has<br>
+a parameter of a very specific shape, the higher-order unifier can't<br>
+infer an appropriate instantiation of the derivation.induct, giving a<br>
+useless goal state:</p>
+<ol>
+<li>⋀Γ' Aa. ⊢ Γ . A</li>
+<li>⋀Γ' Aa B. ⊢ Γ' . Aa ⟹ ⊢ Γ . A ⟹ ⊢ Γ' . B ⟹ ⊢ Γ . A ⟹ ⊢ Γ . A</li>
+<li>⋀Γ' Aa B. ⊢ Γ' . Aa . B ⟹ ⊢ Γ . A ⟹ ⊢ Γ . A</li>
+</ol>
+<p>The first subgoal is the very lemma I'm trying to prove.  I rather<br>
+need something like</p>
+<p>⋀Γ' Aa. ⟦ Γ . A = Γ' . Not Aa . Aa⟧ ⟹ ⊢ Γ . A</p>
+<p>Using apply(induct rule: derivation.cases) instead of induct does give<br>
+something like this, but then in the other subgoals I won't have an<br>
+inductive hypothesis.</p>
+<p>How can I get around this problem?  Is there a method or attribute<br>
+that can combine cases and induct?</p>
+<p>--<br>
+Jun Inoue</p>
+</blockquote>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

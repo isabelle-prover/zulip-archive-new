@@ -1,0 +1,153 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Making records instances of classes · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Making.20records.20instances.20of.20classes.html">[isabelle] Making records instances of classes</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294111765"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Making%20records%20instances%20of%20classes/near/294111765" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Making.20records.20instances.20of.20classes.html#294111765">(Aug 18 2022 at 15:37)</a>:</h4>
+<p>From: Peter Gammie &lt;<a href="mailto:peteg42@gmail.com">peteg42@gmail.com</a>&gt;<br>
+Hello,</p>
+<p>Is it possible to make a record type an instance of a type class?</p>
+<p>Here's a simple example of what doesn't work:</p>
+<p>record ('a, 'b) Tuple = first :: "'a" second :: "'b"</p>
+<p>instance Tuple :: (finite, finite) finite</p>
+<p>*** Logical type constructor expected: "t.Tuple"<br>
+*** At command "instance" (line 7 of "/tmp/t.thy").</p>
+<p>cheers<br>
+peter</p>
+
+
+
+<a name="294111820"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Making%20records%20instances%20of%20classes/near/294111820" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Making.20records.20instances.20of.20classes.html#294111820">(Aug 18 2022 at 15:38)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@kit.edu">andreas.lochbihler@kit.edu</a>&gt;<br>
+Hello Peter,</p>
+<blockquote>
+<p>Is it possible to make a record type an instance of a type class?<br>
+yes, it is, but you must have a look behind the scenes. The Isabelle <br>
+record package provides extensible records. You could define a subrecord <br>
+of Tuple with additional fields and the record package ensures <br>
+subtyping, i.e. every element of the subrecord type works almost like an <br>
+ordinary Tuple record, in particular, cast operations work as expected.</p>
+</blockquote>
+<p>Behind the scenes, the package achieves this by defining a more general <br>
+type for Tuple called Tuple_ext_type, which takes another type variable.<br>
+Then, the type ('a, 'b) Tuple is just a type abbreviation for ('a, 'b, <br>
+unit) Tuple_ext_type. For subrecord types, this additional type variable <br>
+is instantiated to some other type which stores the additional information.</p>
+<p>Type classes can only be instantiated for "logical" type constructors, <br>
+not for abbreviations like Tuple. In your example, you would have to <br>
+instantiate Tuple_ext_type itself. Note that this instantiation then <br>
+also applies to all subrecords you might ever define.</p>
+<p>record ('a, 'b) Tuple = first :: "'a" second :: "'b"</p>
+<p>instance Tuple_type_ext :: (finite, finite, finite) finite</p>
+<p>Cheers,<br>
+Andreas</p>
+
+
+
+<a name="294111863"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Making%20records%20instances%20of%20classes/near/294111863" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Making.20records.20instances.20of.20classes.html#294111863">(Aug 18 2022 at 15:38)</a>:</h4>
+<p>From: Peter Gammie &lt;<a href="mailto:peteg42@gmail.com">peteg42@gmail.com</a>&gt;<br>
+Thanks Andreas!</p>
+<p>Perhaps this could make its way into the distributed Isabelle documentation and/or examples?</p>
+<p>Also Florian Haftmann sent me this complete chunk of proof text off-list, for which I am grateful:</p>
+<p>record ('a, 'b) Tuple = first :: "'a" second :: "'b"</p>
+<p>instance Tuple_ext_type :: (finite, finite, finite) finite<br>
+proof<br>
+ let ?U = "UNIV :: ('a, 'b, 'c) Tuple_ext_type set"<br>
+ { fix x :: "('a, 'b, 'c) Tuple_scheme"<br>
+   have "∃a b c. x = Tuple_ext a b c"<br>
+     by (cases x) simp<br>
+ } then have U:<br>
+   "?U = (\&lt;lambda&gt;((a, b), c). Tuple_ext a b c) ` ((UNIV × UNIV) × UNIV)"<br>
+     by (auto simp add: image_def)<br>
+ show "finite ?U" by (simp add: U)<br>
+qed</p>
+<p>cheers<br>
+peter</p>
+
+
+
+<a name="294133339"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Making%20records%20instances%20of%20classes/near/294133339" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Making.20records.20instances.20of.20classes.html#294133339">(Aug 18 2022 at 17:26)</a>:</h4>
+<p>From: Philipp Küfner &lt;<a href="mailto:philipp.kuefner@tu-berlin.de">philipp.kuefner@tu-berlin.de</a>&gt;<br>
+Dear all,</p>
+<p>In July 2010 there was a discussion on Making records instances of<br>
+classes. As far as I can see the presented solution (see below) does not<br>
+work with the current version of Isabelle (2011) anymore (due to the new<br>
+implementation of records). So does anyone know how to handle this<br>
+problem now?</p>
+<p>Thanks a lot,</p>
+<p>Philipp</p>
+<p>Thanks Andreas!</p>
+<p>Perhaps this could make its way into the distributed Isabelle documentation and/or examples?</p>
+<p>Also Florian Haftmann sent me this complete chunk of proof text off-list, for which I am grateful:</p>
+<p>record ('a, 'b) Tuple = first :: "'a" second :: "'b"</p>
+<p>instance Tuple_ext_type :: (finite, finite, finite) finite<br>
+proof<br>
+ let ?U = "UNIV :: ('a, 'b, 'c) Tuple_ext_type set"<br>
+ { fix x :: "('a, 'b, 'c) Tuple_scheme"<br>
+   have "∃a b c. x = Tuple_ext a b c"<br>
+     by (cases x) simp<br>
+ } then have U:<br>
+   "?U = (\&lt;lambda&gt;((a, b), c). Tuple_ext a b c) ` ((UNIV × UNIV) × UNIV)"<br>
+     by (auto simp add: image_def)<br>
+ show "finite ?U" by (simp add: U)<br>
+qed</p>
+<p>cheers<br>
+peter</p>
+
+
+
+<a name="294133346"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Making%20records%20instances%20of%20classes/near/294133346" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Making.20records.20instances.20of.20classes.html#294133346">(Aug 18 2022 at 17:26)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@kit.edu">andreas.lochbihler@kit.edu</a>&gt;<br>
+Dear Philipp,</p>
+<p>in Isabelle 2011, the type for extensible records is no longer called<br>
+&lt;record name&gt;_type_ext, but &lt;record name&gt;_ext. The NEWS file mentions this as <br>
+follows:</p>
+<blockquote>
+<ul>
+<li>Records: logical foundation type for records does not carry a<br>
+'_type' suffix any longer (obsolete due to authentic syntax).<br>
+INCOMPATIBILITY.</li>
+</ul>
+</blockquote>
+<p>Hence, the following should work now:</p>
+<p>record ('a, 'b) Tuple = first :: "'a" second :: "'b"<br>
+instance Tuple_ext :: (finite, finite, finite) finite</p>
+<p>Hope this helps,<br>
+Andreas</p>
+<p>Philipp Küfner schrieb:</p>
+
+
+
+<a name="294133413"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Making%20records%20instances%20of%20classes/near/294133413" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Making.20records.20instances.20of.20classes.html#294133413">(Aug 18 2022 at 17:26)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Philipp,</p>
+<p>the solution to your problem is to drop the _type suffix on the record<br>
+type name.</p>
+<p>This is what the (for end-users rather cryptic, I confess) entry in the<br>
+NEWS file:</p>
+<ul>
+<li>Records: logical foundation type for records does not carry a<br>
+'_type' suffix any longer (obsolete due to authentic syntax).<br>
+INCOMPATIBILITY.</li>
+</ul>
+<p>hints at.</p>
+<p>Cheers,<br>
+    Florian<br>
+<a href="/user_uploads/14278/j0AHW2wlZqSEFW3zW6GUd-li/signature.asc">signature.asc</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

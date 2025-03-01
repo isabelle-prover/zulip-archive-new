@@ -1,0 +1,101 @@
+<html>
+<head><meta charset="utf-8"><title>split all case expressions · General · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/202961-General/index.html">General</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/split.20all.20case.20expressions.html">split all case expressions</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="215338168"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/split%20all%20case%20expressions/near/215338168" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Max W. Haslbeck <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/split.20all.20case.20expressions.html#215338168">(Nov 02 2020 at 16:01)</a>:</h4>
+<p>I have a lemma/code with lots of case expressions. To split each one of them I have to add the corresponding <code>splits</code> rule for every type that appears. For example:</p>
+<div class="codehilite"><pre><span></span><code>lemma &quot;(case xs of [] ⇒ (case n of 0 ⇒ True | Suc x ⇒ True) | (x#xs) ⇒ True) = True&quot;
+  by (auto split: list.splits nat.splits)
+</code></pre></div>
+<p>Does someone know of a way to do this automatically? I want a method that does:  Split all case expression in the current subgoal.</p>
+
+
+
+<a name="215339173"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/split%20all%20case%20expressions/near/215339173" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/split.20all.20case.20expressions.html#215339173">(Nov 02 2020 at 16:08)</a>:</h4>
+<p>If you can live with declaring the splitting rules once:</p>
+<div class="codehilite"><pre><span></span><code>named_theorems mysplit &quot;Theorems used by mysplit&quot;
+declare list.splits[mysplit] nat.splits[mysplit]
+method mysplit = (split list.splits nat.splits)+
+
+lemma &quot;(case xs of [] ⇒ (case n of 0 ⇒ True | Suc x ⇒ True) | (x#xs) ⇒ True) = True&quot;
+   apply mysplit
+</code></pre></div>
+
+
+
+<a name="215343946"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/split%20all%20case%20expressions/near/215343946" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Max W. Haslbeck <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/split.20all.20case.20expressions.html#215343946">(Nov 02 2020 at 16:38)</a>:</h4>
+<p>Yes, thanks. Already doing that.</p>
+<p>I still would like to know if such a method is generally possible.</p>
+
+
+
+<a name="215347567"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/split%20all%20case%20expressions/near/215347567" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/split.20all.20case.20expressions.html#215347567">(Nov 02 2020 at 17:03)</a>:</h4>
+<p>A very low-tech: find all constants that contain the name <code>case_</code>. The part after the <code>_</code> of the name contains the type name. Therefore the theorem <code>[stuff_after_the_underscore].splits</code> will give the theorem you want to use.</p>
+
+
+
+<a name="215351335"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/split%20all%20case%20expressions/near/215351335" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/split.20all.20case.20expressions.html#215351335">(Nov 02 2020 at 17:30)</a>:</h4>
+<div class="codehilite"><pre><span></span><code>ML ‹
+fun split_thms ctxt t =
+  (case first_field &quot;case_&quot; t of
+    NONE =&gt; []
+  | SOME (_, stuff) =&gt;
+     (Proof_Context.get_thms ctxt (stuff ^ &quot;.splits&quot;) handle _ =&gt; [])
+  )
+
+fun find_split_rules ctxt (a $ b) = find_split_rules ctxt a @ find_split_rules ctxt b
+  | find_split_rules _ (Free (_, _)) = []
+  | find_split_rules ctxt (Const (name, _)) = split_thms ctxt name
+  | find_split_rules ctxt (Abs (_, _, a)) = find_split_rules ctxt a
+  | find_split_rules _ (Bound _) = []
+  | find_split_rules _ (Var _) = []
+
+(*taken from the definition of the split tactic*)
+fun gen_split_tac _ [] = K no_tac
+  | gen_split_tac ctxt (split::splits) =
+      split_tac ctxt [split] ORELSE&#39;
+         gen_split_tac ctxt splits;
+
+fun splitter ctxt i thm =
+   (CHANGED_PROP o gen_split_tac ctxt (@{thms if_splits} @ find_split_rules ctxt (Thm.prop_of thm))) i thm
+›
+
+method_setup mysplit = ‹
+  Scan.optional Attrib.thms [] &gt;&gt;
+    (fn thms =&gt; fn ctxt =&gt;
+      METHOD (fn facts =&gt; REPEAT (HEADGOAL (splitter ctxt))))
+› &quot;apply splits the goal&quot;
+
+
+lemma &quot;(case case_xs of [] ⇒ (case n of 0 ⇒ True | Suc x ⇒ True) | (x#xs) ⇒ True) = True&quot;
+  apply mysplit
+</code></pre></div>
+
+
+
+<a name="215353525"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/split%20all%20case%20expressions/near/215353525" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/split.20all.20case.20expressions.html#215353525">(Nov 02 2020 at 17:47)</a>:</h4>
+<p>(some clean-up is required: I copy-pasted the setup for smt to define the <code>mysplit</code> tactic, but I am too lazy to do it)</p>
+
+
+
+<a name="215354055"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/split%20all%20case%20expressions/near/215354055" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Max W. Haslbeck <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/split.20all.20case.20expressions.html#215354055">(Nov 02 2020 at 17:50)</a>:</h4>
+<p>Thanks, I'll play around with that :)</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

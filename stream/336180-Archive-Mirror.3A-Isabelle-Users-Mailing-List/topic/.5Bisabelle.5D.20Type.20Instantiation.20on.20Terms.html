@@ -1,0 +1,101 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Type Instantiation on Terms · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Type.20Instantiation.20on.20Terms.html">[isabelle] Type Instantiation on Terms</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294740609"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Type%20Instantiation%20on%20Terms/near/294740609" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Type.20Instantiation.20on.20Terms.html#294740609">(Aug 22 2022 at 18:03)</a>:</h4>
+<p>From: Burkhart Wolff &lt;<a href="mailto:wolff@lri.fr">wolff@lri.fr</a>&gt;<br>
+Dear all,</p>
+<p>what is the recommended way in Isabelle17/18 to instantiate a polymorphic term,</p>
+<p>so, e.g.  Const ("Option.option.None", "'a option”)     ( or alternatively:   Const ("Option.option.None", “?'a option”) )</p>
+<p>to</p>
+<p>Const ("Option.option.None", “int option”)</p>
+<p>???</p>
+<p>infer_type apparently does not do the trick.</p>
+<p>Many thanks for some advice.</p>
+<p>bu</p>
+
+
+
+<a name="294740642"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Type%20Instantiation%20on%20Terms/near/294740642" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Type.20Instantiation.20on.20Terms.html#294740642">(Aug 22 2022 at 18:03)</a>:</h4>
+<p>From: Jasmin Blanchette &lt;<a href="mailto:jasmin.blanchette@inria.fr">jasmin.blanchette@inria.fr</a>&gt;<br>
+Hi Burkhart,</p>
+<p>As Makarius would say, it all depends on your application. In general, a substitution is what would be called for. But if you built your term yourself, maybe you can use Sign.mk_const and pass the correct type arguments right away, e.g.</p>
+<p>Sign.mk_const thy (@{const_name None}, @{typ int})</p>
+<p>Cheers,</p>
+<p>Jasmin</p>
+
+
+
+<a name="294740708"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Type%20Instantiation%20on%20Terms/near/294740708" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Type.20Instantiation.20on.20Terms.html#294740708">(Aug 22 2022 at 18:03)</a>:</h4>
+<p>From: Burkhart Wolff &lt;<a href="mailto:wolff@lri.fr">wolff@lri.fr</a>&gt;<br>
+Thanks Jasmin.</p>
+<p>Meanwhile, I found out myself.</p>
+<p>Since it might be of wider interest for Isabelle users <br>
+(and since it is not totally obvious) I present the solution:</p>
+<p>First step: Type generalisation.<br>
+Since type unification and type matching work on schematic type<br>
+variables, one has to generalise the free type variables.</p>
+<p>There are  more general and complex functions for this in structure<br>
+Term_Subst, but for the purpose here the following suffices:</p>
+<p>ML‹<br>
+val generalize_typ = Term.map_type_tfree (fn (str,sort)=&gt; Term.TVar((str,0),sort));<br>
+val generalize_term = Term.map_types generalize_typ;<br>
+›</p>
+<p>(the index 0 is, as I said, sufficient for this special solution)</p>
+<p>Example: <br>
+ML‹val t = generalize_term @{term "[]”}›<br>
+yields now the system  output: “val t = Const ("List.list.Nil", "?'a list"): term”<br>
+indicating that the free type variable has been replaced by a schematic type variable.<br>
+In slow motion: "?'a list” is a system pretty printing for:</p>
+<p>ML‹ val t_schematic = Type("List.list",[TVar(("'a",0),@{sort "HOL.type"})]); ›</p>
+<p>Note that type antiquotations do not permit to denotate types with schematic type variables directly,<br>
+following an Isabelle development trend to hide schematic variables from the Isar interface.</p>
+<p>Second Step: Type Matching (or unification, but watch out for the indexes)<br>
+The trick is most easily done by a high-level interface in structure Sign that covers more low-level<br>
+operations on the Term level.<br>
+Matching and unifications produce a type environment @{ML_type "Type.tyenv”} which is basically <br>
+a type synonym to Vartabs which is basically a synonym to Symtabs … So:</p>
+<p>ML‹<br>
+val tyenv = Sign.typ_match @{theory} (t_schematic, @{typ "int list"}) (Vartab.empty);            <br>
+val  [(("'a", 0), (["HOL.type"], @{typ "int"}))] = Vartab.dest tyenv;<br>
+›</p>
+<p>Third step: Type instantiation.<br>
+Apparently, a bizarre conversion between the old-style interface and <br>
+the new-style @{ML "tyenv"} is necessary. See the following example.</p>
+<p>ML‹<br>
+val S = Vartab.dest tyenv;<br>
+val S' = (map (fn (s,(t,u)) =&gt; ((s,t),u)) S) : ((indexname * sort) * typ) list;<br>
+         (* it took me quite some time to find out that these two type representations,<br>
+            obscured by a number of type-synonyms, where actually identical. *)<br>
+val ty = t_schematic;<br>
+val ty' = Term_Subst.instantiateT S' t_schematic;</p>
+<p>val t = (generalize_term @{term "[]"});<br>
+val t' = Term_Subst.map_types_same (Term_Subst.instantiateT S') (t)<br>
+(* or alternatively : *)<br>
+val t'' = Term.map_types (Term_Subst.instantiateT S') (t)<br>
+›<br>
+The system output for the latter is:<br>
+val ty = "?'a list": typ<br>
+val ty' = "int list": typ<br>
+val t = Const ("List.list.Nil", "?'a list"): term<br>
+val t' = Const ("List.list.Nil", "int list"): term</p>
+<p>Voila.</p>
+<p>Once upon a time, there was this the idea of an "Isabelle programmers cookbook”,<br>
+where this kind of information on this level of abstraction could be gathered. <br>
+Was this project abandoned ?</p>
+<p>bu</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

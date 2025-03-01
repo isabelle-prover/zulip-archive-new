@@ -1,0 +1,107 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Weird situation with the simplifier, congruenc... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Weird.20situation.20with.20the.20simplifier.2C.20congruenc.2E.2E.2E.html">[isabelle] Weird situation with the simplifier, congruenc...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294107739"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Weird%20situation%20with%20the%20simplifier%2C%20congruenc.../near/294107739" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Weird.20situation.20with.20the.20simplifier.2C.20congruenc.2E.2E.2E.html#294107739">(Aug 18 2022 at 15:16)</a>:</h4>
+<p>From: Brian Huffman &lt;<a href="mailto:brianh@cs.pdx.edu">brianh@cs.pdx.edu</a>&gt;<br>
+Hello all,</p>
+<p>The left-hand side of the following lemma is simply an eta-expanded<br>
+version of the right-hand side. It could be solved immediately by<br>
+"apply (rule refl)". One might think that the simplifier could easily<br>
+handle such a simple task.</p>
+<p>lemma "(%n. nat_case 1 Suc n) = (nat_case 1 Suc)"<br>
+by simp</p>
+<p>But... the proof fails! If you do "apply simp" instead, here's what is<br>
+left over:</p>
+<p>goal (1 subgoal):</p>
+<ol>
+<li>(%n. nat_case 1 Suc n) = nat_case (Suc 0) Suc</li>
+</ol>
+<p>The problem is that there is a congruence rule for nat_case:</p>
+<p>Nat.nat.weak_case_cong:<br>
+  M = M' ==&gt; nat_case f1 f2 M = nat_case f1 f2 M'</p>
+<p>On the eta-expanded left-hand side, the congruence rule applies and<br>
+prevents the "1" from being rewritten to "Suc 0". But the congruence<br>
+rule does not apply to the eta-contracted right-hand side.</p>
+<p>To prevent the simplifier from rewriting the first two arguments of<br>
+nat_case it seems like we really need a couple more congruence rules<br>
+for the partially-applied cases:</p>
+<p>lemma nat_weak_case_cong2 [cong]: "nat_case f1 f2 = nat_case f1 f2"<br>
+lemma nat_weak_case_cong3 [cong]: "nat_case f1 = nat_case f1"</p>
+<p>... but the simplifier only allows one congruence per constant to be<br>
+active at one time.</p>
+<p>This problem is actually important in practice: It makes some internal<br>
+proofs in the HOLCF fixrec package break for certain definitions. To<br>
+avoid this issue, I am forced to have fixrec maintain its own private<br>
+simpset that doesn't include any congruence rules.</p>
+<p>It seems like Isabelle tries to maintain the illusion that<br>
+eta-equivalent terms are identical (especially when the "Eta Contract"<br>
+option is enabled in ProofGeneral). The behavior I have described<br>
+above breaks this abstraction.</p>
+<ul>
+<li>Brian</li>
+</ul>
+
+
+
+<a name="294108008"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Weird%20situation%20with%20the%20simplifier%2C%20congruenc.../near/294108008" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Weird.20situation.20with.20the.20simplifier.2C.20congruenc.2E.2E.2E.html#294108008">(Aug 18 2022 at 15:17)</a>:</h4>
+<p>From: Thomas Sewell &lt;<a href="mailto:Thomas.Sewell@nicta.com.au">Thomas.Sewell@nicta.com.au</a>&gt;<br>
+Hello Brian &amp; Isabelle users.</p>
+<p>There's a tension here between Isabelle's resolution engine and its rewriting engine. The resolution engine makes eta-expansion irrelevant; the simplification engine does not. This is more often seen with simplification rules like o_apply - simple constants like "op o" seem to get unfolded inexplicably, the explanation being that the term they were in had been invisibly eta-expanded at some point. The advantage in this case is that it's usually easy to understand what's happened, even if it's difficult to explain why.</p>
+<p>The situation with congruence rules, however, is deeply unpleasant. The simpler way to fix your problem was to install the stronger form of the nat_case congruence rule, nat.case_cong. This one strengthens rather than degrades the simplifier, and eta contraction makes less difference.</p>
+<p>As I understand it, the weak case rules are installed to prevent the rewrite rules of complex recursive functions (e.g. "f x = if x = 0 then 1 else x * f (x - 1)") looping the simplifier. I agree that looping must be prevented, even at the cost of making the simplifier work less often. My experience from the L4.verified project, however, is that it is far preferable to remove the rewrite rules of such functions than to degrade the simplifier.</p>
+<p>There are four reasons for this:<br>
+  1) Novice Isabelle users just don't understand the current default setup, nor do they understand what congruence rules are. It shouldn't be this complicated to explain when (simp add: useful_rule_we_wrote) will work.<br>
+  2) The current situation won't stop looping anway, as split_if is in the default splitter set. The above function will loop the simplifier, as will many, If being more common than any case expression.<br>
+  3) It's easy to write a terminating function that doesn't depend on a case expression for termination. Consider this (contrived) code in the error+state monad:<br>
+"f = do<br>
+  done &lt;- checkIfDone<br>
+  when done $ throwError ()<br>
+  takeOneStep<br>
+  f<br>
+"<br>
+  This function might terminate (depending on the behaviour of checkIfDone and takeOneStep). Its expansion rule must be dropped from the simpset to prevent looping.<br>
+  4) Proofs about complex recursive functions of this type were usually complex and done by induction anyway. Having to manually unroll them with subst is not much additional effort.</p>
+<p>In short, I would prefer it if the stronger case congruence rules were in the default simpset and looping was prevented by other means.</p>
+<p>Yours,<br>
+    Thomas.</p>
+
+
+
+<a name="294108028"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Weird%20situation%20with%20the%20simplifier%2C%20congruenc.../near/294108028" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Weird.20situation.20with.20the.20simplifier.2C.20congruenc.2E.2E.2E.html#294108028">(Aug 18 2022 at 15:17)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+You are right as to the motivation for the design. It seemed to better<br>
+choice at the time. I still find it works well for me. But I would not<br>
+want to argue with you if you say that you think the opposite choice<br>
+works better for your L4.verified, and that may actually be more<br>
+representative for the average user. It was a heuristic design. I<br>
+suspect it would be a lot of work to reverse it.</p>
+<p>Tobias</p>
+<p>Thomas Sewell schrieb:</p>
+
+
+
+<a name="294108036"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Weird%20situation%20with%20the%20simplifier%2C%20congruenc.../near/294108036" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Weird.20situation.20with.20the.20simplifier.2C.20congruenc.2E.2E.2E.html#294108036">(Aug 18 2022 at 15:17)</a>:</h4>
+<p>From: Lawrence Paulson &lt;<a href="mailto:lp15@cam.ac.uk">lp15@cam.ac.uk</a>&gt;<br>
+The current design has the advantage of causing simplification to resemble execution: the arms of a conditional or case expression are left untouched until the relevant case has been identified. I would not express this as "degrading the simplifier". It certainly doesn't degrade its performance. However, I agree that there are situations where people are surprised that obvious simplifications do not take place in a case expression.</p>
+<p>Larry</p>
+<p>Thomas Sewell schrieb:</p>
+<blockquote>
+<p>As I understand it, the weak case rules are installed to prevent the rewrite rules of complex recursive functions (e.g. "f x = if x = 0 then 1 else x * f (x - 1)") looping the simplifier. I agree that looping must be prevented, even at the cost of making the simplifier work less often. My experience from the L4.verified project, however, is that it is far preferable to remove the rewrite rules of such functions than to degrade the simplifier.</p>
+</blockquote>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

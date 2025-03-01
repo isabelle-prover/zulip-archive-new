@@ -1,0 +1,203 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Partially terminating functions · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Partially.20terminating.20functions.html">[isabelle] Partially terminating functions</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294064130"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Partially%20terminating%20functions/near/294064130" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Partially.20terminating.20functions.html#294064130">(Aug 18 2022 at 12:13)</a>:</h4>
+<p>From: John Matthews &lt;<a href="mailto:matthews@galois.com">matthews@galois.com</a>&gt;<br>
+Hi,</p>
+<p>Our Cryptol-&gt;Isabelle translator generates recursive function  <br>
+definitions that don't always terminate, but should terminate when the  <br>
+inputs satisfy certain conditions known to the user but not  <br>
+necessarily to the translator, i.e. the functions are partially  <br>
+terminating.</p>
+<p>Here is a non-Cryptol example of what I'm talking about:</p>
+<p>function (domintros)<br>
+   fac_int :: "int =&gt; int" where<br>
+  "fac_int n = (if n = 0 then 1 else n * fac_int (n - 1))"<br>
+by pat_completeness auto</p>
+<p>I'd like to prove the following partial termination lemma for fac_int:</p>
+<p>lemma "0 &lt;= n ==&gt; fac_int_dom n"</p>
+<p>However, the termination rule for fac_int_dom seems to be too weak:</p>
+<p>lemma fac_int.termination:<br>
+   "[|wf ?R;<br>
+     !!n. n ~= 0 ==&gt; (n - 1, n) \&lt;in&gt; ?R|]<br>
+    ==&gt; !x. fac_int_dom x"</p>
+<p>What I really need is a rule like this, where ?P is an arbitrary  <br>
+precondition on input ?x:</p>
+<p>lemma fac_int.partial_termination:<br>
+   "[|wf ?R;<br>
+     !!n. [|?P n; n ~= 0|] ==&gt; (n - 1, n) \&lt;in&gt; ?R;<br>
+     ?P ?x|]<br>
+    ==&gt; fac_int_dom ?x"</p>
+<p>I know I could generate a rule like this by changing the definition of  <br>
+fac_int, but we don't want the user to have to muck with Cryptol- <br>
+generated definitions just to prove partial termination.</p>
+<p>Is it possible to have the function package generate a partial  <br>
+termination rule for recursive functions?</p>
+<p>Thanks,<br>
+-john</p>
+
+
+
+<a name="294064167"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Partially%20terminating%20functions/near/294064167" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Partially.20terminating.20functions.html#294064167">(Aug 18 2022 at 12:13)</a>:</h4>
+<p>From: Alexander Krauss &lt;<a href="mailto:krauss@in.tum.de">krauss@in.tum.de</a>&gt;<br>
+Hi John,</p>
+<blockquote>
+<p>function (domintros)<br>
+  fac_int :: "int =&gt; int" where<br>
+ "fac_int n = (if n = 0 then 1 else n * fac_int (n - 1))"<br>
+by pat_completeness auto</p>
+<p>I'd like to prove the following partial termination lemma for fac_int:</p>
+<p>lemma "0 &lt;= n ==&gt; fac_int_dom n"</p>
+</blockquote>
+<p>Here is a proof:</p>
+<p>lemma "0 &lt;= n ==&gt; fac_int_dom n"<br>
+proof (induct rule: int_ge_induct)<br>
+   case base show ?case<br>
+     by (auto intro: accpI elim: fac_int_rel.cases)<br>
+next<br>
+   case (step i)<br>
+   show ?case<br>
+     by (rule accpI) (auto intro: step elim!: fac_int_rel.cases )<br>
+qed</p>
+<blockquote>
+<blockquote>
+<p>However, the termination rule for fac_int_dom seems to be too weak:</p>
+</blockquote>
+<p>lemma fac_int.termination:</p>
+</blockquote>
+<p>The ".termination" rule can only prove totality. You have to use the <br>
+rules for accessible part and the call relation, as above. Note that <br>
+"fac_int_dom" is just an abbreviation for "accp fac_int_rel".</p>
+<blockquote>
+<p>What I really need is a rule like this, where ?P is an arbitrary <br>
+precondition on input ?x:</p>
+<p>lemma fac_int.partial_termination:<br>
+  "[|wf ?R;<br>
+    !!n. [|?P n; n ~= 0|] ==&gt; (n - 1, n) \&lt;in&gt; ?R;<br>
+    ?P ?x|]<br>
+   ==&gt; fac_int_dom ?x"</p>
+</blockquote>
+<p>In fact, this rule is wrong: Take P as "&gt;= - 10" and<br>
+R as "{(n - 1, n) | n. n &gt;= - 10 }".</p>
+<p>For this to work, P must be preserved by recursive calls.</p>
+<blockquote>
+<p>Is it possible to have the function package generate a partial <br>
+termination rule for recursive functions?</p>
+</blockquote>
+<p>At the moment, the best way is to use the definition of the domain <br>
+directly as above, together with a suitable induction. An alternative to <br>
+the "(rule accp) then (erule fac_int_rel.cases)" is the ".domintro" <br>
+rule, which makes the above proof much shorter:</p>
+<p>lemma "0 &lt;= n ==&gt; fac_int_dom n"<br>
+by (induct rule: int_ge_induct) (auto intro: fac_int.domintros)</p>
+<p>On the other hand, the domintros are sometimes a little ad-hoc (due to <br>
+internal forward simplification), and some users had probolems with it. <br>
+But the manual version using the definitions always works.</p>
+<p>Alex</p>
+
+
+
+<a name="294064223"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Partially%20terminating%20functions/near/294064223" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Partially.20terminating.20functions.html#294064223">(Aug 18 2022 at 12:14)</a>:</h4>
+<p>From: Thomas Arthur Leck Sewell &lt;<a href="mailto:tsewell@cse.unsw.EDU.AU">tsewell@cse.unsw.EDU.AU</a>&gt;<br>
+Hi John,</p>
+<p>We ran in to a problem somewhat like this. In fact, you have all the <br>
+information you need - use an ML antiquotation like</p>
+<p>ML {* @{term "fac_int_dom"} *}</p>
+<p>and you'll see that fac_int_dom is an abbreviation for the accessible part <br>
+of fac_int_rel, for which you have far more information. In particular, <br>
+you should be able to prove that "n &gt;= 0 ==&gt; fac_int_dom n" from that, and <br>
+then you will be able to use the psimps and pinduct rules.</p>
+<p>We were considering recommending that the function package produce an <br>
+appropriate rule so that you don't have to spot the abbreviation in order <br>
+to prove some precondition implies *_dom.</p>
+<p>Yours,<br>
+    Thomas.</p>
+
+
+
+<a name="294064304"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Partially%20terminating%20functions/near/294064304" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Partially.20terminating.20functions.html#294064304">(Aug 18 2022 at 12:14)</a>:</h4>
+<p>From: Thomas Arthur Leck Sewell &lt;<a href="mailto:tsewell@cse.unsw.EDU.AU">tsewell@cse.unsw.EDU.AU</a>&gt;<br>
+The confusion about partial termination in the function package could <br>
+possibly be solved by modifying the theorem searcher.</p>
+<p>Abbreviations such as rec_fun_dom are easily confused for constants. The <br>
+problem is that the theorem searcher doesn't help to distinguish them.</p>
+<p>When accidentally searching for abbreviations within your own theories it <br>
+is usually clear that the theorem searcher is displaying less results <br>
+than it should. Constants generated by automatic packages, however, are <br>
+assumed to be special cases. It is easy to believe that few rules are <br>
+available.</p>
+<p>Perhaps the theorem searcher could solve these problems by warning that <br>
+one of the input terms is an abbreviation, and that more facts might be <br>
+available for its constituent parts. I'm not sure how to implement <br>
+this, but I think it would save some confusion.</p>
+<p>Another solution would be to have yet another colour scheme in Proof <br>
+Genereal to help identify abbreviations. I suspect this might be overkill.</p>
+<p>Yours,<br>
+    Thomas.</p>
+
+
+
+<a name="294064562"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Partially%20terminating%20functions/near/294064562" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Partially.20terminating.20functions.html#294064562">(Aug 18 2022 at 12:16)</a>:</h4>
+<p>From: John Matthews &lt;<a href="mailto:matthews@galois.com">matthews@galois.com</a>&gt;<br>
+Hi Alex,</p>
+<blockquote>
+<p>Here is a proof:</p>
+<p>lemma "0 &lt;= n ==&gt; fac_int_dom n"<br>
+proof (induct rule: int_ge_induct)<br>
+ case base show ?case<br>
+   by (auto intro: accpI elim: fac_int_rel.cases)<br>
+next<br>
+ case (step i)<br>
+ show ?case<br>
+   by (rule accpI) (auto intro: step elim!: fac_int_rel.cases )<br>
+qed</p>
+</blockquote>
+<p>Thanks. I didn't realize the function package generated these extra  <br>
+lemmas for fac_int_rel, since I was just using find_theorems on  <br>
+"fac_int_dom _".</p>
+<blockquote>
+<blockquote>
+<p>What I really need is a rule like this, where ?P is an arbitrary  <br>
+precondition on input ?x:<br>
+lemma fac_int.partial_termination:<br>
+ "[|wf ?R;<br>
+   !!n. [|?P n; n ~= 0|] ==&gt; (n - 1, n) \&lt;in&gt; ?R;<br>
+   ?P ?x|]<br>
+  ==&gt; fac_int_dom ?x"</p>
+</blockquote>
+<p>In fact, this rule is wrong: Take P as "&gt;= - 10" and<br>
+R as "{(n - 1, n) | n. n &gt;= - 10 }".</p>
+<p>For this to work, P must be preserved by recursive calls.</p>
+</blockquote>
+<p>Ah, right. I missed that extra constraint.</p>
+<p>Thanks,<br>
+-john</p>
+
+
+
+<a name="294064569"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Partially%20terminating%20functions/near/294064569" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Partially.20terminating.20functions.html#294064569">(Aug 18 2022 at 12:16)</a>:</h4>
+<p>From: John Matthews &lt;<a href="mailto:matthews@galois.com">matthews@galois.com</a>&gt;<br>
+Hi Thomas, thanks for your help.</p>
+<p>I agree, it would be useful for the function package to automatically  <br>
+generate a partial termination rule, just not mine! :)</p>
+<p>Thanks,<br>
+-john</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

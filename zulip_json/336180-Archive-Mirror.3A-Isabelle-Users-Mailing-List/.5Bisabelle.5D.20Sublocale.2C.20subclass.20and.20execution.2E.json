@@ -1,0 +1,104 @@
+[
+    {
+        "content": "<p>From: Florian Haftmann &lt;<a href=\"mailto:florian.haftmann@informatik.tu-muenchen.de\">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>\nHi Clemens,</p>\n<p>sorry for the delay.</p>\n<p>On 16.10.2014 18:57, Clemens Ballarin wrote:</p>\n<blockquote>\n<blockquote>\n<p>permanent_interpretation prefix: expr<br>\n  where f = t</p>\n</blockquote>\n<p>What if expr contains where clauses?  Sublocale distinguishes this (awkwardly) by slightly different syntax: \"where\" &lt;term&gt; \"=\" &lt;term&gt; within the expression vs. \"where\" &lt;term&gt; for the rewrite morphism.</p>\n</blockquote>\n<p>This was my fault.  The syntax (cf.<br>\nsrc/Tools/permanent_interpretation.ML) is</p>\n<p>permanent_interpretation expr …<br>\n  defining …<br>\n  where …</p>\n<blockquote>\n<blockquote>\n<p>permanent_interpretation prefix: expr<br>\n  -- ‹with implicit mixin: f_def [symmetric]›</p>\n</blockquote>\n<p>This, I guess, refers to the original sublocale command, right?</p>\n</blockquote>\n<p>In a locale context, yes.</p>\n<blockquote>\n<p>I wonder whether we can come up with a syntax that permits both rewrite morphisms and definitions.  Obviously one of the two kinds of equations would have to be turned around.  Probably it would be more intuitive to reverse the notation of the rewrite morphisms.</p>\n</blockquote>\n<p>Currently, definitions are orientated the other way round than bare<br>\nequations.  Not sure what would fit best here.</p>\n<p>Cheers,<br>\n    Florian<br>\n<a href=\"/user_uploads/14278/kcV-cn1j9k9SnmoZEw4bYGZe/signature.asc\">signature.asc</a></p>",
+        "id": 294316580,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660925644
+    },
+    {
+        "content": "<p>From: Jose Divasón &lt;<a href=\"mailto:jose.divasonm@unirioja.es\">jose.divasonm@unirioja.es</a>&gt;<br>\nDear all,</p>\n<p>I was trying to demonstrate that any field is a euclidean (semi)ring. I<br>\ncan't do it by means of subclasses, because they have different fixed<br>\nparameters:</p>\n<p>class field = comm_ring_1 + inverse +<br>\n  assumes field_inverse: \"a ≠ 0 ⟹ inverse a * a = 1\"<br>\n  assumes field_divide_inverse: \"a / b = a * inverse b\"</p>\n<p>class euclidean_semiring = semiring_div +<br>\n  fixes euclidean_size :: \"'a ⇒ nat\"<br>\n  fixes normalisation_factor :: \"'a ⇒ 'a\"<br>\n  assumes .....</p>\n<p>(<em>subclass (in field) euclidean_ring</em>)</p>\n<p>So, I did it using sublocales (see the attached file).</p>\n<p>sublocale field ⊆ field_is_euclidean_ring: euclidean_ring _ \"λa b. if b = 0<br>\nthen 0 else a/b\" \"λa b. if b = 0 then a else 0\"  _ _ _  \"λi. if i = 0 then<br>\n0 else 1::nat\"  id</p>\n<p>My problem is that, before such a sublocale I can execute functions defined<br>\nin the euclidean_ring class (such as gcd_eucl for naturals and integers).<br>\nOn the contrary, after the sublocale those functions can't be executed<br>\nanymore. Maybe I'm not understanding properly how sublocales work.</p>\n<p>The use of sublocales (and then, my problem) can be avoided creating a new<br>\nclass fixing (and defining) the parameters presented in the euclidean_ring<br>\nclass:</p>\n<p>class field_euclidean = field + euclidean_ring +<br>\n  assumes \"euclidean_size = (λi. if i = 0 then 0 else 1::nat)\"<br>\n  and \"normalisation_factor = id\"</p>\n<p>Nevertheless this is a bit unsatisfactory, because a new class has to be<br>\nintroduced and I should instantiate each field to this new field_euclidean<br>\nclass (although instances would be quite easy).</p>\n<p>In the attached file there is my Isabelle theory (Foo.thy) with further<br>\nexplanations.</p>\n<p>Can this proof be done using sublocales without the loss of executability?</p>\n<p>All suggestions are welcome.</p>\n<p>Thanks,<br>\nJose<br>\n<a href=\"/user_uploads/14278/s_KoPITx6wc-G_QbCy-F4wik/Foo.zip\">Foo.zip</a></p>",
+        "id": 294317221,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660925821
+    },
+    {
+        "content": "<p>From: Florian Haftmann &lt;<a href=\"mailto:florian.haftmann@informatik.tu-muenchen.de\">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>\nHi Jose,</p>\n<blockquote>\n<p>So, I did it using sublocales (see the attached file).</p>\n</blockquote>\n<p>you approach in principle is right.</p>\n<p>The complications you encounter are due to the fact that the code<br>\ngenerator only accepts equations headed by logical constants (for<br>\npurpose of simple foundation) but syntactical constants stemming from<br>\ninterpretations after definitions in locales are usually syntactic<br>\nabbreviations.</p>\n<p>Find the solution in the attached theory.</p>\n<p>In short steps:</p>\n<ul>\n<li>\n<p>Import \"~~/src/Tools/Permanent_Interpretation\" (this will later allow<br>\nto resolve the constant / abbreviation issue with minimal effort).</p>\n</li>\n<li>\n<p>sublocale a ⊆ E is equivalent to context a begin … sublocale E … end</p>\n</li>\n<li>\n<p>Substitute sublocale p: F by permanent_interpretation p?: F (logically<br>\nequivalent, but note the subtle change in semantics of prefixes, see below)</p>\n</li>\n<li>\n<p>Note that locale expressions support also named instantiation rather<br>\nthan positional one, which is superior in presence of many parameters<br>\n(see below – this is not required, but makes more clear whats going on)</p>\n</li>\n<li>\n<p>Currently we are at</p>\n</li>\n</ul>\n<blockquote>\n<p>permanent_interpretation field_is_euclidean_ring?: euclidean_ring<br>\n  where div = \"λa b. if b = 0 then 0 else a/b\"<br>\n    and mod = \"λa b. if b = 0 then a else 0\"<br>\n    and euclidean_size = \"λi. if i = 0 then 0 else 1::nat\"<br>\n    and normalisation_factor = id</p>\n</blockquote>\n<ul>\n<li>Then add a »defining« clause</li>\n</ul>\n<blockquote>\n<p>defining gcd_eucl = gcd_eucl</p>\n</blockquote>\n<p>which essentially makes an appropriate constant definition and provides<br>\na suitable mixin equation for the interpretation such that theorems are<br>\nproperly folded.</p>\n<p>That's it in the first instance.</p>\n<p>Note that the unexpected »real« type is due to an implicit coercion.</p>\n<p>I usually recommend to make interpretation prefixes mandatory (ie.<br>\ndropping the »?«).</p>\n<p>Hope this helps,<br>\n    Florian<br>\n<a href=\"/user_uploads/14278/HYO6nFfnQfLnBtup1NkATCVw/Foo.thy\">Foo.thy</a><br>\n<a href=\"/user_uploads/14278/UQCiH7l5ThCNknUocB2LrttH/signature.asc\">signature.asc</a></p>",
+        "id": 294317240,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660925831
+    },
+    {
+        "content": "<p>From: Clemens Ballarin &lt;<a href=\"mailto:ballarin@in.tum.de\">ballarin@in.tum.de</a>&gt;<br>\nIt might be helpful to explain what permanent_interpretation does in terms a sublocale declaration and definitions.</p>\n<p>Clemens</p>",
+        "id": 294317265,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660925840
+    },
+    {
+        "content": "<p>From: Jose Divasón &lt;<a href=\"mailto:jose.divasonm@unirioja.es\">jose.divasonm@unirioja.es</a>&gt;<br>\nThank you for the useful response.</p>\n<p>Is there any feasible way to avoid that implicit coercion?<br>\nAs far as I know, using permanent_interpretation gcd_eucl is now executable<br>\nbut only over fields. Am I right?</p>\n<p>I mean:</p>\n<p>value \"gcd_eucl (13::nat) (6::nat)\"</p>\n<p>Computes \"field_class.gcd_eucl (real 13) (real 6)\", which is unsatisfactory<br>\nfor my purposes, because the gcd_eucl over reals is not the same as the<br>\ngcd_eucl over int or nat. I guess that now \"euclidean_semiring.gcd_eucl\"<br>\nhas been hidden by the permanent_interpretation.</p>\n<p>Thanks,<br>\nJose</p>",
+        "id": 294317336,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660925863
+    },
+    {
+        "content": "<p>From: Florian Haftmann &lt;<a href=\"mailto:florian.haftmann@informatik.tu-muenchen.de\">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>\nHi Jose,</p>\n<blockquote>\n<p>Is there any feasible way to avoid that implicit coercion?</p>\n</blockquote>\n<p>you can deactivate it using</p>\n<p>declare [[coercion_enabled = false]]</p>\n<p>to eliminate a potential source of confusion.</p>\n<blockquote>\n<p>Computes \"field_class.gcd_eucl (real 13) (real 6)\", which is<br>\nunsatisfactory<br>\nfor my purposes, because the gcd_eucl over reals is not the same as the<br>\ngcd_eucl over int or nat. I guess that now \"euclidean_semiring.gcd_eucl\"<br>\nhas been hidden by the permanent_interpretation.</p>\n</blockquote>\n<p>This is only a matter of name space.  You may use</p>\n<p>declare [[names_long]]</p>\n<p>to have names always printed qualified, this might help in identifying<br>\nthings which might have been shadowed.</p>\n<p>Hope this helps,<br>\n    Florian<br>\n<a href=\"/user_uploads/14278/8i6GMSkVASnHg4UvpBv-BvcU/signature.asc\">signature.asc</a></p>",
+        "id": 294317774,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660925976
+    },
+    {
+        "content": "<p>From: Florian Haftmann &lt;<a href=\"mailto:florian.haftmann@informatik.tu-muenchen.de\">florian.haftmann@informatik.tu-muenchen.de</a>&gt;</p>\n<blockquote>\n<p>It might be helpful to explain what permanent_interpretation does in terms a sublocale declaration and definitions.</p>\n</blockquote>\n<p>This is one item of my documentation dept.</p>\n<p>Here a rough sketch:</p>\n<p>permanent_interpretation prefix: expr<br>\n  where f = t</p>\n<p>One key property is that »t« is parsed in the (approximate) syntactic<br>\ncontext of expr (like mixin equations also).  Let »t'« denote the<br>\ninternalized term.  Then we have:</p>\n<p>definition<br>\n  f_def: \"f = t'\"</p>\n<p>permanent_interpretation prefix: expr<br>\n  -- ‹with implicit mixin: f_def [symmetric]›</p>\n<p>Note that the symmetric of f_def is directly integrated as mixin<br>\nequation into the resulting mixin morphisms – there is so separate proof<br>\nobligation.</p>\n<p>That's it, in short words.</p>\n<p>Cheers,<br>\n    Florian<br>\n<a href=\"/user_uploads/14278/q6PJdwC01aiMiJEKW5cwoXuY/signature.asc\">signature.asc</a></p>",
+        "id": 294317793,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660925981
+    },
+    {
+        "content": "<p>From: Clemens Ballarin &lt;<a href=\"mailto:ballarin@in.tum.de\">ballarin@in.tum.de</a>&gt;<br>\nHi Florian,</p>\n<p>Thanks for the feedback.  Here are two quick questions:</p>\n<blockquote>\n<p>permanent_interpretation prefix: expr<br>\n  where f = t</p>\n</blockquote>\n<p>What if expr contains where clauses?  Sublocale distinguishes this (awkwardly) by slightly different syntax: \"where\" &lt;term&gt; \"=\" &lt;term&gt; within the expression vs. \"where\" &lt;term&gt; for the rewrite morphism.</p>\n<blockquote>\n<p>One key property is that »t« is parsed in the (approximate) syntactic<br>\ncontext of expr (like mixin equations also).  Let »t'« denote the<br>\ninternalized term.  Then we have:</p>\n<p>definition<br>\n  f_def: \"f = t'\"</p>\n<p>permanent_interpretation prefix: expr<br>\n  -- ‹with implicit mixin: f_def [symmetric]›</p>\n</blockquote>\n<p>This, I guess, refers to the original sublocale command, right?</p>\n<p>I wonder whether we can come up with a syntax that permits both rewrite morphisms and definitions.  Obviously one of the two kinds of equations would have to be turned around.  Probably it would be more intuitive to reverse the notation of the rewrite morphisms.</p>\n<p>Clemens</p>",
+        "id": 294317892,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660926005
+    },
+    {
+        "content": "<p>From: Florian Haftmann &lt;<a href=\"mailto:florian.haftmann@informatik.tu-muenchen.de\">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>\nHi Clemens,</p>\n<blockquote>\n<p>I like your idea of using more descriptive keywords here.  Following<br>\nyour suggestion, 'where' could be called 'unfolding' and replaced by<br>\n'folding' if we decide to turn the rewrite equations around.  However,<br>\nthe ing form tends to be used by the proof language for transformations<br>\nof the proof state, and 'unfolding' would even make the grammar<br>\nambiguous.  It will probably make more sense to settle for 'defines',<br>\n'unfolds' and 'folds'.</p>\n</blockquote>\n<p>I agree in principle, but I am still uncertain what the preferred<br>\norientation for mixin equations should be, except that there should only<br>\nbe one orientation.</p>\n<p>Cheers,<br>\n    Florian<br>\n<a href=\"/user_uploads/14278/SIFqV0iV1joVGAKE__ut2I5d/signature.asc\">signature.asc</a></p>",
+        "id": 294318977,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660926331
+    },
+    {
+        "content": "<p>From: Clemens Ballarin &lt;<a href=\"mailto:ballarin@in.tum.de\">ballarin@in.tum.de</a>&gt;<br>\nWell, I'm not sure.  It really is a matter of fast whether you want to see them as rewrite rules or (pseudo-)definitions.  I agree that it might be confusing, but I don't see that having both would be technically more difficult than having only 'folds'.</p>\n<p>Clemens</p>",
+        "id": 294320819,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660926833
+    },
+    {
+        "content": "<p>From: Clemens Ballarin &lt;<a href=\"mailto:ballarin@in.tum.de\">ballarin@in.tum.de</a>&gt;<br>\nHi Florian,</p>\n<p>I like your idea of using more descriptive keywords here.  Following your suggestion, 'where' could be called 'unfolding' and replaced by 'folding' if we decide to turn the rewrite equations around.  However, the ing form tends to be used by the proof language for transformations of the proof state, and 'unfolding' would even make the grammar ambiguous.  It will probably make more sense to settle for 'defines', 'unfolds' and 'folds'.</p>\n<p>Clemens</p>",
+        "id": 294321100,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660926907
+    },
+    {
+        "content": "<p>From: Florian Haftmann &lt;<a href=\"mailto:florian.haftmann@informatik.tu-muenchen.de\">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>\nSurely, there would not be any technical difficulty.</p>\n<p>Florian<br>\n<a href=\"/user_uploads/14278/UTS4kVuq7mRxLeQTAX50ddvN/signature.asc\">signature.asc</a></p>",
+        "id": 294321186,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660926939
+    },
+    {
+        "content": "<p>From: Florian Haftmann &lt;<a href=\"mailto:florian.haftmann@informatik.tu-muenchen.de\">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>\nHi Clemens,</p>\n<p>see now <a href=\"http://isabelle.in.tum.de/reports/Isabelle/rev/16d92d37a8a1\">http://isabelle.in.tum.de/reports/Isabelle/rev/16d92d37a8a1</a> for<br>\ndocumentation stubs on permanent_interpretation.</p>\n<p>Cheers,<br>\n    Florian<br>\n<a href=\"/user_uploads/14278/8uBgvVast0Hye-xElfP2ZGlS/signature.asc\">signature.asc</a></p>",
+        "id": 294321912,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660927171
+    },
+    {
+        "content": "<p>From: Clemens Ballarin &lt;<a href=\"mailto:ballarin@in.tum.de\">ballarin@in.tum.de</a>&gt;<br>\nHi Florian,</p>\n<p>in the documentation, please note that the term 'mixing' needs explaining.  My documentation only refers to rewrite morphisms not mixin equations.  I use mixin only in the source code (but user don't normally read that).</p>\n<p>Is there really a need for a new command?  Wouldn't it make more sense to integrate the new functionality with 'interpretation' and 'sublocale'.</p>\n<p>Clemens</p>",
+        "id": 294321937,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660927183
+    },
+    {
+        "content": "<p>From: Florian Haftmann &lt;<a href=\"mailto:florian.haftmann@informatik.tu-muenchen.de\">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>\nHi Clemens,</p>\n<blockquote>\n<p>in the documentation, please note that the term 'mixing' needs<br>\nexplaining.  My documentation only refers to rewrite morphisms not mixin<br>\nequations.  I use mixin only in the source code (but user don't normally<br>\nread that).</p>\n</blockquote>\n<p>thanks for pointing that out.  I will polish this further.</p>\n<blockquote>\n<p>Is there really a need for a new command?  Wouldn't it make more sense to integrate the new functionality with 'interpretation' and 'sublocale'.</p>\n</blockquote>\n<p>There might be chances for something like</p>\n<p>context<br>\n  fixes …<br>\n  assumes …<br>\nbegin</p>\n<p>permanent_interpretation …</p>\n<p>end</p>\n<p>to work some day.  Anyway, I first have to conduct some experiments to<br>\nget an idea what the challenges are.</p>\n<p>Cheers,<br>\n    Florian</p>\n<p>P. S. This has left the proper scope of isabelle-users already, so we<br>\nshould continue the thread on isabelle-dev.<br>\n<a href=\"/user_uploads/14278/px4EH9Ou-Dq0TN6yzpZyanBU/signature.asc\">signature.asc</a></p>",
+        "id": 294322278,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660927306
+    },
+    {
+        "content": "<p>From: Clemens Ballarin &lt;<a href=\"mailto:ballarin@in.tum.de\">ballarin@in.tum.de</a>&gt;<br>\nHi Florian,</p>\n<p>This looks interesting, but it's not clear to me what it would mean.  I take that this is a makeshift context that cannot be entered again.  Presumably the construct yields some sort of lifting?</p>\n<p>Clemens</p>",
+        "id": 294322455,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660927360
+    },
+    {
+        "content": "<p>From: Florian Haftmann &lt;<a href=\"mailto:florian.haftmann@informatik.tu-muenchen.de\">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>\nThe idea is that the context itself is embedded into a target again (for<br>\nsimplicity, let us assume a locale as canonical candidate):</p>\n<p>context foo<br>\nbegin</p>\n<p>…</p>\n<p>context<br>\n  fixes …<br>\n  assumes P<br>\nbegin</p>\n<p>permanent_interpretation bar: bar …</p>\n<p>end</p>\n<p>…</p>\n<p>end</p>\n<p>So, technically speaking, this would establish a sublocale dependency<br>\nfrom bar to foo such that facts propagated from bar to foo gain<br>\nadditional assumptions P.</p>\n<p>It can be seen as a proper user-space pattern to avoid raw instantiation<br>\nof foundational facts bar… [OF …].</p>\n<p>It is not clear to me whether that machinery can handle this out of the<br>\nbox (or even properly), so this has to be figured out first.</p>\n<p>Cheers,<br>\n    Florian<br>\n<a href=\"/user_uploads/14278/RqMSFliXXSWM-yaX2sxWaYca/signature.asc\">signature.asc</a></p>",
+        "id": 294322471,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660927367
+    }
+]

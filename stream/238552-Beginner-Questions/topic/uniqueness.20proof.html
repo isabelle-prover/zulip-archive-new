@@ -1,0 +1,156 @@
+<html>
+<head><meta charset="utf-8"><title>uniqueness proof · Beginner Questions · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/index.html">Beginner Questions</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/uniqueness.20proof.html">uniqueness proof</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="291580165"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/uniqueness%20proof/near/291580165" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Artem Khovanov <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/uniqueness.20proof.html#291580165">(Aug 01 2022 at 14:07)</a>:</h4>
+<p>I'm trying to prove the following statement (uniqueness in division lemma):</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">context</span> <span class="n">euclidean_domain</span>
+<span class="k">begin</span>
+
+<span class="kn">lemma</span> <span class="n">div_unique</span><span class="o">:</span>
+  <span class="kp">assumes</span> <span class="s">"a ∈ carrier R - { 𝟬 }"</span> <span class="s">"b ∈ carrier R - { 𝟬 }"</span>
+  <span class="kp">shows</span> <span class="s">"∃!q. ∃!r. q ∈ carrier R ∧ r ∈ carrier R ∧ a = (b ⊗ q) ⊕ r ∧ ((r = 𝟬) ∨ (φ r &lt; φ b))"</span>
+    <span class="o">(</span><span class="kp">is</span> <span class="s">"∃!q. ∃!r. ?quot_rem q r"</span><span class="o">)</span>
+<span class="k">proof</span>
+  <span class="k">obtain</span> <span class="n">q</span> <span class="kp">where</span> <span class="s">"∃r. ?quot_rem q r"</span> <span class="k">using</span> <span class="n">euclidean_function</span> <span class="n">assms</span> <span class="k">by</span> <span class="n">presburger</span>
+  <span class="k">show</span> <span class="s">"∃!r. ?quot_rem q r"</span> <span class="gr">sorry</span>
+  <span class="k">show</span> <span class="s">"⋀q'. ∃!r.?quot_rem q' r ⟹ q' = q"</span> <span class="gr">sorry</span>
+<span class="k">qed</span>
+
+<span class="k">end</span>
+</code></pre></div>
+<p>The automatic proof rule (sensibly) gives goals<br>
+<code>∃!r. ?quot_rem ?q r</code> and <code>⋀q'. ∃!r. ?quot_rem q' r ⟹ q' = ?q</code>.<br>
+However, when I attempt to pass in the <code>obtain</code>ed variable <code>q</code> for <code>?q</code> as above, I get the error<br>
+<code>Result contains obtained parameters: q. Local statement fails to refine any pending goal</code><br>
+What am I doing wrong? How can I pass the variable from an existential operator into another proof?</p>
+
+
+
+<a name="291580642"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/uniqueness%20proof/near/291580642" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Artem Khovanov <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/uniqueness.20proof.html#291580642">(Aug 01 2022 at 14:10)</a>:</h4>
+<p>Here's a more minimal (trivial) example of the issue:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">lemma</span> <span class="n">test</span><span class="o">:</span>
+  <span class="kp">assumes</span> <span class="s">"∃ x. P x"</span>
+  <span class="kp">shows</span> <span class="s">"∃x. P x"</span>
+<span class="k">proof</span>
+  <span class="k">obtain</span> <span class="n">x</span> <span class="kp">where</span> <span class="s">"P x"</span> <span class="k">using</span> <span class="n">assms</span> <span class="k">by</span> <span class="n">auto</span>
+  <span class="k">thus</span> <span class="s">"P x"</span> <span class="k">by</span> <span class="n">auto</span>
+<span class="k">qed</span>
+</code></pre></div>
+<p>gives the same error at <code>thus</code>.</p>
+
+
+
+<a name="291581870"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/uniqueness%20proof/near/291581870" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Fabian Huch <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/uniqueness.20proof.html#291581870">(Aug 01 2022 at 14:20)</a>:</h4>
+<p>An easy fix for that is to first <code>have</code> your property with the obtained variable, then show the existence statement from that:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">proof</span> <span class="o">-</span>
+  <span class="k">obtain</span> <span class="n">x</span> <span class="kp">where</span> <span class="s">"P x"</span> <span class="k">using</span> <span class="n">assms</span> <span class="k">by</span> <span class="n">auto</span>
+  <span class="k">then</span> <span class="k">have</span> <span class="s">"P x"</span> <span class="k">by</span> <span class="n">auto</span>
+  <span class="k">thus</span> <span class="s">"∃x. P x"</span> <span class="k">by</span> <span class="n">auto</span>
+<span class="k">qed</span>
+</code></pre></div>
+<p>I don't know if there is a more elegant way though.</p>
+
+
+
+<a name="291582165"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/uniqueness%20proof/near/291582165" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Artem Khovanov <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/uniqueness.20proof.html#291582165">(Aug 01 2022 at 14:22)</a>:</h4>
+<p><span class="user-mention silent" data-user-id="348400">Fabian Huch</span> <a href="#narrow/stream/238552-Beginner-Questions/topic/uniqueness.20proof/near/291581870">said</a>:</p>
+<blockquote>
+<p>An easy fix for that is to first <code>have</code> your property with the obtained variable, then show the existence statement from that:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">proof</span> <span class="o">-</span>
+  <span class="k">obtain</span> <span class="n">x</span> <span class="kp">where</span> <span class="s">"P x"</span> <span class="k">using</span> <span class="n">assms</span> <span class="k">by</span> <span class="n">auto</span>
+  <span class="k">then</span> <span class="k">have</span> <span class="s">"P x"</span> <span class="k">by</span> <span class="n">auto</span>
+  <span class="k">thus</span> <span class="s">"∃x. P x"</span> <span class="k">by</span> <span class="n">auto</span>
+<span class="k">qed</span>
+</code></pre></div>
+<p>I don't know if there is a more elegant way though.</p>
+</blockquote>
+<p>Hmm.. but then in the first (existence + uniqueness) case I can't unpack the operator into existence and uniqueness bits, because then it'll unpack the existence part too far for this fix to work.</p>
+
+
+
+<a name="291582540"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/uniqueness%20proof/near/291582540" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Artem Khovanov <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/uniqueness.20proof.html#291582540">(Aug 01 2022 at 14:25)</a>:</h4>
+<p>For example, if I would like to prove</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">lemma</span> <span class="n">test</span><span class="o">:</span>
+  <span class="kp">assumes</span> <span class="s">"∃ x. P x"</span> <span class="s">"⟦P a; P b⟧ ⟹ a = b"</span>
+  <span class="kp">shows</span> <span class="s">"∃!x. P x"</span>
+<span class="k">proof</span>
+  <span class="k">obtain</span> <span class="n">x</span> <span class="kp">where</span> <span class="s">"P x"</span> <span class="k">using</span> <span class="n">assms</span> <span class="k">by</span> <span class="n">auto</span>
+  <span class="k">show</span> <span class="s">"P x"</span> <span class="k">by</span> <span class="n">auto</span>
+  <span class="k">thus</span> <span class="s">"⋀x'. P x' ⟹ x' = x"</span> <span class="k">by</span> <span class="n">auto</span>
+<span class="k">qed</span>
+</code></pre></div>
+
+
+
+<a name="291583503"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/uniqueness%20proof/near/291583503" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Fabian Huch <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/uniqueness.20proof.html#291583503">(Aug 01 2022 at 14:32)</a>:</h4>
+<p>Well you can do the same thing:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code>  <span class="k">have</span> <span class="s">"P x"</span> <span class="gr">sorry</span>
+  <span class="k">moreover</span> <span class="k">have</span> <span class="s">"⋀y. P y ⟹ y = x"</span> <span class="gr">sorry</span>
+  <span class="k">ultimately</span> <span class="k">have</span> <span class="s">"∃!x. P x"</span> <span class="k">by</span> <span class="n">blast</span>
+</code></pre></div>
+<p>Ultimately, it shouldn't matter except for style - you can always first <code>have</code> what you <code>show</code>.</p>
+
+
+
+<a name="291583603"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/uniqueness%20proof/near/291583603" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Artem Khovanov <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/uniqueness.20proof.html#291583603">(Aug 01 2022 at 14:33)</a>:</h4>
+<p><span class="user-mention silent" data-user-id="348400">Fabian Huch</span> <a href="#narrow/stream/238552-Beginner-Questions/topic/uniqueness.20proof/near/291583503">said</a>:</p>
+<blockquote>
+<p>Well you can do the same thing:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code>  <span class="k">have</span> <span class="s">"P x"</span> <span class="gr">sorry</span>
+  <span class="k">moreover</span> <span class="k">have</span> <span class="s">"⋀y. P y ⟹ y = x"</span> <span class="gr">sorry</span>
+  <span class="k">ultimately</span> <span class="k">have</span> <span class="s">"∃!x. P x"</span> <span class="k">by</span> <span class="n">blast</span>
+</code></pre></div>
+<p>Ultimately, it shouldn't matter except for style - you can always first <code>have</code> what you <code>show</code>.</p>
+</blockquote>
+<p>Ah right yep thanks!</p>
+
+
+
+<a name="291586647"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/uniqueness%20proof/near/291586647" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Artem Khovanov <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/uniqueness.20proof.html#291586647">(Aug 01 2022 at 14:56)</a>:</h4>
+<p>Here is another workaround I found (it looks silly here, but is good for longer proofs):</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">lemma</span> <span class="n">test</span><span class="o">:</span>
+  <span class="kp">assumes</span> <span class="s">"∃ x. P x"</span>
+  <span class="kp">shows</span> <span class="s">"∃x. P x"</span>
+<span class="k">proof</span><span class="o">-</span>
+  <span class="k">obtain</span> <span class="n">x</span> <span class="kp">where</span> <span class="s">"P x"</span> <span class="k">using</span> <span class="n">assms</span> <span class="k">by</span> <span class="n">auto</span>
+  <span class="k">show</span> <span class="s">"∃x. P x"</span>
+  <span class="k">proof</span>
+    <span class="k">show</span> <span class="s">"P x"</span> <span class="k">using</span> <span class="sx">`P x`</span> <span class="ow">.</span>
+  <span class="k">qed</span>
+<span class="k">qed</span>
+</code></pre></div>
+
+
+
+<a name="291590011"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/uniqueness%20proof/near/291590011" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jan van Brügge <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/uniqueness.20proof.html#291590011">(Aug 01 2022 at 15:21)</a>:</h4>
+<p>This is maybe a bit shorter:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">lemma</span> <span class="n">test</span><span class="o">:</span>
+  <span class="kp">assumes</span> <span class="s">"∃ x. P x"</span>
+  <span class="kp">shows</span> <span class="s">"∃x. P x"</span>
+<span class="k">proof</span><span class="o">-</span>
+  <span class="k">obtain</span> <span class="n">x</span> <span class="kp">where</span> <span class="s">"P x"</span> <span class="o">(</span><span class="kp">is</span> <span class="s">"?P x"</span><span class="o">)</span> <span class="k">using</span> <span class="n">assms</span> <span class="k">by</span> <span class="n">auto</span>
+  <span class="k">show</span> <span class="s">"∃x. P x"</span> <span class="k">by</span> <span class="o">(</span><span class="n">rule</span> <span class="n">exI</span><span class="o">[</span><span class="n">of</span> <span class="o">?</span><span class="n">P</span><span class="o">,</span> <span class="n">OF</span> <span class="sx">`?P x`</span><span class="o">])</span>
+<span class="k">qed</span>
+</code></pre></div>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

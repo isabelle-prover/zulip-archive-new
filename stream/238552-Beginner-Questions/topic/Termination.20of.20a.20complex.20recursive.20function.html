@@ -1,0 +1,91 @@
+<html>
+<head><meta charset="utf-8"><title>Termination of a complex recursive function · Beginner Questions · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/index.html">Beginner Questions</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Termination.20of.20a.20complex.20recursive.20function.html">Termination of a complex recursive function</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="223888288"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Termination%20of%20a%20complex%20recursive%20function/near/223888288" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Gergely Buday <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Termination.20of.20a.20complex.20recursive.20function.html#223888288">(Jan 25 2021 at 12:16)</a>:</h4>
+<p>I am doing Exercise 3.2 from Nipkow &amp; Klein's Concrete Semantics book.</p>
+<p>I arrived to a function definition that compiles at least at the covering all the cases level, but its termination is of question that I do not see through.</p>
+<div class="codehilite"><pre><span></span><code>theory Minimal
+
+imports Main
+
+begin
+
+type_synonym vname = string
+datatype aexp = N int | V vname | Plus aexp aexp
+
+text ‹In this exercise we verify constant folding for aexp where we
+sum up all constants, even if they are not next to each other. For example, Plus
+(N 1) (Plus (V x ) (N 2)) becomes Plus (V x ) (N 3). This goes beyond asimp.
+Define a function full_asimp :: aexp ⇒ aexp that sums up all constants and
+prove its correctness: aval (full_asimp a) s = aval a s.›
+
+
+fun full_asimp :: &quot;aexp ⇒ aexp&quot; where
+  (* adding constants on top *)
+  &quot;full_asimp (Plus (N i) (N j)) = N(i+j)&quot;
+
+  (* adding constants on first and second level *)
+| &quot;full_asimp (Plus (N i) (Plus (N j) a2))  = full_asimp (Plus (N(i+j)) (full_asimp a2))&quot;
+| &quot;full_asimp (Plus (N i) (Plus a2 (N j)))  = full_asimp (Plus (N(i+j)) (full_asimp a2))&quot;
+
+| &quot;full_asimp (Plus (Plus (N i) a2) (N j))  = full_asimp (Plus (N(i+j)) (full_asimp a2))&quot;
+| &quot;full_asimp (Plus (Plus a2 (N i)) (N j))  = full_asimp (Plus (N(i+j)) (full_asimp a2))&quot;
+
+  (* Keeping constants and variables *)
+| &quot;full_asimp (V n) = V n&quot;
+| &quot;full_asimp (N i) = N i&quot;
+
+  (* handling unhandled constant/variable + other cases recursively *)
+| &quot;full_asimp (Plus (V n) a2) = Plus (V n) (full_asimp a2)&quot;
+| &quot;full_asimp (Plus a1 (V n)) = Plus (full_asimp a1) (V n)&quot;
+| &quot;full_asimp (Plus (N i) a2) = full_asimp (Plus (N i) (full_asimp a2))&quot;
+| &quot;full_asimp (Plus a1 (N i)) = full_asimp (Plus (full_asimp a1) (N i))&quot;
+
+  (* handling the Plus (Plus Plus) case *)
+| &quot;full_asimp (Plus (Plus a1 a2) (Plus b1 b2)) =
+     full_asimp (Plus
+                  (full_asimp (Plus a1 a2))
+                  (full_asimp (Plus b1 b2))
+                )&quot;
+</code></pre></div>
+<p>Do you have a hint what should be the next step? At all, is it possible to prove the termination of this, don't I have too much recursive calls?</p>
+
+
+
+<a name="223888902"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Termination%20of%20a%20complex%20recursive%20function/near/223888902" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Termination.20of.20a.20complex.20recursive.20function.html#223888902">(Jan 25 2021 at 12:22)</a>:</h4>
+<div class="codehilite"><pre><span></span><code>&quot;full_asimp (Plus a1 (N i)) = full_asimp (Plus (full_asimp a1) (N i))&quot;
+</code></pre></div>
+<p>that line looks very suspicious.</p>
+
+
+
+<a name="223889387"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Termination%20of%20a%20complex%20recursive%20function/near/223889387" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Termination.20of.20a.20complex.20recursive.20function.html#223889387">(Jan 25 2021 at 12:26)</a>:</h4>
+<p>For termination, you have to make sure that the arguments are smaller (in some sense of smaller). Esp. simpilification functions tend to not always change the argument. So look at all your calls assuming that the expression is already simplified.</p>
+
+
+
+<a name="223891183"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Termination%20of%20a%20complex%20recursive%20function/near/223891183" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Gergely Buday <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Termination.20of.20a.20complex.20recursive.20function.html#223891183">(Jan 25 2021 at 12:44)</a>:</h4>
+<p>The thing is, full_asimp a1 might bring up a new constant (N j) that full_asimp should take care of, combining with (N i). It might bring up a (Plus (V n) (N j)), ditto. I do not see how I could do this with less recursive calls.</p>
+
+
+
+<a name="223891394"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Termination%20of%20a%20complex%20recursive%20function/near/223891394" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jakub Kądziołka <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Termination.20of.20a.20complex.20recursive.20function.html#223891394">(Jan 25 2021 at 12:47)</a>:</h4>
+<p>The downloadable package of exercise templates on <a href="http://concrete-semantics.org">concrete-semantics.org</a> seems to provide a bit more guidance for this exercise</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

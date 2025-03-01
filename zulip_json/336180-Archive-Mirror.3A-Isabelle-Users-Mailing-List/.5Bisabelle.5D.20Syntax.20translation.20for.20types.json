@@ -1,0 +1,26 @@
+[
+    {
+        "content": "<p>From: Andreas Lochbihler &lt;<a href=\"mailto:lochbihl@ipd.info.uni-karlsruhe.de\">lochbihl@ipd.info.uni-karlsruhe.de</a>&gt;<br>\nHello,</p>\n<p>I would like to have Isabelle print types using the type abbreviations I <br>\nhave introduced with \"types\". To that end, I have come across <br>\ntranslations for types that work reasonably well if type variables occur <br>\nonly once. However, I fail to make it work for type abbreviation like this:</p>\n<p>types 'a my_type = \"('a list × int × 'a list)\"</p>\n<p>translations<br>\n   \"my_type a\" &lt;= (type) \"a list × int × a list\"</p>\n<p>Isabelle complains that variable a occurs twice in \"a list × int × a <br>\nlist\". How can I set up an appropriate print translation for such a type <br>\nabbreviation? Do I need to write an ML translation function? If so, how <br>\ncan I find out how to do that? Or is there any better support other than <br>\ntranslations (similar to abbreviation for constants)?</p>\n<p>Regards,<br>\nAndreas</p>",
+        "id": 294090738,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660831731
+    },
+    {
+        "content": "<p>From: Norbert Schirmer &lt;<a href=\"mailto:schirmer@in.tum.de\">schirmer@in.tum.de</a>&gt;<br>\nHi Andreas,</p>",
+        "id": 294090865,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660831774
+    },
+    {
+        "content": "<p>From: Norbert Schirmer &lt;<a href=\"mailto:schirmer@in.tum.de\">schirmer@in.tum.de</a>&gt;<br>\nHi Andreas,</p>\n<p>According to the old Isabelle reference manual (Sect. 7.6.1):</p>\n<p><a href=\"http://isabelle.in.tum.de/dist/Isabelle/doc/ref.pdf\">http://isabelle.in.tum.de/dist/Isabelle/doc/ref.pdf</a></p>\n<p>print translations are applied top-down. So from this you cannot  <br>\nexpect that your inner translation of my_type was already applied  <br>\nbefore you get to translate foo.<br>\nA straightforward solution is to put the modularity you want into your  <br>\nML code. The foo translation matches on plain pairs, and then calls  <br>\nthe my-type translation on its elements (if they fail they will raise  <br>\na match, so thats fine).<br>\nSkeleton:</p>\n<p>print_translation {*<br>\nlet<br>\n   fun my_type_tr' [Const (\"list\",_)$a1,Const (\"*\",_)$Const (\"int\",_)$ <br>\n(Const (\"list\",_)$a2)] =<br>\n     if a1=a2 then Syntax.const \"my_type\"$a1<br>\n     else raise Match;<br>\n   fun foo_tr' [a,b] =<br>\n    let<br>\n      val Const(\"my_type\",_)$a1 = my_type_tr' (snd (strip_comb a));<br>\n      val Const(\"my_type\",_)$a2 = my_type_tr' (snd (strip_comb b));<br>\n    in if a1=a2 then Syntax.const \"foo\"$a1 else raise Match<br>\n    end<br>\nin [(\"*\",my_type_tr'),<br>\n     (\"*\",foo_tr')]<br>\nend</p>\n<p>Cheers,</p>\n<p>Norbert</p>",
+        "id": 294090877,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660831780
+    },
+    {
+        "content": "<p>From: Andreas Lochbihler &lt;<a href=\"mailto:lochbihl@ipd.info.uni-karlsruhe.de\">lochbihl@ipd.info.uni-karlsruhe.de</a>&gt;<br>\nHi Norbert,</p>\n<p>thank you very much for the print translation. It works great - also for <br>\nmy more elaborate type abbreviations. However, with a hierarchy of types <br>\nabbreviations and appropriate translatons, I seem to have to do pattern <br>\nmatching down to the real types in every translation. Is there any <br>\npossibility to avoid this and reuse the previous translations? Here is a <br>\ntrivial example:</p>\n<p>types 'a my_type = \"('a list × int × 'a list)\"<br>\nprint_translation {*<br>\nlet<br>\n   fun tr' [Const (\"list\",_)$a1, Const (\"*\",_)$Const (\"int\",_)$(Const <br>\n(\"list\",_)$a2)] =<br>\n     if a1=a2 then Syntax.const \"my_type\"$a1<br>\n     else raise Match;<br>\nin [(\"*\",tr')]<br>\nend<br>\n*}</p>\n<p>types 'a foo = \"('a my_type * 'a my_type)\"<br>\nprint_translation {*<br>\nlet<br>\n   fun tr' [Const (\"*\", _) $ (Const (\"list\",_)$a1) $ (Const <br>\n(\"*\",_)$Const (\"int\",_)$(Const (\"list\",_)$a2)),<br>\n            Const (\"*\", _) $ (Const (\"list\",_)$a3) $ (Const <br>\n(\"*\",_)$Const (\"int\",_)$(Const (\"list\",_)$a4))] =<br>\n     if a1=a2 andalso a2=a3 andalso a3=a4 then Syntax.const \"foo\"$a1<br>\n     else raise Match;<br>\nin [(\"*\",tr')]<br>\nend<br>\n*}</p>\n<p>In the print translation for foo, I currently copy the pattern for <br>\nmy_type twice (and add the outermost \"*\" again), but it would be great <br>\nto have the translation for my_type applied first (i.e. bottom-up) and <br>\nthen in tr' for foo, I would only have to check for my_type.</p>\n<p>In particular, if I change my_type later on, I only have to change the <br>\ntranslation for my_type, but not for all those that build on my_type.</p>\n<p>Thanks in advance,<br>\nAndreas</p>",
+        "id": 294090891,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660831790
+    }
+]

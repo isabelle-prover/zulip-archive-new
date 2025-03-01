@@ -1,0 +1,20 @@
+[
+    {
+        "content": "<p>From: Peter Lammich &lt;<a href=\"mailto:peter.lammich@uni-muenster.de\">peter.lammich@uni-muenster.de</a>&gt;<br>\nHi all, I encounter the following problem with the metis-method and the <br>\n+-combinator:</p>\n<p>lemma \"a#b ~= b\" \"a#b ~= b\" \"a#b ~= b\" \"a#b ~= a#x#b\"<br>\n    apply -<br>\n    apply (metis not_Cons_self)+<br>\n    apply (auto)</p>\n<p>The second apply-step will fail with the error message<br>\n*** Metis: No first-order proof with the lemmas supplied<br>\n*** At command \"apply\".</p>\n<p>However, I would have expected the meaning of + to be: Apply argument <br>\nmethod(ical) repeatedly until it fails, at least once.<br>\nHence  \"apply (metis not_Cons_self)+\" should solve the first 3 subgoals.</p>\n<p>Regards,<br>\n  Peter</p>",
+        "id": 294065853,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660825438
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nThis is indeed slightly non-standard behaviour for a proof method.  The <br>\nreason is that the internal meson tactic does not fail cleanly (by <br>\nreturning an empty result sequence), but emits spurious errors.</p>\n<p>Here is an adhoc version of the tactic that turns <em>all</em> ERROR exeptions <br>\ninto a failed state (we do this by somewhat unusual operations on the <br>\nresult sequence):</p>\n<p>ML {*<br>\n  fun my_metis_tac ctxt ths i st =<br>\n    Seq.of_list (Seq.list_of (MetisTools.metis_tac ctxt ths i st)<br>\n      handle ERROR _ =&gt; [])<br>\n*}</p>\n<p>(For a production-quality version, instead of handling all kinds of errors <br>\nblindly, one would have to go through the Meson/Isabelle linkup carefully <br>\nand refrain emitting errors in certain cases.)</p>\n<p>The above ML tactic may be turned into an Isar method like this:</p>\n<p>method_setup my_metis = {*<br>\n  Method.thms_ctxt_args (fn ths =&gt; fn ctxt =&gt;<br>\n    Method.SIMPLE_METHOD' (CHANGED_PROP o metis_tac ctxt ths))<br>\n*} \"METIS\"</p>\n<p>Example:</p>\n<p>lemma \"a#b ~= b\" \"a#b ~= b\" \"a#b ~= b\" \"a#b ~= a#x#b\"<br>\n  apply (my_metis not_Cons_self)+</p>\n<p>Now only the last goal remains.</p>\n<p>Makarius</p>",
+        "id": 294065897,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660825444
+    },
+    {
+        "content": "<p>From: Peter Lammich &lt;<a href=\"mailto:peter.lammich@uni-muenster.de\">peter.lammich@uni-muenster.de</a>&gt;<br>\nMakarius wrote:</p>\n<p>Thank you very much!</p>\n<p>I removed an obvious typo (replacing metis_tac by my_metis_tac, as <br>\ndeclared in the ML-code above) and now it seems to work:</p>\n<p>ML {*<br>\n  fun my_metis_tac ctxt ths i st =<br>\n    Seq.of_list (Seq.list_of (MetisTools.metis_tac ctxt ths i st)<br>\n      handle ERROR _ =&gt; [])<br>\n*}</p>\n<p>method_setup my_metis = {*<br>\n  Method.thms_ctxt_args (fn ths =&gt; fn ctxt =&gt;<br>\n    Method.SIMPLE_METHOD' (CHANGED_PROP o <em>my_</em>metis_tac ctxt ths))<br>\n*} \"METIS\"</p>\n<p>Regards,<br>\n  Peter</p>",
+        "id": 294065907,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660825450
+    }
+]

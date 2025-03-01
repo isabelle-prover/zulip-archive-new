@@ -1,0 +1,569 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Let and commutative rewrite rules · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Let.20and.20commutative.20rewrite.20rules.html">[isabelle] Let and commutative rewrite rules</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294639108"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Let%20and%20commutative%20rewrite%20rules/near/294639108" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Let.20and.20commutative.20rewrite.20rules.html#294639108">(Aug 22 2022 at 09:42)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+Dear Andreas,</p>
+<p>I am certainly open to changes. Here are two that I would welcome: simplifying <br>
+the code or adding informal explanations. In the case of your proposed change I <br>
+did notice that it would increase the running time and was also a bit concerned <br>
+about that.</p>
+<p>I am afraid I cannot remember what situations prompted Norbert to write the more <br>
+elaborate simproc.</p>
+<p>Tobias<br>
+<a href="/user_uploads/14278/YQ9Zr5uA8EL_c3Fi7wl9cP1N/smime.p7s">smime.p7s</a></p>
+
+
+
+<a name="294639121"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Let%20and%20commutative%20rewrite%20rules/near/294639121" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Let.20and.20commutative.20rewrite.20rules.html#294639121">(Aug 22 2022 at 09:42)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear Tobias,</p>
+<p>An informal explanation of the code is in the NEWS file (for Isabelle2005). It explains <br>
+pretty well what is going on.</p>
+<p>Simplifier: new simproc for "let x = a in f x".  If a is a free or<br>
+   bound variable or a constant then the let is unfolded.  Otherwise<br>
+   first a is simplified to b, and then f b is simplified to g. If<br>
+   possible we abstract b from g arriving at "let x = b in h x",<br>
+   otherwise we unfold the let and arrive at g.</p>
+<p>Unfortunately, this does not help much in understanding the motivation and indented use <br>
+cases for the simproc. From a proving perspective, Norbert's case looks quite pragmatic to <br>
+me: let's inline and see what happens - maybe one can regain the abstraction afterwards. <br>
+Thus, the simproc breaks the abstraction of the binding - if more can be done, then it <br>
+will be done.</p>
+<p>This is in line with my experience. Let bindings help to make definitions more readable, <br>
+but for proving, I usually just get rid of them by unfolding Let_def, because the <br>
+classical reasoner does not deal with them at all and the simplifier does these funny <br>
+transformations.</p>
+<p>I am not really happy with this behaviour. I'd prefer something (maybe a different let) <br>
+that respects the abstraction. What are your and others' experience with this?</p>
+<p>Below are my thoughts on respecting the abstraction:</p>
+<p>From a conceptual point of view, the let binding should respect the abstraction. That is, <br>
+the new variable should be treated like a fresh constant - this is presently the case <br>
+without the simproc. Unfortunately, proving then becomes a nightmare because no properties <br>
+of the variable are known to the provers. It would be good to have some mechanism that <br>
+automatically transfers the required properties from the bound term to the variable, but <br>
+it is not clear what these properties should be. In fact, being equal to the bound term is <br>
+also a property. So the simproc let_simp just goes all the way of transferring the <br>
+properties by inlining.</p>
+<p>Still, I wonder whether let_simp is doing to much. Essentially, it tries to guess when the <br>
+binding should be unfolded (by trying out all possibilities). The other abstraction <br>
+facilities in Isabelle such as definition and function have well-defined rules for when to <br>
+break the abstraction automatically: definition only explicitly when the user unfolds the <br>
+defining equation, and function when the argument matches the pattern. This seems to work <br>
+rather well in practice. With let_simp, it does not work for bindings.</p>
+<p>Unfortunately, I do not a good understanding of how such on-the-fly abstractions (let <br>
+bindings) should be handled in general. I just have a few data points. Norrish and Slind <br>
+(TPHOLs 2005 proof pearl) argue that it is important in some cases to keep the abstraction <br>
+of let bindings (and the names of the bound variables). Their approach extracts let <br>
+bindings from proof goals and makes them available as assumptions. Thus, the user can <br>
+manually derive the required properties for the bound variables and---equally <br>
+importantly---the let bindings are out of the way in the proof term.</p>
+<p>Urban mentioned a similar problem in <br>
+<a href="https://lists.cam.ac.uk/mailman/htdig/cl-isabelle-users/2013-November/msg00277.html">https://lists.cam.ac.uk/mailman/htdig/cl-isabelle-users/2013-November/msg00277.html</a>.</p>
+<p>What I like about let_simp is that it eliminates duplicate let bindings, i.e., the term</p>
+<p>let x = f a b in let y = f a b in P x x y y</p>
+<p>becomes</p>
+<p>let x = f a b in P x x x x</p>
+<p>It also folds the abstraction if the bound term occurs in the body:</p>
+<p>let x = f a b in P x x (f a b)</p>
+<p>becomes</p>
+<p>let x = f a b in P x x x</p>
+<p>Unfortunately, the current simproc does not get the let out of the way. For example, to <br>
+prove the following, I have to unfold the binding.</p>
+<p>1 + (let x = f a in x + x) = (let x = f a in 1 + (x + x))</p>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<a name="294639287"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Let%20and%20commutative%20rewrite%20rules/near/294639287" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Let.20and.20commutative.20rewrite.20rules.html#294639287">(Aug 22 2022 at 09:43)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+I like the elimination of atomic let bindings (and the elimination if there are <br>
+&lt;= 1 occurrences of the bound variable), but not the rest of the current <br>
+let_simp. If possible, I would relegate that to a special simproc that can be <br>
+activated on demand.</p>
+<p>A mechanism to make let-bindings in a goal available as assumptions (as in HOL4) <br>
+would be nice, but that only seems to sense in combination with a structured <br>
+proof that can access these assumption by some name.</p>
+<p>Tobias<br>
+<a href="/user_uploads/14278/Bh77owRtcrb_JOCEiFkTz8_C/smime.p7s">smime.p7s</a></p>
+
+
+
+<a name="294639375"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Let%20and%20commutative%20rewrite%20rules/near/294639375" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Let.20and.20commutative.20rewrite.20rules.html#294639375">(Aug 22 2022 at 09:44)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Tobias,</p>
+<p>On 08/05/15 13:41, Tobias Nipkow wrote:</p>
+<blockquote>
+<p>I like the elimination of atomic let bindings (and the elimination if there are &lt;= 1<br>
+occurrences of the bound variable), but not the rest of the current let_simp. If possible,<br>
+I would relegate that to a special simproc that can be activated on demand.<br>
+These cases I like, too, but they are not part of Norbert's special case.</p>
+</blockquote>
+<blockquote>
+<p>A mechanism to make let-bindings in a goal available as assumptions (as in HOL4) would be<br>
+nice, but that only seems to sense in combination with a structured proof that can access<br>
+these assumption by some name.<br>
+I would already be very happy to float lets consistently outwards - if the classical <br>
+reasoner also knows what to do with them. At least, they would no longer intervene with <br>
+other rewrite rules as in "map f (let g = h a in map g ys)", where the let prevents the <br>
+simp rule "map f (map g xs) = map (f o g) xs" from triggering.</p>
+</blockquote>
+<p>I find these intervening control operators (let, if, case, ...) pretty annoying - <br>
+especially if the occur under lambdas where the splitter cannot extract them <br>
+automatically. But that's a different story.</p>
+<p>Andreas</p>
+<blockquote>
+<p>On 08/05/2015 09:46, Andreas Lochbihler wrote:</p>
+<blockquote>
+<p>Dear Tobias,</p>
+<p>An informal explanation of the code is in the NEWS file (for Isabelle2005). It<br>
+explains pretty well what is going on.</p>
+<p>Simplifier: new simproc for "let x = a in f x".  If a is a free or<br>
+   bound variable or a constant then the let is unfolded.  Otherwise<br>
+   first a is simplified to b, and then f b is simplified to g. If<br>
+   possible we abstract b from g arriving at "let x = b in h x",<br>
+   otherwise we unfold the let and arrive at g.</p>
+<p>Unfortunately, this does not help much in understanding the motivation and<br>
+indented use cases for the simproc. From a proving perspective, Norbert's case<br>
+looks quite pragmatic to me: let's inline and see what happens - maybe one can<br>
+regain the abstraction afterwards. Thus, the simproc breaks the abstraction of<br>
+the binding - if more can be done, then it will be done.</p>
+<p>This is in line with my experience. Let bindings help to make definitions more<br>
+readable, but for proving, I usually just get rid of them by unfolding Let_def,<br>
+because the classical reasoner does not deal with them at all and the simplifier<br>
+does these funny transformations.</p>
+<p>I am not really happy with this behaviour. I'd prefer something (maybe a<br>
+different let) that respects the abstraction. What are your and others'<br>
+experience with this?</p>
+<p>Below are my thoughts on respecting the abstraction:</p>
+<p>From a conceptual point of view, the let binding should respect the<br>
+abstraction. That is, the new variable should be treated like a fresh constant -<br>
+this is presently the case without the simproc. Unfortunately, proving then<br>
+becomes a nightmare because no properties of the variable are known to the<br>
+provers. It would be good to have some mechanism that automatically transfers<br>
+the required properties from the bound term to the variable, but it is not clear<br>
+what these properties should be. In fact, being equal to the bound term is also<br>
+a property. So the simproc let_simp just goes all the way of transferring the<br>
+properties by inlining.</p>
+<p>Still, I wonder whether let_simp is doing to much. Essentially, it tries to<br>
+guess when the binding should be unfolded (by trying out all possibilities). The<br>
+other abstraction facilities in Isabelle such as definition and function have<br>
+well-defined rules for when to break the abstraction automatically: definition<br>
+only explicitly when the user unfolds the defining equation, and function when<br>
+the argument matches the pattern. This seems to work rather well in practice.<br>
+With let_simp, it does not work for bindings.</p>
+<p>Unfortunately, I do not a good understanding of how such on-the-fly abstractions<br>
+(let bindings) should be handled in general. I just have a few data points.<br>
+Norrish and Slind (TPHOLs 2005 proof pearl) argue that it is important in some<br>
+cases to keep the abstraction of let bindings (and the names of the bound<br>
+variables). Their approach extracts let bindings from proof goals and makes them<br>
+available as assumptions. Thus, the user can manually derive the required<br>
+properties for the bound variables and---equally importantly---the let bindings<br>
+are out of the way in the proof term.</p>
+<p>Urban mentioned a similar problem in<br>
+<a href="https://lists.cam.ac.uk/mailman/htdig/cl-isabelle-users/2013-November/msg00277.html">https://lists.cam.ac.uk/mailman/htdig/cl-isabelle-users/2013-November/msg00277.html</a>.</p>
+<p>What I like about let_simp is that it eliminates duplicate let bindings, i.e.,<br>
+the term</p>
+<p>let x = f a b in let y = f a b in P x x y y</p>
+<p>becomes</p>
+<p>let x = f a b in P x x x x</p>
+<p>It also folds the abstraction if the bound term occurs in the body:</p>
+<p>let x = f a b in P x x (f a b)</p>
+<p>becomes</p>
+<p>let x = f a b in P x x x</p>
+<p>Unfortunately, the current simproc does not get the let out of the way. For<br>
+example, to prove the following, I have to unfold the binding.</p>
+<p>1 + (let x = f a in x + x) = (let x = f a in 1 + (x + x))</p>
+<p>Best,<br>
+Andreas<br>
+</p>
+</blockquote>
+</blockquote>
+
+
+
+<a name="294639489"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Let%20and%20commutative%20rewrite%20rules/near/294639489" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Let.20and.20commutative.20rewrite.20rules.html#294639489">(Aug 22 2022 at 09:44)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+On 08/05/2015 15:29, Andreas Lochbihler wrote:</p>
+<blockquote>
+<p>Hi Tobias,</p>
+<p>On 08/05/15 13:41, Tobias Nipkow wrote:</p>
+<blockquote>
+<p>I like the elimination of atomic let bindings (and the elimination if there<br>
+are &lt;= 1<br>
+occurrences of the bound variable), but not the rest of the current let_simp.<br>
+If possible,<br>
+I would relegate that to a special simproc that can be activated on demand.<br>
+These cases I like, too, but they are not part of Norbert's special case.</p>
+</blockquote>
+</blockquote>
+<p>That is my point, I would like to separate out the rest of his code.</p>
+<p>Tobias</p>
+<blockquote>
+<blockquote>
+<p>A mechanism to make let-bindings in a goal available as assumptions (as in<br>
+HOL4) would be<br>
+nice, but that only seems to sense in combination with a structured proof that<br>
+can access<br>
+these assumption by some name.<br>
+I would already be very happy to float lets consistently outwards - if the<br>
+classical reasoner also knows what to do with them. At least, they would no<br>
+longer intervene with other rewrite rules as in "map f (let g = h a in map g<br>
+ys)", where the let prevents the simp rule "map f (map g xs) = map (f o g) xs"<br>
+from triggering.</p>
+</blockquote>
+<p>I find these intervening control operators (let, if, case, ...) pretty annoying<br>
+- especially if the occur under lambdas where the splitter cannot extract them<br>
+automatically. But that's a different story.</p>
+<p>Andreas</p>
+<p>On 08/05/2015 09:46, Andreas Lochbihler wrote:</p>
+<blockquote>
+<blockquote>
+<p>Dear Tobias,</p>
+<p>An informal explanation of the code is in the NEWS file (for Isabelle2005). It<br>
+explains pretty well what is going on.</p>
+<p>Simplifier: new simproc for "let x = a in f x".  If a is a free or<br>
+   bound variable or a constant then the let is unfolded.  Otherwise<br>
+   first a is simplified to b, and then f b is simplified to g. If<br>
+   possible we abstract b from g arriving at "let x = b in h x",<br>
+   otherwise we unfold the let and arrive at g.</p>
+<p>Unfortunately, this does not help much in understanding the motivation and<br>
+indented use cases for the simproc. From a proving perspective, Norbert's case<br>
+looks quite pragmatic to me: let's inline and see what happens - maybe one can<br>
+regain the abstraction afterwards. Thus, the simproc breaks the abstraction of<br>
+the binding - if more can be done, then it will be done.</p>
+<p>This is in line with my experience. Let bindings help to make definitions more<br>
+readable, but for proving, I usually just get rid of them by unfolding Let_def,<br>
+because the classical reasoner does not deal with them at all and the simplifier<br>
+does these funny transformations.</p>
+<p>I am not really happy with this behaviour. I'd prefer something (maybe a<br>
+different let) that respects the abstraction. What are your and others'<br>
+experience with this?</p>
+<p>Below are my thoughts on respecting the abstraction:</p>
+<p>From a conceptual point of view, the let binding should respect the<br>
+abstraction. That is, the new variable should be treated like a fresh constant -<br>
+this is presently the case without the simproc. Unfortunately, proving then<br>
+becomes a nightmare because no properties of the variable are known to the<br>
+provers. It would be good to have some mechanism that automatically transfers<br>
+the required properties from the bound term to the variable, but it is not clear<br>
+what these properties should be. In fact, being equal to the bound term is also<br>
+a property. So the simproc let_simp just goes all the way of transferring the<br>
+properties by inlining.</p>
+<p>Still, I wonder whether let_simp is doing to much. Essentially, it tries to<br>
+guess when the binding should be unfolded (by trying out all possibilities). The<br>
+other abstraction facilities in Isabelle such as definition and function have<br>
+well-defined rules for when to break the abstraction automatically: definition<br>
+only explicitly when the user unfolds the defining equation, and function when<br>
+the argument matches the pattern. This seems to work rather well in practice.<br>
+With let_simp, it does not work for bindings.</p>
+<p>Unfortunately, I do not a good understanding of how such on-the-fly abstractions<br>
+(let bindings) should be handled in general. I just have a few data points.<br>
+Norrish and Slind (TPHOLs 2005 proof pearl) argue that it is important in some<br>
+cases to keep the abstraction of let bindings (and the names of the bound<br>
+variables). Their approach extracts let bindings from proof goals and makes them<br>
+available as assumptions. Thus, the user can manually derive the required<br>
+properties for the bound variables and---equally importantly---the let bindings<br>
+are out of the way in the proof term.</p>
+<p>Urban mentioned a similar problem in<br>
+<a href="https://lists.cam.ac.uk/mailman/htdig/cl-isabelle-users/2013-November/msg00277.html">https://lists.cam.ac.uk/mailman/htdig/cl-isabelle-users/2013-November/msg00277.html</a>.</p>
+<p>What I like about let_simp is that it eliminates duplicate let bindings, i.e.,<br>
+the term</p>
+<p>let x = f a b in let y = f a b in P x x y y</p>
+<p>becomes</p>
+<p>let x = f a b in P x x x x</p>
+<p>It also folds the abstraction if the bound term occurs in the body:</p>
+<p>let x = f a b in P x x (f a b)</p>
+<p>becomes</p>
+<p>let x = f a b in P x x x</p>
+<p>Unfortunately, the current simproc does not get the let out of the way. For<br>
+example, to prove the following, I have to unfold the binding.</p>
+<p>1 + (let x = f a in x + x) = (let x = f a in 1 + (x + x))</p>
+<p>Best,<br>
+Andreas</p>
+</blockquote>
+<p><a href="/user_uploads/14278/hi4-SsqowFIIAhMkHbc_ABTC/smime.p7s">smime.p7s</a></p>
+</blockquote>
+</blockquote>
+
+
+
+<a name="294639621"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Let%20and%20commutative%20rewrite%20rules/near/294639621" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Let.20and.20commutative.20rewrite.20rules.html#294639621">(Aug 22 2022 at 09:45)</a>:</h4>
+<p>From: Thomas Sewell &lt;<a href="mailto:thomas.sewell@nicta.com.au">thomas.sewell@nicta.com.au</a>&gt;<br>
+While the let-simp simproc is being discussed, I might mention the<br>
+problem I ran into with it.</p>
+<p>Note that the body of the let is simplified twice, once by the normal<br>
+bottom-up algorithm of the simplifier, and again with the let-expression<br>
+unfolded as part of let-simp.</p>
+<p>Now suppose that you start with a largish program which uses the let<br>
+construct for structuring:</p>
+<p>"let a = 1;<br>
+     (b, s) = f a s;<br>
+     (c, s) = g b s;<br>
+     d = a + b;<br>
+     ... etc"</p>
+<p>Running the regular simplifier on this is exponential in the nesting<br>
+level of the lets. The innermost expression will be simplified with each<br>
+possible combination of folding and unfolding of all the let expressions<br>
+it is in.</p>
+<p>There's also a secondary problem in my case, which is that the let<br>
+expression was folded in the first place to avoid an exponential blowup.<br>
+I tried working around this, but the long story is that I gave up on<br>
+using Isabelle for handling this problem.</p>
+<p>Nonetheless, you might want to think about avoiding the exponential issue.</p>
+<p>Cheers,<br>
+     Thomas.</p>
+<hr>
+<p>The information in this e-mail may be confidential and subject to legal professional privilege and/or copyright. National ICT Australia Limited accepts no liability for any damage caused by this email or its attachments.</p>
+
+
+
+<a name="294639668"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Let%20and%20commutative%20rewrite%20rules/near/294639668" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Let.20and.20commutative.20rewrite.20rules.html#294639668">(Aug 22 2022 at 09:46)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+Thanks for the data point, it looks like we should really separate out that <br>
+exponential blowup because it happens in practice.</p>
+<p>Tobias<br>
+<a href="/user_uploads/14278/djhlV1BbOBc1H--RSQjanrlV/smime.p7s">smime.p7s</a></p>
+
+
+
+<a name="294640022"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Let%20and%20commutative%20rewrite%20rules/near/294640022" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Let.20and.20commutative.20rewrite.20rules.html#294640022">(Aug 22 2022 at 09:48)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;</p>
+<blockquote>
+<p>I like the elimination of atomic let bindings (and the elimination if<br>
+                                                 ^^^^^^^^^^^^^^^^^^^^^^<br>
+there are &lt;= 1 occurrences of the bound variable)<br>
+  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^</p>
+</blockquote>
+<p>This in fact has been introduced by me.</p>
+<p>(Just a remark.  I have little ideas what proof support we actually<br>
+would need for let-bindings).</p>
+<p>Florian<br>
+<a href="/user_uploads/14278/OwFAWg_zOIqoFOHYPZslmnz1/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294642487"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Let%20and%20commutative%20rewrite%20rules/near/294642487" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Let.20and.20commutative.20rewrite.20rules.html#294642487">(Aug 22 2022 at 10:05)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear experts on rewriting,</p>
+<p>I have a problem with let bindings and commutative rewrite rules. Here is an example and <br>
+my understanding of what is happening.</p>
+<p>lemma "(let pb = foobar b in f pb (λpad. g (pb * pad :: int))) = bar"<br>
+apply(simp add: mult.commute)</p>
+<ol>
+<li>
+<p>mult.commute rewrites pb * pad into pad * pb, because pad seems to be smaller than pb <br>
+in the term order that the simplifier uses.</p>
+</li>
+<li>
+<p>The let simproc determines that pb occurs more than once in the body, so it does not <br>
+inline the let binding. Instead, it simplifies the body with knowledge pb = foobar b. <br>
+Thus, the simplifier now sees pad * foobar b. Since "foobar b" is smaller than pad in the <br>
+term order, commutativity kicks in again and we get foobar b * pad. Now, the simproc <br>
+abstracts the simplified body over foobar b again and replaces it with pb. So we are back <br>
+to pb * pad. Thus, the simplifier goes over the whole term again and we are back at step 1.</p>
+</li>
+</ol>
+<p>In my understanding so far, commutative rewrite rules are safe (in the sense of <br>
+termination) to add to the simplifier, but the let simproc interferes with this. Is this a <br>
+known problem? Can the let simproc be somehow changed to avoid this?</p>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<a name="294642509"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Let%20and%20commutative%20rewrite%20rules/near/294642509" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Let.20and.20commutative.20rewrite.20rules.html#294642509">(Aug 22 2022 at 10:05)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+Dear Andreas,</p>
+<p>I was not aware of this interaction but it does not surprise me - the let <br>
+simproc is magic - but you can switch it off. I have no idea if it can be <br>
+modified to avoid this interaction in the first place. That sounds like a time sink.</p>
+<p>Tobias<br>
+<a href="/user_uploads/14278/ktF60FLxaf07QjLaaoQI6cOI/smime.p7s">smime.p7s</a></p>
+
+
+
+<a name="294642596"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Let%20and%20commutative%20rewrite%20rules/near/294642596" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Let.20and.20commutative.20rewrite.20rules.html#294642596">(Aug 22 2022 at 10:05)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear Tobias,</p>
+<p>I had another look at the implementation of let_simp. I guess that one might be able to <br>
+change the let simproc fairly easily. The idea is as follows. For non-trivial lets (at <br>
+least two occurrences of the bound variable and the bound term is not atomic), the let <br>
+simproc inlines the bound term in the body, normalises the result with the simplifier and <br>
+the current simpset, and then replaces all the remaining occurrences of the bound term in <br>
+the normalised term with the bound variable.</p>
+<p>There is already a check whether the new body is alpha-beta-eta-equivalent to the old <br>
+body. In that case, the simproc aborts with NONE. Now, the interaction can occur only if <br>
+the abstracted body is no longer in normal form (although it is with the bound term <br>
+inlined)*. Thus, it would make sense to normalise the abstracted body again and check for <br>
+equivalence with the original body.</p>
+<p>When I add this additional check, the looping in my example disappears. What do you think?</p>
+<p>Best,<br>
+Andreas</p>
+<ul>
+<li>This may happen due to term order as in my case, but I imagine that simprocs like <br>
+NO_MATCH equally cause trouble here.</li>
+</ul>
+
+
+
+<a name="294642859"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Let%20and%20commutative%20rewrite%20rules/near/294642859" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Let.20and.20commutative.20rewrite.20rules.html#294642859">(Aug 22 2022 at 10:07)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+Dear Andreas,</p>
+<p>Thank you for your thoughts, but I would rather not change the current setup. I <br>
+don't really understand Norbert's code and I don't want to add further bits to <br>
+it. Moreover, the problem seems to crop up very rarely. If we were to modify the <br>
+code, I would expect one of two results: it hardly has any effect or it breaks a <br>
+lot of proofs. In both cases I would want to leave well alone.</p>
+<p>Tobias</p>
+<p>PS I have recently made some similar change also in HOL and am thinking about <br>
+undoing it for some of the reasons above.<br>
+<a href="/user_uploads/14278/f0fb7yThQ5_NgZ6emw0aPKY1/smime.p7s">smime.p7s</a></p>
+
+
+
+<a name="294643070"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Let%20and%20commutative%20rewrite%20rules/near/294643070" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Let.20and.20commutative.20rewrite.20rules.html#294643070">(Aug 22 2022 at 10:08)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear Tobias,</p>
+<p>I do not like the situation "We do not fully understand what is going on, so better not <br>
+change anything", because this effectively freezes the code as it currently is with no way <br>
+to ever improve it. I am pretty sure that my change would have hardly any effect on the <br>
+existing proofs (although I would have to test this hypothesis). Still, I agree with your <br>
+decision for another reason. The let_simp simproc is already fairly inefficient when there <br>
+are nested let expressions such as</p>
+<p>let x = foo a b c in<br>
+let y = bar a b c in<br>
+let z = fbr a b c in<br>
+f x x y y z z</p>
+<p>because when the simproc triggers on the let for x (i.e., it has already looked at the <br>
+lets for y and z), it inlines the x in the body and invokes the simplifier on the body</p>
+<p>let y = bar a b c in<br>
+let z = fbr a b c in<br>
+f (foo a b c) (foo a b c) y y z z</p>
+<p>Thus, the simplifier goes over the whole body again, which triggers the let_simp for the y <br>
+once more (it has already triggered for this let binding before it triggered for the outer <br>
+let). In summary, let_simp's runtime is exponential in the depth of let nestings.</p>
+<p>Now, if we were to add another normalisation check for the abstracted body, this would <br>
+increase the base of the exponential by one. The non-termination problem occurs rarely <br>
+(the main reason is probably that commutativity rules are not in the simpset by default), <br>
+so it probably does not justify slowing the simplifier down (although it took me a while <br>
+to understand where the non-termination came from).</p>
+<p>I consider the exponential running time more of a problem. (Note that this term remains <br>
+linear in size if everything is inlined, so there is no exponential blow-up in term size <br>
+due to the inlining.) I digged a bit through the history of the simproc, but I was not <br>
+able to find any more information on what Norbert's case really is. Is there anyone who <br>
+remembers?</p>
+<p>Andreas</p>
+<p>PS: For completeness, here's the changed simproc with the additional normalisation test <br>
+for Isabelle2015-RC3.</p>
+<p>lemma Let_folded2: "⟦ f x ≡ g x; g ≡ g' ⟧ ⟹ Let x f ≡ Let x g'"<br>
+by (simp add: Let_def)</p>
+<p>simproc_setup let_simp ("Let x f") = {*<br>
+let<br>
+   val (f_Let_unfold, x_Let_unfold) =<br>
+     let val [(_ $ (f $ x) $ _)] = Thm.prems_of @{thm Let_unfold}<br>
+     in apply2 (Thm.cterm_of @{context}) (f, x) end<br>
+   val (f_Let_folded2, x_Let_folded2) =<br>
+     let val [(_ $ (f $ x) $ _), _] = Thm.prems_of @{thm Let_folded2}<br>
+     in apply2 (Thm.cterm_of @{context}) (f, x) end;<br>
+   val (g_Let_folded2, g'_Let_folded2) =<br>
+     let val [_, (_ $ g $ g')] = Thm.prems_of @{thm Let_folded2}<br>
+     in apply2 (Thm.cterm_of @{context}) (g, g') end;<br>
+   fun count_loose (Bound i) k = if i &gt;= k then 1 else 0<br>
+     | count_loose (s $ t) k = count_loose s k + count_loose t k<br>
+     | count_loose (Abs (_, _, t)) k = count_loose  t (k + 1)<br>
+     | count_loose _ _ = 0;<br>
+   fun is_trivial_let (Const (@{const_name Let}, _) $ x $ t) =<br>
+     (case t of<br>
+       Abs (_, _, t') =&gt; count_loose t' 0 &lt;= 1<br>
+     | _ =&gt; true);<br>
+in<br>
+   fn _ =&gt; fn ctxt =&gt; fn ct =&gt;<br>
+     if is_trivial_let (Thm.term_of ct)<br>
+     then SOME @{thm Let_def} (<em>no or one ocurrence of bound variable</em>)<br>
+     else<br>
+       let (<em>Norbert Schirmer's case</em>)<br>
+         val t = Thm.term_of ct;<br>
+         val ([t'], ctxt') = Variable.import_terms false [t] ctxt;<br>
+       in<br>
+<a href="http://Option.map">Option.map</a> (hd o Variable.export ctxt' ctxt o single)<br>
+           (case t' of Const (@{const_name Let},_) $ x $ f =&gt; (* x and f are already in <br>
+normal form *)<br>
+             if is_Free x orelse is_Bound x orelse is_Const x<br>
+             then SOME @{thm Let_def}<br>
+             else<br>
+               let<br>
+                 val n = case f of (Abs (x, _, _)) =&gt; x | _ =&gt; "x";<br>
+                 val cx = Thm.cterm_of ctxt x;<br>
+                 val xT = Thm.typ_of_cterm cx;<br>
+                 val cf = Thm.cterm_of ctxt f;<br>
+                 val fx_g = Simplifier.rewrite ctxt (Thm.apply cf cx);<br>
+                 val (_ $ _ $ g) = Thm.prop_of fx_g;<br>
+                 val g' = abstract_over (x, g);<br>
+                 val abs_g'= Abs (n, xT, g');<br>
+               in<br>
+                 if g aconv g' then<br>
+                   let<br>
+                     val rl =<br>
+                       cterm_instantiate [(f_Let_unfold, cf), (x_Let_unfold, cx)] @{thm <br>
+Let_unfold};<br>
+                   in SOME (rl OF [fx_g]) end<br>
+                 else if (Envir.beta_eta_contract f) aconv (Envir.beta_eta_contract <br>
+abs_g') then<br>
+                   NONE (<em>avoid identity conversion</em>)<br>
+                 else<br>
+                   (* normalise the abstracted body, as the abstraction might have<br>
+                      un-normalised the body, e.g., ordered rewriting,<br>
+                      simprocs with syntactic checks, ... *)<br>
+                   let<br>
+                     val g'_normal = Simplifier.rewrite ctxt (Thm.cterm_of ctxt abs_g');<br>
+                     val (_ $ _ $ g'_normalised) = Thm.prop_of g'_normal;<br>
+                   in<br>
+                     if (Envir.beta_eta_contract f) aconv (Envir.beta_eta_contract <br>
+g'_normalised) then<br>
+                       NONE<br>
+                     else<br>
+                       let<br>
+                         val g'x = abs_g' $ x;<br>
+                         val g_g'x = Thm.symmetric (Thm.beta_conversion false <br>
+(Thm.cterm_of ctxt g'x));<br>
+                         val rl =<br>
+                           @{thm Let_folded2} |&gt; cterm_instantiate<br>
+                             [(f_Let_folded2, Thm.cterm_of ctxt f),<br>
+                              (x_Let_folded2, cx),<br>
+                              (g_Let_folded2, Thm.cterm_of ctxt abs_g'),<br>
+                              (g'_Let_folded2, Thm.cterm_of ctxt g'_normalised)];<br>
+                       in SOME (rl OF [Thm.transitive fx_g g_g'x, g'_normal])<br>
+                       end<br>
+                   end<br>
+               end<br>
+           | _ =&gt; NONE)<br>
+       end<br>
+end<br>
+*}</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,96 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] question concerning simplification basics · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20question.20concerning.20simplification.20basics.html">[isabelle] question concerning simplification basics</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294079830"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20question%20concerning%20simplification%20basics/near/294079830" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20question.20concerning.20simplification.20basics.html#294079830">(Aug 18 2022 at 13:44)</a>:</h4>
+<p>From: Andrei Popescu &lt;<a href="mailto:uuomul@yahoo.com">uuomul@yahoo.com</a>&gt;<br>
+Hello,   </p>
+<p>In the scripts below, why does lemma "try" succeed whilst lemma "try2" fails?  ("try2" fails not only with force, but also with auto and blast, not to mention simp). </p>
+<p>Thank you in advance, <br>
+   Andrei Popescu </p>
+<p>consts P::"'a =&gt; bool"</p>
+<p>definition Q :: "'a =&gt; bool" <br>
+where "Q = P"</p>
+<p>lemma try:<br>
+"P x  ==&gt; Q x"<br>
+proof-<br>
+  assume "P x"<br>
+  thus "Q x" by (simp add: Q_def)<br>
+qed</p>
+<p>lemma try2:<br>
+"P x  ==&gt; Q x"<br>
+proof-<br>
+  assume "P x"<br>
+  thus "Q x" using Q_def by force (* THIS FAILS *)<br>
+qed</p>
+
+
+
+<a name="294080071"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20question%20concerning%20simplification%20basics/near/294080071" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20question.20concerning.20simplification.20basics.html#294080071">(Aug 18 2022 at 13:45)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On Tue, 7 Jul 2009, Andrei Popescu wrote:</p>
+<blockquote>
+<p>consts P::"'a =&gt; bool"</p>
+<p>definition Q :: "'a =&gt; bool"<br>
+where "Q = P"</p>
+<p>lemma try:<br>
+"P x  ==&gt; Q x"<br>
+proof-<br>
+  assume "P x"<br>
+  thus "Q x" by (simp add: Q_def)<br>
+qed</p>
+</blockquote>
+<p>This works, because the polymorphic definition Q_def is locally added to <br>
+the Simplifier context (via "add") and the Simplifier will match it <br>
+against any goal states, instantiating an arbitrary ?'a by a fixed 'a as <br>
+expected.</p>
+<blockquote>
+<p>lemma try2:<br>
+"P x  ==&gt; Q x"<br>
+proof-<br>
+  assume "P x"<br>
+  thus "Q x" using Q_def by force (* THIS FAILS *)<br>
+qed</p>
+</blockquote>
+<p>This fails because Q_def is merely inserted straight into the goal, before <br>
+regular "force" operation.  The unspecified ?'a on the left of the <br>
+implication that is part of the goal will never be instantiated by the <br>
+proof tool -- all automated proof tools work like that (simp, auto, fast).</p>
+<p>Better be more specific about "unfolding Q_def" before finishing by force <br>
+etc.  Alternatively, you can include it via "simp add: Q_def" into the <br>
+method context as for simp above.</p>
+<p>Makarius</p>
+
+
+
+<a name="294080130"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20question%20concerning%20simplification%20basics/near/294080130" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20question.20concerning.20simplification.20basics.html#294080130">(Aug 18 2022 at 13:46)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+This is a tricky one to do with types. If you write "using &lt;thms&gt;" then<br>
+these thms become part of the proof state, namely new assumptions. But<br>
+the simplifier does not instantiate ?-Variables in the proof state -<br>
+this is not equivalence preserving. This includes type variables. In<br>
+your example one of your assumptions is now "(Q::?'a =&gt; bool) = (P::?'a<br>
+=&gt; bool)" and this ?'a does not get instantiated with 'a to allow<br>
+rewriting the conclusion "Q(x::'a)". If you write "(simp add:thms)"<br>
+instead, the simplifier is perfectly happy to instantiate the ?-type<br>
+variables as required because they are no longer part of the proof state.</p>
+<p>The only time I add simplification rules via "using" is if they need to<br>
+be simplified themselves. Otherwise "simp add:" is preferable.</p>
+<p>Best<br>
+Tobias</p>
+<p>Andrei Popescu wrote:</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

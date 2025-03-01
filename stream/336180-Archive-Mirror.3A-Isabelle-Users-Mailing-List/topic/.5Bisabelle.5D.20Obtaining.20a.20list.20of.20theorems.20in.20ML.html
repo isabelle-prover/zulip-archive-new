@@ -1,0 +1,160 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Obtaining a list of theorems in ML · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Obtaining.20a.20list.20of.20theorems.20in.20ML.html">[isabelle] Obtaining a list of theorems in ML</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294652638"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Obtaining%20a%20list%20of%20theorems%20in%20ML/near/294652638" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Obtaining.20a.20list.20of.20theorems.20in.20ML.html#294652638">(Aug 22 2022 at 11:12)</a>:</h4>
+<p>From: Viorel Preoteasa &lt;<a href="mailto:viorel.preoteasa@aalto.fi">viorel.preoteasa@aalto.fi</a>&gt;<br>
+Hello,</p>
+<p>I am interested in obtaining the theorems declared in a certain context.<br>
+I know that I can get these theorems from the current context using<br>
+anti-quotations @{thms MyTh}. However this is not satisfactory because<br>
+I need these theorems from a dynamic context which is passed as an<br>
+argument to a function.</p>
+<p>So I need a function "GetMyThms ctxt" which does exactly the same<br>
+as @{thms MyTh}, but for ctxt parameter, and not the current context.</p>
+<p>theorems MyTh = exI exE</p>
+<p>ML{*<br>
+val my_ths = @{thms MyTh};<br>
+val ctxt = @{context}</p>
+<p>fun GetMyThms ctxt = ..;<br>
+val my_thsa = GetMyThms ctxt;<br>
+*}</p>
+<p>How can I achieve this?</p>
+<p>Best regards,</p>
+<p>Viorel Preoteasa</p>
+
+
+
+<a name="294654252"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Obtaining%20a%20list%20of%20theorems%20in%20ML/near/294654252" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Obtaining.20a.20list.20of.20theorems.20in.20ML.html#294654252">(Aug 22 2022 at 11:22)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+Hello Viorel,</p>
+<blockquote>
+<p>So I need a function "GetMyThms ctxt" which does exactly the same<br>
+as @{thms MyTh}, but for ctxt parameter, and not the current context.</p>
+</blockquote>
+<p>this can be achieved like so:</p>
+<p>Proof_Context.get_thms ctxt "append.simps"</p>
+<p>Depending on where you get these theorem names from, it might make more<br>
+sense to use the appropriate parsers which produce theorems directly (e.g.<br>
+Attrib.thms). I would strongly encourage to use those instead.</p>
+<p>Cheers<br>
+Lars</p>
+
+
+
+<a name="294654399"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Obtaining%20a%20list%20of%20theorems%20in%20ML/near/294654399" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Obtaining.20a.20list.20of.20theorems.20in.20ML.html#294654399">(Aug 22 2022 at 11:23)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+(NoteThatCamelCaseIsNotUsedInIsabelleSources.)</p>
+<p>What the @{thms} does exactly can be explored by following its definition <br>
+in Isabelle/ML (using C-hover-click in the Prover IDE).  The main thing is <br>
+Attrib.thm; it has relatives like Attrib.eval_thms (rarely used in <br>
+practice) and Proof_Context.get_fact.</p>
+<p>That does dynamic evaluation of fact names and attribute expressions at <br>
+runtime.  Normally you don't want to do that under program control -- it <br>
+used to be called "fishing" in the past, but that technique is no longer <br>
+seen today, because there are usually better ways.</p>
+<p>For example, dynamically changing facts can be managed like this in <br>
+Isabelle2015:</p>
+<p>named_theorems foo</p>
+<p>ML ‹fun get_foo ctxt = Named_Theorems.get ctxt @{named_theorems foo}›</p>
+<p>The user can now use attributes [foo add] or [foo del].  Your tool can use <br>
+get_foo to see the current content in a given context.</p>
+<p>Makarius</p>
+
+
+
+<a name="294654564"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Obtaining%20a%20list%20of%20theorems%20in%20ML/near/294654564" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Obtaining.20a.20list.20of.20theorems.20in.20ML.html#294654564">(Aug 22 2022 at 11:24)</a>:</h4>
+<p>From: Viorel Preoteasa &lt;<a href="mailto:viorel.preoteasa@aalto.fi">viorel.preoteasa@aalto.fi</a>&gt;<br>
+Hi Makarius,</p>
+<p>Thank you for your answer.</p>
+<blockquote>
+<p>(NoteThatCamelCaseIsNotUsedInIsabelleSources.)<br>
+I was almost sure that I will make a mistake in this example. I did<br>
+think about the "ctxt" abbreviation, and it seems I got it right.</p>
+<p>What the @{thms} does exactly can be explored by following its <br>
+definition in Isabelle/ML (using C-hover-click in the Prover IDE).  <br>
+The main thing is Attrib.thm; it has relatives like Attrib.eval_thms <br>
+(rarely used in practice) and Proof_Context.get_fact.</p>
+</blockquote>
+<p>I did find Attrib.thm by cotrol-click of @{thms ...}, but I did not know <br>
+how to use it directly.</p>
+<blockquote>
+<p>That does dynamic evaluation of fact names and attribute expressions <br>
+at runtime.  Normally you don't want to do that under program control <br>
+-- it used to be called "fishing" in the past, but that technique is <br>
+no longer seen today, because there are usually better ways.</p>
+<p>For example, dynamically changing facts can be managed like this in <br>
+Isabelle2015:</p>
+<p>named_theorems foo</p>
+<p>ML ‹fun get_foo ctxt = Named_Theorems.get ctxt @{named_theorems foo}›</p>
+<p>The user can now use attributes [foo add] or [foo del].  Your tool can <br>
+use get_foo to see the current content in a given context.</p>
+</blockquote>
+<p>This is a nice solution. Is there a way to also clear the foo content, <br>
+without knowing what it contains?</p>
+<p>Viorel</p>
+
+
+
+<a name="294654745"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Obtaining%20a%20list%20of%20theorems%20in%20ML/near/294654745" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Obtaining.20a.20list.20of.20theorems.20in.20ML.html#294654745">(Aug 22 2022 at 11:26)</a>:</h4>
+<p>From: Viorel Preoteasa &lt;<a href="mailto:viorel.preoteasa@aalto.fi">viorel.preoteasa@aalto.fi</a>&gt;<br>
+Hi Lars,</p>
+<p>Thank you for your message.</p>
+<p>On 9/1/2015 5:30 PM, Lars Hupel wrote:</p>
+<blockquote>
+<p>Hello Viorel,</p>
+<blockquote>
+<p>So I need a function "GetMyThms ctxt" which does exactly the same<br>
+as @{thms MyTh}, but for ctxt parameter, and not the current context.<br>
+this can be achieved like so:</p>
+</blockquote>
+<p>Proof_Context.get_thms ctxt "append.simps"</p>
+</blockquote>
+<p>This seems to give me what I need.</p>
+<blockquote>
+<p>Depending on where you get these theorem names from, it might make more<br>
+sense to use the appropriate parsers which produce theorems directly (e.g.<br>
+Attrib.thms). I would strongly encourage to use those instead.<br>
+The first thing <a href="http://th.at">th.at</a> I run into was Attribthms , but I did not manage <br>
+to use it.</p>
+</blockquote>
+<p>These theorems are all fixed under some declaration:</p>
+<p>theorems MySimps = ...</p>
+<p>and in different theories I need to use different theorems, so I will just<br>
+define MySimps to be one or another list.</p>
+<p>Best regards,</p>
+<p>Viorel</p>
+
+
+
+<a name="294654863"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Obtaining%20a%20list%20of%20theorems%20in%20ML/near/294654863" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Obtaining.20a.20list.20of.20theorems.20in.20ML.html#294654863">(Aug 22 2022 at 11:27)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+That is the missing [foo only] that will probably emerge for the next <br>
+release. For now, the implementation of Named_Theorems can be taken as an <br>
+example how to do such things yourself.</p>
+<p>An important ingredient is Local_Theory.add_thms_dynamic to expose certain <br>
+context-defined fact content to the user by a specific name.  If you don't <br>
+like general Local_Theory programming interfaces, you can also do it a <br>
+global theory like this:</p>
+<p>setup ‹Global_Theory.add_thms_dynamic (@{binding foo}, undefined)›</p>
+<p>The "undefined" function accesses your tool-specific facts.  You can <br>
+maintain that in any way you like, e.g. via Generic_Data in the context.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

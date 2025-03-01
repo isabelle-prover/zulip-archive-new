@@ -1,0 +1,90 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Auto and set ordering -- unpredictable? · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Auto.20and.20set.20ordering.20--.20unpredictable.3F.html">[isabelle] Auto and set ordering -- unpredictable?</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294130209"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Auto%20and%20set%20ordering%20--%20unpredictable%3F/near/294130209" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Auto.20and.20set.20ordering.20--.20unpredictable.3F.html#294130209">(Aug 18 2022 at 17:08)</a>:</h4>
+<p>From: <a href="mailto:munddr@gmail.com">munddr@gmail.com</a><br>
+Hi,</p>
+<p>I'm trying to prove a very simple lemma in the following simple example:</p>
+<p>axiomatization<br>
+f :: "nat =&gt; nat" and<br>
+Set :: "nat set" and<br>
+i1 :: nat and<br>
+i2 :: nat<br>
+where<br>
+f1 : "f i1 = 1" and<br>
+f2 : "f i2 = 2" and<br>
+s1 : "Set = {i1,i2}"</p>
+<p>lemma "{i2} = {x : {i2,i1}. fx = 2}"<br>
+using f1 f2 s1<br>
+by auto</p>
+<p>It works and I know s1 is redundant here. Now, let's try:</p>
+<p>lemma "{i2} = {x : {i1,i2}. fx = 2}"<br>
+using f1 f2 s1<br>
+by auto</p>
+<p>Auto doesn't work. However, if s1 was removed, it works. So how come using  <br>
+the redundant fact "s1" requires the set to be ordered in a particular way?  <br>
+It doesn't seem intuitive.</p>
+<p>Help will be appreciated!</p>
+<p>Thanks<br>
+John</p>
+
+
+
+<a name="294130215"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Auto%20and%20set%20ordering%20--%20unpredictable%3F/near/294130215" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Auto.20and.20set.20ordering.20--.20unpredictable.3F.html#294130215">(Aug 18 2022 at 17:08)</a>:</h4>
+<p>From: Brian Huffman &lt;<a href="mailto:brianh@cs.pdx.edu">brianh@cs.pdx.edu</a>&gt;<br>
+Hi John,</p>
+<p>I tried this example with "trace simplifier" enabled, and it reveals<br>
+what the problem is. Here is the first part of the tracing output:</p>
+<p>[1]SIMPLIFIER INVOKED ON THE FOLLOWING TERM:<br>
+⟦f i1 = 1; f i2 = 2; Set = {i1, i2}⟧ ⟹ {i2} = {x ∈ {i1, i2}. f x = 2}</p>
+<p>[1]Adding rewrite rule "??.unknown":<br>
+f i2 ≡ 2</p>
+<p>[1]Adding rewrite rule "??.unknown":<br>
+{i1, i2} ≡ Set</p>
+<p>Note the orientation of the rule in the last line.</p>
+<p>Usually, when you have an assumption of the form "lhs = rhs", the<br>
+simplifier will add the rewrite rule "lhs == rhs" to the local<br>
+simpset. But depending on some heuristic, the simplifier may decide to<br>
+add the rewrite "rhs == lhs", or even "(lhs = rhs) == True" instead. I<br>
+have seen this behavior before in situations where the rule "lhs ==<br>
+rhs" would obviously loop, so it only makes sense to use the opposite<br>
+orientation. "(lhs = rhs) == True" is used when either orientation<br>
+would obviously loop.</p>
+<p>Apparently the heuristic also reorients rules like "Set = {i1, i2}",<br>
+where the lhs is a top-level constant. Usually this reorientation<br>
+makes sense (for example, with the assumption "[] = xs", it is better<br>
+to replace each occurrence of "xs" with "[]" than vice-versa) since<br>
+for most top-level constants, there will be further applicable simp<br>
+rules in the simpset.</p>
+<p>Note that the heuristic does not apply to locally-fixed variables. So<br>
+the following proof works:</p>
+<p>lemma<br>
+  fixes f :: "nat =&gt; nat" and Set :: "nat set" and i1 :: nat and i2 :: nat<br>
+  assumes f1 : "f i1 = 1" and f2 : "f i2 = 2" and s1 : "Set = {i1, i2}"<br>
+  shows "{i2} = {x : {i1, i2}. f x = 2}"<br>
+using f1 f2 s1<br>
+by auto</p>
+<p>I expect that if you changed your axiomatization to a locale, the<br>
+reorientation would similarly go away.</p>
+<p>Also, if you use "simp add" instead of "using", the reorientation does<br>
+not happen:</p>
+<p>lemma "{i2} = {x : {i1, i2}. f x = 2}"<br>
+by (auto simp add: f1 f2 s1)</p>
+<ul>
+<li>Brian</li>
+</ul>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

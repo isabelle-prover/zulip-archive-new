@@ -1,0 +1,103 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Possible bug in Finite_Map · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Possible.20bug.20in.20Finite_Map.html">[isabelle] Possible bug in Finite_Map</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294744328"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Possible%20bug%20in%20Finite_Map/near/294744328" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Possible.20bug.20in.20Finite_Map.html#294744328">(Aug 22 2022 at 18:26)</a>:</h4>
+<p>From: Domagoj Stolfa &lt;<a href="mailto:ds815@cam.ac.uk">ds815@cam.ac.uk</a>&gt;<br>
+Hi all:</p>
+<p>I've tried naively writing a function that filters some values in the codomain of an fmap. It resulted in a function that looks a little bit like:</p>
+<p>fun filter_types_clause :: "(var, (ty × nat)) fmap ⇒ (var, (ty × nat)) fmap" where<br>
+"filter_types_clause m = fmfilter<br>
+                          (λx .<br>
+                            (let r = fmlookup m x in<br>
+                              case r of None ⇒ False<br>
+                                       | Some res ⇒ let scp = snd res in<br>
+                                                      if scp = 2 ∨ scp = 3<br>
+                                                        then True<br>
+                                                        else False))<br>
+                          m"</p>
+<p>However, Isabelle wasn't happy with the function and outputted the following error:</p>
+<p>exception THM 0 raised (line 86 of "goal.ML"):<br>
+  Proof failed.</p>
+<p>1. ⋀ma. fmfilter<br>
+             (λx. case fmlookup ma x of None ⇒ False<br>
+                  | Some res ⇒ let scp = snd res in (scp = 2 ∨ scp = 3 ⟶ True) ∧ (¬ (scp = 2 ∨ scp = 3) ⟶ False))<br>
+             ma =<br>
+            fmfilter<br>
+             (λx. Let (fmlookup ma x)<br>
+                   (case_option False<br>
+                     (λres. let scp = snd res in (scp = 2 ∨ scp = 3 ⟶ True) ∧ (¬ (scp = 2 ∨ scp = 3) ⟶ False))))<br>
+             ma<br>
+  (⋀ma. fmfilter<br>
+          (λx. case fmlookup ma x of None ⇒ False<br>
+               | Some res ⇒ let scp = snd res in (scp = 2 ∨ scp = 3 ⟶ True) ∧ (¬ (scp = 2 ∨ scp = 3) ⟶ False))<br>
+          ma =<br>
+         fmfilter<br>
+          (λx. Let (fmlookup ma x)<br>
+                (case_option False<br>
+                  (λres. let scp = snd res in (scp = 2 ∨ scp = 3 ⟶ True) ∧ (¬ (scp = 2 ∨ scp = 3) ⟶ False))))<br>
+          ma) ⟹<br>
+  ((⋀a. Wellfounded.accp filter_types_clause_rel a ⟹ ∃!y. filter_types_clause_graph a y) &amp;&amp;&amp;<br>
+   (⋀P x. (⋀m. x = m ⟹ P) ⟹ P))<br>
+    [filter_types_clause_graph ≡ ??.tinyd.filter_types_clause_graph]</p>
+<p>Writing the function without the first let, and instead putting the expression (fmlookup m x) in the case expression eliminates the bug. Moreover, writing it as a definition instead of a function in the above form also gets rid of the problem (as it's non-recursive to begin with). After talking to Lars (who also suggested writing it down as a definition instead of a function), we seem to have reached a conclusion that it may be a bug in Finite_Map -- could anyone confirm/reproduce this? The "var" type is a String.literal and "ty" is just a sum type with four constructors, ty_int, ty_array, ty_bool and ty_unit.</p>
+<p>The version of Isabelle is 2018 and I've been running it on Mac OS X.</p>
+<p>Thanks!</p>
+<p>—<br>
+Domagoj<br>
+<a href="/user_uploads/14278/xGKWpmmcYbKBZoWJgrdPNjSg/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294744351"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Possible%20bug%20in%20Finite_Map/near/294744351" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Possible.20bug.20in.20Finite_Map.html#294744351">(Aug 22 2022 at 18:27)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+This appears to be a problem with "auto".</p>
+<p>Here is a smaller reproducer:</p>
+<p>"filter_types_clause m = fmfilter<br>
+                          (λx .<br>
+                            (let r = fmlookup m x in<br>
+                              case r of  Some res ⇒  snd res = 2))<br>
+                          m"</p>
+<p>When defining this function "function (sequential)", "pat_completeness"<br>
+discharges the first subgoal as it should. But "auto", instead of<br>
+solving the remaining one, produces this goal state:</p>
+<p>goal (1 subgoal):</p>
+<ol>
+<li>⋀ma.<br>
+  fmfilter (λx. case fmlookup ma x of Some res ⇒ snd res = 2) ma =<br>
+  fmfilter (λx. Let (fmlookup ma x) (case_option undefined (λres. snd<br>
+res = 2))) ma</li>
+</ol>
+<p>For some reason, it unfolds the "Let" in the first half of the equation,<br>
+but not in the second half.</p>
+<p>Without the let simproc, it works:</p>
+<p>declare [[simproc del: let_simp]]</p>
+<p>Maybe someone who knows how that simproc works could take a look.</p>
+<p>Cheers<br>
+Lars</p>
+
+
+
+<a name="294744449"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Possible%20bug%20in%20Finite_Map/near/294744449" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Possible.20bug.20in.20Finite_Map.html#294744449">(Aug 22 2022 at 18:27)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:mail@andreas-lochbihler.de">mail@andreas-lochbihler.de</a>&gt;<br>
+Hi Lars,</p>
+<p>I briefly looked into this. To me, let_simp does not seem to be the culprit. From looking <br>
+at simp_trace and simp_debug, It seems as if there is an unfortunate interaction between <br>
+the congruence rule for fmfilter and the case_option simp rules. For if I delete the <br>
+fmfilter_cong congruence rule, the proof succeeds.</p>
+<p>Andreas</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

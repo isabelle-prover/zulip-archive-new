@@ -1,0 +1,56 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle-dev] Application of method algebra fails · Mirror: Isabelle Development Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/index.html">Mirror: Isabelle Development Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20Application.20of.20method.20algebra.20fails.html">[isabelle-dev] Application of method algebra fails</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="343799754"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20Application%20of%20method%20algebra%20fails/near/343799754" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20Application.20of.20method.20algebra.20fails.html#343799754">(Mar 22 2023 at 22:51)</a>:</h4>
+<p>From: <a href="mailto:christian@madez.de">christian@madez.de</a><br>
+In some cases, the proof method algebra fails even though it should work.<br>
+The bug can be reproduced in one case with the following theory:</p>
+<p>theory Scratch<br>
+  imports Main<br>
+begin</p>
+<p>lemma "(- x + 3) * (x + 1) + (x - 1) ^ 2 - 3 = (1::int)"<br>
+  by algebra</p>
+<p>lemma "(- x + 3) * (x + 1) + (x - 1) ^ 2 - 2 = (2::int)"<br>
+  by algebra</p>
+<p>end<br>
+I verified the bug occurs on Isabelle2021-1, Isabelle2022 and on the changeset 77699:d5060a919b3f from Mon Mar 20 18:33:56 2023 +0100.</p>
+<p>CTRL + left click on the proof method algebra in Isabelle opens the file src/HOL/Groebner_Basis.thy. This points to algebra_tac in Tools/groebner.ML. There we find the definition</p>
+<p>fun algebra_tac add_ths del_ths ctxt i =<br>
+ ring_tac add_ths del_ths ctxt i ORELSE ideal_tac add_ths del_ths ctxt i<br>
+We can find the definition of ring_tac in the same file as:</p>
+
+
+
+<a name="343800252"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20Application%20of%20method%20algebra%20fails/near/343800252" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20Application.20of.20method.20algebra.20fails.html#343800252">(Mar 22 2023 at 22:55)</a>:</h4>
+<p>From: <a href="mailto:christian@madez.de">christian@madez.de</a><br>
+I'm sorry I sent the last message truncated. Here is the rest of the message:</p>
+<p>fun ring_tac add_ths del_ths ctxt =<br>
+  Object_Logic.full_atomize_tac ctxt<br>
+  THEN' presimplify ctxt add_ths del_ths<br>
+  THEN' CSUBGOAL (fn (p, i) =&gt;<br>
+    resolve_tac ctxt [let val form = Object_Logic.dest_judgment ctxt p<br>
+          in case get_ring_ideal_convs ctxt form of<br>
+           NONE =&gt; Thm.reflexive form<br>
+          | SOME thy =&gt; #ring_conv thy ctxt form<br>
+          end] i<br>
+      handle TERM _ =&gt; no_tac<br>
+        | CTERM _ =&gt; no_tac<br>
+        | THM _ =&gt; no_tac);<br>
+I do not see how debug this system like I could with printing state in imperative languages, so I'm lost at this point.</p>
+<p>Best,<br>
+Christian Weinz</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

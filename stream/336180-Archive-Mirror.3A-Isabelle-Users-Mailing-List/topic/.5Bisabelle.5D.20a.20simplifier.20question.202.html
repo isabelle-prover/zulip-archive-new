@@ -1,0 +1,249 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] a simplifier question 2 · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20a.20simplifier.20question.202.html">[isabelle] a simplifier question 2</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294643585"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20a%20simplifier%20question%202/near/294643585" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20a.20simplifier.20question.202.html#294643585">(Aug 22 2022 at 10:12)</a>:</h4>
+<p>From: Lars Noschinski &lt;<a href="mailto:noschinl@in.tum.de">noschinl@in.tum.de</a>&gt;<br>
+On 13.06.2015 15:59, noam neer wrote:</p>
+<blockquote>
+<p>sounds reasonable. however, when I give it to Isabelle I don't get an<br>
+error message saying it can't match power_add to the goal,</p>
+</blockquote>
+<p>You wouldn't get an error message about this -- an equation not matching<br>
+the goal is the rule, not the exception ;)</p>
+<blockquote>
+<p>I get some<br>
+complaint about type unknowns :</p>
+<p>lemma ?a ^ 6 = ?a ^ 3 * ?a ^ 3<br>
+    [1]SIMPLIFIER INVOKED ON THE FOLLOWING TERM:<br>
+    (⋀a m n. a ^ (m + n) = a ^ m * a ^ n) ⟹ a ^ 6 = a ^ 3 * a ^ 3<br>
+    [1]Cannot add premise as rewrite rule because it contains (type) unknowns:<br>
+    ⋀a m n. a ^ (m + n) = a ^ m * a ^ n<br>
+    Failed to apply initial proof method⌂:<br>
+    using this:<br>
+      ?a ^ (?m + ?n) = ?a ^ ?m * ?a ^ ?n<br>
+    goal (1 subgoal):<br>
+     1. a ^ 6 = a ^ 3 * a ^ 3</p>
+<p>what does it mean ?<br>
+This means that that the simplifier falls over even earlier than I<br>
+thought: Isabelle/HOL cannot quantify over types, so polymorphic rules<br>
+(like power_add) are expressed by schematic type variables. If you do</p>
+</blockquote>
+<p>lemma<br>
+          fixes   a::real<br>
+          shows   "a^6 = a^3 * a^3"<br>
+        using power_add<br>
+        apply -</p>
+<p>you see that the schematic variables in power_add have been replaced by<br>
+universally quantified variables. However, if you Ctrl+Hover over the<br>
+bound variable "a", you see that it still has a schematic type. To use<br>
+it for rewriting, these variables must be instantiated. The simplifier<br>
+does not instantiate type variables (except in a few circumstances), so<br>
+it rejects this rule.</p>
+<p>For your experiments, you can instantiate the type variables in the<br>
+lemma by writing</p>
+<p>using power_add[where 'a=real]</p>
+<p>instead.</p>
+<p>-- Lars</p>
+
+
+
+<a name="294646617"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20a%20simplifier%20question%202/near/294646617" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20a.20simplifier.20question.202.html#294646617">(Aug 22 2022 at 10:32)</a>:</h4>
+<p>From: noam neer &lt;<a href="mailto:noamneer@gmail.com">noamneer@gmail.com</a>&gt;<br>
+hi.</p>
+<p>I have another simplifier question, possibly partly related to the previous<br>
+one.<br>
+again I have a proof that works-</p>
+<p>theory tmp<br>
+imports Complex_Main<br>
+begin<br>
+    lemma<br>
+      fixes   a::real<br>
+      shows   "a^6 = a^3 * a^3"<br>
+    using [[simp_trace=true]]<br>
+    using power_add [of a 3 3]<br>
+    by simp<br>
+end</p>
+<p>and two that don't. the first failed proof is</p>
+<p>theory tmp<br>
+imports Complex_Main<br>
+begin<br>
+    lemma<br>
+      fixes   a::real<br>
+      shows   "a^6 = a^3 * a^3"<br>
+    using [[simp_trace=true]]<br>
+    using power_add<br>
+    by simp<br>
+end</p>
+<p>where it seems strange that the smiplifier couldn't find by itself such a<br>
+simple substitution. the second failed proof is</p>
+<p>theory tmp<br>
+imports Complex_Main<br>
+begin<br>
+    lemma<br>
+      fixes   a::real<br>
+      shows   "a^6 = a^3 * a^3"<br>
+    using [[simp_trace=true]]<br>
+    by (simp add:power_add [of a 3 3])<br>
+end</p>
+<p>is the explanation here the same as before, that in this way<br>
+"power_add [of a 3 3]" is not available to the linear arith component?<br>
+it seems that the simplifier could have done it by itself if it only knew<br>
+that "6=3+3". isn't there a way to inform it of this? it seems very<br>
+rudimentary.</p>
+<p>thanx</p>
+
+
+
+<a name="294646625"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20a%20simplifier%20question%202/near/294646625" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20a.20simplifier.20question.202.html#294646625">(Aug 22 2022 at 10:32)</a>:</h4>
+<p>From: Lars Noschinski &lt;<a href="mailto:noschinl@in.tum.de">noschinl@in.tum.de</a>&gt;<br>
+On 07.06.2015 01:30, noam neer wrote:</p>
+<p>[simplifier questions]</p>
+<p>The simplifier performs (primarily) rewriting. A term t will be<br>
+rewritten with an equation s = s' if there is some substitution of the<br>
+variables σ, such that t is syntactically equal to sσ. Then t is<br>
+replaced by s'σ. The simplifier tries to do this for all subterms of the<br>
+goal.</p>
+<p>Recall, power_add is the theorem: ?a ^ (?m + ?n) = ?a ^ ?m * ?a ^ ?n</p>
+<p>Now, for your proof attempts:</p>
+<blockquote>
+<p>lemma<br>
+     fixes   a::real<br>
+     shows   "a^6 = a^3 * a^3"<br>
+   using [[simp_trace=true]]<br>
+   using power_add [of a 3 3]<br>
+   by simp </p>
+</blockquote>
+<p>This works as the simplifier can rewrite "3 + 3" to 6 and can then solve<br>
+the goal by rewriting with "a^6 = a^3 * a^3".</p>
+<blockquote>
+<p>using power_add</p>
+</blockquote>
+<p>The simplifier cannot rewrite "?m + ?n" to anything. It also does not match the "6" in the goal.</p>
+<blockquote>
+<p>apply (simp add: power_add)</p>
+</blockquote>
+<p>Similar. "a^6" does not match "?a ^ (?m + ?n)".</p>
+<p>In my opinion, the nicest proof is:</p>
+<p>apply (simp add: power_add[symmetric])</p>
+<p>The [symmetric] reverses the equation.</p>
+<p>-- Lars</p>
+
+
+
+<a name="294646636"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20a%20simplifier%20question%202/near/294646636" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20a.20simplifier.20question.202.html#294646636">(Aug 22 2022 at 10:32)</a>:</h4>
+<p>From: noam neer &lt;<a href="mailto:noamneer@gmail.com">noamneer@gmail.com</a>&gt;<br>
+thanx for the explanation.<br>
+however, note that in the third proof I didn't write</p>
+<blockquote>
+<p>apply (simp add: power_add)</p>
+</blockquote>
+<p>but</p>
+<blockquote>
+<p>by (simp add:power_add [of a 3 3])</p>
+</blockquote>
+<p>so I'm adding "a^(3+3)=a^3 * a^3" to the simp set.<br>
+this doesn't match directly, but why wasn't the simplifier able<br>
+to simplify it to "a^6 = a^3 * a^3" ?</p>
+<p>On Sun, Jun 7, 2015 at 10:12 AM, Lars Noschinski &lt;<a href="mailto:noschinl@in.tum.de">noschinl@in.tum.de</a>&gt; wrote:</p>
+<blockquote>
+<p>On 07.06.2015 01:30, noam neer wrote:</p>
+<p>[simplifier questions]</p>
+<p>The simplifier performs (primarily) rewriting. A term t will be<br>
+rewritten with an equation s = s' if there is some substitution of the<br>
+variables σ, such that t is syntactically equal to sσ. Then t is<br>
+replaced by s'σ. The simplifier tries to do this for all subterms of the<br>
+goal.</p>
+<p>Recall, power_add is the theorem: ?a ^ (?m + ?n) = ?a ^ ?m * ?a ^ ?n</p>
+<p>Now, for your proof attempts:</p>
+<blockquote>
+<p>lemma<br>
+     fixes   a::real<br>
+     shows   "a^6 = a^3 * a^3"<br>
+   using [[simp_trace=true]]<br>
+   using power_add [of a 3 3]<br>
+   by simp</p>
+</blockquote>
+<p>This works as the simplifier can rewrite "3 + 3" to 6 and can then solve<br>
+the goal by rewriting with "a^6 = a^3 * a^3".</p>
+<blockquote>
+<p>using power_add</p>
+</blockquote>
+<p>The simplifier cannot rewrite "?m + ?n" to anything. It also does not<br>
+match the "6" in the goal.</p>
+<blockquote>
+<p>apply (simp add: power_add)</p>
+</blockquote>
+<p>Similar. "a^6" does not match "?a ^ (?m + ?n)".</p>
+<p>In my opinion, the nicest proof is:</p>
+<p>apply (simp add: power_add[symmetric])</p>
+<p>The [symmetric] reverses the equation.</p>
+<p>-- Lars</p>
+</blockquote>
+
+
+
+<a name="294646649"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20a%20simplifier%20question%202/near/294646649" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20a.20simplifier.20question.202.html#294646649">(Aug 22 2022 at 10:32)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:eberlm@in.tum.de">eberlm@in.tum.de</a>&gt;<br>
+Equations added to the simp set are not simplified themselves, so the <br>
+simplifier will only rewrite "a^(3+3)", but still not "a^6". It might <br>
+not even rewrite "a^(3+3)" to "a^3 * a^3", because "3+3" might be <br>
+rewritten to "6" first.</p>
+<p>Manuel</p>
+
+
+
+<a name="294646669"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20a%20simplifier%20question%202/near/294646669" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20a.20simplifier.20question.202.html#294646669">(Aug 22 2022 at 10:33)</a>:</h4>
+<p>From: Lars Noschinski &lt;<a href="mailto:noschinl@in.tum.de">noschinl@in.tum.de</a>&gt;<br>
+That issue is shortly touched upon in Gerwin's style guide[1] in the<br>
+section " Decide on good normal forms and use them consistently."</p>
+<p>[1] <a href="http://proofcraft.org/blog/isabelle-style-part2.html">http://proofcraft.org/blog/isabelle-style-part2.html</a></p>
+
+
+
+<a name="294647160"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20a%20simplifier%20question%202/near/294647160" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20a.20simplifier.20question.202.html#294647160">(Aug 22 2022 at 10:36)</a>:</h4>
+<p>From: noam neer &lt;<a href="mailto:noamneer@gmail.com">noamneer@gmail.com</a>&gt;<br>
+hi again.your explanation for the first failed proof :</p>
+<p>theory tmp<br>
+    imports Complex_Main<br>
+    begin<br>
+        lemma<br>
+          fixes   a::real<br>
+          shows   "a^6 = a^3 * a^3"<br>
+        using [[simp_trace=true]]<br>
+        using power_add<br>
+        by simp<br>
+    end</p>
+<p>sounds reasonable. however, when I give it to Isabelle I don't get an<br>
+error message saying it can't match power_add to the goal, I get some<br>
+complaint about type unknowns :</p>
+<p>lemma ?a ^ 6 = ?a ^ 3 * ?a ^ 3<br>
+    [1]SIMPLIFIER INVOKED ON THE FOLLOWING TERM:<br>
+    (⋀a m n. a ^ (m + n) = a ^ m * a ^ n) ⟹ a ^ 6 = a ^ 3 * a ^ 3<br>
+    [1]Cannot add premise as rewrite rule because it contains (type) unknowns:<br>
+    ⋀a m n. a ^ (m + n) = a ^ m * a ^ n<br>
+    Failed to apply initial proof method⌂:<br>
+    using this:<br>
+      ?a ^ (?m + ?n) = ?a ^ ?m * ?a ^ ?n<br>
+    goal (1 subgoal):</p>
+<p>1. a ^ 6 = a ^ 3 * a ^ 3</p>
+<p>what does it mean ?</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,244 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Isabelle2021-1-RC2: Invoking smt-method in the... · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2021-1-RC2.3A.20Invoking.20smt-method.20in.20the.2E.2E.2E.html">[isabelle] Isabelle2021-1-RC2: Invoking smt-method in the...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="260773679"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2021-1-RC2%3A%20Invoking%20smt-method%20in%20the.../near/260773679" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2021-1-RC2.3A.20Invoking.20smt-method.20in.20the.2E.2E.2E.html#260773679">(Nov 09 2021 at 09:42)</a>:</h4>
+<p>From: Dominique Unruh &lt;<a href="mailto:unruh@ut.ee">unruh@ut.ee</a>&gt;<br>
+Hi,</p>
+<p>I have one problem with an Isabelle/Scala initialized Isabelle session. <br>
+I do not know whether this indicates a regression or is because I <br>
+initialize Isabelle wrongly. (The problem did not occur with Isabelle2021.)</p>
+<p>I have a theory that contains a trivial lemma with smt-method (lemma <br>
+True by smt).</p>
+<p>When I load this theory via Isabelle/Scala, I get the following exception:</p>
+<p>exception Fail raised (line 57 of "System/isabelle_system.ML"): Bad<br>
+    bash_process server address<br>
+    At command "by" (line 6 of<br>
+    "~/svn/qrhl-tool/scala-isabelle/src/test/isabelle/Theory_With_Smt.thy")</p>
+<p>I initialize Isabelle roughly as follows:</p>
+<p>Isabelle_System.init(isabelle_root = isabelleRoot.toString)<br>
+    val channel = System_Channel()<br>
+    val options = Options.init()<br>
+    val channel_options = options.string.update("system_channel_address", channel.address).<br>
+       string.update("system_channel_password", channel.password)</p>
+<p>val sessionRoots2 = sessionRoots.map(p =&gt; isabelle.File.path(p.toFile)).toList<br>
+    val sessions_structure = Sessions.load_structure(options = options, dirs = sessionRoots2)<br>
+    val store = Sessions.store(options)</p>
+<p>ML_Process(channel_options, sessions_structure, store, eval_main = mlCode, logic = logic, cwd = cwd.toFile)</p>
+<p>Here mlCode is some ML code that does some communication and then <br>
+effectively runs the following code:</p>
+<p>Thy_Info.use_thy (Path.implode path)</p>
+<p>Thy_Info.get_theory name</p>
+<p>where path and name are the path and name of the theory with the smt call.</p>
+<p>The same above works fine with theories that do not contain smt.</p>
+<p>I'm sorry not to provide a runnable example, but give the concrete <br>
+setup, it would be quite some work to cut everything down to a runnable <br>
+example. I'm hoping the issue can be clarified without one. But if not, <br>
+I can try to produce one.</p>
+<p>Best wishes,<br>
+Dominique.</p>
+
+
+
+<a name="260784304"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2021-1-RC2%3A%20Invoking%20smt-method%20in%20the.../near/260784304" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2021-1-RC2.3A.20Invoking.20smt-method.20in.20the.2E.2E.2E.html#260784304">(Nov 09 2021 at 11:28)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+The relevant NEWS entry for Isabelle2021-1 is this:</p>
+<ul>
+<li>External bash processes are always managed by Isabelle/Scala, in<br>
+contrast to Isabelle2021 where this was only done for macOS on Apple<br>
+Silicon.</li>
+</ul>
+<p>The main Isabelle/ML interface is Isabelle_System.bash_process with<br>
+result type Process_Result.T (resembling class Process_Result in Scala);<br>
+derived operations Isabelle_System.bash and Isabelle_System.bash_output<br>
+provide similar functionality as before. The underlying TCP/IP server<br>
+within Isabelle/Scala is available to other programming languages as<br>
+well, notably Isabelle/Haskell.</p>
+<p>We have already had long discussions about remaining possibilities to run<br>
+Isabelle without a proper PIDE session context.</p>
+<p>Many system operations already use the Isabelle/Scala function protocol, e.g.<br>
+Isabelle_System.make_directory. This works much better and more portably that<br>
+e.g. perl in the past (perl has been discontinued altogether for Isabelle2021-1).</p>
+<p>For "bash_process" there is something special: the service is actually via<br>
+TCP, e.g. to allow Haskell (or eventually OCaml) to run the external process<br>
+in the Isabelle way.</p>
+<p>Thus you merely need a proper server in Isabelle/Scala + options for<br>
+Isabelle/ML, and not a full PIDE session.  Here is an example of such<br>
+low-level tinkering that could work by accident:</p>
+<p>import isabelle._</p>
+<p>val options = Options.init()<br>
+val session = new Session(options, Resources.empty)<br>
+val bash_handler = new Bash.Handler<br>
+bash_handler.init(session)</p>
+<p>val ml_options = bash_handler.prover_options(options)</p>
+<p>// sanity check:<br>
+ml_options.string("bash_process_address")<br>
+ml_options.string("bash_process_password")</p>
+<p>// run ML_Process<br>
+ML_Process(ml_options, ...)</p>
+<p>bash_handler.exit()</p>
+<p>Makarius</p>
+
+
+
+<a name="260785726"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2021-1-RC2%3A%20Invoking%20smt-method%20in%20the.../near/260785726" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2021-1-RC2.3A.20Invoking.20smt-method.20in.20the.2E.2E.2E.html#260785726">(Nov 09 2021 at 11:42)</a>:</h4>
+<p>From: Dominique Unruh &lt;<a href="mailto:unruh@ut.ee">unruh@ut.ee</a>&gt;<br>
+Hi,</p>
+
+
+
+<a name="260788242"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2021-1-RC2%3A%20Invoking%20smt-method%20in%20the.../near/260788242" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2021-1-RC2.3A.20Invoking.20smt-method.20in.20the.2E.2E.2E.html#260788242">(Nov 09 2021 at 12:09)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On 09/11/2021 12:40, Dominique Unruh wrote:</p>
+<blockquote>
+<blockquote>
+<p>We have already had long discussions about remaining possibilities to run<br>
+Isabelle without a proper PIDE session context.<br>
+Yes, and you convinced me not to do that. The code fragment in my mail was my<br>
+attempt to programmatically initialize such a PIDE session context. However, I<br>
+do not know what a "proper PIDE session context" means in terms of the methods<br>
+that I invoke. I thought Isabelle.init followed by ML_Process would do that.<br>
+Should I initialize it differently?</p>
+</blockquote>
+</blockquote>
+<p>The PIDE session object in my snippet is this:</p>
+<p>val session = new Session(options, Resources.empty)</p>
+<p>But that is not quite "proper": the resources are empty and it is not<br>
+connected to an ML process. The Bash.Handler does not care right now.</p>
+<blockquote>
+<p>Note that I don't directly care about the bash, it just happens that the<br>
+exception I got related to bash, but what I needed was to invoke "by smt".</p>
+</blockquote>
+<p>There are two assumptions behind that:</p>
+<p>* bash_process works (this thread)</p>
+<p>* z3 works: it has always been somewhat fragile and is de-facto downgraded<br>
+now; veriT takes more and more over.</p>
+<blockquote>
+<p>So I don't want to do low-level tinkering if it can be avoided, but correctly<br>
+initialize PIDE (as long as this can be done starting the Isabelle process<br>
+from Scala, as opposed to the other way around).</p>
+</blockquote>
+<p>You can see in Isabelle/jEdit and Isabelle/VSCode how the Session objects are<br>
+created and initalized. The scala_project Maven project makes it very easy to<br>
+browse the implementation.</p>
+<blockquote>
+<p>My goal is to have scala-isabelle use the officially supported ways to get<br>
+maximum stability.</p>
+</blockquote>
+<p>You should actually try to dismantle scala-isabelle. It has caused enough<br>
+tensions and continuous problems in the past.</p>
+<p>Makarius</p>
+
+
+
+<a name="260798752"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2021-1-RC2%3A%20Invoking%20smt-method%20in%20the.../near/260798752" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2021-1-RC2.3A.20Invoking.20smt-method.20in.20the.2E.2E.2E.html#260798752">(Nov 09 2021 at 13:44)</a>:</h4>
+<p>From: Dominique Unruh &lt;<a href="mailto:unruh@ut.ee">unruh@ut.ee</a>&gt;<br>
+Hi,</p>
+<blockquote>
+<p>You can see in Isabelle/jEdit and Isabelle/VSCode how the Session objects are<br>
+created and initalized.<br>
+OK, I will try and reverse engineer from there.</p>
+</blockquote>
+<blockquote>
+<p>You should actually try to dismantle scala-isabelle. It has caused enough<br>
+tensions and continuous problems in the past.<br>
+I think there is a misunderstanding here.</p>
+</blockquote>
+<p>If I dismantle scala-isabelle, I will still have to invoke Isabelle from <br>
+within qrhl-tool (unless you suggest to dismantle that theorem prover, <br>
+too).  (Unless you count the repeated mails some time ago where someone <br>
+insisted in using scala-isabelle for getting an AST of an Isabelle <br>
+theory despite your and my explanations that this is not supported by <br>
+Isabelle or scala-isabelle.)</p>
+<p>And the difficulties I have raised in this list related to <br>
+scala-isabelle are due to the fact that it is not clear (to me) and also <br>
+somewhat in flux, how to invoke Isabelle from Scala.</p>
+<p>So I would have exactly the same questions if I would not use <br>
+scala-isabelle.</p>
+<p>scala-isabelle actually makes things easier because it encapsulates the <br>
+undocumented (or documented-by-source-code) aspects of the invocation of <br>
+Isabelle into a documented API (that also changes less).</p>
+<p>Best wishes,<br>
+Dominique.</p>
+<p>On 11/9/21 2:08 PM, Makarius wrote:</p>
+<blockquote>
+<p>On 09/11/2021 12:40, Dominique Unruh wrote:</p>
+<blockquote>
+<blockquote>
+<p>We have already had long discussions about remaining possibilities to run<br>
+Isabelle without a proper PIDE session context.<br>
+Yes, and you convinced me not to do that. The code fragment in my mail was my<br>
+attempt to programmatically initialize such a PIDE session context. However, I<br>
+do not know what a "proper PIDE session context" means in terms of the methods<br>
+that I invoke. I thought Isabelle.init followed by ML_Process would do that.<br>
+Should I initialize it differently?<br>
+The PIDE session object in my snippet is this:</p>
+</blockquote>
+</blockquote>
+<p>val session = new Session(options, Resources.empty)</p>
+<p>But that is not quite "proper": the resources are empty and it is not<br>
+connected to an ML process. The Bash.Handler does not care right now.</p>
+<blockquote>
+<p>Note that I don't directly care about the bash, it just happens that the<br>
+exception I got related to bash, but what I needed was to invoke "by smt".<br>
+There are two assumptions behind that:</p>
+</blockquote>
+<p>* bash_process works (this thread)</p>
+<p>* z3 works: it has always been somewhat fragile and is de-facto downgraded<br>
+now; veriT takes more and more over.</p>
+<blockquote>
+<p>So I don't want to do low-level tinkering if it can be avoided, but correctly<br>
+initialize PIDE (as long as this can be done starting the Isabelle process<br>
+from Scala, as opposed to the other way around).<br>
+You can see in Isabelle/jEdit and Isabelle/VSCode how the Session objects are<br>
+created and initalized. The scala_project Maven project makes it very easy to<br>
+browse the implementation.</p>
+</blockquote>
+<blockquote>
+<p>My goal is to have scala-isabelle use the officially supported ways to get<br>
+maximum stability.<br>
+You should actually try to dismantle scala-isabelle. It has caused enough<br>
+tensions and continuous problems in the past.</p>
+</blockquote>
+<p>Makarius</p>
+</blockquote>
+
+
+
+<a name="260815435"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2021-1-RC2%3A%20Invoking%20smt-method%20in%20the.../near/260815435" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2021-1-RC2.3A.20Invoking.20smt-method.20in.20the.2E.2E.2E.html#260815435">(Nov 09 2021 at 15:35)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+The Isabelle/PIDE server does have a lot of explicit documentation: chapter 4<br>
+of the "system" manual. In retrospect, I am unsure if it ever got used in<br>
+applications so far.</p>
+<p>There is a report by  Boris Shminke on using it from Python:<br>
+<a href="https://link.springer.com/chapter/10.1007%2F978-3-030-81097-9_20">https://link.springer.com/chapter/10.1007%2F978-3-030-81097-9_20</a> --- but it<br>
+remains unclear if and how it works in applications.</p>
+<p>Makarius</p>
+
+
+
+<a name="261046384"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2021-1-RC2%3A%20Invoking%20smt-method%20in%20the.../near/261046384" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2021-1-RC2.3A.20Invoking.20smt-method.20in.20the.2E.2E.2E.html#261046384">(Nov 10 2021 at 20:01)</a>:</h4>
+<p>From: Simon Wimmer &lt;<a href="mailto:wimmersimon@gmail.com">wimmersimon@gmail.com</a>&gt;<br>
+We have another application for grading Isabelle theories on<br>
+<a href="http://do.proof.in.tum.de">do.proof.in.tum.de</a>:<br>
+<a href="https://github.com/maxhaslbeck/proving-contest-backends/blob/master/Isabelle/grader.py">https://github.com/maxhaslbeck/proving-contest-backends/blob/master/Isabelle/grader.py</a></p>
+<p>Simon</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

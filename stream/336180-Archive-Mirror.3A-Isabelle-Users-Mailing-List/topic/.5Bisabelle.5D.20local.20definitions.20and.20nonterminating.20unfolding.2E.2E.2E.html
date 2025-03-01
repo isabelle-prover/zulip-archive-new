@@ -1,0 +1,127 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] local definitions and nonterminating unfolding... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20local.20definitions.20and.20nonterminating.20unfolding.2E.2E.2E.html">[isabelle] local definitions and nonterminating unfolding...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294270670"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20local%20definitions%20and%20nonterminating%20unfolding.../near/294270670" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20local.20definitions.20and.20nonterminating.20unfolding.2E.2E.2E.html#294270670">(Aug 19 2022 at 13:51)</a>:</h4>
+<p>From: Julian Brunner &lt;<a href="mailto:julianbrunner@gmail.com">julianbrunner@gmail.com</a>&gt;<br>
+Hello everyone,</p>
+<p>I've recently run into a situation where the unfolding command doesn't<br>
+terminate when used with statements containing local definitions.<br>
+Consider the following example:</p>
+<p>locale foo =<br>
+  fixes a :: "nat option"<br>
+  assumes not_None: "a ~= None"<br>
+begin</p>
+<p>definition "b == the a"</p>
+<p>lemma a_Some: "a = Some b"<br>
+    unfolding b_def<br>
+    using not_None<br>
+    by auto</p>
+<p>lemma these_a: "Option.these {a} = {b}"<br>
+    unfolding a_Some<br>
+    by simp</p>
+<p>end</p>
+<p>Here, the unfolding command in the proof of 'these_a' doesn't<br>
+terminate. I've figured out that the reason for this is that when<br>
+defining 'b', what actually happens is that 'foo.b' of type 'nat<br>
+option =&gt; nat' is defined globally, with 'b' being a local<br>
+abbreviation for 'foo.b a'. This, of course, means that 'a_Some'<br>
+actually says 'a = Some (foo.b a)', so unfolding that of course<br>
+doesn't terminate.</p>
+<p>I've been struggling to find a workaround for this. In my actual<br>
+theory (this is just a toy example), being able to unfold a statement<br>
+similar to 'a_Some' (or, adding it to the simplifier, for that matter)<br>
+would be hugely beneficial, since it is much easier to work with than<br>
+the assumption from which it was derived. I've tried using the defines<br>
+element and additional fixed variables when declaring the locale to<br>
+introduce an actual constant for 'b'. While this has worked fine<br>
+within the context of the locale, it makes global statements about the<br>
+locale more complex, which is unfortunate, considering the intent of<br>
+simplifying proofs inside the locale.</p>
+<p>Does anyone know of a good way to deal with a situation like this?</p>
+<p>Thanks in advance,<br>
+ Julian</p>
+
+
+
+<a name="294271755"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20local%20definitions%20and%20nonterminating%20unfolding.../near/294271755" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20local.20definitions.20and.20nonterminating.20unfolding.2E.2E.2E.html#294271755">(Aug 19 2022 at 13:57)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Julian,</p>
+<p>You can use congruence rules for the foundational constant to stop the simplifier from <br>
+working on the locale parameters. It does not work with unfolding, because unfold ignoes <br>
+congruence rules. Here's your example:</p>
+<blockquote>
+<p>locale foo =<br>
+   fixes a :: "nat option"<br>
+   assumes not_None: "a ~= None"<br>
+begin</p>
+<p>definition "b == the a"</p>
+<p>lemma a_Some: "a = Some b"<br>
+     unfolding b_def<br>
+     using not_None<br>
+     by auto</p>
+<p>end</p>
+</blockquote>
+<p>lemma foo_b_cong [cong]: "foo.b a == foo.b a" by(rule reflexive)<br>
+-- "You have to supply as many parameters to foo.b as there are locale parameters on which <br>
+b depends."</p>
+<p>context foo begin</p>
+<p>lemma these_a: "Option.these {a} = {b}"<br>
+     by(simp add: a_Some)</p>
+<blockquote>
+<p>end</p>
+</blockquote>
+<p>Hope this helps,<br>
+Andreas</p>
+
+
+
+<a name="294272433"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20local%20definitions%20and%20nonterminating%20unfolding.../near/294272433" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20local.20definitions.20and.20nonterminating.20unfolding.2E.2E.2E.html#294272433">(Aug 19 2022 at 14:00)</a>:</h4>
+<p>From: Julian Brunner &lt;<a href="mailto:julianbrunner@gmail.com">julianbrunner@gmail.com</a>&gt;<br>
+While unfolding would have been nicer, it's a start and it seems like<br>
+unfolding can be emulated using something like 'apply (simp only:<br>
+a_Some cong: foo_b_cong)'. Thank you!</p>
+
+
+
+<a name="294272447"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20local%20definitions%20and%20nonterminating%20unfolding.../near/294272447" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20local.20definitions.20and.20nonterminating.20unfolding.2E.2E.2E.html#294272447">(Aug 19 2022 at 14:00)</a>:</h4>
+<p>From: Gottfried Barrow &lt;<a href="mailto:igbi@gmx.com">igbi@gmx.com</a>&gt;<br>
+No response is necessary. I put this in only because I wanted to say a <br>
+few days back that I've learned that there's no guarantee that <code>simp</code> <br>
+can be controlled with <code>only</code>, which, consequently, destroys its use as <br>
+a means to make known that you're making a proof step explicit, such as <br>
+with your example above.</p>
+<p>To a certain extent, <code>simp</code> behaves like <code>auto</code>. It can call other <br>
+automatic proof methods on its own. I decided it is what it is, and <br>
+there must be good reason for it to not shut down calling particular <br>
+proof methods when <code>only</code> is used. This next example shows that you <br>
+cannot completely control <code>simp</code> with <code>only</code>:</p>
+<p>lemma "2 + 2 = (4::nat)"<br>
+   using[[simp_trace, simp_trace_depth_limit=100, linarith_trace, <br>
+rule_trace]]<br>
+apply(simp only:)<br>
+done</p>
+<p>It's calling some form of the linear arithmetic proof method. But this <br>
+is explained in the Isar Reference manual, page 188, "...but also <br>
+non-trivial tools like linear arithmetic in HOL. The latter may lead to <br>
+some surprise of the meaning of 'only' in Isabelle/HOL compared to English!"</p>
+<p>Monolingual English speakers can only speculate whether surprises would <br>
+result in the context of "nur, lediglich, erst, einzig, bloß, und allein."</p>
+<p>Regards,<br>
+GB</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

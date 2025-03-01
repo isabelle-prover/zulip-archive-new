@@ -1,0 +1,266 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Proof_Context abstraction · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof_Context.20abstraction.html">[isabelle] Proof_Context abstraction</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294285106"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof_Context%20abstraction/near/294285106" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof_Context.20abstraction.html#294285106">(Aug 19 2022 at 15:06)</a>:</h4>
+<p>From: Joachim Breitner &lt;<a href="mailto:breitner@kit.edu">breitner@kit.edu</a>&gt;<br>
+Hi,</p>
+<p>I’m trying to learn hacking Isabelle/ML, and I started with the<br>
+seemingly simple task of “For all local facts with a name, add a "foo"<br>
+to their name”.</p>
+<p>Here is what I tried:</p>
+<p>theory Scratch imports Main  keywords "foobar" :: prf_decl<br>
+begin</p>
+<p>ML {*<br>
+fun named_local_facts ctxt = <br>
+  let val facts = Proof_Context.facts_of ctxt;<br>
+  in  Facts.dest_static false [Global_Theory.facts_of (Proof_Context.theory_of ctxt)] facts<br>
+  end;</p>
+<p>val foobar_cmd =<br>
+    Proof.map_context (fn ctxt =&gt; <br>
+      let<br>
+        val facts = named_local_facts ctxt<br>
+        val renamed = map (apfst (suffix "foo")) facts<br>
+      in fold (Proof_Context.put_thms true) (map (apsnd SOME) renamed) ctxt<br>
+      end );</p>
+<p>Outer_Syntax.command @{command_spec "foobar"} "my test command" (Scan.succeed (Toplevel.proof foobar_cmd));<br>
+*}</p>
+<p>notepad<br>
+begin<br>
+ assume bar: "p = (a,b)" and X<br>
+ foobar<br>
+end<br>
+end</p>
+<p>Unfortunately, I get<br>
+        Bad name binding: "local.barfoo"</p>
+<p>It seems to me that Proof_Context provides a certain abstraction over<br>
+local facts, where I can still retrieve them in a raw way (“facts_of”),<br>
+but I can only add them via an interface (“put_thms”) that expect the<br>
+names in a certain, yet-to-be-mangled name. Is that roughly correct?</p>
+<p>Is there a way to mess with the internals of the Proof_Context directly,<br>
+or would I have to change <a href="http://proof_context.ml">proof_context.ml</a> for that (such as exposing<br>
+map_data)?</p>
+<p>Or am I approach this task in a wrong way?</p>
+<p>Thanks,<br>
+Joachim<br>
+<a href="/user_uploads/14278/jWrBiqHhfVI9k3fxuIoduB_g/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294285139"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof_Context%20abstraction/near/294285139" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof_Context.20abstraction.html#294285139">(Aug 19 2022 at 15:06)</a>:</h4>
+<p>From: Joachim Breitner &lt;<a href="mailto:breitner@kit.edu">breitner@kit.edu</a>&gt;<br>
+Hi,</p>
+<p>a bit of progress:</p>
+<p>Tracing existing code a bit more, it seems that I have to go through<br>
+Proof_Context.note_thmss, which expects a binding.</p>
+<p>So I tried to use Binding.qualified_name to turn the string<br>
+local.Cons.IHfoo into a binding. But if I add that using<br>
+Proof_Context.note_thmss, "print_facts" will list it as IHfoo, not as<br>
+Cons.IHfoo.</p>
+<p>Greetings,<br>
+Joachim<br>
+<a href="/user_uploads/14278/W1jO97WO-u5r6kXa3PZbYcdy/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294285263"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof_Context%20abstraction/near/294285263" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof_Context.20abstraction.html#294285263">(Aug 19 2022 at 15:07)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On Tue, 29 Jul 2014, Joachim Breitner wrote:</p>
+<blockquote>
+<p>and I started with the seemingly simple task of “For all local facts <br>
+with a name, add a "foo" to their name”.</p>
+</blockquote>
+<p>That is not a simple task, and it does not quite fit to how Isabelle <br>
+conceptually works.</p>
+<p>The "implementation" manual provides a lot of background information, but <br>
+it needs to be studied carefully together with some canonical application.</p>
+<p>Section "1.2 Names" might help a bit as a start in this particular case.</p>
+<blockquote>
+<p>I’m trying to learn hacking Isabelle/ML</p>
+</blockquote>
+<blockquote>
+<p>Is there a way to mess with the internals of the Proof_Context directly, <br>
+or would I have to change <a href="http://proof_context.ml">proof_context.ml</a> for that (such as exposing <br>
+map_data)?</p>
+<p>Or am I approach this task in a wrong way?</p>
+</blockquote>
+<p>It depends whom you ask, and what you want to achieve.  Proper <br>
+understanding the systems needs long time of study, not quick hacking.  I <br>
+would go as far as to say that and "hacking" or "messing" is a not worth <br>
+the time spent on it.</p>
+<p>Makarius</p>
+
+
+
+<a name="294285288"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof_Context%20abstraction/near/294285288" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof_Context.20abstraction.html#294285288">(Aug 19 2022 at 15:07)</a>:</h4>
+<p>From: Joachim Breitner &lt;<a href="mailto:breitner@kit.edu">breitner@kit.edu</a>&gt;<br>
+Hello,</p>
+<p>there is always a first step, and different people learn in different<br>
+ways. I could have said “experimentation” if you like that word better.</p>
+<p>I want to achieve sufficient knowledge of the Isabelle/ML layer to<br>
+implement a "unfold_in_context" command as outlined last week. I’d say<br>
+that learning to do that is worthwhile independent of whether such a<br>
+command is desirable.</p>
+<p>So can I expect guidance from those on this list who already spent the<br>
+long time of study? Or is it expected for newcomers to study on their<br>
+own until they achieve mastery (or give up)?</p>
+<p>Thanks,<br>
+Joachim<br>
+<a href="/user_uploads/14278/jyY7IjKVG-CyOYrv8fovxx_m/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294285300"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof_Context%20abstraction/near/294285300" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof_Context.20abstraction.html#294285300">(Aug 19 2022 at 15:07)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+Hi Joachim,</p>
+<blockquote>
+<p>there is always a first step, and different people learn in different<br>
+ways. I could have said “experimentation” if you like that word better.</p>
+</blockquote>
+<p>I found that reading the sources and experimenting (in a type-driven<br>
+way) with them worked well for me. Also, the Isar Implementation Manual<br>
+and the Isabelle/ML Cookbook are valuable resources.</p>
+<blockquote>
+<p>So can I expect guidance from those on this list who already spent the<br>
+long time of study? Or is it expected for newcomers to study on their<br>
+own until they achieve mastery (or give up)?</p>
+</blockquote>
+<p>I'm sure you'll find helpful answers here.</p>
+<p>Cheers<br>
+Lars</p>
+
+
+
+<a name="294285319"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof_Context%20abstraction/near/294285319" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof_Context.20abstraction.html#294285319">(Aug 19 2022 at 15:07)</a>:</h4>
+<p>From: Joachim Breitner &lt;<a href="mailto:breitner@kit.edu">breitner@kit.edu</a>&gt;<br>
+Dear Lars,</p>
+<p>Am Mittwoch, den 30.07.2014, 08:15 +0200 schrieb Lars Hupel:</p>
+<blockquote>
+<blockquote>
+<p>there is always a first step, and different people learn in different<br>
+ways. I could have said “experimentation” if you like that word better.</p>
+</blockquote>
+<p>I found that reading the sources and experimenting (in a type-driven<br>
+way) with them worked well for me. Also, the Isar Implementation Manual<br>
+and the Isabelle/ML Cookbook are valuable resources.</p>
+</blockquote>
+<p>thanks; looks like I’m on the right paths.</p>
+<p>Since you mention type-driven: Do you know of a way of having the system<br>
+tell me the types of non-exported functions in existing ML code in<br>
+Pure/? The exported functions have their types visible in the signature<br>
+specification. And for code in my own modules Ctrl-Hover is very<br>
+helpful, but that doesn’t work in ML files that have been loaded in the<br>
+heap. Is there maybe a way to get jEdit process Pure (instead of loading<br>
+a Heap)?</p>
+<blockquote>
+<blockquote>
+<p>So can I expect guidance from those on this list who already spent the<br>
+long time of study? Or is it expected for newcomers to study on their<br>
+own until they achieve mastery (or give up)?</p>
+</blockquote>
+<p>I'm sure you'll find helpful answers here.</p>
+</blockquote>
+<p>Great. Then let me try to ask better questions next times :-)</p>
+<p>Greetings,<br>
+Joachim<br>
+<a href="/user_uploads/14278/0-YlItSZJnMQu6vSabWENpa7/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294285328"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof_Context%20abstraction/near/294285328" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof_Context.20abstraction.html#294285328">(Aug 19 2022 at 15:07)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;</p>
+<blockquote>
+<p>Since you mention type-driven: Do you know of a way of having the<br>
+system tell me the types of non-exported functions in existing ML<br>
+code in Pure/? The exported functions have their types visible in the<br>
+signature specification.</p>
+</blockquote>
+<p>This is going to sound very low-tech, but I usually copy-paste<br>
+significant chunks or even a whole file into a "ML{* *}" block in a<br>
+theory. This usually works fine and gives you the full markup.</p>
+<blockquote>
+<p>And for code in my own modules Ctrl-Hover is very helpful, but that<br>
+doesn’t work in ML files that have been loaded in the heap. Is there<br>
+maybe a way to get jEdit process Pure (instead of loading a Heap)?</p>
+</blockquote>
+<p>As far as I know, that is only possible for theories loaded <em>after</em> Pure<br>
+has been bootstrapped. You're probably out of luck there.</p>
+<p>Cheeers<br>
+Lars</p>
+
+
+
+<a name="294285353"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof_Context%20abstraction/near/294285353" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof_Context.20abstraction.html#294285353">(Aug 19 2022 at 15:07)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:lammich@in.tum.de">lammich@in.tum.de</a>&gt;<br>
+I'm even more low-tech: I have a console open in src/, and use <br>
+  grep "val &lt;fun-name&gt;:" -r .<br>
+this usually matches the line in the signature that declares the type.</p>
+<p>The same could be achieved with jedits (mouse-intensive) hypersearch<br>
+feature.</p>
+
+
+
+<a name="294285370"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof_Context%20abstraction/near/294285370" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof_Context.20abstraction.html#294285370">(Aug 19 2022 at 15:08)</a>:</h4>
+<p>From: Joachim Breitner &lt;<a href="mailto:breitner@kit.edu">breitner@kit.edu</a>&gt;<br>
+Dear List,</p>
+<p>Thanks for that suggestion. Unfortunately, that does not help with code<br>
+that doesn’t have type signatures.</p>
+<p>Greetings,<br>
+Joachim<br>
+<a href="/user_uploads/14278/90SosQU6A5KnaEDjFgJaLIpV/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294285881"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof_Context%20abstraction/near/294285881" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof_Context.20abstraction.html#294285881">(Aug 19 2022 at 15:10)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+That is why I have moved more and more tools within Pure into Pure.thy <br>
+itself, so that they can be loaded into another theory as well, for <br>
+inspecting within the Prover IDE.</p>
+<p>Makarius</p>
+
+
+
+<a name="294285904"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof_Context%20abstraction/near/294285904" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof_Context.20abstraction.html#294285904">(Aug 19 2022 at 15:10)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Hypersearch is indeed the one big thing of jEdit, independently of the <br>
+Prover IDE.  It is my main tool for navigating the Isabelle bootstrap <br>
+sources: its uniform naming conventions make this work very well.</p>
+<p>The "implementation" manual also explains how Isabelle/ML is usually <br>
+written, such that it is reasonably easy to read it systematically, with <br>
+or without tool support.</p>
+<p>Makarius</p>
+
+
+
+<a name="294285924"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof_Context%20abstraction/near/294285924" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof_Context.20abstraction.html#294285924">(Aug 19 2022 at 15:10)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Experimentation is at least proper terminology of empirical science. <br>
+More of its principles can be applied to explore the Isabelle sources, to <br>
+understand more aspects of it.</p>
+<p>The "implementation" manual explains many things that help working <br>
+systematically with the sources, but it definitely needs serious efforts.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,26 @@
+[
+    {
+        "content": "<p>From: Sebastiaan Joosten &lt;<a href=\"mailto:sjcjoosten@gmail.com\">sjcjoosten@gmail.com</a>&gt;<br>\nHi Isabelle list,</p>\n<p>I'm getting a ghc warning of overlapping patterns, and I'm wondering whether that's intended behavior. The example uses \"fun\" (or equivalently: function with sequential), shown below.<br>\nI consider these options:</p>\n<ol>\n<li>Fun should not generate overlapping simp rules.</li>\n<li>Fun may generate overlapping simp rules, but the code export should not generate code for the overlapped ones (or avoid the overlap in another way, like by changing the pattern order).</li>\n<li>Code export may sometimes generate overlapping rules, this is intended behavior. In this case I need to disable some of Haskell's warnings on the generated files.</li>\n</ol>\n<p>I'd love to hear which is the case.</p>\n<p>Here is the example:</p>\n<p>theory Test imports Main begin</p>\n<p>fun foo where<br>\n  \"foo (True, []) = True\"<br>\n| \"foo (False, [x]) = True\"<br>\n| \"foo _ = False\"</p>\n<p>export_code foo in Haskell</p>\n<p>end</p>\n<p>Here is the relevant Haskell code:</p>\n<p>foo :: forall a. (Bool, [a]) -&gt; Bool;<br>\nfoo (True, []) = True;<br>\nfoo (False, [x]) = True;<br>\nfoo (False, []) = False;<br>\nfoo (False, v : vc : vd) = False;<br>\nfoo (True, vb : vc) = False;<br>\nfoo (v, vb : va : vd) = False; -- overlapped by the two patterns above</p>\n<p>Best,</p>\n<p>Sebastiaan</p>",
+        "id": 294706578,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661180824
+    },
+    {
+        "content": "<p>From: Andreas Lochbihler &lt;<a href=\"mailto:andreas.lochbihler@inf.ethz.ch\">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>\nHi Sebastiaan,</p>\n<p>The generated code indeed can contain overlapping rules and this is actually a feature of <br>\nthe code generator. For example, this makes it possible to implement generic algorithms in <br>\na modular way when data refinement in the code generator is used. In fact, the code <br>\ngenerator cannot decide in general whether a given pattern has been covered by all <br>\nprevious equations, because it would have to know the semantics of the constructors, but <br>\nthe modular architecture prevents that.</p>\n<p>The function package is also well-advised to generate overlapping simp rules. Perfect <br>\nminimisation is NP complete (Alex Krauss has a paper on that), so function definitions <br>\nwould take much longer.</p>\n<p>Best,<br>\nAndreas</p>",
+        "id": 294706613,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661180836
+    },
+    {
+        "content": "<p>From: Sebastiaan Joosten &lt;<a href=\"mailto:sjcjoosten@gmail.com\">sjcjoosten@gmail.com</a>&gt;<br>\nHi Andreas,</p>\n<p>thank you for your response!</p>\n<p>it surprised me that Haskell's overlapping patterns warning had not hit me earlier. If the function package can be simplified such that it creates <em>more</em> overlapping rules, I may not have been as surprised, and I would be all for it.</p>\n<blockquote>\n<p>The function package is also well-advised to generate overlapping simp rules. Perfect minimisation is NP complete (Alex Krauss has a paper on that), so function definitions would take much longer.</p>\n</blockquote>\n<p>I don't agree with this reasoning: eagerly removing an overlapped simp rule is something else than perfect minimisation. The function package might annotate which simp rules are overlapped by all the earlier ones, such that the code generator only produces code for those that are non-overlapped. Alternatively, the function package might generate a code lemma that uses in-order if-then-else, also to avoid unnecessary blowup in code size, as illustrated by the following:</p>\n<p>fun foo where<br>\n \"foo [x] [] [] [] [] [] = True\"<br>\n|\"foo [] [x] [] [] [] [] = True\"<br>\n|\"foo [] [] [x] [] [] [] = True\"<br>\n|\"foo [] [] [] [x] [] [] = True\"<br>\n|\"foo [] [] [] [] [x] [] = True\"<br>\n|\"foo [] [] [] [] [] [x] = True\"<br>\n|\"foo _  _  _  _  _  _ = False\"</p>\n<p>In any case, I suppose I should just suppress code-overlap warnings in Haskell for now.</p>\n<p>Best,</p>\n<p>Sebastiaan</p>",
+        "id": 294706632,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661180842
+    },
+    {
+        "content": "<p>From: Andreas Lochbihler &lt;<a href=\"mailto:andreas.lochbihler@inf.ethz.ch\">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>\nHi Sebastiaan,</p>\n<p>Indeed, it would be great if the sequential option in the function package produces less <br>\nredundant rules than it is doing now. In particular, as all those redundant cases show up <br>\nin the induction rule for the function, so if one uses this induction rule, one has to <br>\nprove a lot of redundant subgoals, too :-).</p>\n<p>If you have some time, feel free to look into the code. The pattern splitting is done in <br>\nsrc/HOL/Tools/Function/pattern_split.ML.</p>\n<p>Best,<br>\nAndreas</p>",
+        "id": 294706680,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661180855
+    }
+]

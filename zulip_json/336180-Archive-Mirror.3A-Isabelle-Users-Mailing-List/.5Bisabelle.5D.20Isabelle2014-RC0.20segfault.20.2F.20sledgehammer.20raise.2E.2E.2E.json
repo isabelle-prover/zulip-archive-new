@@ -1,0 +1,134 @@
+[
+    {
+        "content": "<p>From: Fabian Immler &lt;<a href=\"mailto:immler@in.tum.de\">immler@in.tum.de</a>&gt;<br>\nHi Isabelle,</p>\n<p>I noticed two problems, it could be that they are related but i don't know. Note that (especially the first one) might be related to the ML process crashing in thread [1].</p>\n<p>Here is how i can reproduce them -- it seems to be important to have a clean ISABELLE_HOME_USER.<br>\nI could reproduce them on my Mac (OS X 10.8.5) and on a Linux machine. The errors also occur with \"current\" isabelle bc957769b584.</p>\n<p>1.) When I start Isabelle loading the following theory,</p>\n<p>theory Scratch<br>\nimports Main<br>\nbegin</p>\n<p>notepad<br>\nbegin<br>\n  fix P and x::'a<br>\n  {<br>\n    fix x::'a<br>\n    have \"P x ⟹ P x\"<br>\n      by simp<br>\n  } hence True<br>\n    sledgehammer</p>\n<p>sledgehammer finds a proof and appears to have terminated, but the poly-Process keeps running with 100% CPU until I get the following error message (via Isabelle Syslog) indicating a segfault:</p>\n<p>Welcome to Isabelle/HOL (Isabelle2014-RC0: July 2014)<br>\nmessage_output terminated<br>\n/Users/immler/Desktop/Isabelle2014-RC0.app/Contents/Resources/Isabelle2014-RC0/lib/scripts/run-polyml-5.5.2: line 84: 85096 Segmentation fault: 11  \"$POLY\" -q -i $ML_OPTIONS --eval \"$(perl \"$ISABELLE_HOME/lib/scripts/recode.pl\" \"$MLTEXT\")\" --error-exit &lt; /dev/null</p>\n<p>standard_error terminated<br>\nstandard_output terminated<br>\nprocess terminated<br>\ncommand_input terminated<br>\nprocess_manager terminated<br>\nReturn code: 139</p>\n<p>2.) When I load the following theory (again with a clean ISABELLE_HOME_USER)</p>\n<p>theory Scratch<br>\nimports Main<br>\nbegin</p>\n<p>lemma True<br>\nsledgehammer learn_isar<br>\n ..<br>\n(* sufficiently many blank lines to have the sledgehammer invocation below outside of the visible part of the text area *)<br>\nnotepad<br>\nbegin<br>\n  fix P and x::'a<br>\n  {<br>\n    fix x::'a<br>\n    have \"P x ⟹ P x\"<br>\n      by simp<br>\n  } hence True<br>\n    sledgehammer</p>\n<p>while making sure that \"sledgehammer\" is not started before \"sledgehammer learn_isar\" ends, sledgehammer fails with</p>\n<p>exception DUP \"<code>⋀\\^E\\^Fxml_elem\\^Fxml_name=typing\\^E\\^E\\^Fxml_body\\^E\\^E\\^Fxml_elem\\^Fxml_name=sorting\\^E\\^E\\^Fxml_body\\^Etype\\^E\\^F\\^E'a\\^E\\^F ...... l_elem\\^Fxml_name=typing\\^E\\^E\\^Fxml_body\\^E\\^E\\^Fxml_elem\\^Fxml_name=sorting\\^E\\^E\\^Fxml_body\\^Etype\\^E\\^F\\^E'a\\^E\\^F\\^E\\^E\\^F\\^Exa\\^E\\^F\\^E</code>\" raised (line 261 of \"General/table.ML\")</p>\n<p>Best regards,<br>\nFabian</p>\n<p>[1] <a href=\"http://thread.gmane.org/gmane.science.mathematics.logic.isabelle.user/9091\">http://thread.gmane.org/gmane.science.mathematics.logic.isabelle.user/9091</a></p>",
+        "id": 294282349,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660920772
+    },
+    {
+        "content": "<p>From: Christian Sternagel &lt;<a href=\"mailto:c.sternagel@gmail.com\">c.sternagel@gmail.com</a>&gt;<br>\nJust for the record: I have also seen the second issue that Fabian <br>\ndescribes several times but did not investigate yet, how to reproduce it <br>\nreliably.</p>\n<p>cheers</p>\n<p>chris</p>",
+        "id": 294282379,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660920779
+    },
+    {
+        "content": "<p>From: Jasmin Christian Blanchette &lt;<a href=\"mailto:jasmin.blanchette@gmail.com\">jasmin.blanchette@gmail.com</a>&gt;<br>\nHi Fabian, Christian,</p>\n<blockquote>\n<p>I noticed two problems, it could be that they are related but i don't know. Note that (especially the first one) might be related to the ML process crashing in thread [1].</p>\n</blockquote>\n<p>Thanks for your reports. I will look more closely into them in the coming days. I actually ran into the second issue last Friday when demoing Sledgehammer to Daniel Matichuk but could not reproduce it afterward. I also experience the first issue once in a while, sometimes with Sledgehammer, sometimes without; it seems to be related to multithreading.</p>\n<p>I will disable MaSh for now -- it is the likely source of both problems, and I would rather play safe with the coming release. It's a pity, since the tool really does help Sledgehammer, but I don't want to see reports like this one about Isabelle2014 final if it can be avoided.</p>\n<p>Cheers,</p>\n<p>Jasmin</p>",
+        "id": 294282410,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660920789
+    },
+    {
+        "content": "<p>From: Lars Noschinski &lt;<a href=\"mailto:noschinl@in.tum.de\">noschinl@in.tum.de</a>&gt;<br>\nYesterday, PolyML crashed two times for me (once with a segfault, once<br>\nwith an illegal instruction). This happened, when I replaced a \"by<br>\n(metis ...)\" by an \"apply (metis ...)\". The \"by (metis ...)\" was of<br>\ncourse just inserted by sledgehammer, so this might have been an<br>\ninstance of the same problem.</p>\n<p>-- Lars</p>",
+        "id": 294282416,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660920791
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nA segfault is ultimately a problem in the ML runtime system, but if there <br>\nis a clearly defined ML component that triggers the problem, David <br>\nMatthews can probably make educated guesses what is wrong.</p>\n<p>We have had spurious crashes of this kind since last winter, but they were <br>\nso rare that it was hard to guess anything.  The problem (if it is the <br>\nsame) seems to be specific to parallel Intel hardware, but not AMD.</p>\n<p>If anybody observes any such segfaults on AMD, please report this.</p>\n<p>Another possibility for further testing is to downgrade to an older <br>\nPoly/ML version from <a href=\"http://isabelle.in.tum.de/components\">http://isabelle.in.tum.de/components</a> e.g. by claiming <br>\nit in $ISABELLE_HOME_USER/etc/settings like this:</p>\n<p>init_component \"$HOME/.isabelle/contrib/polyml-5.5.1-1\"</p>\n<p>Then use \"isabelle components -a\" on the command-line to resolve missing <br>\ncomponents, and restart the Isabelle application.</p>\n<p>Makarius</p>",
+        "id": 294282435,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660920796
+    },
+    {
+        "content": "<p>From: Christian Sternagel &lt;<a href=\"mailto:c.sternagel@gmail.com\">c.sternagel@gmail.com</a>&gt;<br>\nOne further data point:</p>\n<p>When I run Fabian's first example</p>\n<blockquote>\n<p>theory Scratch<br>\nimports Main<br>\nbegin</p>\n<p>notepad<br>\nbegin<br>\n   fix P and x::'a<br>\n   {<br>\n     fix x::'a<br>\n     have \"P x ⟹ P x\"<br>\n       by simp<br>\n   } hence True<br>\n     sledgehammer</p>\n</blockquote>\n<p>I get the second error he reported (instead of a segfault; this is not <br>\nwith a clean ISABELLE_HOME_USER though), i.e.,</p>\n<p>exception DUP</p>\n<p>\"<code>⋀\\^E\\^Fxml_elem\\^Fxml_name=typing\\^E\\^E\\^Fxml_body\\^E\\^E\\^Fxml_elem\\^Fxml_name=sorting\\^E\\^E\\^Fxml_body\\^Etype\\^E\\^F\\^E'a\\^E\\^F \n...... \nl_elem\\^Fxml_name=typing\\^E\\^E\\^Fxml_body\\^E\\^E\\^Fxml_elem\\^Fxml_name=sorting\\^E\\^E\\^Fxml_body\\^Etype\\^E\\^F\\^E'a\\^E\\^F\\^E\\^E\\^F\\^Exa\\^E\\^F\\^E</code>\" <br>\nraised (line 261 of \"General/table.ML\")</p>\n<p>So the two issues seem related.</p>\n<p>cheers</p>\n<p>chris</p>",
+        "id": 294282469,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660920812
+    },
+    {
+        "content": "<p>From: Fabian Immler &lt;<a href=\"mailto:immler@in.tum.de\">immler@in.tum.de</a>&gt;<br>\nI get the same behavior with polyml-5.5.1-1 and polyml-5.4.1 (have not checked the other ones).</p>\n<p>Fabian</p>",
+        "id": 294282477,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660920815
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nThanks for testing -- I am presently sitting in the lecture hall at ITP <br>\nand can't do experiments myself.</p>\n<p>polyml-5.4.1 does not have the advanced memory management of polyml-5.5.x <br>\nso the crash source is different, but this also means it is potentially <br>\neasier to isolate.</p>\n<p>Makarius</p>",
+        "id": 294282511,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660920827
+    },
+    {
+        "content": "<p>From: Jasmin Christian Blanchette &lt;<a href=\"mailto:jasmin.blanchette@gmail.com\">jasmin.blanchette@gmail.com</a>&gt;<br>\nFabian wrote:</p>\n<p>For the record: I followed the instructions and unfortunately wasn't able to reproduce either bug on my MacBook Pro. I'll try it again when I get a chance. Otherwise, we'll need to investigate when we're both at the same physical location.</p>\n<p>Jasmin</p>",
+        "id": 294282648,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660920857
+    },
+    {
+        "content": "<p>From: Lars Noschinski &lt;<a href=\"mailto:noschinl@in.tum.de\">noschinl@in.tum.de</a>&gt;<br>\nAnother segfault, this time triggered directly while using sledgehammer.</p>\n<hr>\n<p>$ cat ~/.isabelle/Isabelle2014-RC0/etc/settings<br>\nML_OPTIONS=\"-H 1000 --gcthreads 1\"<br>\nJEDIT_JAVA_OPTIONS=\"-Xms512m -Xmx4096m -Xss4m -Dactors.corePoolSize=4<br>\n-Dactors.enableForkJoin=false\"</p>\n<p>init_component \"$HOME/P/afp\"</p>\n<hr>\n<p>Following Makarius' suggestion, I'm leaving MaSh enabled for now, but<br>\nswitch to poly 5.5.1-1 and will report on further possible crashes.</p>",
+        "id": 294282758,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660920894
+    },
+    {
+        "content": "<p>From: Lars Noschinski &lt;<a href=\"mailto:noschinl@in.tum.de\">noschinl@in.tum.de</a>&gt;<br>\nCrashed again; even at the same position in the theory (with poly<br>\n5.5.1-1). I'll try tomorrow whether this can be reproduced reliably.</p>\n<p>Welcome to Isabelle/HOL (Isabelle2014-RC0: July 2014)<br>\nmessage_output terminated<br>\n/home/noschinl/opt/Isabelle2014-RC0/lib/scripts/run-polyml-5.5.1: line<br>\n84: 27780 Segmentation fault      \"$POLY\" -q -i $ML_OPTIONS --eval<br>\n\"$(perl \"$ISABELLE_HOME/lib/scripts/recode.pl\" \"$MLTEXT\")\" --error-exit<br>\n&lt; /dev/null</p>\n<p>-- Lars</p>",
+        "id": 294282804,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660920907
+    },
+    {
+        "content": "<p>From: Lars Noschinski &lt;<a href=\"mailto:noschinl@in.tum.de\">noschinl@in.tum.de</a>&gt;<br>\nSince it is already tomorrow: I started the minimization process and<br>\npolyml indeed crashed reliably at the same place, again and again. Then<br>\nit suddenly stopped, and I haven't been able to reproduce it again (even<br>\nwhen going back to the original theory).</p>\n<p>But I stumbled upon some interesting behaviour: Apparently, in this<br>\nproof, sledgehammer tries to use a theorem whose proof (in another<br>\ntheory) failed. So, in the sledgehammer window, I don't see the output<br>\nof sledgehammer, but rather the error message belonging to the failed<br>\n\"by\" of said theorem.</p>\n<p>-- Lars</p>",
+        "id": 294282857,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660920925
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nWhile sitting together at the \"Heuriger\" on Friday, Cezary mentioned in <br>\npassing that the machine-learning stuff uses a lot of archaic array <br>\nprogramming.  That might well be a reason for Poly/ML vomiting: it has <br>\nhappened occasionally over the years, but arrays are extremely rare these <br>\ndays. A more recent incident was reported by Cezary on the thread <br>\n\"[polyml] Heap does not grow up to --maxheap\" <br>\n<a href=\"http://lists.inf.ed.ac.uk/pipermail/polyml/2013-March/001181.html\">http://lists.inf.ed.ac.uk/pipermail/polyml/2013-March/001181.html</a></p>\n<p>Maybe there is an easy way to avoid mutable data structures, and get <br>\nthings back into proper shape for the Isabelle2014 release.</p>\n<p>Independently of that, it would be nice if the reason of the crash could <br>\nbe isolated and sent to David Matthews.</p>\n<p>Makarius</p>",
+        "id": 294283457,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660921103
+    },
+    {
+        "content": "<p>From: Jasmin Christian Blanchette &lt;<a href=\"mailto:jasmin.blanchette@gmail.com\">jasmin.blanchette@gmail.com</a>&gt;<br>\nAm 20.07.2014 um 19:12 schrieb Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;:</p>\n<blockquote>\n<p>While sitting together at the \"Heuriger\" on Friday, Cezary mentioned in passing that the machine-learning stuff uses a lot of archaic array programming.  That might well be a reason for Poly/ML vomiting: it has happened occasionally over the years, but arrays are extremely rare these days. A more recent incident was reported by Cezary on the thread \"[polyml] Heap does not grow up to --maxheap\" <a href=\"http://lists.inf.ed.ac.uk/pipermail/polyml/2013-March/001181.html\">http://lists.inf.ed.ac.uk/pipermail/polyml/2013-March/001181.html</a></p>\n<p>Maybe there is an easy way to avoid mutable data structures, and get things back into proper shape for the Isabelle2014 release.</p>\n</blockquote>\n<p>I don't think there's an easy way. This code has to be as fast as possible. It currently runs in about 300 ms on my machine, which is good, but I can imagine that this number looks more like 3 s or worse for the L4.verified guys (due to inherent quadratic components). Sticking to pure functional data structure would add a logarithmic component and a whole lot of memory allocations in a tight loop. If the opposite of \"archaic\" means \"slow\", I'm siding with \"archaic\".</p>\n<p>The only realistic alternative I see is to use an external C or C++ program and providing it as a component. I would rather avoid this.</p>\n<blockquote>\n<p>Independently of that, it would be nice if the reason of the crash could be isolated and sent to David Matthews.</p>\n</blockquote>\n<p>Yes, I'll look into this once the Vienna Summer of Logic is definitely over.</p>\n<p>It would be nice to be able to fix this before the Isabelle2014 release, but I'm currently working from the hypothesis that we won't make it on time.</p>\n<p>Jasmin</p>",
+        "id": 294284117,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660921287
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nThe opposite of archaic means fast on the usual side-conditions of our ML <br>\nenvironment (persistent data structures in a parallel environment).  The <br>\noverall performance of Isabelle has increased a lot in that respect in the <br>\npast 7 years.  In contrast, OCaml guys usually optimize for a different <br>\nexecution model, and well-known provers on that platform are perceived as <br>\nvery slow today.</p>\n<p>Sometimes there are archaic algorithms that insist in poking around in <br>\nsome array in a certain way, but that is often not necessary.  I can't say <br>\nanything specific about the machine-learning business -- it might require <br>\nsome actual work to reform it.  There might be also quick-and-dirty <br>\nworkarounds to allocate many small arrays with a normal tree table for <br>\naccess -- Poly/ML does not like large blobs on the heap.</p>\n<p>In my everyday encounter with arrarys in legacy APIs on the JVM, they <br>\nusually inflict a performance hit that could have been avoided by proper <br>\nimmutable structures from the Scala library.  This old \"arrays are fast <br>\nmyth\" is really just a myth and needs to be overcome.</p>\n<p>Makarius</p>",
+        "id": 294284342,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660921342
+    },
+    {
+        "content": "<p>From: Jasmin Christian Blanchette &lt;<a href=\"mailto:jasmin.blanchette@gmail.com\">jasmin.blanchette@gmail.com</a>&gt;<br>\nHi Fabian, Makarius,</p>\n<p>Fabian wrote:</p>\n<blockquote>\n<p>1.) When I start Isabelle loading the following theory,</p>\n<p>theory Scratch<br>\nimports Main<br>\nbegin</p>\n<p>notepad<br>\nbegin<br>\n fix P and x::'a<br>\n {<br>\n   fix x::'a<br>\n   have \"P x ⟹ P x\"<br>\n     by simp<br>\n } hence True<br>\n   sledgehammer</p>\n<p>sledgehammer finds a proof and appears to have terminated, but the poly-Process keeps running with 100% CPU until I get the following error message (via Isabelle Syslog) indicating a segfault:</p>\n</blockquote>\n<p>I can reproduce the problem with the following (array-free!) theory:</p>\n<p>theory Scratch<br>\n    imports Main<br>\n    begin</p>\n<p>ML {*<br>\n    fun launch_thread timeout task =<br>\n      let<br>\n        val birth_time = <a href=\"http://Time.now\">Time.now</a> ()<br>\n        val death_time = Time.+ (birth_time, timeout)<br>\n        val desc = (\"\", \"\")<br>\n      in<br>\n        Async_Manager.thread \"\" birth_time death_time desc task<br>\n      end<br>\n    *}</p>\n<p>ML {*<br>\n    launch_thread (seconds 10.0) (fn _ =&gt; error \"FOO\")<br>\n    *}</p>\n<p>end</p>\n<p>In short: Any uncaught exception raised from an old-style \"Async_Manager\" worker thread eventually leads to a segfault.</p>\n<blockquote>\n<p>2.) When I load the following theory (again with a clean ISABELLE_HOME_USER)</p>\n<p>theory Scratch<br>\nimports Main<br>\nbegin</p>\n<p>lemma True<br>\nsledgehammer learn_isar<br>\n..<br>\n(* sufficiently many blank lines to have the sledgehammer invocation below outside of the visible part of the text area *)<br>\nnotepad<br>\nbegin<br>\n fix P and x::'a<br>\n {<br>\n   fix x::'a<br>\n   have \"P x ⟹ P x\"<br>\n     by simp<br>\n } hence True<br>\n   sledgehammer</p>\n<p>while making sure that \"sledgehammer\" is not started before \"sledgehammer learn_isar\" ends, sledgehammer fails with</p>\n<p>exception DUP \"`⋀</p>\n</blockquote>\n<p>I have yet to investigate this closer, but the exception that was thrown in (1) was \"DUP\", so the bug appears to be a... duplicate. ;)</p>\n<p>Thanks again for taking the time to produce such a useful bug report!</p>\n<p>Jasmin</p>",
+        "id": 294284463,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660921394
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nThe problem can be pushed further down to Runtime.thread, which is marked <br>\nas \"Proof General legacy\", but that is not the problem here.</p>\n<p>For the moment, the included changeset should prevent that particular <br>\ncrash, but I first need to understand what is really going on.</p>\n<p>BTW, the other hard crash with Isabelle2014-RC0 PIDE interaction under <br>\nheavy load and many auxiliary files is already sorted out: it is a failure <br>\nof the ML/C foreign language interface and our SHA1.digest that is based <br>\non it.  (That <em>is</em> one of these array algorithms.)</p>\n<p>Makarius<br>\n<a href=\"/user_uploads/14278/OFR2E4azwP1SevZsDQ6UEig7/ch\">ch</a></p>",
+        "id": 294284506,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660921410
+    },
+    {
+        "content": "<p>From: Jasmin Christian Blanchette &lt;<a href=\"mailto:jasmin.blanchette@gmail.com\">jasmin.blanchette@gmail.com</a>&gt;<br>\nThe issues with MaSh should all be addressed now (cffd1d6ae1e5). If anybody sees anything remotely strange with MaSh in the run-up to Isabelle2014, please report it again.</p>\n<p>Jasmin</p>",
+        "id": 294284550,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660921423
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nJust an update on these speculative ML_OPTIONS that I proposed to you at <br>\nITP: \"--gcthreads 1\" should not make a difference, you can remove it or <br>\nuse a default that makes sense for your hardware (e.g. 2 or 4).  The 1 was <br>\nbased on the suspicion that parallel GC could be unstable, but the <br>\nwell-known ML_file editing crash was caused by SHA1.digest via ML/C FFI. <br>\nThat should work better in the coming Isabelle2014-RC1.</p>\n<p>Also note that JEDIT_JAVA_OPTIONS now have simpler defaults.  You can omit <br>\nthe properties for the actors framework, because it is no longer used in <br>\nIsabelle2014.</p>\n<p>There is a remaining problem that the JVM uses the full hyperthreaded <br>\nnumber of CPU cores by default, according to <br>\nRuntime.getRuntime().availableProcessors(), but I don't know how to change <br>\nthat.  Oracle is not as quick as David Matthews to adapt to current <br>\nhardware.</p>\n<p>Makarius</p>",
+        "id": 294284716,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660921464
+    },
+    {
+        "content": "<p>From: Fabian Immler &lt;<a href=\"mailto:immler@in.tum.de\">immler@in.tum.de</a>&gt;<br>\nI have recently seen this behavior as well (in Isabelle2014-RC1) and can reproduce it as follows (it seems important that mashine learning is \"finished\"):</p>\n<p>theory Scratch imports Main begin</p>\n<p>lemma True sledgehammer learn_isar by (rule TrueI)</p>\n<p>notepad begin<br>\n fix P<br>\n have \"P\"<br>\n   by nothing<br>\n have \"P\"<br>\n   (* invoke s/h here *)</p>\n<p>inserting a textual \"sledgehammer\" or \"sledgehammer learn_isar\" command shows nothing in the output, but colors the command in red.</p>\n<p>Fabian</p>",
+        "id": 294288705,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660922717
+    },
+    {
+        "content": "<p>From: Jasmin Christian Blanchette &lt;<a href=\"mailto:jasmin.blanchette@gmail.com\">jasmin.blanchette@gmail.com</a>&gt;<br>\nHi Lars &amp; Fabian,</p>\n<p>Thank you for your report! The attached changeset for \"isabelle-release\" fixes it. In short, it's naive to expect \"Thm.proof_body_of\" never to throw any exceptions.</p>\n<p>Makarius: Could you apply the attached changeset to \"isabelle-release\"? Thanks.</p>\n<p>Jasmin<br>\n<a href=\"/user_uploads/14278/i0ECXmv8BJp5sq7Y7yuvICsE/try_proof_body\">try_proof_body</a></p>",
+        "id": 294288899,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660922784
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nOn Fri, 1 Aug 2014, Jasmin Christian Blanchette wrote:</p>\n<blockquote>\n<blockquote>\n<p>I have recently seen this behavior as well (in Isabelle2014-RC1) and can reproduce it as follows (it seems important that mashine learning is \"finished\"):</p>\n<p>theory Scratch imports Main begin</p>\n<p>lemma True sledgehammer learn_isar by (rule TrueI)</p>\n<p>notepad begin<br>\nfix P<br>\nhave \"P\"<br>\n  by nothing<br>\nhave \"P\"<br>\n  (* invoke s/h here *)</p>\n<p>inserting a textual \"sledgehammer\" or \"sledgehammer learn_isar\" command shows nothing in the output, but colors the command in red.</p>\n</blockquote>\n<p>The attached changeset for \"isabelle-release\" fixes it. In short, it's <br>\nnaive to expect \"Thm.proof_body_of\" never to throw any exceptions.</p>\n</blockquote>\n<p>There is some documentation about it in the implementation manual:</p>\n<p>\\item @{ML Thm.proof_of}~@{text \"thm\"} and @{ML<br>\n   Thm.proof_body_of}~@{text \"thm\"} produce the proof term or proof<br>\n   body (with digest of oracles and theorems) from a given theorem.<br>\n   Note that this involves a full join of internal futures that fulfill<br>\n   pending proof promises, and thus disrupts the natural bottom-up<br>\n   construction of proofs by introducing dynamic ad-hoc dependencies.<br>\n   Parallel performance may suffer by inspecting proof terms at<br>\n   run-time.</p>\n<p>This makes it clear that looking at the internal derivation of a theorem <br>\nmeans to side-step the normal order of processing -- as a consequence you <br>\nmay see failures from forked branches of the parallel execution.</p>\n<blockquote>\n<p>Makarius: Could you apply the attached changeset to \"isabelle-release\"?</p>\n</blockquote>\n<p>OK, I will push this over to bitbucket soon.</p>\n<p>Although the deeper problem remains: How to inspect parallel derivations <br>\nrobustly while the system is running?  The Thm.get_name_hint approach is <br>\nfragile anyway -- I have just been there with another guy today.  Isn't <br>\nthat one of the hints from the Isabelle cookbook that don't quite work?</p>\n<p>Makarius</p>",
+        "id": 294289999,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660923128
+    }
+]

@@ -1,0 +1,104 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] interpretation and sublocale add Pure.prop to ... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20interpretation.20and.20sublocale.20add.20Pure.2Eprop.20to.20.2E.2E.2E.html">[isabelle] interpretation and sublocale add Pure.prop to ...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294633660"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20interpretation%20and%20sublocale%20add%20Pure.prop%20to%20.../near/294633660" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20interpretation.20and.20sublocale.20add.20Pure.2Eprop.20to.20.2E.2E.2E.html#294633660">(Aug 22 2022 at 09:08)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear Isar experts,</p>
+<p>In interpretation and sublocale statements, the generated abbreviation ?thesis contains an <br>
+additional Pure.prop . Unfortunately, this marker renders ?thesis unusable for show <br>
+statements.</p>
+<p>Here's a minimal example:</p>
+<p>locale l = fixes x assumes "x = x"<br>
+interpretation l "Suc 0"<br>
+proof -<br>
+   (* ?thesis here is "Pure.prop (HOL.Trueprop (l (Suc 0)))" *)<br>
+   show "PROP ?thesis"   (* does not work -&gt; failed to refine any pending goal *)<br>
+   show "Trueprop (l (Suc 0))"  (* works *)</p>
+<p>Why do interpretation and sublocale statements add this Pure.prop marker to ?thesis? And <br>
+what is Pure.prop needed for at all?</p>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<a name="294634222"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20interpretation%20and%20sublocale%20add%20Pure.prop%20to%20.../near/294634222" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20interpretation.20and.20sublocale.20add.20Pure.2Eprop.20to.20.2E.2E.2E.html#294634222">(Aug 22 2022 at 09:11)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;</p>
+<blockquote>
+<p>AFAIR in src/Pure/Isar/element.ML there some functions for »witnesses«,<br>
+i.e. hypotheses as protected facts which later on allow to instantiate<br>
+facts accordingly during interpretation.  These use Pure.prop to protect<br>
+their propositions internally.</p>
+</blockquote>
+<p>After a second inspection, the story seems to be quite obvious:</p>
+<p>in src/Pure/element.ML, find</p>
+<blockquote>
+<p>val refine_witness =<br>
+  Proof.refine (Method.Basic (fn ctxt =&gt; EMPTY_CASES o<br>
+    K (ALLGOALS (CONJUNCTS (ALLGOALS (CONJUNCTS (TRYALL (resolve_tac ctxt [Drule.protectI]))))))));</p>
+</blockquote>
+<blockquote>
+<p>fun gen_witness_proof proof after_qed wit_propss eq_props =<br>
+  let<br>
+    …<br>
+  in proof after_qed' propss #&gt; refine_witness #&gt; Seq.hd end;</p>
+</blockquote>
+<p>i.e. the initial proof goal (?thesis) is, in most practical cases,<br>
+immediately refined by Drule.protectI, and the goal left afterwards does<br>
+not match ?thesis any longer.</p>
+<p>There have been substantial reasons why witnesses are protected by<br>
+Pure.prop, but this is beyond my historic memory.</p>
+<p>No line in this code goes back beyond Jan. 2009, but at that time the<br>
+whole locale machinery was reimplemented, but the witness business<br>
+remained the same, undergoing some iterations of polishing.</p>
+<p>Florian</p>
+<blockquote>
+<p>I do not know whether this can be lifted somehow, but I guess not.</p>
+<p>This is a very technical detail of the locale implementation indeed.</p>
+<p>Florian</p>
+<p><a href="/user_uploads/14278/3LXpjl78iCQb36Qjg0KDpkzB/signature.asc">signature.asc</a></p>
+</blockquote>
+
+
+
+<a name="294634229"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20interpretation%20and%20sublocale%20add%20Pure.prop%20to%20.../near/294634229" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20interpretation.20and.20sublocale.20add.20Pure.2Eprop.20to.20.2E.2E.2E.html#294634229">(Aug 22 2022 at 09:11)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+I vaguely remember discussions about this problem with Clemens Ballarin, <br>
+back to 2005 at the least.  The use of the Pure.prop marker is canonical <br>
+to avoid fragile tools using variations of old "COMP" (which are still not <br>
+as forgotten as they deserve).</p>
+<p>I can't say on the spot, if it can be made more smooth to end-users. This <br>
+approach is already there for several years, i.e. not a regression.  I <br>
+have ticket the thread as "important", but the normal release schedule <br>
+takes priority at the moment.</p>
+<p>Makarius</p>
+
+
+
+<a name="294638987"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20interpretation%20and%20sublocale%20add%20Pure.prop%20to%20.../near/294638987" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20interpretation.20and.20sublocale.20add.20Pure.2Eprop.20to.20.2E.2E.2E.html#294638987">(Aug 22 2022 at 09:41)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Andreas,</p>
+<p>AFAIR in src/Pure/Isar/element.ML there some functions for »witnesses«,<br>
+i.e. hypotheses as protected facts which later on allow to instantiate<br>
+facts accordingly during interpretation.  These use Pure.prop to protect<br>
+their propositions internally.</p>
+<p>I do not know whether this can be lifted somehow, but I guess not.</p>
+<p>This is a very technical detail of the locale implementation indeed.</p>
+<p>Florian<br>
+<a href="/user_uploads/14278/c-xe2JPOS64-9cis1m2rpLW-/signature.asc">signature.asc</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

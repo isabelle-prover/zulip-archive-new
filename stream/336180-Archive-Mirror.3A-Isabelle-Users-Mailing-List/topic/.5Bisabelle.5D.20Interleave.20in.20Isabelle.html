@@ -1,0 +1,102 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Interleave in Isabelle · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Interleave.20in.20Isabelle.html">[isabelle] Interleave in Isabelle</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294135235"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Interleave%20in%20Isabelle/near/294135235" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Interleave.20in.20Isabelle.html#294135235">(Aug 18 2022 at 17:35)</a>:</h4>
+<p>From: Johan Jeuring &lt;<a href="mailto:johanj@cs.uu.nl">johanj@cs.uu.nl</a>&gt;<br>
+We noticed that the Isabelle Reference Manual from 1999 mentions an  <br>
+interleaving construct for tactics, which has disappeared in the  <br>
+manual from 2011. Is there a particular reason for this?</p>
+<p>We ask because we are working on a paper on interleaving strategies  <br>
+for solving exercises (with the goal to follow and comment upon  <br>
+student interactions), and Isabelle seems to be the only prover that  <br>
+has offered interleave. We can imagine that efficiency might be a  <br>
+reason to exclude it: the number of possibilities increases (more  <br>
+than) exponentially in the length of the arguments when interleaving  <br>
+is used.</p>
+<p>Any ideas?</p>
+<p>Thanks,</p>
+<p>Johan Jeuring</p>
+
+
+
+<a name="294135252"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Interleave%20in%20Isabelle/near/294135252" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Interleave.20in.20Isabelle.html#294135252">(Aug 18 2022 at 17:35)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On Thu, 14 Apr 2011, Johan Jeuring wrote:</p>
+<blockquote>
+<p>We noticed that the Isabelle Reference Manual from 1999 mentions an <br>
+interleaving construct for tactics, which has disappeared in the manual <br>
+from 2011. Is there a particular reason for this?</p>
+</blockquote>
+<p>It was probably dropped when renovating some of the more ancient manuals, <br>
+because it was hardly ever used.</p>
+<p>A grep through the sources and its history reveals the following:</p>
+<p>* Isabelle2011 provides Seq.interleave (in src/Pure/General/seq.ML)<br>
+     and INTLEAVE (in src/Pure/tactical.ML) but neither of them is used.</p>
+<p>* These operations have been there since the beginnings of recorded<br>
+     Isabelle history in 1993, see also <a href="http://isabelle.in.tum.de/repos/isabelle/annotate/957c887b89b5/src/Pure/tctical.ML#l102">http://isabelle.in.tum.de/repos/isabelle/annotate/957c887b89b5/src/Pure/tctical.ML#l102</a></p>
+<p>* In prehistoric Isabelle92 there is a single use of the tactical</p>
+<p>val prems = goal ZF.thy<br>
+     "[| f: A-&gt;B;  g: C-&gt;D;  A Int C = 0  |] ==&gt;  \<br>
+\    (f Un g) : (A Un C) -&gt; (B Un D)";<br>
+      (<em>Contradiction if A Int C = 0, a:A, a:B</em>)<br>
+val [disjoint] = prems RL ([IntI] RLN (2, [equals0D]));<br>
+by (cut_facts_tac prems 1);<br>
+by (rtac PiI 1);<br>
+(<em>solve subgoal 2 first!!</em>)<br>
+by (DEPTH_SOLVE_1 (eresolve_tac [UnE, Pair_mem_PiE, sym, disjoint] 2<br>
+        INTLEAVE ares_tac [ex1I, apply_Pair RS UnI1, apply_Pair RS UnI2] 2));<br>
+by (REPEAT (eresolve_tac [asm_rl,UnE,rel_Un,PiE] 1));<br>
+val fun_disjoint_Un = result();</p>
+<p>* In Isabelle93 the same is proved like this, using the "Classical<br>
+     reasoner" (fast_tac):</p>
+<p>val prems = goal ZF.thy<br>
+     "[| f: A-&gt;B;  g: C-&gt;D;  A Int C = 0  |] ==&gt;  \<br>
+\    (f Un g) : (A Un C) -&gt; (B Un D)";<br>
+      (<em>Contradiction if A Int C = 0, a:A, a:B</em>)<br>
+val [disjoint] = prems RL ([IntI] RLN (2, [equals0D]));<br>
+val Pair_UnE = read_instantiate [("c","&lt;?a,?b&gt;")] UnE;  (* ignores x: A Un <br>
+C *)<br>
+by (cut_facts_tac prems 1);<br>
+by (rtac PiI 1);<br>
+by (REPEAT (ares_tac [rel_Un, fun_is_rel] 1));<br>
+by (rtac ex_ex1I 1);<br>
+by (fast_tac (ZF_cs addDs [apply_Pair]) 1);<br>
+by (REPEAT_FIRST (eresolve_tac [asm_rl, Pair_UnE, sym RS trans]<br>
+              ORELSE' eresolve_tac [Pair_mem_PiE,disjoint] THEN' atac));<br>
+val fun_disjoint_Un = result();</p>
+<blockquote>
+<p>We ask because we are working on a paper on interleaving strategies for <br>
+solving exercises (with the goal to follow and comment upon student <br>
+interactions), and Isabelle seems to be the only prover that has offered <br>
+interleave.</p>
+</blockquote>
+<p>These are just a few lines of rather obvious SML text.  When I encountered <br>
+it as a young student in 1993 it did not surprise me.</p>
+<blockquote>
+<p>We can imagine that efficiency might be a reason to exclude it: the <br>
+number of possibilities increases (more than) exponentially in the <br>
+length of the arguments when interleaving is used.</p>
+</blockquote>
+<p>Larry might remember what he did in 1992/1993.  We do not have any formal <br>
+history, because we started using CVS 1.0 only in summer 1993.</p>
+<p>Often such generic strategies have been superseded by specific proof <br>
+automation, such as the Classical Reasoner above.</p>
+<p>Since tacticals are closely related to parser combinators, you might also <br>
+look there in the literature what people did to improve worst-case <br>
+complexities.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

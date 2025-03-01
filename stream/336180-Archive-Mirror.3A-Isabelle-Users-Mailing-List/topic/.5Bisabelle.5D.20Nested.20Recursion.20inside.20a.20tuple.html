@@ -1,0 +1,96 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Nested Recursion inside a tuple · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Nested.20Recursion.20inside.20a.20tuple.html">[isabelle] Nested Recursion inside a tuple</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294062227"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Nested%20Recursion%20inside%20a%20tuple/near/294062227" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Nested.20Recursion.20inside.20a.20tuple.html#294062227">(Aug 18 2022 at 12:02)</a>:</h4>
+<p>From: Leonor Prensa &lt;<a href="mailto:leonor.prensa@loria.fr">leonor.prensa@loria.fr</a>&gt;<br>
+Dear Isabelle users,</p>
+<p>we are trying to define a function that uses nested primitive recursion<br>
+but we get the error below. We reproduce the error by using<br>
+the example in the tutorial where the recursion is inside a list and inside<br>
+a tuple (this seems to be the problem).</p>
+<p>Is there anyway we can define this kind of nested recursion?<br>
+Thank you very much in advance for any tips,</p>
+<p>Ricardo Peña and Leonor Prensa</p>
+<hr>
+<p>theory Problem<br>
+imports Main<br>
+begin</p>
+<p>datatype ('v,'f)"term" = Var 'v | App 'f "(('v,'f)term \&lt;times&gt; nat) list"</p>
+<p>consts<br>
+subst :: "('v =&gt; ('v,'f)term) =&gt; ('v,'f)term =&gt; ('v,'f)term"</p>
+<p>substs:: "('v =&gt; ('v,'f)term) =&gt; (('v,'f)term \&lt;times&gt; nat) list =&gt; <br>
+(('v,'f)term \&lt;times&gt; nat) list"</p>
+<p>primrec</p>
+<p>"subst s (Var x) = s x"</p>
+<p>subst_App:<br>
+"subst s (App f ts) = App f (substs s ts)"<br>
+"substs s [] = []"<br>
+"substs s (t # ts) = (case t of (t', n) =&gt; (subst s t', n) # substs s ts)"</p>
+<p>end</p>
+<hr>
+<p>*** Entity to be defined occurs on rhs<br>
+*** The error(s) above occurred in definition "subst_term_def":<br>
+*** "subst õ∫<br>
+*** õla b. term_rec_1 (õlx s. s x) (õlf ts tsa s. App f (tsa s)) (õls. [])<br>
+*** (õlt ts ta tsa s. case t of (t', n) õﬁ (subst s t', n) # tsa s) <br>
+undefined b a"<br>
+*** At command "primrec".</p>
+
+
+
+<a name="294062590"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Nested%20Recursion%20inside%20a%20tuple/near/294062590" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Nested.20Recursion.20inside.20a.20tuple.html#294062590">(Aug 18 2022 at 12:04)</a>:</h4>
+<p>From: Alexander Krauss &lt;<a href="mailto:krauss@in.tum.de">krauss@in.tum.de</a>&gt;<br>
+Dear Leonor and Ricardo,</p>
+<p>Primrec requires that you define a separate function for the pair. The <br>
+following works:</p>
+<p>consts<br>
+   subst :: "('v =&gt; ('v,'f)term) =&gt; ('v,'f)term =&gt; ('v,'f)term"<br>
+   substs:: "('v =&gt; ('v,'f)term) =&gt; (('v,'f)term × nat) list =&gt; <br>
+(('v,'f)term × nat) list"<br>
+   substp:: "('v =&gt; ('v,'f)term) =&gt; ('v,'f)term × nat =&gt; ('v,'f)term × nat"</p>
+<p>primrec<br>
+   "subst s (Var x) = s x"<br>
+subst_App:<br>
+   "subst s (App f ts) = App f (substs s ts)"<br>
+   "substs s [] = []"<br>
+   "substp s (t,n) = (subst s t, n)"<br>
+   "substs s (t # ts) = (substp s t # substs s ts)"</p>
+<p>Instead of primrec, you could also use function/fun, which is more <br>
+liberal. For example:</p>
+<p>lemma term_size[simp]: "(a, b) : set ts ==&gt; size a &lt; Suc <br>
+term_nat_x_list_size ts)"<br>
+by (induct ts) auto</p>
+<p>fun<br>
+subst :: "('v =&gt; ('v,'f)term) =&gt; ('v,'f)term =&gt; ('v,'f)term"<br>
+where<br>
+   "subst s (Var x) = s x"<br>
+| "subst s (App f ts) = App f (map (%(t,n). (subst s t, n)) ts)"</p>
+<p>The funny lemma about size is still required in Isabelle 2007, but will <br>
+be unnecessary in the next version.</p>
+<p>Alex</p>
+
+
+
+<a name="294062927"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Nested%20Recursion%20inside%20a%20tuple/near/294062927" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Nested.20Recursion.20inside.20a.20tuple.html#294062927">(Aug 18 2022 at 12:06)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+Thanks Alex. My own experience with such datatypes indicates that fun <br>
+leads to simpler proofs because its induction principles avoid <br>
+simultaneous inductions over lists.</p>
+<p>Tobias</p>
+<p>Alexander Krauss schrieb:</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

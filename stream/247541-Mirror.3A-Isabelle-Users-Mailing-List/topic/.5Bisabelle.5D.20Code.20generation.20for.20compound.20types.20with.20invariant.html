@@ -1,0 +1,189 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Code generation for compound types with invariant · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20compound.20types.20with.20invariant.html">[isabelle] Code generation for compound types with invariant</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="412785392"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20for%20compound%20types%20with%20invariant/near/412785392" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20compound.20types.20with.20invariant.html#412785392">(Jan 14 2024 at 05:51)</a>:</h4>
+<p>From: <a href="mailto:hannobecker@posteo.de">hannobecker@posteo.de</a><br>
+Hi,</p>
+<p>This is a question on code generation for types with invariants.</p>
+<p>If I understand correctly, Section 3.2 in <br>
+<a href="https://isabelle.in.tum.de/~haftmann/pdf/data_refinement_in_isabelle_hol_haftmann_krauss_kuncar_nipkow.pdf">https://isabelle.in.tum.de/~haftmann/pdf/data_refinement_in_isabelle_hol_haftmann_krauss_kuncar_nipkow.pdf</a> <br>
+(2013) explains that code generation does not support code equations for <br>
+lifted definitions targeting compound types where the abstract type does <br>
+not appear at the top level.</p>
+<p>Here's a simple example where the target type is <code>_ option</code>. One can <br>
+similarly construct examples for <code>_ + _</code> or <code>_ * _</code>.</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">typedef</span><span class="w"> </span><span class="n">nat_pos</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">‹{ n :: nat . n &gt; 0 }›</span>
+<span class="w">   </span><span class="k">by</span><span class="w"> </span><span class="o">(</span><span class="n">simp</span><span class="w"> </span><span class="n">add</span><span class="o">:</span><span class="w"> </span><span class="n">gt_ex</span><span class="o">)</span>
+<span class="k">setup_lifting</span><span class="w"> </span><span class="n">nat_pos.type_definition_nat_pos</span>
+
+<span class="k">definition</span><span class="w"> </span><span class="n">nat_minus_one</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">‹nat ⇒ nat option›</span>
+<span class="w">   </span><span class="kp">where</span><span class="w"> </span><span class="s">‹nat_minus_one n ≡ if n - 1 &gt; 0 then Some (n - 1) else None›</span>
+
+<span class="kn">lift_definition</span><span class="w"> </span><span class="n">nat_pos_minus_one</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">‹nat_pos ⇒ nat_pos option›</span>
+<span class="w">   </span><span class="kp">is</span><span class="w"> </span><span class="s">‹nat_minus_one›</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="o">(</span><span class="n">auto</span><span class="w"> </span><span class="n">simp</span><span class="w"> </span><span class="n">add</span><span class="o">:</span><span class="w"> </span><span class="n">nat_minus_one_def</span><span class="o">)</span>
+
+<span class="c">(* No code equations for nat_pos_minus_one *)</span>
+<span class="k">export_code</span><span class="w"> </span><span class="n">nat_pos_minus_one</span><span class="w"> </span><span class="kp">in</span><span class="w"> </span><span class="n">OCaml</span>
+</code></pre></div>
+<p>I am aware that this limitation can be worked around by realizing <br>
+<code>nat_pos option</code> as a subtype of <code>nat option</code>. However, while it works <br>
+for this toy example, the need to introduce such helper types seems <br>
+impractical in general.</p>
+<p>Question 1:</p>
+<p>Is there a sound way to obtain code equations for examples as above, <br>
+without using intermediate types?</p>
+<p>Working at the SML-level is fine, so long as it builds atop of existing <br>
+code generator interfaces and doesn't require fiddling with the shipped <br>
+sources.</p>
+<p>Question 2:</p>
+<p>Why does the code generator not generate code equations here, even <br>
+though <code>lift_definition</code> has generated the correct proof obligations? <br>
+What is the soundness risk?</p>
+<p>I gather that the soundness of the code generator requires meta-proof <br>
+that <code>Abs_C</code> is only used on terms satisfying the invariant. However, <br>
+that's exactly what <code>lift_definition</code> asks us to prove. So, it would <br>
+seem to me that the following hack would be sound, despite using the <br>
+generally unsound <code>code_printing</code>:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">definition</span><span class="w"> </span><span class="o">[</span><span class="n">code</span><span class="w"> </span><span class="n">del</span><span class="o">]:</span><span class="w"> </span><span class="s">‹Abs_nat_pos' ≡ Abs_nat_pos›</span>
+<span class="k">code_printing</span><span class="w"> </span><span class="kp">constant</span><span class="w"> </span><span class="n">Abs_nat_pos'</span><span class="w"> </span><span class="n">⇀</span><span class="w"> </span><span class="o">(</span><span class="n">OCaml</span><span class="o">)</span><span class="w"> </span><span class="s">"Abs'_nat'_pos"</span>
+
+<span class="k">declare</span><span class="w"> </span><span class="n">nat_pos_minus_one_def</span><span class="o">[</span><span class="n">folded</span><span class="w"> </span><span class="n">Abs_nat_pos'_def</span><span class="o">,</span><span class="w"> </span><span class="n">code</span><span class="o">]</span>
+<span class="k">export_code</span><span class="w"> </span><span class="n">nat_pos_minus_one</span><span class="w"> </span><span class="kp">in</span><span class="w"> </span><span class="n">OCaml</span>
+
+<span class="c">(*</span>
+<span class="c">let rec nat_pos_minus_one</span>
+<span class="c">   x = Fun.map_fun rep_nat_pos (Option.map_option Abs_nat_pos)</span>
+<span class="c">nat_minus_one x;;</span>
+<span class="c">*)</span>
+</code></pre></div>
+<p>I would be grateful for thoughts on whether this is indeed a sound <br>
+workaround for the current limitations.</p>
+<p>Thank you,<br>
+Hanno</p>
+
+
+
+<a name="412788593"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20for%20compound%20types%20with%20invariant/near/412788593" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20compound.20types.20with.20invariant.html#412788593">(Jan 14 2024 at 06:50)</a>:</h4>
+<p>From: Dmitriy Traytel &lt;<a href="mailto:traytel@di.ku.dk">traytel@di.ku.dk</a>&gt;<br>
+Hi Hanno,</p>
+<p>While not an answer to your questions about the soundness boundaries of the code generator, let me point you to the code_dt feature of lift_definition, which automates the "intermediate type" construction.</p>
+<p>See also: <a href="https://lists.cam.ac.uk/sympa/arc/cl-isabelle-users/2022-11/msg00047.html">https://lists.cam.ac.uk/sympa/arc/cl-isabelle-users/2022-11/msg00047.html</a></p>
+<p>Best wishes,<br>
+Dmitriy</p>
+
+
+
+<a name="412789370"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20for%20compound%20types%20with%20invariant/near/412789370" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20compound.20types.20with.20invariant.html#412789370">(Jan 14 2024 at 07:03)</a>:</h4>
+<p>From: <a href="mailto:hannobecker@posteo.de">hannobecker@posteo.de</a><br>
+Hi Dmitriy,</p>
+<p>Oof, I really ought to have noticed this - it's also clearly documented <br>
+in the Isabelle Reference Manual. Thanks a lot.</p>
+<p>I am still interested in the 2nd question, but the immediate issue is <br>
+solved.</p>
+<p>All the best,<br>
+Hanno</p>
+
+
+
+<a name="413023181"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20for%20compound%20types%20with%20invariant/near/413023181" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20compound.20types.20with.20invariant.html#413023181">(Jan 15 2024 at 20:15)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Hanno,</p>
+<blockquote>
+<p>Question 1:</p>
+<p>Is there a sound way to obtain code equations for examples as above, <br>
+without using intermediate types?</p>
+</blockquote>
+<p>see Dmitriy’s answer.  It is an omission that code_dt is not mentioned <br>
+in the tutorial on code generation, I will take a look at it.</p>
+<blockquote>
+<p>Question 2:</p>
+<p>Why does the code generator not generate code equations here, even <br>
+though <code>lift_definition</code> has generated the correct proof obligations? <br>
+What is the soundness risk?</p>
+<p>I gather that the soundness of the code generator requires meta-proof <br>
+that <code>Abs_C</code> is only used on terms satisfying the invariant. However, <br>
+that's exactly what <code>lift_definition</code> asks us to prove.</p>
+</blockquote>
+<p>Logically, there is no issue concerning that.  But technically: the <br>
+syntactic requirements for abstract code equations need to be checked, <br>
+cf. <br>
+<a href="https://isabelle-dev.sketis.net/source/isabelle/browse/default/src/Pure/Isar/code.ML$697">https://isabelle-dev.sketis.net/source/isabelle/browse/default/src/Pure/Isar/code.ML$697</a> <br>
+– extending that check to nested types would result in a considerable <br>
+amount of additional extra-logical trusted code for things which can be <br>
+done inside the logic.</p>
+<p>Hope this helps,<br>
+    Florian</p>
+
+
+
+<a name="413099786"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20for%20compound%20types%20with%20invariant/near/413099786" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20compound.20types.20with.20invariant.html#413099786">(Jan 16 2024 at 08:11)</a>:</h4>
+<p>From: <a href="mailto:hannobecker@posteo.de">hannobecker@posteo.de</a><br>
+Hi Florian,</p>
+<p>Thank you for your reply. It makes sense to prefer a solution which <br>
+builds on top of the existing trusted code base, rather than extending <br>
+it.</p>
+<p>All the best,<br>
+Hanno</p>
+
+
+
+<a name="416499154"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20for%20compound%20types%20with%20invariant/near/416499154" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20compound.20types.20with.20invariant.html#416499154">(Jan 18 2024 at 05:12)</a>:</h4>
+<p>From: <a href="mailto:hannobecker@posteo.de">hannobecker@posteo.de</a><br>
+Hi Florian, all,</p>
+<p>Quick follow-up: <code>code_dt</code> does not seem to work with compound <br>
+invariants. Here is a minimal example:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">typedef</span><span class="w"> </span><span class="n">nat_pos</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">‹{ n :: nat . n &gt; 0 ∧ n &gt; 0 }›</span>
+<span class="w">   </span><span class="k">by</span><span class="w"> </span><span class="o">(</span><span class="n">simp</span><span class="w"> </span><span class="n">add</span><span class="o">:</span><span class="w"> </span><span class="n">gt_ex</span><span class="o">)</span>
+<span class="k">setup_lifting</span><span class="w"> </span><span class="n">nat_pos.type_definition_nat_pos</span>
+
+<span class="k">definition</span><span class="w"> </span><span class="n">nat_minus_one</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">‹nat ⇒ nat option›</span>
+<span class="w">   </span><span class="kp">where</span><span class="w"> </span><span class="s">‹nat_minus_one n ≡ if n - 1 &gt; 0 then Some (n - 1) else None›</span>
+
+<span class="kn">lift_definition</span><span class="w"> </span><span class="o">(</span><span class="n">code_dt</span><span class="o">)</span><span class="w"> </span><span class="n">nat_pos_minus_one</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">‹nat_pos ⇒ nat_pos</span>
+<span class="s">option›</span>
+<span class="w">   </span><span class="kp">is</span><span class="w"> </span><span class="s">‹nat_minus_one›</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="o">(</span><span class="n">auto</span><span class="w"> </span><span class="n">simp</span><span class="w"> </span><span class="n">add</span><span class="o">:</span><span class="w"> </span><span class="n">nat_minus_one_def</span><span class="o">)</span>
+
+<span class="c">(* Tactic failed</span>
+<span class="c">The error(s) above occurred for the goal statement⌂:</span>
+<span class="c">rel_fun (eq_onp (pred_option (λn. 0 &lt; n ∧ 0 &lt; n))) (eq_onp (λn. 0 &lt; n ∧</span>
+<span class="c">0 &lt; n))</span>
+<span class="c">  (case_option (Rep_nat_pos undefined) (λx2. x2)) (case_option</span>
+<span class="c">(Rep_nat_pos undefined) (λx2. x2)) *)</span>
+</code></pre></div>
+<p>This can be worked around by wrapping the invariant into a definition.</p>
+<p>Best,<br>
+Hanno</p>
+
+
+
+<a name="420780833"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20for%20compound%20types%20with%20invariant/near/420780833" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20compound.20types.20with.20invariant.html#420780833">(Feb 10 2024 at 08:03)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+For the record: In the tutorial on code generation I have added a <br>
+reference to lift_definition (which was missing so far). Hopefully this <br>
+clarifies the situation.</p>
+<p>This refers to rev. 82fbd5919f24 and will be part of the next Isabelle <br>
+release.</p>
+<p>Cheers,<br>
+    Florian</p>
+<p><a href="/user_uploads/14278/csmBo39Mc6NcoCN7MI24Wcru/OpenPGP_0xA707172232CFA4E9.asc">OpenPGP_0xA707172232CFA4E9.asc</a><br>
+<a href="/user_uploads/14278/cYIU6Dy84OLo8vUaLULKDJz0/OpenPGP_signature.asc">OpenPGP_signature.asc</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

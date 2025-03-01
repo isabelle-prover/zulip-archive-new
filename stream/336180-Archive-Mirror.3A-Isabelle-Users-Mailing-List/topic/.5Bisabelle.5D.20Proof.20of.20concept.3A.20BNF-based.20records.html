@@ -1,0 +1,683 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Proof of concept: BNF-based records · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof.20of.20concept.3A.20BNF-based.20records.html">[isabelle] Proof of concept: BNF-based records</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294725549"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof%20of%20concept%3A%20BNF-based%20records/near/294725549" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof.20of.20concept.3A.20BNF-based.20records.html#294725549">(Aug 22 2022 at 16:38)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Thanks to everybody who contributed to this thread.</p>
+<p>Here is a summary of important points that are relevant for the next<br>
+round of renovation of the Isabelle/HOL record package.</p>
+<ul>
+<li>
+<p>Scalability and extensibility are both used in applications and very<br>
+relevant. 100-1000 record fields and max. 5 record extensions occur<br>
+routinely -- e.g. in the seL4 project by Data61 (usually generated from<br>
+programs / specifications).</p>
+</li>
+<li>
+<p>Some connection of records with datatypes is occasionally useful, e.g.<br>
+for recursion through record types or convenient notation for datatype<br>
+constructors (with updates), but it works against scalability demands<br>
+for records, because datatypes are very heavy.</p>
+</li>
+</ul>
+<p>Some partial solutions (for small records) are:</p>
+<p><a href="https://github.com/seL4/l4v/tree/master/tools/c-parser/recursive_records">https://github.com/seL4/l4v/tree/master/tools/c-parser/recursive_records</a></p>
+<p><a href="http://isabelle.in.tum.de/repos/isabelle/file/3107dcea3493/src/HOL/Library/Datatype_Records.thy">http://isabelle.in.tum.de/repos/isabelle/file/3107dcea3493/src/HOL/Library/Datatype_Records.thy</a></p>
+<ul>
+<li>
+<p>Instead of providing a separate datatype_record or record_datatype<br>
+package, it might be better to have a plugin for the existing BNF<br>
+datatype package to provide certain notational conveniences of records.</p>
+</li>
+<li>
+<p>There are existing techniques to connect records and datatypes<br>
+manually, e.g. with 'copy_bnf'.</p>
+</li>
+<li>
+<p>The record package is still awaiting localization, in order to make it<br>
+work in local contexts (locale, class, context, experiment etc.). Some<br>
+key challenges:</p>
+<ul>
+<li>
+<p>The package is very large and complex, with many cumulative<br>
+additions over time, by several authors.</p>
+</li>
+<li>
+<p>Record syntax needs to be somehow localized; conceptually it should<br>
+work, because the syntax is "constant", only the record field names,<br>
+types, and extensions depend on the context.</p>
+</li>
+</ul>
+</li>
+<li>
+<p>Update syntax is actually generic, there is no direct connection to<br>
+records.</p>
+</li>
+<li>
+<p>There are some open questions concerning code-generation for records.</p>
+</li>
+<li>
+<p>Instead of using records (with predicates over them) it is often more<br>
+convenient to use locales (with individual parameters and assumptions)<br>
+and let the locale + interpretation infrastructure handle merges,<br>
+instantiation etc.</p>
+</li>
+<li>
+<p>The Isabelle mailing lists have accumulated various non-conclusive<br>
+threads about records vs. datatypes over the past few years, e.g. see<br>
+here<br>
+<a href="https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2017-August/msg00016.html">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2017-August/msg00016.html</a></p>
+<p>Makarius</p>
+</li>
+</ul>
+
+
+
+<a name="294726705"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof%20of%20concept%3A%20BNF-based%20records/near/294726705" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof.20of.20concept.3A.20BNF-based.20records.html#294726705">(Aug 22 2022 at 16:44)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+Dear list,</p>
+<p>I'd like to demonstrate that it is quite simple to base records on BNFs.</p>
+<p>The short story is: it takes about 160 lines of ML code and 50 lines of <br>
+syntax declarations to achieve almost (one big caveat, see below) <br>
+feature parity to the standard record package (sources attached).</p>
+<p>Looking for your input on whether this is useful, and whether it belongs <br>
+into HOL-Library, the AFP, or the bin.</p>
+<p>What is supported? Pretty much the old syntax:</p>
+<p>bnf_record ('a, 'b) foo =<br>
+     field_1 :: 'a<br>
+     field_2 :: 'b</p>
+<p>term "⦇ field_1 = 3, field_2 = () ⦈"<br>
+   term "foo ⦇ field_1 := y ⦈"</p>
+<p>Also, record construction syntax is supported out of the box for <br>
+arbitrary single-free-constructor types:</p>
+<p>datatype x = X (a: int) (b: int)</p>
+<p>term "⦇ a = 1, b = 2 ⦈"</p>
+<p>Update syntax for existing types can be installed like this:</p>
+<p>local_setup ‹BNF_Record.mk_update_defs @{type_name x}›</p>
+<p>term "(X 1 2) ⦇ b := 3 ⦈ = X 1 3"</p>
+<p>What isn't supported?</p>
+<ul>
+<li>No extensions (i.e. "_ext", "_scheme" etc.).</li>
+<li>
+<p>Full flags and options of the datatype package (e.g. declaring type <br>
+variables as dead, disabling plugins).</p>
+</li>
+<li>
+<p>Any kind of compatibility between standard and BNF records.</p>
+</li>
+</ul>
+<p>How is it implemented?</p>
+<ol>
+<li>Define a single-constructor datatype.</li>
+<li>Generate update functions for each field.</li>
+<li>Lots of syntax sugar.</li>
+</ol>
+<p>Why?</p>
+<p>The short reason: the "record" package isn't localized.</p>
+<p>The longer reason: there are more problems with records, e.g. there is <br>
+no support for nested recursion (they do not constitute BNFs), and even <br>
+"copy_bnf" can't fix the absence of a suitable "size" function (which <br>
+makes termination proofs impossible).</p>
+<p>Why not?</p>
+<p>The internal construction of standard records is much faster. Half of <br>
+the 50 lines to declare syntax is required to un-declare record syntax. <br>
+Unfortunately raw "syntax" rules can't be bundle-d. Importing the theory <br>
+breaks all existing record syntax.</p>
+<p>What is the motivation for this?</p>
+<p>Lem supports records. CakeML uses them for some core types, and <br>
+specifies nested recursion through them. Whenever CakeML updates, I can <br>
+either change the generated sources to include a bunch of magic <br>
+incantations to make termination proofs work, or I can change Lem to <br>
+emit "bnf_record" instead of "record".* As a third option (somewhere <br>
+between band-aid and proper solution), Jasmin has already suggested a <br>
+few months to port the size plugin to records. I attempted that but <br>
+unfortunately it took me too much time and ultimately I didn't manage <br>
+to. This here was much quicker to pull off (approx. 3 h) and fixes an <br>
+immediate problem I had. (Jasmin did however prevent me from writing a <br>
+plugin that generates update functions for all datatypes.)</p>
+<p>Cheers<br>
+Lars</p>
+<ul>
+<li>Changing Lem to emit "datatype" doesn't solve the absence of updating <br>
+functions that are also required for Lem/CakeML.<br>
+<a href="/user_uploads/14278/EtIRP6SpiQof_KDWirwi79o_/bnf_record.ML">bnf_record.ML</a><br>
+<a href="/user_uploads/14278/tPHl4OrYQvcK7F2NasOMU0wG/BNF_Record.thy">BNF_Record.thy</a><br>
+<a href="/user_uploads/14278/EHuB-q2XvUZi-eBAxh5f6DVF/Test_BNF_Record.thy">Test_BNF_Record.thy</a></li>
+</ul>
+
+
+
+<a name="294727080"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof%20of%20concept%3A%20BNF-based%20records/near/294727080" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof.20of.20concept.3A.20BNF-based.20records.html#294727080">(Aug 22 2022 at 16:45)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On 08/02/18 22:36, Lars Hupel wrote:</p>
+<blockquote>
+<p>I'd like to demonstrate that it is quite simple to base records on BNFs.</p>
+<p>The short story is: it takes about 160 lines of ML code and 50 lines of<br>
+syntax declarations to achieve almost (one big caveat, see below)<br>
+feature parity to the standard record package (sources attached).</p>
+</blockquote>
+<p>This is all very strange. No discussion whatsoever and now there is even<br>
+a change on the Isabelle repository:<br>
+<a href="http://isabelle.in.tum.de/repos/isabelle/rev/7929240e44d4">http://isabelle.in.tum.de/repos/isabelle/rev/7929240e44d4</a></p>
+<p>The history of the official Isabelle record package is long and<br>
+entangled. Initially its main idea was to support extensible records in<br>
+a simple manner (see the paper by Naraschewski and Wenzel from 1998).<br>
+Later, some guys from Sydney added many more features to make the<br>
+package scalable for the L4.verified project -- that made the<br>
+implementation also very complex. Thus it has become difficult to update<br>
+and "localize" it. Moreover any connection to BNF datatypes (which are<br>
+very resource hungry) is likely to bomb applications with many record<br>
+fields (or record extensions).</p>
+<p>It is presently unclear to me, where the scalability features are used<br>
+in practice. If L4.verified no longer requires that, we can probably<br>
+remove 80% of the record package and then update it easily. If scalable<br>
+records are still required, it will need more work to update.</p>
+<p>Can some Data61 people say more about their current applications of the<br>
+record package?</p>
+<blockquote>
+<p>Looking for your input on whether this is useful, and whether it belongs<br>
+into HOL-Library, the AFP, or the bin.</p>
+</blockquote>
+<p>Spontaneously, I would have said HOL-ex or the bin. By putting it in<br>
+HOL-Library, you make certain claims of quality and sustained<br>
+maintenance. I.e. the first posting I can imagine on isabelle-users:</p>
+<p>"I've found out about HOL-Library.Datatype_Records by accident -- there<br>
+is no NEWS entry and no documentation whatsoever. That tool appears to<br>
+be in conflict with the existing record package. Can anybody please fix<br>
+this ASAP, such that I can use theories with regular records together<br>
+with these new BNF records? Anyway, what is the roadmap? Can I expect<br>
+new BNF records will eventually supersede old-fashioned typedef records?"</p>
+<blockquote>
+<p>What is supported? Pretty much the old syntax:</p>
+<p>bnf_record ('a, 'b) foo =<br>
+    field_1 :: 'a<br>
+    field_2 :: 'b</p>
+<p>term "⦇ field_1 = 3, field_2 = () ⦈"<br>
+  term "foo ⦇ field_1 := y ⦈"</p>
+<p>Also, record construction syntax is supported out of the box for<br>
+arbitrary single-free-constructor types:</p>
+<p>datatype x = X (a: int) (b: int)</p>
+<p>term "⦇ a = 1, b = 2 ⦈"</p>
+<p>Update syntax for existing types can be installed like this:</p>
+<p>local_setup ‹BNF_Record.mk_update_defs @{type_name x}›</p>
+<p>term "(X 1 2) ⦇ b := 3 ⦈ = X 1 3"</p>
+</blockquote>
+<p>That is record notation with "make" and "update" operations on top of<br>
+existing datatypes. It was actually the plan in 1996/1997, before the<br>
+extensible record scheme emerged in 1998. We did not do this by fancy,<br>
+but it was based on requirements from applications.</p>
+<blockquote>
+<p>Why?</p>
+<p>The longer reason: there are more problems with records, e.g. there is<br>
+no support for nested recursion (they do not constitute BNFs), and even<br>
+"copy_bnf" can't fix the absence of a suitable "size" function (which<br>
+makes termination proofs impossible).</p>
+</blockquote>
+<p>Can you explain this further? Is there an inherent problem of the<br>
+general idea of the regular record package wrt. BNFs? Can the BNF<br>
+experts comment on that?</p>
+<blockquote>
+<p>Why not?</p>
+<p>The internal construction of standard records is much faster. Half of<br>
+the 50 lines to declare syntax is required to un-declare record syntax.<br>
+Unfortunately raw "syntax" rules can't be bundle-d. Importing the theory<br>
+breaks all existing record syntax.</p>
+</blockquote>
+<p>BTW, there is an old Isabelle development principle to be monotonic wrt.<br>
+existing tools. A fork and clone is bad enough, one that disrupts what<br>
+is already there is worse: entropy, decay.</p>
+<blockquote>
+<p>What is the motivation for this?</p>
+<p>Lem supports records. CakeML uses them for some core types, and<br>
+specifies nested recursion through them. Whenever CakeML updates, I can<br>
+either change the generated sources to include a bunch of magic<br>
+incantations to make termination proofs work, or I can change Lem to<br>
+emit "bnf_record" instead of "record".* As a third option (somewhere<br>
+between band-aid and proper solution), Jasmin has already suggested a<br>
+few months to port the size plugin to records. I attempted that but<br>
+unfortunately it took me too much time and ultimately I didn't manage<br>
+to. This here was much quicker to pull off (approx. 3 h) and fixes an<br>
+immediate problem I had. (Jasmin did however prevent me from writing a<br>
+plugin that generates update functions for all datatypes.)</p>
+</blockquote>
+<p>This hints at various discussions in the dark. We have relatively little<br>
+traffic on the isabelle-users and isabelle-dev mailing lists, so why not<br>
+use them for proper discussions?</p>
+<p>As a reminder:</p>
+<p>* isabelle-users is for anything that is relevant to users of official<br>
+Isabelle releases (past, present, future releases).</p>
+<p>* isabelle-dev is for anything concerning the ongoing development<br>
+process of Isabelle repository versions between releases.</p>
+<p>* It does not make sense to cross-post on both lists; isabelle-dev is<br>
+the smaller list, essentially a subset of isabelle-users.</p>
+<p>Mailing lists are not for real-time "chats". Often the relevant people<br>
+are not immediately reactive (e.g. busy somewhere else or even on<br>
+vacation). This means it needs more than just a few days to draw<br>
+conclusions from the absence of postings.</p>
+<p>Makarius</p>
+
+
+
+<a name="294727105"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof%20of%20concept%3A%20BNF-based%20records/near/294727105" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof.20of.20concept.3A.20BNF-based.20records.html#294727105">(Aug 22 2022 at 16:45)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+Lars discussed this with me. There is no harm in putting it in Library as long <br>
+as the functionality and limitations of this approach are clearly stated in the <br>
+theory, which they are currently not. This needs to be included. Then people <br>
+know what they are letting themselves in for.</p>
+<p>Tobias<br>
+<a href="/user_uploads/14278/NbnlwNq9HAtGqjBBDc8lVFys/smime.p7s">smime.p7s</a></p>
+
+
+
+<a name="294727142"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof%20of%20concept%3A%20BNF-based%20records/near/294727142" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof.20of.20concept.3A.20BNF-based.20records.html#294727142">(Aug 22 2022 at 16:46)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;</p>
+<blockquote>
+<p>Can you explain this further? Is there an inherent problem of the<br>
+general idea of the regular record package wrt. BNFs? Can the BNF<br>
+experts comment on that?</p>
+</blockquote>
+<p>I explained that in my email. "copy_bnf" makes a record a BNF. But for<br>
+it to be able to be used in a function definition, it also requires size<br>
+setup, which as of now, is manual.</p>
+<blockquote>
+<p>BTW, there is an old Isabelle development principle to be monotonic wrt.<br>
+existing tools. A fork and clone is bad enough, one that disrupts what<br>
+is already there is worse: entropy, decay.</p>
+</blockquote>
+<p>As I said, raw syntax cannot be bundled. I expect people to have a brief<br>
+look over what they're including, and the way the syntax setup works is<br>
+exceedingly obvious.</p>
+<blockquote>
+<p>This hints at various discussions in the dark. We have relatively little<br>
+traffic on the isabelle-users and isabelle-dev mailing lists, so why not<br>
+use them for proper discussions?</p>
+</blockquote>
+<p>The problems with record + nested recursion had been laid out on the<br>
+mailing lists a few months ago.</p>
+
+
+
+<a name="294727175"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof%20of%20concept%3A%20BNF-based%20records/near/294727175" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof.20of.20concept.3A.20BNF-based.20records.html#294727175">(Aug 22 2022 at 16:46)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+Fair point. I will add a few paragraphs there.</p>
+
+
+
+<a name="294727249"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof%20of%20concept%3A%20BNF-based%20records/near/294727249" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof.20of.20concept.3A.20BNF-based.20records.html#294727249">(Aug 22 2022 at 16:46)</a>:</h4>
+<p>From: <a href="mailto:Gerwin.Klein@data61.csiro.au">Gerwin.Klein@data61.csiro.au</a></p>
+<blockquote>
+<p>It is presently unclear to me, where the scalability features are used<br>
+in practice. If L4.verified no longer requires that, we can probably<br>
+remove 80% of the record package and then update it easily. If scalable<br>
+records are still required, it will need more work to update.</p>
+<p>Can some Data61 people say more about their current applications of the<br>
+record package?</p>
+</blockquote>
+<p>We still do require it, and in fact make more use of the scalability than ever, because seL4 keeps growing and we keep adding support for further architectures.</p>
+<p>We also depend on extensibility of records in a few places.</p>
+<blockquote>
+<blockquote>
+<p>Looking for your input on whether this is useful, and whether it belongs<br>
+into HOL-Library, the AFP, or the bin.</p>
+</blockquote>
+<p>Spontaneously, I would have said HOL-ex or the bin. By putting it in<br>
+HOL-Library, you make certain claims of quality and sustained<br>
+maintenance. I.e. the first posting I can imagine on isabelle-users:</p>
+<p>"I've found out about HOL-Library.Datatype_Records by accident -- there<br>
+is no NEWS entry and no documentation whatsoever. That tool appears to<br>
+be in conflict with the existing record package. Can anybody please fix<br>
+this ASAP, such that I can use theories with regular records together<br>
+with these new BNF records? Anyway, what is the roadmap? Can I expect<br>
+new BNF records will eventually supersede old-fashioned typedef records?”</p>
+</blockquote>
+<p>:-)</p>
+<p>I must admit that we have been maintaining a similar (very bare-bones) additional datatype record package on the side for about a decade. We use it in addition to the standard record package to model C structs, because they can contain recursive pointer types, which we couldn’t do with normal records. I.e. it might make sense to have both, as long as it is clear what each is for, what the differences are, and why they can’t/shouldn’t be the same.</p>
+<blockquote>
+<blockquote>
+<p>The longer reason: there are more problems with records, e.g. there is<br>
+no support for nested recursion (they do not constitute BNFs), and even<br>
+"copy_bnf" can't fix the absence of a suitable "size" function (which<br>
+makes termination proofs impossible).</p>
+</blockquote>
+<p>Can you explain this further? Is there an inherent problem of the<br>
+general idea of the regular record package wrt. BNFs? Can the BNF<br>
+experts comment on that?</p>
+</blockquote>
+<p>I’d be interested in that too. It’d be nice to properly localise and BNF-ify records eventually.</p>
+<p>Cheers,<br>
+Gerwin</p>
+
+
+
+<a name="294727290"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof%20of%20concept%3A%20BNF-based%20records/near/294727290" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof.20of.20concept.3A.20BNF-based.20records.html#294727290">(Aug 22 2022 at 16:46)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Can you point to the sources of a few such big record definitions?</p>
+<p>Such examples will be required even to a canonical localization effort<br>
+of the package that retains its feature richness.</p>
+<p>Makarius</p>
+
+
+
+<a name="294727309"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof%20of%20concept%3A%20BNF-based%20records/near/294727309" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof.20of.20concept.3A.20BNF-based.20records.html#294727309">(Aug 22 2022 at 16:46)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+People often don't have a choice: imports are often indirect. E.g. when<br>
+you use theories from HOL-Algebra, the regular record package will be<br>
+used. Combining this which bnf_record will break it.</p>
+<p>It is normally possible to add new things without disrupting existing<br>
+things, and thus retain the good manners of monotonicity.</p>
+<p>Makarius</p>
+
+
+
+<a name="294727424"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof%20of%20concept%3A%20BNF-based%20records/near/294727424" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof.20of.20concept.3A.20BNF-based.20records.html#294727424">(Aug 22 2022 at 16:47)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Can you point to the sources of this alternative datatype record<br>
+package? How does it treat record syntax?</p>
+<p>One important aspect of localizing the record package is actually the<br>
+concrete syntax. When that is done properly, syntax could be attached to<br>
+different term constructions, independently of the underlying record<br>
+representation.</p>
+<p>Makarius</p>
+
+
+
+<a name="294727441"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof%20of%20concept%3A%20BNF-based%20records/near/294727441" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof.20of.20concept.3A.20BNF-based.20records.html#294727441">(Aug 22 2022 at 16:47)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:lammich@in.tum.de">lammich@in.tum.de</a>&gt;<br>
+Is there a way to do advanced syntax (e.g. nonterminal, syntax,<br>
+translations, parse_translation, print_ast_translation) properly (e.g.<br>
+localized)?</p>
+
+
+
+<a name="294727516"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof%20of%20concept%3A%20BNF-based%20records/near/294727516" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof.20of.20concept.3A.20BNF-based.20records.html#294727516">(Aug 22 2022 at 16:47)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Yes, one merely needs to connect local entities with global items in the<br>
+background theory (the so-called foundation), according to the usual<br>
+policies of local_theory contexts.</p>
+<p>Here the foundation consists of raw syntax and translations, and the<br>
+connection might require further tricks that have not been used before.</p>
+<p>The whole localization business is about such tricks -- to make things<br>
+possible that look impossible at first sight.</p>
+<p>Makarius</p>
+
+
+
+<a name="294727578"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof%20of%20concept%3A%20BNF-based%20records/near/294727578" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof.20of.20concept.3A.20BNF-based.20records.html#294727578">(Aug 22 2022 at 16:48)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:lammich@in.tum.de">lammich@in.tum.de</a>&gt;<br>
+So I don't feel so bad anymore about writing syntax translations tgat depend<br>
+on a configuration flag from the local context ... I did this trick recently<br>
+to enable advanced syntax in a bundle ... the problem was that some<br>
+translations that match on the outermost constant of an expression are not<br>
+supposed to return identity ... this required further workarounds and makes it<br>
+all feel like a bad hack.  </p>
+<p>Peter</p>
+
+
+
+<a name="294727595"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof%20of%20concept%3A%20BNF-based%20records/near/294727595" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof.20of.20concept.3A.20BNF-based.20records.html#294727595">(Aug 22 2022 at 16:48)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Can you point to the sources?</p>
+<p>Makarius</p>
+
+
+
+<a name="294727624"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof%20of%20concept%3A%20BNF-based%20records/near/294727624" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof.20of.20concept.3A.20BNF-based.20records.html#294727624">(Aug 22 2022 at 16:48)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:lammich@in.tum.de">lammich@in.tum.de</a>&gt;<br>
+No, but I can include a stripped-down example. Basically, the print and<br>
+parse translations will raise Match if they are disabled by a<br>
+configuration option.</p>
+<p>See the last lines of attached text to see an example how it is<br>
+supposed to work.</p>
+<p>The decomposition of strings looks ughly, I basically copied it from<br>
+String_Syntax.ML</p>
+
+
+
+<a name="294727717"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof%20of%20concept%3A%20BNF-based%20records/near/294727717" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof.20of.20concept.3A.20BNF-based.20records.html#294727717">(Aug 22 2022 at 16:49)</a>:</h4>
+<p>From: <a href="mailto:Thomas.Sewell@data61.csiro.au">Thomas.Sewell@data61.csiro.au</a><br>
+Hi all. I'm the guy from Sydney who added stuff to the record package.<br>
+I'm just back from holiday, and I should try to clear up some<br>
+misunderstandings.</p>
+<ul>
+<li>1 - It's OK for other packages to use the record update syntax.</li>
+</ul>
+<p>I think the BNF record extension mechanism is fine. I think (but haven't<br>
+checked) that it's the record update syntax which is being used. This is<br>
+just syntax for any constant whose name ends in "_update". You can play<br>
+with this by hand, if you want, define the constant spam_update<br>
+and use the syntax "r (| spam := 1 |)". This won't create conflicts with<br>
+the record package, since the record package knows which constants<br>
+it "owns".</p>
+<ul>
+<li>2 - I changed the record package, but I tried to avoid "features".</li>
+</ul>
+<p>The history, as I recall, is that the extensible record mechanism is <br>
+quite old.<br>
+Norbert Schirmer's Simpl package tends to require large records, so<br>
+he adjusted the implementation. He managed to support about 100 variables,<br>
+and then I adjusted it again to get up to 1000.</p>
+<p>My adjustment made a lot of changes to how the record type is defined<br>
+internally. But I tried to avoid changing the "surface layer" which users<br>
+interact with. I think Makarius is slightly wrong to describe this as <br>
+new features,<br>
+it was meant to just be a performance upgrade within the machinery.</p>
+<p>I did make a mistake. I didn't understand the code generator well, and <br>
+in fact I<br>
+still don't. I had hoped at the time that my changes were benign, and <br>
+would result<br>
+in code being generated fairly normally. I was wrong, apparently. Other <br>
+authors<br>
+subsequently added quite a lot of code to produce theorems that allow <br>
+the code<br>
+generator to simulate a simpler definition for records. This conflicts <br>
+with my<br>
+performance goals somewhat. With all these changes together, the package is<br>
+now quite complicated.</p>
+<ul>
+<li>3 - The L4.verified performance constraints aren't complicated.</li>
+</ul>
+<p>We can't "quote" the big record definition that is done, because it's <br>
+called in ML by<br>
+another package. But we can describe the performance constraints very <br>
+easily:<br>
+somewhere upwards of 700 variables. I think that our most challenging <br>
+configuration<br>
+might be up well about 1000 now.</p>
+<p>There's one key big record for any given inclusion of a C program, i.e. <br>
+one in any<br>
+image. It's a flat record, not an extension and never extended.</p>
+<p>Quoting myself on this list from nearly 10 years ago, you can run test <br>
+an n-variable<br>
+record definition quite easily:</p>
+<p>ML {*<br>
+fun add_test_rec b n = let<br>
+     fun var i = (Binding.suffix_name (string_of_int i) b, @{typ bool}, <br>
+Mixfix.NoSyn)<br>
+   in Record.add_record {overloaded = false} ([], b)<br>
+     NONE (map var (1 upto n))<br>
+   end<br>
+*}</p>
+<p>setup {* add_test_rec @{binding test_rec} 20 *}<br>
+setup {* add_test_rec @{binding test_rec_b} 200 *}</p>
+<p>We also use a number of smaller records, and do use the extension <br>
+feature, but<br>
+I don't think we're different to other users in any interesting way.</p>
+<ul>
+<li>4 - Past performance problems.</li>
+</ul>
+<p>We had a live discussion about record performance problems more than 5 years<br>
+ago. Around then we were having critical difficulties getting images to <br>
+build on<br>
+pretty much any hardware. I tracked down the problem at the time. It was due<br>
+to both the code generator support for extra record features and a <br>
+change to the<br>
+way proof terms were stored.</p>
+<p>This problem was then solved in PolyML. When David Matthews added<br>
+shareCommonData as a feature that the GC called occasionally, the problem<br>
+went away. Now the relevant image builds are just slow. I can explain <br>
+this in more<br>
+detail, if anyone really cares, but on our side we no longer need to do <br>
+anything<br>
+about it.</p>
+<ul>
+<li>5 - Future maintenance.</li>
+</ul>
+<p>The record package is now quite complicated. Various people would like <br>
+to localise<br>
+it. Part of the problem is that it doesn't have a single author any <br>
+more. I made a quick<br>
+attempt to do some localising in the past, but I quickly hit bits of the <br>
+syntax translations<br>
+and simprocs that I avoided changing in the past and that I still don't <br>
+understand.</p>
+<p>There are probably many other agendas as well.</p>
+<p>Cheers,<br>
+     Thomas.</p>
+
+
+
+<a name="294727773"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof%20of%20concept%3A%20BNF-based%20records/near/294727773" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof.20of.20concept.3A.20BNF-based.20records.html#294727773">(Aug 22 2022 at 16:49)</a>:</h4>
+<p>From: Dmitriy Traytel &lt;<a href="mailto:traytel@inf.ethz.ch">traytel@inf.ethz.ch</a>&gt;<br>
+Back from vacation here as well. I'll try to clarify some things from the BNF perspective. BTW: the term "datatype-base" for Lars' tool would be more appropriate than "BNF-based" (whereas the datatypes themselves are "BNF-based"). </p>
+<blockquote>
+<p>On 14 Feb 2018, at 15:01, Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt; wrote:</p>
+<p>The history of the official Isabelle record package is long and<br>
+entangled. Initially its main idea was to support extensible records in<br>
+a simple manner (see the paper by Naraschewski and Wenzel from 1998).<br>
+Later, some guys from Sydney added many more features to make the<br>
+package scalable for the L4.verified project -- that made the<br>
+implementation also very complex. Thus it has become difficult to update<br>
+and "localize" it. Moreover any connection to BNF datatypes (which are<br>
+very resource hungry) is likely to bomb applications with many record<br>
+fields (or record extensions).</p>
+</blockquote>
+<p>I dimly remember that Andeas Lochbihler had an application of a long sequence of record extensions (depth 5 or 6), but can not find the corresponding formalization in Isabelle+AFP.</p>
+<blockquote>
+<blockquote>
+<p>Why?</p>
+<p>The longer reason: there are more problems with records, e.g. there is<br>
+no support for nested recursion (they do not constitute BNFs), and even<br>
+"copy_bnf" can't fix the absence of a suitable "size" function (which<br>
+makes termination proofs impossible).</p>
+</blockquote>
+<p>Can you explain this further? Is there an inherent problem of the<br>
+general idea of the regular record package wrt. BNFs? Can the BNF<br>
+experts comment on that?</p>
+</blockquote>
+<p>As Lars has pointed out: there is no problem with records w.r.t. BNFs. One can register any record as a BNF using the copy_bnf command (potentially inheriting some dead variables from the underlying product type used in the construction of records). A BNF does not give one a size function though.</p>
+<blockquote>
+<blockquote>
+<p>Jasmin has already suggested a<br>
+few months to port the size plugin to records. I attempted that but<br>
+unfortunately it took me too much time and ultimately I didn't manage<br>
+to. This here was much quicker to pull off (approx. 3 h) and fixes an<br>
+immediate problem I had. (Jasmin did however prevent me from writing a<br>
+plugin that generates update functions for all datatypes.)</p>
+</blockquote>
+<p>This hints at various discussions in the dark. We have relatively little<br>
+traffic on the isabelle-users and isabelle-dev mailing lists, so why not<br>
+use them for proper discussions?</p>
+</blockquote>
+<p>Actually, this was on the mailing list and I am surprised that nobody has posted the link yet:</p>
+<p><a href="https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2017-August/msg00016.html">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2017-August/msg00016.html</a> &lt;<a href="https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2017-August/msg00016.html">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2017-August/msg00016.html</a>&gt;</p>
+<p>However, for some reason, I can't find the last mail from Jasmin (to Lars, cc'ing me and isabelle-users) in this thread in the mailman archives. So I guess we should call it "in the twilight" rather than "in the dark". Here is its content (of which in particular the last paragraph is relevant in this thread):</p>
+<blockquote>
+<p>On 13 Aug 2017, at 17:47, Blanchette, J.C. &lt;<a href="mailto:j.c.blanchette@vu.nl">j.c.blanchette@vu.nl</a>&gt; wrote:</p>
+<p>Hi Lars,</p>
+<blockquote>
+<p>A good starting point could be to decouple record syntax from record<br>
+definitions. There's no reason why</p>
+<p>datatype foo = Bar (x: nat) (y: nat)</p>
+<p>couldn't be treated as a record, including update functions.</p>
+</blockquote>
+<p>I'm not sure what you mean exactly by "treated as a record". Records have a quite different feel, with their polymorphic "more" field.</p>
+<p>I remember looking at records a few years ago and finding out that many of the properties and concepts shared with datatypes (or the "ctr_sugar" abstraction) have different names or different forms. A thorough analysis of the current situation would be a good idea before adding anything.</p>
+<blockquote>
+<p>I'm already working on a plugin that produces "*_update" functions (this allows for<br>
+record update syntax, albeit not construction syntax).</p>
+</blockquote>
+<p>I'm not sure what your plans are, but I would argue against using the datatype plugin for this, because such plugins are enabled by default. More than enough constants are already generated for datatypes. Perhaps we could discuss alternatives offline if you like.</p>
+<p>Cheers,</p>
+<p>Jasmin</p>
+</blockquote>
+<p>Stepping back and looking at the different requirements (of Lars and Data61) gives me the impression, that it would be useful to have a plugin to enable record syntax and update-functions for datatypes. There are many questions that need to be discussed: Should it work for single-constructor datatypes only? What about recursive single-constructor datatypes? (The answer to the latter seems yes thinking of Data61's recursive pointer type.)</p>
+<p>However, this plugin definitely needs to be disabled by default. </p>
+<p>There are ways to achieve this (c.f. the "transfer" option and plugin of primrec in src/HOL/Tools/BNF/bnf_lfp_rec_sugar.ML and src/HOL/Tools/BNF/bnf_lfp_rec_sugar_transfer.ML), but they feel more like a workaround, rather than the solution: we are using an additional configuration option to disable the plugin by default. Ideally, there would be a cleaner way to specify the defaults directly in the plugin infrastructure when creating a plugin interpretation (i.e. in the Plugin.interpretation function).</p>
+<p>This plugin would be clearly conceptually separated from the record package (which we will never supersede with datatypes because of efficiency). Probably much of the tool that Lars' created can be reused in such a plugin, but without introducing a new record package and the confusion associated to it.</p>
+<p>Dmitriy</p>
+
+
+
+<a name="294727878"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof%20of%20concept%3A%20BNF-based%20records/near/294727878" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof.20of.20concept.3A.20BNF-based.20records.html#294727878">(Aug 22 2022 at 16:49)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:mail@andreas-lochbihler.de">mail@andreas-lochbihler.de</a>&gt;</p>
+<blockquote>
+<p>I dimly remember that Andeas Lochbihler had an application of a long sequence of record extensions (depth 5 or 6), but can not find the corresponding formalization in Isabelle+AFP.</p>
+</blockquote>
+<p>Such a long sequence appeared in early versions of my Monomorphic_Monad formalisation in <br>
+the AFP. (There was a record for a monad, an extension for exceptions, another one for <br>
+state, etc.) But I dropped the whole record approach because the fixed order of record <br>
+extensions made the whole approach too inflexible. Today, Monomorphic_Monad is based on <br>
+locales.</p>
+<p>All my records are small in terms of fields and I have frequently used extensions, but <br>
+usually no deeper than three levels. Some examples can be found in the unfinished FSCPI <br>
+formalisation at:</p>
+<p><a href="https://www.ethz.ch/content/dam/ethz/special-interest/infk/inst-infsec/information-security-group-dam/research/projects/FCSPI/CoSP.zip">https://www.ethz.ch/content/dam/ethz/special-interest/infk/inst-infsec/information-security-group-dam/research/projects/FCSPI/CoSP.zip</a></p>
+<p>Andreas</p>
+
+
+
+<a name="294728021"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof%20of%20concept%3A%20BNF-based%20records/near/294728021" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof.20of.20concept.3A.20BNF-based.20records.html#294728021">(Aug 22 2022 at 16:50)</a>:</h4>
+<p>From: "Achim D. Brucker" &lt;<a href="mailto:brucker@spamfence.net">brucker@spamfence.net</a>&gt;<br>
+(re-sending, as I first used a non-subscribed email address)</p>
+<p>Hi,<br>
+We are currently porting (at this point in time, manually) the<br>
+extensible encoding for class model from my PhD thesis [A] to<br>
+records. Our main application at the moment is a formalization of the<br>
+Document Object Model (DOM) and partly HTML (as an extension of the<br>
+DOM) for reasoning over browser APIs that modify DOM/HTML instances<br>
+(a first AFP submission is planned for the near future).</p>
+<p>Here, we easily end up with 5 and more extensions and also rather<br>
+complex type polynoms as extension types. </p>
+<p>We moved from a datatype-based approach to record to benefit from the<br>
+records syntax and also to re-use the existing extensibility of records<br>
+(instead of implementing our own using records or tuples as we did in<br>
+our old object-oriented datatype package). </p>
+<p>Best,<br>
+        Achim</p>
+<p>[A] Achim D. Brucker, Burkhart Wolff: An Extensible Encoding of<br>
+    Object-oriented Data Models in hol. J. Autom. Reasoning 41(3-4):<br>
+    219-249 (2008)<br>
+<a href="https://www.brucker.ch/bibliography/abstract/brucker.ea-extensible-2008-b">https://www.brucker.ch/bibliography/abstract/brucker.ea-extensible-2008-b</a><br>
+<a href="/user_uploads/14278/L0hDYtAuiKsnVJ56LrYk05yc/signature.asc">signature.asc</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

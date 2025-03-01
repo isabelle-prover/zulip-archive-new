@@ -1,0 +1,262 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Code Generation with Locales that Fix Type Par... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20Generation.20with.20Locales.20that.20Fix.20Type.20Par.2E.2E.2E.html">[isabelle] Code Generation with Locales that Fix Type Par...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294706334"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20Generation%20with%20Locales%20that%20Fix%20Type%20Par.../near/294706334" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20Generation.20with.20Locales.20that.20Fix.20Type.20Par.2E.2E.2E.html#294706334">(Aug 22 2022 at 15:05)</a>:</h4>
+<p>From: Brandon Bohrer &lt;<a href="mailto:bbohrer@cs.cmu.edu">bbohrer@cs.cmu.edu</a>&gt;<br>
+Hello All,</p>
+<p>I've been trying to generate code for functions that are defined inside a<br>
+locale, but Isabelle is refusing and the error suggests it is related to<br>
+the type variables fixed by my locale. Here is a toy example of the problem:</p>
+<p>theory "Codegen_Example"<br>
+  imports Complex_Main<br>
+begin<br>
+  locale Foo =<br>
+  fixes x::"'type_param::finite"<br>
+  fixes y::"'type_param::finite"</p>
+<p>context Foo begin<br>
+fun test1 :: "int \&lt;Rightarrow&gt; int" where<br>
+  "test1 n = n"</p>
+<p>fun test2 :: "'a \&lt;Rightarrow&gt; 'a" where<br>
+  "test2 n = n"</p>
+<p>fun test3 :: "int \&lt;Rightarrow&gt; 'type_param \&lt;Rightarrow&gt; int" where<br>
+  "test3 n _= n"<br>
+end</p>
+<p>interpretation bb: Foo Enum.finite_2.a\&lt;^sub&gt;1 Enum.finite_2.a\&lt;^sub&gt;2<br>
+done</p>
+<p>(* Works *)<br>
+export_code "bb.test1" in SML<br>
+export_code "bb.test2" in SML</p>
+<p>(* Does Not Work*)<br>
+export_code "bb.test3" in SML<br>
+end</p>
+<p>The last "export_code" line gives the error:</p>
+<p>Type<br>
+int ⇒ Enum.finite_2 ⇒ int<br>
+of constant "Codegen_Example.Foo.test3"<br>
+is too specific compared to declared type<br>
+int ⇒ ?'type_param::{} ⇒ int</p>
+<p>I don't understand this error, because generating code for a specific<br>
+instance 'type_param = Enum.finite_2 seems like something that ought to<br>
+work (and Enum.finite_2 supports the finite typeclass).</p>
+<p>Does anyone know a way to convince Isabelle to generate code in such a<br>
+situation (or fix my confusion as to why this is not supported?). It would<br>
+actually be more convenient in my case to generate polymorphic code instead<br>
+of fixing 'type_param = Enum.finite_2, but of course that's cheating in the<br>
+sense that SML knows nothing about the finite typeclass thus cannot enforce<br>
+it.</p>
+<p>Incidentally, in the real code, the reason for fixing the type parameters<br>
+like this are (1) I use the assumption 'type_param::finite very frequently<br>
+and it's nicer to only write it down once and (2) I frequently construct<br>
+values based on x and y (and a number of other arguments) so it would be<br>
+quite unwieldy if they were not locale parameters.</p>
+<p>Thanks in advance,<br>
+Brandon<br>
+<a href="/user_uploads/14278/CPdQqdNS5YmzbDmd89wqhZAP/Codegen_Example.thy">Codegen_Example.thy</a></p>
+
+
+
+<a name="294706340"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20Generation%20with%20Locales%20that%20Fix%20Type%20Par.../near/294706340" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20Generation.20with.20Locales.20that.20Fix.20Type.20Par.2E.2E.2E.html#294706340">(Aug 22 2022 at 15:05)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear Brandon,</p>
+<p>The underlying reason is not related to type classes. It is simply that you must do some <br>
+work to get the code generator work on interpretations of locales. You have three options:</p>
+<ol>
+<li>Export the code for the general constant Foo.test3 after having re-declared the code <br>
+equations on the theory level:</li>
+</ol>
+<p>lemmas [code] = Foo.test1.simps Foo.test2.simps Foo.test3.simps</p>
+<p>export_code Foo.test3 in SML</p>
+<p>In addition, if you want to get the specialisation for the interpretation, you must define <br>
+a constant instead of the abbreviation:</p>
+<p>definition "bb_test3 = bb.test3"<br>
+export_code bb_test3 in SML</p>
+<p>This option works only if your locale does not contain or inherit any "assumes" parts.</p>
+<ol start="2">
+<li>You define at the time of interpretation new constants for all the terms you ever want <br>
+to execute. You must use global_interpretation instead of interpretation.</li>
+</ol>
+<p>global_interpretation bb: Foo Enum.finite_2.a⇩1 Enum.finite_2.a⇩2<br>
+   defines bb_test1 = bb.test1<br>
+     and bb_test2 = bb.test2<br>
+     and bb_test3 = bb.test3</p>
+<ol start="3">
+<li>You use one of Peter Lammich's tools from Autoref or Monadic Refinement Framework that <br>
+automates step 2. He can tell you more about this.</li>
+</ol>
+<p>Hope this helps,<br>
+Andreas</p>
+
+
+
+<a name="294706396"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20Generation%20with%20Locales%20that%20Fix%20Type%20Par.../near/294706396" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20Generation.20with.20Locales.20that.20Fix.20Type.20Par.2E.2E.2E.html#294706396">(Aug 22 2022 at 15:06)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:lammich@in.tum.de">lammich@in.tum.de</a>&gt;</p>
+<ol start="3">
+<li>You use one of Peter Lammich's tools from Autoref or Monadic<blockquote>
+<p>Refinement Framework that <br>
+automates step 2. He can tell you more about this.</p>
+</blockquote>
+</li>
+</ol>
+<p>Unfortunately, the Locale_Code tool Andreas probably refers to does not<br>
+work for this particular case. </p>
+<p>This tool was specifically developed for the needs of the Isabelle<br>
+Collection Framework. It's a workaround, and after being told that this<br>
+hack is of no general interest as it should be done properly, I did not<br>
+invest more work to make it usable in more general cases.</p>
+<p>Anyway, 5 years later, the problem of generating code from locale<br>
+interpretations <em>without</em> writing tons of boilerplate seems still not<br>
+solved.</p>
+<p>So again, here the idea of my hack:</p>
+<p>Before and after interpreting a locale, record the existing Spec_Rules.<br>
+After interpreting the locale, make a diff to find the new spec rules,<br>
+and process them to automatically set up new code equations.</p>
+<p>However, as far as I can remember, the current implementation only<br>
+declares new code equations, without defining new constants. </p>
+<p>See "$AFP/Collections/ICF/tools/Locale_Code_Ex" and the Isabelle<br>
+Collection Framework for examples where it actually works and the three<br>
+lines </p>
+<p>setup Locale_Code.open_block<br>
+interpretation ...<br>
+setup Locale_Code.close_block</p>
+<p>declare dozens of code theorems, thus saving dozens of boilerplate declarations as would be required for method 1 or 2.</p>
+
+
+
+<a name="294706428"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20Generation%20with%20Locales%20that%20Fix%20Type%20Par.../near/294706428" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20Generation.20with.20Locales.20that.20Fix.20Type.20Par.2E.2E.2E.html#294706428">(Aug 22 2022 at 15:06)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Brandon,</p>
+<blockquote>
+<ol start="2">
+<li>You define at the time of interpretation new constants for all the<br>
+terms you ever want to execute. You must use global_interpretation<br>
+instead of interpretation.</li>
+</ol>
+<p>global_interpretation bb: Foo Enum.finite_2.a⇩1 Enum.finite_2.a⇩2<br>
+  defines bb_test1 = bb.test1<br>
+    and bb_test2 = bb.test2<br>
+    and bb_test3 = bb.test3</p>
+</blockquote>
+<p>this approach is indeed canonical.</p>
+<p>CU,<br>
+    Florian</p>
+<blockquote>
+<ol start="3">
+<li>You use one of Peter Lammich's tools from Autoref or Monadic<br>
+Refinement Framework that automates step 2. He can tell you more about<br>
+this.</li>
+</ol>
+<p>Hope this helps,<br>
+Andreas</p>
+<p>On 16/02/17 14:55, Brandon Bohrer wrote:</p>
+<blockquote>
+<p>Hello All,</p>
+<p>I've been trying to generate code for functions that are defined inside a<br>
+locale, but Isabelle is refusing and the error suggests it is related to<br>
+the type variables fixed by my locale. Here is a toy example of the<br>
+problem:</p>
+<p>theory "Codegen_Example"<br>
+  imports Complex_Main<br>
+begin<br>
+  locale Foo =<br>
+  fixes x::"'type_param::finite"<br>
+  fixes y::"'type_param::finite"</p>
+<p>context Foo begin<br>
+fun test1 :: "int \&lt;Rightarrow&gt; int" where<br>
+  "test1 n = n"</p>
+<p>fun test2 :: "'a \&lt;Rightarrow&gt; 'a" where<br>
+  "test2 n = n"</p>
+<p>fun test3 :: "int \&lt;Rightarrow&gt; 'type_param \&lt;Rightarrow&gt; int" where<br>
+  "test3 n _= n"<br>
+end</p>
+<p>interpretation bb: Foo Enum.finite_2.a\&lt;^sub&gt;1 Enum.finite_2.a\&lt;^sub&gt;2<br>
+done</p>
+<p>(* Works *)<br>
+export_code "bb.test1" in SML<br>
+export_code "bb.test2" in SML</p>
+<p>(* Does Not Work*)<br>
+export_code "bb.test3" in SML<br>
+end</p>
+<p>The last "export_code" line gives the error:</p>
+<p>Type<br>
+int ⇒ Enum.finite_2 ⇒ int<br>
+of constant "Codegen_Example.Foo.test3"<br>
+is too specific compared to declared type<br>
+int ⇒ ?'type_param::{} ⇒ int</p>
+<p>I don't understand this error, because generating code for a specific<br>
+instance 'type_param = Enum.finite_2 seems like something that ought to<br>
+work (and Enum.finite_2 supports the finite typeclass).</p>
+<p>Does anyone know a way to convince Isabelle to generate code in such a<br>
+situation (or fix my confusion as to why this is not supported?). It<br>
+would<br>
+actually be more convenient in my case to generate polymorphic code<br>
+instead<br>
+of fixing 'type_param = Enum.finite_2, but of course that's cheating<br>
+in the<br>
+sense that SML knows nothing about the finite typeclass thus cannot<br>
+enforce<br>
+it.</p>
+<p>Incidentally, in the real code, the reason for fixing the type parameters<br>
+like this are (1) I use the assumption 'type_param::finite very<br>
+frequently<br>
+and it's nicer to only write it down once and (2) I frequently construct<br>
+values based on x and y (and a number of other arguments) so it would be<br>
+quite unwieldy if they were not locale parameters.</p>
+<p>Thanks in advance,<br>
+Brandon<br>
+</p>
+</blockquote>
+<p><a href="/user_uploads/14278/zB33v_rCKy4L6tTQOTAzoCeb/signature.asc">signature.asc</a></p>
+</blockquote>
+
+
+
+<a name="294706517"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20Generation%20with%20Locales%20that%20Fix%20Type%20Par.../near/294706517" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20Generation.20with.20Locales.20that.20Fix.20Type.20Par.2E.2E.2E.html#294706517">(Aug 22 2022 at 15:06)</a>:</h4>
+<p>From: Brandon Bohrer &lt;<a href="mailto:bbohrer@cs.cmu.edu">bbohrer@cs.cmu.edu</a>&gt;<br>
+Hi Andreas,</p>
+<p>Thank you for such a detailed response! Solution #2 got export_code to work<br>
+(my locale has assumptions, so #1 was not an option). I don't mind the<br>
+boilerplate code so long as it works.</p>
+<p>My locale also has some inductive predicates for which I would like to<br>
+generate code. Am I correct that the predicate compiler doesn't work inside<br>
+locales that have assumptions? The following thread seems to suggest so:<br>
+<a href="https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2017-January/msg00063.html">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2017-January/msg00063.html</a></p>
+<p>If that's the case, it shouldn't be too hard to turn all my predicates into<br>
+functions. It just looks cleaner when they're written as inductive<br>
+predicates, so it would be nice if code generation for predicates happens<br>
+to work.</p>
+
+
+
+<a name="294706531"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20Generation%20with%20Locales%20that%20Fix%20Type%20Par.../near/294706531" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20Generation.20with.20Locales.20that.20Fix.20Type.20Par.2E.2E.2E.html#294706531">(Aug 22 2022 at 15:06)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Brandon,</p>
+<p>code_pred does not work inside the locale, but you can use it with global_interpretation. <br>
+Here's an example:</p>
+<p>locale l = fixes x :: 'a assumes "x = x"<br>
+inductive (in l) is_x where "is_x x"<br>
+global_interpretation i: l "0 :: nat" defines i_is_x = "i.is_x" by unfold_locales simp</p>
+<p>declare i.is_x.intros[code_pred_intro]<br>
+code_pred i_is_x by(rule i.is_x.cases)<br>
+thm i_is_x.equation</p>
+<p>The crucial line is the re-declaration of the intro rules.</p>
+<p>Hope this helps,<br>
+Andreas</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

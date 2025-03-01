@@ -1,0 +1,92 @@
+[
+    {
+        "content": "<p>From: Manuel Eberl &lt;<a href=\"mailto:eberlm@in.tum.de\">eberlm@in.tum.de</a>&gt;<br>\nHallo,</p>\n<p>I have a number of theorems that contain some constant p both in their<br>\nassumptions and in their conclusions.</p>\n<p>I now want to derive modified theorems from them by adding an assumption<br>\n\"p = ?q\" (for a schematic variable ?q) and replace all occurrences of p<br>\nin the assumptions and the conclusion with ?q. Ideally in ML.</p>\n<p>What is the easiest way to do that?</p>\n<p>Cheers,</p>\n<p>Manuel</p>",
+        "id": 294637029,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661160576
+    },
+    {
+        "content": "<p>From: Joachim Breitner &lt;<a href=\"mailto:breitner@kit.edu\">breitner@kit.edu</a>&gt;<br>\nHi,</p>\n<p>foo[unfolded eq_thm] or foo[folded eq_thm] do it in Isabelle/Isar; not<br>\nsure about Isabelle/ML.</p>\n<p>Greetings,<br>\nJoachim<br>\n<a href=\"/user_uploads/14278/HtJR75LvcZH6xuOFWB6bnU2h/signature.asc\">signature.asc</a></p>",
+        "id": 294637201,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661160651
+    },
+    {
+        "content": "<p>From: Joachim Breitner &lt;<a href=\"mailto:breitner@kit.edu\">breitner@kit.edu</a>&gt;<br>\nignore me, misread your question.<br>\n<a href=\"/user_uploads/14278/5RwMgh2kJpLMBB_OHtgwG26K/signature.asc\">signature.asc</a></p>",
+        "id": 294637339,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661160716
+    },
+    {
+        "content": "<p>From: Jasmin Blanchette &lt;<a href=\"mailto:jasmin.blanchette@inria.fr\">jasmin.blanchette@inria.fr</a>&gt;<br>\nI think you’ll have to instantiate the “subst” theorem with the right “P” and “s” (using “Drule.cterm_instantiate” or other similar functions), then you can use resolution with your original theorems (e.g. “RS” or “OF” in ML). This is a bit tricky, but a good opportunity to exercise forward theorem derivations in Isabelle.</p>\n<p>Alternative: A backward proof. You construct the statement of the theorem you want to prove and write a little tactic to solve it. Here, both forward and backward are about equally difficult, because you need to build some terms (the “P” instance in the forward proof, the goal statement in the backward proof).</p>\n<p>Jasmin</p>",
+        "id": 294637561,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661160783
+    },
+    {
+        "content": "<p>From: Manuel Eberl &lt;<a href=\"mailto:eberlm@in.tum.de\">eberlm@in.tum.de</a>&gt;<br>\nIt occurred to me to simply use theorem rewriting. The following piece<br>\nof code seems to do what I want to do. Am I doing anything in there that<br>\nI should not do or do differently?</p>\n<p>ML {*</p>\n<p>fun generalize_master_thm ctxt thm =<br>\n  let<br>\n    val ([p'], ctxt') = Variable.variant_fixes [\"p''\"] ctxt<br>\n    val p' = Free (p', HOLogic.realT)<br>\n    val a = @{term \"nth as\"} $ Bound 0<br>\n    val b = @{term \"Transcendental.powr\"} $ (@{term \"nth bs\"} $ Bound 0)<br>\n$ p'<br>\n    val f = Abs (\"i\", HOLogic.natT, @{term \"op * :: real =&gt; real =&gt;<br>\nreal\"} $ a $ b)<br>\n    val setsum = @{term \"setsum :: (nat =&gt; real) =&gt; nat set =&gt; real\"} $<br>\nf $ @{term \"{..&lt;k}\"}<br>\n    val prop = HOLogic.mk_Trueprop (HOLogic.mk_eq (setsum, @{term<br>\n\"1::real\"}))<br>\n    val cprop = Thm.cterm_of ctxt' prop<br>\n  in<br>\n    thm<br>\n    |&gt; Local_Defs.unfold ctxt' [Thm.assume cprop RS @{thm p_unique}]<br>\n    |&gt; Thm.implies_intr cprop<br>\n    |&gt; rotate_prems 1<br>\n    |&gt; singleton (Variable.export ctxt' ctxt)<br>\n  end</p>\n<p>val _ =  Pretty.writeln (Syntax.pretty_term @{context} (Thm.prop_of<br>\n@{thm master1}))<br>\n  val _ =  Pretty.writeln (Syntax.pretty_term @{context} (Thm.prop_of<br>\n(generalize_master_thm @{context} @{thm master1})))<br>\n*}</p>\n<p>Input theorem:<br>\ng ∈ O(λx. real x powr ?p') ⟹<br>\n1 &lt; (∑i&lt;k. as ! i * bs ! i powr ?p') ⟹<br>\neventually (λx. 0 &lt; f x) sequentially ⟹<br>\nf ∈ Θ(λx. real x powr p)</p>\n<p>Output theorem:<br>\ng ∈ O(λx. real x powr ?p') ⟹<br>\n1 &lt; (∑i&lt;k. as ! i * bs ! i powr ?p') ⟹<br>\neventually (λx. 0 &lt; f x) sequentially ⟹<br>\n(∑i&lt;k. as ! i * bs ! i powr ?p''1) = 1 ⟹<br>\nf ∈ Θ(λx. real x powr ?p''1)</p>\n<p>Cheers,</p>\n<p>Manuel</p>",
+        "id": 294637751,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661160851
+    },
+    {
+        "content": "<p>From: Jasmin Blanchette &lt;<a href=\"mailto:jasmin.blanchette@inria.fr\">jasmin.blanchette@inria.fr</a>&gt;</p>\n<blockquote>\n<p>On 02.04.2015, at 23:16, Manuel Eberl &lt;<a href=\"mailto:eberlm@in.tum.de\">eberlm@in.tum.de</a>&gt; wrote:</p>\n<p>It occurred to me to simply use theorem rewriting. The following piece<br>\nof code seems to do what I want to do. Am I doing anything in there that<br>\nI should not do or do differently?</p>\n</blockquote>\n<p>I don’t know, but this</p>\n<blockquote>\n<p>Input theorem:<br>\ng ∈ O(λx. real x powr ?p') ⟹<br>\n1 &lt; (∑i&lt;k. as ! i * bs ! i powr ?p') ⟹<br>\neventually (λx. 0 &lt; f x) sequentially ⟹<br>\nf ∈ Θ(λx. real x powr p)</p>\n<p>Output theorem:<br>\ng ∈ O(λx. real x powr ?p') ⟹<br>\n1 &lt; (∑i&lt;k. as ! i * bs ! i powr ?p') ⟹<br>\neventually (λx. 0 &lt; f x) sequentially ⟹<br>\n(∑i&lt;k. as ! i * bs ! i powr ?p''1) = 1 ⟹<br>\nf ∈ Θ(λx. real x powr ?p'’1)</p>\n</blockquote>\n<p>looks different from what you described abstractly in your previous email.</p>\n<p>Jasmin</p>",
+        "id": 294637817,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661160887
+    },
+    {
+        "content": "<p>From: Manuel Eberl &lt;<a href=\"mailto:eberlm@in.tum.de\">eberlm@in.tum.de</a>&gt;<br>\nYes, I do another step. I do not assume the equation directly, but<br>\nsomething that implies it. A function that does what I actually asked is<br>\nthis:</p>\n<p>fun generalize_master_thm ctxt thm =<br>\n  let<br>\n    val ([p'], ctxt') = Variable.variant_fixes [\"p''\"] ctxt<br>\n    val p' = Free (p', HOLogic.realT)<br>\n    val prop = HOLogic.mk_Trueprop (HOLogic.mk_eq (@{term \"p\"}, p'))<br>\n    val cprop = Thm.cterm_of ctxt prop<br>\n  in<br>\n    thm<br>\n    |&gt; Local_Defs.unfold ctxt' [Thm.assume cprop]<br>\n    |&gt; Thm.implies_intr cprop<br>\n    |&gt; rotate_prems 1<br>\n    |&gt; singleton (Variable.export ctxt' ctxt)<br>\n  end</p>\n<p>with input theorem<br>\n  g ∈ O(λx. real x powr ?p') ⟹<br>\n  1 &lt; (∑i&lt;k. as ! i * bs ! i powr ?p') ⟹<br>\n  eventually (λx. 0 &lt; f x) sequentially ⟹<br>\n  f ∈ Θ(λx. real x powr p)</p>\n<p>and output theorem<br>\n  g ∈ O(λx. real x powr ?p') ⟹<br>\n  1 &lt; (∑i&lt;k. as ! i * bs ! i powr ?p') ⟹<br>\n  eventually (λx. 0 &lt; f x) sequentially ⟹<br>\n  p = ?p''1 ⟹<br>\n  f ∈ Θ(λx. real x powr ?p''1)</p>\n<p>What I would like to know is whether any of the things I do are<br>\nconsidered bad style.</p>\n<p>Cheers,</p>\n<p>Manuel</p>",
+        "id": 294637845,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661160900
+    },
+    {
+        "content": "<p>From: Jasmin Blanchette &lt;<a href=\"mailto:jasmin.blanchette@inria.fr\">jasmin.blanchette@inria.fr</a>&gt;<br>\nHi Manuel,</p>\n<p>Normally, when allocating names, I would (following an idiom I learned from Dmitriy) still use the original context without the names and thread that one through the program, i.e. “unfold ctxt” without prime. I think you can get into trouble if you start using “ctxt’ ”, e.g. if you define new types or constants. Typically, the only place where you need “ctxt’ ” is in an “export” or when allocating further names. Dmitriy usually calls these contexts “ctxt_names”, to clarify their role.</p>\n<p>Otherwise, if you’re an eta-macho, you can kill the “thm” argument and change all “|&gt;”’s to “#&gt;”’s. It’s quite tempting in your example, actually. ;)</p>\n<p>Jasmin</p>",
+        "id": 294637904,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661160918
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nJust the usual hints on context-conformance of Isabelle/ML snippets:</p>\n<ul>\n<li>\n<p>The @{term} antiquotations mention free variables \"as\", \"bs\", \"k\".  To<br>\n   which context do they belong?  If they are undeclared, the code will<br>\n   crash in a context that declares them locally.</p>\n</li>\n<li>\n<p>@{term \"nth as\"} is polymorphic, i.e. in invents a locally fixed type 'a<br>\n   (depending on the compilation context).  This is likely to break down<br>\n   when used in a different context.</p>\n</li>\n<li>\n<p>As a general rule of thumb, @{term} antiquotations are only useful for<br>\n   well-defined closed terms, such as @{term \"1::real\"}.  Variables need to<br>\n   be constructed explicitly at run-time, like p' above.</p>\n</li>\n<li>\n<p>The global context above is not immediately clear, making it hard to<br>\n   test.  Morover, it seems to use an undefined repository version, instead<br>\n   of the latest release.</p>\n<p>Makarius</p>\n</li>\n</ul>",
+        "id": 294637978,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661160948
+    },
+    {
+        "content": "<p>From: Manuel Eberl &lt;<a href=\"mailto:eberlm@in.tum.de\">eberlm@in.tum.de</a>&gt;<br>\nThis code runs in the context of a locale in which as and bs are fixed<br>\nand have type \"real list\". I should have mentioned that.</p>\n<p>I have to use the repository version because I require some<br>\nmeasure-theoretic theories that are not present in the latest release.</p>\n<p>Cheers,</p>\n<p>Manuel</p>",
+        "id": 294637997,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661160955
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;</p>\n<ul>\n<li>\n<p>What is the context where \"p\" in @{term \"p\"} comes from and belongs to?</p>\n</li>\n<li>\n<p>The prop belongs to ctxt' by construction, so further contextual<br>\n   operations need to use that, or a monotonic extension of it.  So<br>\n   Thm.cterm_of ctxt should be Thm.cterm_of ctxt'.  Otherwise, one needs a<br>\n   semantic proof, why ctxt is sufficient, but it merely obscures the code.</p>\n</li>\n</ul>\n<p>The main point of Thm.cterm_of acting on Proof.context in coming <br>\nIsabelle2015 is to make Isabelle/ML tool implementations more conformant <br>\nto normal context discplines, and not drop out into some global thy value <br>\nfrom the background.</p>\n<p>Makarius</p>",
+        "id": 294638010,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661160961
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\n\"The\" repository version is undefined, until \"hg id\" is used.</p>\n<p>Makarius</p>",
+        "id": 294638055,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661160967
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nAnother variation: fix q locally, then work with non-schematic material <br>\ninside the extended context (which is usually easier and more robust), <br>\nthen export the result into the original context to make q schematic.</p>\n<p>Makarius</p>",
+        "id": 294638071,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661160973
+    },
+    {
+        "content": "<p>From: Manuel Eberl &lt;<a href=\"mailto:eberlm@in.tum.de\">eberlm@in.tum.de</a>&gt;</p>\n<blockquote>\n<ul>\n<li>What is the context where \"p\" in @{term \"p\"} comes from and belongs to?<br>\np is an abbreviation of type real defined in terms of as and bs in the<br>\nlocale context.</li>\n</ul>\n</blockquote>\n<blockquote>\n<ul>\n<li>The prop belongs to ctxt' by construction, so further contextual<br>\n  operations need to use that, or a monotonic extension of it.  So<br>\n  Thm.cterm_of ctxt should be Thm.cterm_of ctxt'.  Otherwise, one needs a<br>\n  semantic proof, why ctxt is sufficient, but it merely obscures the<br>\ncode. <br>\nAh, I see.</li>\n</ul>\n</blockquote>\n<blockquote>\n<p>\"The\" repository version is undefined, until \"hg id\" is used. <br>\ne83ecf0a0ee1. I usually make a point of pulling the latest version<br>\nregularly to keep my developments up-to-date.</p>\n</blockquote>\n<blockquote>\n<p>Another variation: fix q locally, then work with non-schematic<br>\nmaterial inside the extended context (which is usually easier and more<br>\nrobust), then export the result into the original context to make q<br>\nschematic. <br>\nIs that not what I did in the end? (q being p')</p>\n</blockquote>\n<p>Cheers,</p>\n<p>Manuel</p>\n<p>On 07/04/15 11:54, Makarius wrote:</p>\n<blockquote>\n<p>On Fri, 3 Apr 2015, Manuel Eberl wrote:</p>\n<blockquote>\n<p>Yes, I do another step. I do not assume the equation directly, but<br>\nsomething that implies it. A function that does what I actually asked is<br>\nthis:</p>\n<p>fun generalize_master_thm ctxt thm =<br>\n let<br>\n   val ([p'], ctxt') = Variable.variant_fixes [\"p''\"] ctxt<br>\n   val p' = Free (p', HOLogic.realT)<br>\n   val prop = HOLogic.mk_Trueprop (HOLogic.mk_eq (@{term \"p\"}, p'))<br>\n   val cprop = Thm.cterm_of ctxt prop<br>\n in<br>\n   thm<br>\n   |&gt; Local_Defs.unfold ctxt' [Thm.assume cprop]<br>\n   |&gt; Thm.implies_intr cprop<br>\n   |&gt; rotate_prems 1<br>\n   |&gt; singleton (Variable.export ctxt' ctxt)<br>\n end</p>\n</blockquote>\n<p>The main point of Thm.cterm_of acting on Proof.context in coming<br>\nIsabelle2015 is to make Isabelle/ML tool implementations more<br>\nconformant to normal context discplines, and not drop out into some<br>\nglobal thy value from the background.</p>\n<p>Makarius</p>\n</blockquote>",
+        "id": 294638105,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661160986
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nOn Tue, 7 Apr 2015, Manuel Eberl wrote:</p>\n<blockquote>\n<blockquote>\n<p>\"The\" repository version is undefined, until \"hg id\" is used.<br>\ne83ecf0a0ee1. I usually make a point of pulling the latest version<br>\nregularly to keep my developments up-to-date.</p>\n</blockquote>\n</blockquote>\n<p>\"The latest\" is only meaningful for an instant of time in your private <br>\ncontext that nobody else knows about.  Any public discussion on it is <br>\ninvalidated rather quickly, by new incoming changes. Luckily Mercurial has <br>\na unique value-oriented id for arbitrary points in history.</p>\n<p>\"Latest\" versions also have the tendency to become outdated rather <br>\nquickly, paradoxically to become older than the truely latest release <br>\nversion.</p>\n<blockquote>\n<blockquote>\n<p>Another variation: fix q locally, then work with non-schematic<br>\nmaterial inside the extended context (which is usually easier and more<br>\nrobust), then export the result into the original context to make q<br>\nschematic.<br>\nIs that not what I did in the end? (q being p')</p>\n</blockquote>\n</blockquote>\n<p>Ah, I did not see that.  Maybe I was confused by the many p', p''.  The <br>\nsystem already takes care of renamings, so if you mean a local \"x\" you fix <br>\nthat and call it x in ML.  If you mean p' you call it p' etc.</p>\n<p>Makarius</p>",
+        "id": 294638123,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661160992
+    }
+]

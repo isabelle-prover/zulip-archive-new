@@ -1,0 +1,99 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Isabelle-2016-1, RC-4, simplifier and auto beh... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle-2016-1.2C.20RC-4.2C.20simplifier.20and.20auto.20beh.2E.2E.2E.html">[isabelle] Isabelle-2016-1, RC-4, simplifier and auto beh...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294699252"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle-2016-1%2C%20RC-4%2C%20simplifier%20and%20auto%20beh.../near/294699252" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle-2016-1.2C.20RC-4.2C.20simplifier.20and.20auto.20beh.2E.2E.2E.html#294699252">(Aug 22 2022 at 14:30)</a>:</h4>
+<p>From: "Thiemann, Rene" &lt;<a href="mailto:Rene.Thiemann@uibk.ac.at">Rene.Thiemann@uibk.ac.at</a>&gt;<br>
+Dear all,</p>
+<p>during porting our theories from Isabelle 2016 to 2016-1-RC4, I made two strange observations where I don’t know whether these have been intended.</p>
+<p>Cheers,<br>
+René</p>
+<p>theory Foo<br>
+  imports Main<br>
+begin</p>
+<p>datatype "term" = Fun int "term list" </p>
+<p>text ‹Observation 1: change of simplifier behaviour which more often leads to nontermination.›</p>
+<p>fun get_unit :: "term ⇒ unit" where<br>
+  "get_unit t = (case t of Fun f ts ⇒ undefined (map get_unit ts))" </p>
+<p>lemma get_unit: "get_unit t = ()" by simp<br>
+thm get_unit[unfolded get_unit.simps]</p>
+<p>(* produces the expected result<br>
+  (case ?t of Fun f ts ⇒ undefined (map get_funs ts)) = ()<br>
+  in Isabelle 2016, but the unfolding loops in Isabelle 2016-1 RC4 *)</p>
+<p>text ‹Observation 2: auto is not idempotent.›</p>
+<p>fun funas_term :: "term ⇒ (int × nat)set" where<br>
+  "funas_term (Fun f ts) = {(f, length ts)} ∪ ⋃(set (map funas_term ts))"</p>
+<p>context <br>
+  fixes F :: "(int × nat)set" <br>
+  and comb :: "term list ⇒ term" <br>
+ assumes comb: "funas_term (comb ts) ⊆ F ∪ (⋃ (funas_term ` set ts))" <br>
+begin<br>
+fun comb_term :: "term ⇒ term"<br>
+where<br>
+  "comb_term (Fun f ts) = <br>
+    (if (f,length ts) ∈ F then Fun f (map comb_term ts)<br>
+    else comb (map comb_term ts))"</p>
+<p>lemma funas_term_clean_comb_term: "funas_term (comb_term t) ⊆ F"<br>
+proof (induct t)<br>
+  case (Fun f ts)<br>
+  show ?case<br>
+  proof (cases "(f,length ts) ∈ F")<br>
+    case True<br>
+    with Fun show ?thesis by auto <br>
+   (* Here, one "auto" suffices in Isabelle 2016, whereas a single auto is not sufficient in RC4.<br>
+      In RC4 one needs "by (auto, auto)" *)<br>
+  next<br>
+    case False<br>
+    hence id: "comb_term (Fun f ts) = comb (map comb_term ts)" by simp<br>
+    show ?thesis unfolding id using comb[of "map comb_term ts"] Fun by auto<br>
+  qed <br>
+qed<br>
+end</p>
+<p>end<br>
+<a href="/user_uploads/14278/Y6wLWZqemGuNpmPjmf24iyMl/Foo.thy">Foo.thy</a></p>
+
+
+
+<a name="294699275"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle-2016-1%2C%20RC-4%2C%20simplifier%20and%20auto%20beh.../near/294699275" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle-2016-1.2C.20RC-4.2C.20simplifier.20and.20auto.20beh.2E.2E.2E.html#294699275">(Aug 22 2022 at 14:30)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:lammich@in.tum.de">lammich@in.tum.de</a>&gt;</p>
+<blockquote>
+<p>lemma get_unit: "get_unit t = ()" by simp<br>
+thm get_unit[unfolded get_unit.simps]</p>
+<p>(* produces the expected result<br>
+  (case ?t of Fun f ts ⇒ undefined (map get_funs ts)) = ()<br>
+  in Isabelle 2016, but the unfolding loops in Isabelle 2016-1 RC4 *)</p>
+</blockquote>
+<p>Makarius changed the implementation of unfold, in particular, no<br>
+[abs_def] is needed any more. This effect is probably related to that.</p>
+<blockquote>
+<p>text ‹Observation 2: auto is not idempotent.›</p>
+</blockquote>
+<p>I made the same observation already, but could not yet figure out what<br>
+the exact problem is. I think auto was never intended to be idempotent,<br>
+but it's just a matter of experience: Experience says it should be<br>
+idempotent here, but in 2016-1-RC2 it turns out to be not.</p>
+
+
+
+<a name="294699291"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle-2016-1%2C%20RC-4%2C%20simplifier%20and%20auto%20beh.../near/294699291" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle-2016-1.2C.20RC-4.2C.20simplifier.20and.20auto.20beh.2E.2E.2E.html#294699291">(Aug 22 2022 at 14:30)</a>:</h4>
+<p>From: Simon Wimmer &lt;<a href="mailto:wimmersimon@gmail.com">wimmersimon@gmail.com</a>&gt;<br>
+Btw,<br>
+the comment for mk_auto_tac in clasimp.ML reads:</p>
+<p>Designed to be idempotent, except if Blast.depth_tac instantiates variables<br>
+  in some of the subgoals</p>
+<p>Simon</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

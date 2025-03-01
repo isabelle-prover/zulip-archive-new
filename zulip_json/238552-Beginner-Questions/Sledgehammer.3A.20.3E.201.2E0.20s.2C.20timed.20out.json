@@ -1,0 +1,68 @@
+[
+    {
+        "content": "<p>Sometimes, at a hard to prove lemma I get a hint:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"n\">vampire</span><span class=\"o\">:</span><span class=\"w\"> </span><span class=\"n\">Try</span><span class=\"w\"> </span><span class=\"n\">this</span><span class=\"o\">:</span><span class=\"w\"> </span><span class=\"k\">by</span><span class=\"w\"> </span><span class=\"n\">metis</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">&gt;</span><span class=\"w\"> </span><span class=\"n\">1.0</span><span class=\"w\"> </span><span class=\"n\">s</span><span class=\"o\">,</span><span class=\"w\"> </span><span class=\"n\">timed</span><span class=\"w\"> </span><span class=\"n\">out</span><span class=\"o\">)</span>\n</code></pre></div>\n<p>but when I try <code>by metis</code>, the system loops and <code>by metis</code> keeps to be purple.</p>\n<p>Is there a general advice how can I write a proper proof for the statement?</p>\n<p>What is being over 1 seconds? How can I make Sledgehammer try longer? sledgehammer [timeou= ...] is something different I fear.</p>",
+        "id": 444472397,
+        "sender_full_name": "Gergely Buday",
+        "timestamp": 1718287170
+    },
+    {
+        "content": "<p>Self-answer: I guess the </p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kt\">sledgehammer</span><span class=\"w\"> </span><span class=\"o\">[</span><span class=\"n\">preplay_timeout</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">5</span><span class=\"o\">]</span>\n</code></pre></div>\n<p>sets the metis timeout.</p>",
+        "id": 444474307,
+        "sender_full_name": "Gergely Buday",
+        "timestamp": 1718287605
+    },
+    {
+        "content": "<p>Okay so this is my knowledge on this topic, please someone correct me if I am wrong.</p>\n<p>Isabelle does not trust external solvers (such as vampire) when they claim they have found a proof. This would compromise its high level of assurance (where everything is build up from a small kernel of inference rules) since external solvers might have bugs in them.</p>\n<p>On top of that there could be a problem with the translation to the problem given to the external solver.  Usually that would only go in the direction of making an unsat problem sat because the problem is overapproximated (e.g., by not including the definition of an operator and therefore abstracting it). </p>\n<p>Therefore, Isabelle tries to find a proof on its own (here with metis). It still learns some information from the external solver (such as what facts were needed, and as an optimization for some solvers even an unsat core). For some SMT solvers the solver can also return a proof certificate that then is easier to replay. But maybe its internal method is not strong enough to find the proof or (more unlikely) the solver made a mistake/did got the wrong input. </p>\n<p>I don't think the sledgehammer option you show has anything to do with the general metis timeout since metis is a tactic on its own. There is probably an option for metis doing that. However, in my experience this is not an issue of metis not having enough time usually. Instead I would split the goal up further to make it easier for the automation.</p>",
+        "id": 454020680,
+        "sender_full_name": "Hanna Lachnitt",
+        "timestamp": 1721931368
+    },
+    {
+        "content": "<p>One example of translation issue are lets: the generated problems do not contain lets. So the external might be able to solve the problem but not metis (who has the lets). In that particular example the solution is easy (add <code>Let_def</code> / unfold them), but in general it is not really worth investigating</p>",
+        "id": 454317836,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1722006149
+    },
+    {
+        "content": "<p>IIRC the <code>preplay_timeout</code>is controlling  the amount of time sledgehammer tries the tactic before marking it as timeout. So a side effect is that it sets the \"metis\" timeout (but also the timeout from all other tactics)</p>",
+        "id": 454318315,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1722006314
+    },
+    {
+        "content": "<p>There is limited reward in increasing the timeout too much, because (usually) you do not want to insert tactics that take too long anyway</p>",
+        "id": 454318447,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1722006359
+    },
+    {
+        "content": "<p>(in my experience, there is a factor ~2 between the real time and the time given by sledgehammer)</p>",
+        "id": 454318689,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1722006399
+    },
+    {
+        "content": "<p>And to add to Hanna answer, if metis is called on a small goal and few theorems, then it will either be fast or fail (usually by timeout)</p>",
+        "id": 454322906,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1722007357
+    },
+    {
+        "content": "<p>Remark that a timeout can also mean that vampire did something incorrect</p>",
+        "id": 454323051,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1722007414
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"477368\">Hanna Lachnitt</span> <a href=\"#narrow/stream/238552-Beginner-Questions/topic/Sledgehammer.3A.20.3E.201.2E0.20s.2C.20timed.20out/near/454020680\">said</a>:</p>\n<blockquote>\n<p>general metis timeout since metis is a tactic on its own. There is probably an option for metis doing that</p>\n</blockquote>\n<p>A timeout for tactics is too dangerous (only smt had it and this has been disabled by setting it in infinity), mostly because <code>isabelle build</code> launches many many threads, starting the timeout, but they are all waiting and would fail with a timeout, especially on weak hardware (let's say a raspberry pi + <code>isabelle build</code>)</p>",
+        "id": 454324210,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1722007821
+    },
+    {
+        "content": "<p>Activating the \"isar proof\" option (by ticking the box) might solve the problem</p>",
+        "id": 454325110,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1722008132
+    }
+]

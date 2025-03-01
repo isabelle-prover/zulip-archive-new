@@ -1,0 +1,78 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Code Optimization · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20Optimization.html">[isabelle] Code Optimization</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294099285"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20Optimization/near/294099285" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20Optimization.html#294099285">(Aug 18 2022 at 14:34)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Christian,</p>
+<blockquote>
+<p>So my question is: Is it possible to introduce different 'code_unfolds'<br>
+for different target languages?</p>
+</blockquote>
+<p>this is not possible.  In case you need different preprocessor setups,<br>
+you can provide separate theories which tweak the standard setup by<br>
+means of code_unfold / code_unfold del, and (not) import them as desired.</p>
+<p>Personally I am sceptical whether such specialised optimisations are<br>
+worth the effort -- but don't take this remark too seriously.</p>
+<p>Hope this helps,<br>
+    Florian<br>
+<a href="/user_uploads/14278/AMpR3eWQO3aVlom_qL1GIPnd/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294102175"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20Optimization/near/294102175" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20Optimization.html#294102175">(Aug 18 2022 at 14:48)</a>:</h4>
+<p>From: Christian Sternagel &lt;<a href="mailto:christian.sternagel@uibk.ac.at">christian.sternagel@uibk.ac.at</a>&gt;<br>
+Hi,</p>
+<p>if I understand correctly, the attribute 'code_unfold' introduces <br>
+something like a (pre)compiler optimization, that is, some <br>
+easy-to-reason-about but inefficient code is replaced by a more <br>
+efficient one.</p>
+<p>Now, there are maybe different "efficiency"-concerns for different <br>
+programming languages. Lets take the example of 'concat(map xs)'. In <br>
+theory List we have</p>
+<p>lemma concat_map_code[code_unfold]:<br>
+   "concat(map f xs) = concat_map f xs" ...</p>
+<p>where 'concat_map' is defined by</p>
+<p>primrec<br>
+   concat_map :: "('a =&gt; 'b list) =&gt; 'a list =&gt; 'b list"<br>
+where<br>
+   "concat_map f [] = []" |<br>
+   "concat_map f (x#xs) = f x @ concat_map f xs"</p>
+<p>While I think that this is perfectly okay (and maybe even preferable in <br>
+order to exploit lazyness) for Haskell, for a strict language (like <br>
+OCaml) I would prefer the following implementation:</p>
+<p>primrec<br>
+   rev_append :: "'a list =&gt; 'a list =&gt; 'a list"<br>
+where<br>
+   "rev_append [] ys = ys" |<br>
+   "rev_append (x#xs) ys = rev_append xs (x#ys)"</p>
+<p>primrec<br>
+   concat_map' :: "('a =&gt; 'b list) =&gt; 'b list =&gt; 'a list =&gt; 'b list"<br>
+where<br>
+   "concat_map' f res [] = rev res" |<br>
+   "concat_map' f res (x#xs) = concat_map' f (rev_append (f x) res) xs"</p>
+<p>lemma rev_append_rev: "rev_append xs ys = rev xs @ ys" by (induct xs <br>
+arbitrary: ys) auto</p>
+<p>lemma concat_map'_conv: "concat_map' f xs ys = rev xs @ concat(map f ys)"<br>
+by (induct ys arbitrary: xs) (simp_all add: rev_append_rev)</p>
+<p>lemma concat_map_code_strict[code_unfold]:<br>
+   "concat(map f xs) = concat_map' f [] xs"<br>
+unfolding concat_map'_conv by simp</p>
+<p>So my question is: Is it possible to introduce different 'code_unfolds' <br>
+for different target languages?</p>
+<p>cheers</p>
+<p>chris</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

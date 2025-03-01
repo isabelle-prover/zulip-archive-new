@@ -1,0 +1,168 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Telling auto to use an eisbach method · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Telling.20auto.20to.20use.20an.20eisbach.20method.html">[isabelle] Telling auto to use an eisbach method</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294681877"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Telling%20auto%20to%20use%20an%20eisbach%20method/near/294681877" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Telling.20auto.20to.20use.20an.20eisbach.20method.html#294681877">(Aug 22 2022 at 14:03)</a>:</h4>
+<p>From: Lawrence Paulson &lt;<a href="mailto:lp15@cam.ac.uk">lp15@cam.ac.uk</a>&gt;<br>
+Could you please be more specific? That sounds pretty much like what auto/force/blast do anyway if you use intro/elim/dest without the (!) modifier.</p>
+<p>Larry Paulson</p>
+
+
+
+<a name="294681898"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Telling%20auto%20to%20use%20an%20eisbach%20method/near/294681898" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Telling.20auto.20to.20use.20an.20eisbach.20method.html#294681898">(Aug 22 2022 at 14:03)</a>:</h4>
+<p>From: Joachim Breitner &lt;<a href="mailto:joachim@cis.upenn.edu">joachim@cis.upenn.edu</a>&gt;<br>
+Dear Larry,</p>
+<p>precisely – but auto (AFAIK) can only invoke _rules_, not _methods_.  I<br>
+want it to invoke a (custom eisbach-defined) method in this way.</p>
+<p>The introduction rule in my example requires picking a “sufficiently<br>
+fresh” variable, by specifying a set of variables to avoid. Such an<br>
+intro rule does not work well with "auto", as it would leave a<br>
+schematic variable around.</p>
+<p>But almost always, this set of variables can be calculated from the<br>
+context, i.e. the current goal statement. I (more or less) have a<br>
+method that does that, and I want auto to try that.</p>
+<p>Thanks,<br>
+Joachim<br>
+<a href="/user_uploads/14278/VS1A-x5pY92wyJFLgF6HD6a0/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294681930"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Telling%20auto%20to%20use%20an%20eisbach%20method/near/294681930" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Telling.20auto.20to.20use.20an.20eisbach.20method.html#294681930">(Aug 22 2022 at 14:03)</a>:</h4>
+<p>From: Joachim Breitner &lt;<a href="mailto:breitner@kit.edu">breitner@kit.edu</a>&gt;<br>
+Dear Larry,</p>
+<p>indeed, that seems to be the right way into the machinery!</p>
+<p>I have something that seems to work, but raises a few questions about<br>
+Isabelle/ML-level programming.</p>
+<p>Here is my code so far:</p>
+<p>theory Auto_Method<br>
+imports<br>
+  Main<br>
+  "~~/src/HOL/Eisbach/Eisbach"<br>
+keywords "auto_method" :: thy_decl<br>
+begin</p>
+<p>ML ‹<br>
+  fun auto_method method_text = (fn ctxt =&gt;<br>
+    ctxt addSbefore ("TODO", fn ctxt =&gt; fn _ =&gt;<br>
+      let val method = Method.evaluate method_text ctxt<br>
+      in  Method.NO_CONTEXT_TACTIC ctxt (method [])<br>
+      end<br>
+   ));</p>
+<p>fun auto_method_cmd method_text lthy = <br>
+    let (* val ctxt = Local_Theory.target_of lthy<br>
+           val method = Method.evaluate method_text ctxt *)<br>
+    in Local_Theory.background_theory (map_theory_claset (auto_method method_text)) lthy<br>
+    end;</p>
+<p>Outer_Syntax.local_theory @{command_keyword "auto_method"} <br>
+    "adds a method invocation to the classical reasoner"<br>
+    (Method.parse &gt;&gt; (fn (method_text, _) =&gt; auto_method_cmd method_text))<br>
+›</p>
+<p>And this actually works:</p>
+<p>consts P :: bool <br>
+    consts Q :: bool<br>
+    lemma H1: "P ⟹ Q" and H2: P sorry<br>
+    method Q_method methods m = (match conclusion in "Q" ⇒ ‹rule H1; m›)<br>
+    auto_method (Q_method ‹rule H2›)<br>
+    lemma Q by auto</p>
+<p>So far so good. But I noticed that if I make a mistake in auto_method,<br>
+i.e. by writing</p>
+<p>auto_method (Q_method ‹rule does_not_exist›)</p>
+<p>then the error about does_not_exist is raised in the application of<br>
+auto, _not_ the invocation of auto_method, where it should be.</p>
+<p>I concluded that this is due to the executing Method.evaluate in the<br>
+context of the wrapper invocation, not in the context of the<br>
+local_theory command. When I try doing it there (see the commented-out-<br>
+code) I get the proper error message. But actually using the wrapper<br>
+causes the error message</p>
+<p>exception CONTEXT<br>
+       ("Cannot transfer: not a super theory", [], [], ["Q ⟹ (Q)"],</p>
+<p>What am I doing wrong?</p>
+<p>Thanks,<br>
+Joachim<br>
+<a href="/user_uploads/14278/L_Tq_7JOCyJv72TnOeSfb9C_/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294681938"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Telling%20auto%20to%20use%20an%20eisbach%20method/near/294681938" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Telling.20auto.20to.20use.20an.20eisbach.20method.html#294681938">(Aug 22 2022 at 14:03)</a>:</h4>
+<p>From: Lawrence Paulson &lt;<a href="mailto:lp15@cam.ac.uk">lp15@cam.ac.uk</a>&gt;<br>
+Possibly you could accomplish what you want using a “wrapper”. Unfortunately, they are very obscure. See The Isabelle/Isar Reference Manual, section 9.4.7, Modifying the search step.</p>
+<p>Larry Paulson</p>
+
+
+
+<a name="294683143"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Telling%20auto%20to%20use%20an%20eisbach%20method/near/294683143" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Telling.20auto.20to.20use.20an.20eisbach.20method.html#294683143">(Aug 22 2022 at 14:09)</a>:</h4>
+<p>From: Joachim Breitner &lt;<a href="mailto:joachim@cis.upenn.edu">joachim@cis.upenn.edu</a>&gt;<br>
+Dear list,</p>
+<p>I’m current in the process of following a Coq course using Isabelle<br>
+(more as a Fingerübung), and there I see some nice use of tactics, such<br>
+as:<br>
+ - If you find a goal of this shape,<br>
+ - invoke that particular rule<br>
+ - with an instantiation calculated from the current goal state.</p>
+<p>In this case, the instantiation includes a set of names to avoid. I<br>
+have posed my question about that part at<br>
+<a href="http://stackoverflow.com/q/39280314/946226">http://stackoverflow.com/q/39280314/946226</a><br>
+(and now there is an Eisbach tag), but I am also wondering:</p>
+<p>How do I best integrate this into an (otherwise) nicely automated proof<br>
+using our beloved auto? <br>
+Conceptually, to me, the custom method is just a smart version of an<br>
+introduction rule. But clearly I cannot just give a method as an<br>
+argument to auto’s "intro:".</p>
+<p>Is there any other way to tell auto: „When you try introduction rules,<br>
+well, also try running this given method?“</p>
+<p>If not, should there be such a way?</p>
+<p>Greetings,<br>
+Joachim<br>
+<a href="/user_uploads/14278/t1JKNj74QoG81tNu79OMqTC_/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294684404"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Telling%20auto%20to%20use%20an%20eisbach%20method/near/294684404" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Telling.20auto.20to.20use.20an.20eisbach.20method.html#294684404">(Aug 22 2022 at 14:11)</a>:</h4>
+<p>From: Christian Sternagel &lt;<a href="mailto:c.sternagel@gmail.com">c.sternagel@gmail.com</a>&gt;<br>
+Dear Joachim,</p>
+<p>I don't know the details of what you are trying to do. Maybe it could be<br>
+tackled by a simproc (which basically also says, do something special on<br>
+goals of a specific shape)?</p>
+<p>cheers</p>
+<p>chris</p>
+
+
+
+<a name="294684577"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Telling%20auto%20to%20use%20an%20eisbach%20method/near/294684577" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Telling.20auto.20to.20use.20an.20eisbach.20method.html#294684577">(Aug 22 2022 at 14:12)</a>:</h4>
+<p>From: Joachim Breitner &lt;<a href="mailto:joachim@cis.upenn.edu">joachim@cis.upenn.edu</a>&gt;<br>
+Dear Chris,</p>
+<p>For an example, see<br>
+<a href="https://github.com/nomeata/cis670-16fa/blob/926a15752522836620dde10076132879aa83b2a3/isa/Ch4.thy#L366-L382">https://github.com/nomeata/cis670-16fa/blob/926a15752522836620dde10076132879aa83b2a3/isa/Ch4.thy#L366-L382</a><br>
+(this file has no dependencies outside of HOL and HOL/Library)</p>
+<p>In essence, I want to replace</p>
+<p>apply(induction "[x \&lt;leadsto&gt; u] e" arbitrary: x e rule: lc.induct)<br>
+    apply(auto elim!: subst.elims[OF sym])<br>
+    apply(lc_let_with_find_fresh; auto)<br>
+    done</p>
+<p>with "by (induction ...) (auto ...)".</p>
+<p>Quite possible that simprocs are the way to go, although judging from<br>
+the name, they are not: It is not (safe) simplification that I want to<br>
+instrument, but rather the part of auto that does proof search, i.e.<br>
+undoes a rule application if it turned out that it did not lead<br>
+anywhere.</p>
+<p>Greetings,<br>
+Joachim<br>
+<a href="/user_uploads/14278/rZyAgXz0vgzR_qS51CfvuDnd/signature.asc">signature.asc</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

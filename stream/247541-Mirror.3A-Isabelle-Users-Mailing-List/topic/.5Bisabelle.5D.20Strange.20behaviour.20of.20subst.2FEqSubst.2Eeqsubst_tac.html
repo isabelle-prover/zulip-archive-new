@@ -1,0 +1,82 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Strange behaviour of subst/EqSubst.eqsubst_tac · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Strange.20behaviour.20of.20subst.2FEqSubst.2Eeqsubst_tac.html">[isabelle] Strange behaviour of subst/EqSubst.eqsubst_tac</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="208487182"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Strange%20behaviour%20of%20subst/EqSubst.eqsubst_tac/near/208487182" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Strange.20behaviour.20of.20subst.2FEqSubst.2Eeqsubst_tac.html#208487182">(Aug 30 2020 at 14:19)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:eberlm@in.tum.de">eberlm@in.tum.de</a>&gt;<br>
+Somebody asked a question of StackOverflow [1] about why the "subst"<br>
+method (which should only affect the first subgoal) implicitly<br>
+discharges duplicate subgoals. I checked the code and found that it<br>
+somehow calls "distinct_subgoals_tac" somewhere, although I find the<br>
+code very difficult to read:</p>
+<p>fun eqsubst_tac ctxt occs thms i st =<br>
+  let val nprems = Thm.nprems_of st in<br>
+    if nprems &lt; i then Seq.empty else<br>
+    let<br>
+      val thmseq = Seq.of_list thms;<br>
+      fun apply_occ occ st =<br>
+        thmseq |&gt; Seq.maps (fn r =&gt;<br>
+          eqsubst_tac' ctxt<br>
+            (skip_first_occs_search occ searchf_lr_unify_valid) r<br>
+            (i + (Thm.nprems_of st - nprems)) st);<br>
+      val sorted_occs = Library.sort (rev_order o int_ord) occs;<br>
+    in<br>
+      Seq.maps distinct_subgoals_tac (Seq.EVERY (map apply_occ<br>
+sorted_occs) st)<br>
+    end<br>
+  end;</p>
+<p>In any case, it seems to me that this violates the usual contract that a<br>
+tactic that takes a subgoal index should only affect that one subgoal.</p>
+<p>I have no idea why it calls distinct_subgoals_tac in the first place. A<br>
+simple solution would be to just wrap the entire thing in a<br>
+"SELECT_GOAL". The performance impact should be minimal since this<br>
+tactic is typically used very sparingly for single rewrite steps; any<br>
+heavy rewriting is done with the simplifier anyway.</p>
+<p>Any other opinions on this?</p>
+<p>Manuel</p>
+<p>[1]:<br>
+<a href="https://stackoverflow.com/questions/63657976/subst-refl-closing-duplicate-subgoals-whats-going-on/63658319#63658319">https://stackoverflow.com/questions/63657976/subst-refl-closing-duplicate-subgoals-whats-going-on/63658319#63658319</a></p>
+
+
+
+<a name="208487508"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Strange%20behaviour%20of%20subst/EqSubst.eqsubst_tac/near/208487508" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Strange.20behaviour.20of.20subst.2FEqSubst.2Eeqsubst_tac.html#208487508">(Aug 30 2020 at 14:27)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:mail@andreas-lochbihler.de">mail@andreas-lochbihler.de</a>&gt;<br>
+Hi Manuel,</p>
+<p>when you apply a conditional rewrite rule in several places with</p>
+<p>apply(subst (1 2 3) cond_rule)</p>
+<p>where the assumptions of the rule end up as the same subgoal, then the <br>
+distinct_subgoals_tac ensures that the user has to discharge the assumptions only once. So <br>
+there's a point in eliminating repeated goals. But I agree with you that this should be <br>
+confined to the subgoal on which subst is operating.</p>
+<p>Andreas</p>
+
+
+
+<a name="208611840"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Strange%20behaviour%20of%20subst/EqSubst.eqsubst_tac/near/208611840" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Strange.20behaviour.20of.20subst.2FEqSubst.2Eeqsubst_tac.html#208611840">(Aug 31 2020 at 20:35)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+I have looked at the history: this odd behaviour goes back to 2005 (by Lucas<br>
+Dixon), see <a href="https://isabelle-dev.sketis.net/rISABELLE366d39e95d3c">https://isabelle-dev.sketis.net/rISABELLE366d39e95d3c</a></p>
+<p>In later years we've got sufficiently well-established means to make proof<br>
+tools behave the proper way.</p>
+<p>It actually turned out very easy to amend that on the spot, see the following<br>
+changes for next Isabelle release:</p>
+<p><a href="https://isabelle-dev.sketis.net/rISABELLEe5fcbf6dc687">https://isabelle-dev.sketis.net/rISABELLEe5fcbf6dc687</a><br>
+<a href="https://isabelle-dev.sketis.net/rAFPcb48e644eda2">https://isabelle-dev.sketis.net/rAFPcb48e644eda2</a></p>
+<p>(As usual, AFP serves as a sanity check to see if a hypothetical change should<br>
+become real.)</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

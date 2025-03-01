@@ -1,0 +1,331 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Problem with function package · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problem.20with.20function.20package.html">[isabelle] Problem with function package</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294325587"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problem%20with%20function%20package/near/294325587" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problem.20with.20function.20package.html#294325587">(Aug 19 2022 at 17:00)</a>:</h4>
+<p>From: René Thiemann &lt;<a href="mailto:rene.thiemann@uibk.ac.at">rene.thiemann@uibk.ac.at</a>&gt;<br>
+Dear all,</p>
+<p>today we stumbled over a strange behavior of the function package, which refused some very standard function definition that relies upon locally fixed parameters.</p>
+<p>theory Scratch<br>
+imports Main<br>
+begin</p>
+<p>locale foo =<br>
+  fixes x :: nat<br>
+begin</p>
+<p>function f :: "nat =&gt; nat" where<br>
+  "f y = (if y &gt; x then f (y - 1)  else y)"<br>
+apply pat_completeness <br>
+apply auto (* works and leaves no proof obligations *)<br>
+done (* post processing of function package fails:<br>
+exception THM 0 raised (line 726 of "thm.ML"):<br>
+  forall_intr: variable "x" free in assumptions<br>
+  (⋀y. x = y ⟹ P) ⟹ P *)<br>
+end<br>
+end</p>
+<p>The above function was accepted without problems until Isabelle2013, and is refused in Isabelle2013-1/2, 2014, and also in todays repository snapshot. Perhaps it is related to the news entry for Isabelle2013-1:</p>
+<ul>
+<li>
+<p>Function package: For each function f, new rules f.elims are<br>
+generated, which eliminate equalities of the form "f x = t".</p>
+</li>
+<li>
+<p>New command 'fun_cases' derives ad-hoc elimination rules for<br>
+function equations as simplified instances of f.elims, analogous to<br>
+inductive_cases.  See ~~/src/HOL/ex/Fundefs.thy for some examples.</p>
+</li>
+</ul>
+<p>Kind regards,<br>
+Christian, Florian, and René</p>
+
+
+
+<a name="294325603"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problem%20with%20function%20package/near/294325603" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problem.20with.20function.20package.html#294325603">(Aug 19 2022 at 17:00)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:eberlm@in.tum.de">eberlm@in.tum.de</a>&gt;<br>
+Oh dear. This looks like something I am probably responsible for. I<br>
+shall look into it in the next few days.</p>
+<p>My first guess would be that it has something to do with my very poor<br>
+understanding of contexts.</p>
+<p>Cheers,<br>
+Manuel</p>
+
+
+
+<a name="294325627"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problem%20with%20function%20package/near/294325627" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problem.20with.20function.20package.html#294325627">(Aug 19 2022 at 17:00)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+I mae a first analysis</p>
+<p>in function_elims.ML</p>
+<blockquote>
+<p>fun mk_funeq 0 T (acc_vars, acc_lhs) =<br>
+              let val y = Free("y", T)<br>
+              in (y :: acc_vars, (HOLogic.mk_Trueprop (HOLogic.mk_eq<br>
+(acc_lhs, y))), T) end<br>
+          | mk_funeq n (Type (@{type_name "fun"}, [S, T])) (acc_vars,<br>
+acc_lhs) =<br>
+              let val xn = Free ("x" ^ Int.toString n, S)<br>
+              in mk_funeq (n - 1) T (xn :: acc_vars, acc_lhs $ xn) end<br>
+          | mk_funeq _ _ _ = raise TERM ("Not a function.", [f]);</p>
+</blockquote>
+<p>This looks suspicious since you cannot assume that "x\d" and "y" are<br>
+fresh.  You should use a pattern like</p>
+<p>Name.variant "x" (Proof_Context.names_of ctxt)</p>
+<p>Hope this helps,<br>
+    Florian</p>
+<p>Am 27.01.2015 um 18:59 schrieb Manuel Eberl:</p>
+<blockquote>
+<p>Oh dear. This looks like something I am probably responsible for. I<br>
+shall look into it in the next few days.</p>
+<p>My first guess would be that it has something to do with my very poor<br>
+understanding of contexts.</p>
+<p>Cheers,<br>
+Manuel</p>
+<p>On 27/01/15 18:34, René Thiemann wrote:</p>
+<blockquote>
+<p>Dear all,</p>
+<p>today we stumbled over a strange behavior of the function package, which refused some very standard function definition that relies upon locally fixed parameters.</p>
+<p>theory Scratch<br>
+imports Main<br>
+begin</p>
+<p>locale foo =<br>
+  fixes x :: nat<br>
+begin</p>
+<p>function f :: "nat =&gt; nat" where<br>
+  "f y = (if y &gt; x then f (y - 1)  else y)"<br>
+apply pat_completeness <br>
+apply auto (* works and leaves no proof obligations *)<br>
+done (* post processing of function package fails:<br>
+exception THM 0 raised (line 726 of "thm.ML"):<br>
+  forall_intr: variable "x" free in assumptions<br>
+  (⋀y. x = y ⟹ P) ⟹ P *)<br>
+end<br>
+end</p>
+<p>The above function was accepted without problems until Isabelle2013, and is refused in Isabelle2013-1/2, 2014, and also in todays repository snapshot. Perhaps it is related to the news entry for Isabelle2013-1:</p>
+<ul>
+<li>
+<p>Function package: For each function f, new rules f.elims are<br>
+generated, which eliminate equalities of the form "f x = t".</p>
+</li>
+<li>
+<p>New command 'fun_cases' derives ad-hoc elimination rules for<br>
+function equations as simplified instances of f.elims, analogous to<br>
+inductive_cases.  See ~~/src/HOL/ex/Fundefs.thy for some examples.</p>
+</li>
+</ul>
+<p>Kind regards,<br>
+Christian, Florian, and René</p>
+</blockquote>
+<p><a href="/user_uploads/14278/zD0ipd0tllCyPhRGkO033GTY/signature.asc">signature.asc</a></p>
+</blockquote>
+
+
+
+<a name="294325678"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problem%20with%20function%20package/near/294325678" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problem.20with.20function.20package.html#294325678">(Aug 19 2022 at 17:01)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:eberlm@in.tum.de">eberlm@in.tum.de</a>&gt;<br>
+The issue was actually not the one you highlighted, but another instance<br>
+of the same problem in mutual.ML.</p>
+<p>I fixed all the occurrences of this problem in the function package and<br>
+everything seems to be running smoothly now. I already pushed the bug fix.</p>
+<p>Thanks for your analysis and telling me how to fix it.</p>
+<p>Cheers,<br>
+Manuel</p>
+
+
+
+<a name="294325698"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problem%20with%20function%20package/near/294325698" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problem.20with.20function.20package.html#294325698">(Aug 19 2022 at 17:01)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Just from to wording of it, is a dangerous claim to have "fixed" "all" <br>
+"bugs".  It is important to develop a sense of realism of what a change <br>
+really does. The Isabelle mailing lists are full of postings of myself, <br>
+where I try to explain that over and over again.</p>
+<p>In particular it does not make any sense to produe Isabelle changesets <br>
+"like fixed bug" -- some actual information needs to be put into a <br>
+changelog.</p>
+<p>Here is some general information on Isabelle development:</p>
+<p>* README_REPOSITORY</p>
+<p>* The "implementation" manual, esp. chapter 0 and chapter 1 as a start.</p>
+<p>* Existing examples that are known to be done properly.</p>
+<p>Makarius</p>
+
+
+
+<a name="294325717"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problem%20with%20function%20package/near/294325717" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problem.20with.20function.20package.html#294325717">(Aug 19 2022 at 17:01)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:eberlm@in.tum.de">eberlm@in.tum.de</a>&gt;</p>
+<blockquote>
+<p>Just from to wording of it, is a dangerous claim to have "fixed" "all"<br>
+"bugs".<br>
+That is not what I said. I said I fixed all occurrences of _this one<br>
+class_ of bug in the function package, i.e. choosing fixed names for<br>
+variables that may not be fresh in the given context. I am reasonably<br>
+sure that I caught them all, seeing as I am the one who introduced them.<br>
+Not 100% sure, but reasonably so.</p>
+</blockquote>
+<p>I would have put information in a change log if I had found such a<br>
+change log. The only thing I was aware of was the NEWS file, but that<br>
+did not seem a suitable place. Where /am/ I supposed to describe the<br>
+change? The top of the changed file itself?</p>
+<p>I did read most of the information you suggested, but could not find any<br>
+reference of where to describe such changes.</p>
+<p>Manuel</p>
+
+
+
+<a name="294325731"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problem%20with%20function%20package/near/294325731" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problem.20with.20function.20package.html#294325731">(Aug 19 2022 at 17:01)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On Wed, 28 Jan 2015, Manuel Eberl wrote:</p>
+<blockquote>
+<p>I would have put information in a change log if I had found such a <br>
+change log.</p>
+</blockquote>
+<p>The changlog is what you write as commit message.  It ends up in the <br>
+persistent and immutable history, which is the main documentation of the <br>
+ongoing Isabelle development process.  README_REPOSITORY tries to explain <br>
+all that a bit.</p>
+<p>Such history entries are essential for future archeaological diggings, <br>
+when new problems are exposed, usually on older attempts to "fix bugs". <br>
+In such situations it is important to see what was really going on at a <br>
+certain point of time, and what the author of a change was thinking.  So <br>
+"fixed bug in foo" is not informative, but is equivalent to an empty <br>
+changelog entry.</p>
+<blockquote>
+<p>The top of the changed file itself?</p>
+</blockquote>
+<p>People did that before RCS and CVS.  We have Mercurial today, with the <br>
+history in the history, and the source in the source.  I.e. clearly <br>
+separated meta-data and data.</p>
+<p>Makarius</p>
+
+
+
+<a name="294325746"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problem%20with%20function%20package/near/294325746" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problem.20with.20function.20package.html#294325746">(Aug 19 2022 at 17:01)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+That works in many situations, but is a bit low-level.  The Variable <br>
+module provides canonical entry points to work with local variables, e.g. <br>
+via Variable.variant_frees or Variable.variant_fixes.</p>
+<p>Makarius</p>
+
+
+
+<a name="294325819"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problem%20with%20function%20package/near/294325819" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problem.20with.20function.20package.html#294325819">(Aug 19 2022 at 17:01)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Manuel,</p>
+<blockquote>
+<p>Thanks for your analysis and telling me how to fix it.</p>
+</blockquote>
+<p>well, it was no more than a rush first analysis.</p>
+<p>It is indeed best here to use the existing infrastructure in<br>
+variable.ML, as Makarius pointed out.</p>
+<p>One technical comment:</p>
+<p>val name_ctxt = Variable.names_of ctxt<br>
+        val (free_vars, prop, ranT, name_ctxt) =<br>
+          mk_funeq arity (fastype_of f) name_ctxt ([], f);</p>
+<p>This pattern (deliberate shadowing of names) is dangerous since it is<br>
+not robust against changed line positions.  »Not robust« in the sense<br>
+that the compiler cannot detect such slips.</p>
+<p>There are two approaches to avoid this:</p>
+<p>a) In smooth cases, the funny combinators ||&gt;&gt; and |-&gt; (##&gt;&gt; and #-&gt;)<br>
+can save you from mentioning sth more than once (see the Isabelle/ML<br>
+chapter in the implementation manual).</p>
+<p>b) In complex cases, this is not feasible.  Then you have to swallow the<br>
+bitter pill and give explicit indices.  Popular schemas are (foo, foo',<br>
+foo'') for little occurrences and (foo1, foo2, foo3, …) for many<br>
+occurrences.  In extreme cases also explicit application-domain prefixes<br>
+can be seen (cf.<br>
+<a href="http://isabelle.in.tum.de/repos/isabelle/file/df5dc24ca712/src/Pure/Isar/expression.ML#l857">http://isabelle.in.tum.de/repos/isabelle/file/df5dc24ca712/src/Pure/Isar/expression.ML#l857</a>).<br>
+  Looks like a parody on ancient line-number based programming, but is<br>
+robust against accidental position swapping.</p>
+<p>Hope this helps,<br>
+    Florian</p>
+<blockquote>
+<p>Cheers,<br>
+Manuel</p>
+<p>On 28/01/15 08:26, Florian Haftmann wrote:</p>
+<blockquote>
+<p>I mae a first analysis</p>
+<p>in function_elims.ML</p>
+<blockquote>
+<p>fun mk_funeq 0 T (acc_vars, acc_lhs) =<br>
+              let val y = Free("y", T)<br>
+              in (y :: acc_vars, (HOLogic.mk_Trueprop (HOLogic.mk_eq<br>
+(acc_lhs, y))), T) end<br>
+          | mk_funeq n (Type (@{type_name "fun"}, [S, T])) (acc_vars,<br>
+acc_lhs) =<br>
+              let val xn = Free ("x" ^ Int.toString n, S)<br>
+              in mk_funeq (n - 1) T (xn :: acc_vars, acc_lhs $ xn) end<br>
+          | mk_funeq _ _ _ = raise TERM ("Not a function.", [f]);<br>
+This looks suspicious since you cannot assume that "x\d" and "y" are<br>
+fresh.  You should use a pattern like</p>
+</blockquote>
+<p>Name.variant "x" (Proof_Context.names_of ctxt)</p>
+<p>Hope this helps,<br>
+ Florian</p>
+<p>Am 27.01.2015 um 18:59 schrieb Manuel Eberl:</p>
+<blockquote>
+<p>Oh dear. This looks like something I am probably responsible for. I<br>
+shall look into it in the next few days.</p>
+<p>My first guess would be that it has something to do with my very poor<br>
+understanding of contexts.</p>
+<p>Cheers,<br>
+Manuel<br>
+</p>
+</blockquote>
+<p>On 27/01/15 18:34, René Thiemann wrote:</p>
+<blockquote>
+<blockquote>
+<p>Dear all,</p>
+<p>today we stumbled over a strange behavior of the function package, which refused some very standard function definition that relies upon locally fixed parameters.</p>
+<p>theory Scratch<br>
+imports Main<br>
+begin</p>
+<p>locale foo =<br>
+  fixes x :: nat<br>
+begin</p>
+<p>function f :: "nat =&gt; nat" where<br>
+  "f y = (if y &gt; x then f (y - 1)  else y)"<br>
+apply pat_completeness <br>
+apply auto (* works and leaves no proof obligations *)<br>
+done (* post processing of function package fails:<br>
+exception THM 0 raised (line 726 of "thm.ML"):<br>
+  forall_intr: variable "x" free in assumptions<br>
+  (⋀y. x = y ⟹ P) ⟹ P *)<br>
+end<br>
+end</p>
+<p>The above function was accepted without problems until Isabelle2013, and is refused in Isabelle2013-1/2, 2014, and also in todays repository snapshot. Perhaps it is related to the news entry for Isabelle2013-1:</p>
+<ul>
+<li>
+<p>Function package: For each function f, new rules f.elims are<br>
+generated, which eliminate equalities of the form "f x = t".</p>
+</li>
+<li>
+<p>New command 'fun_cases' derives ad-hoc elimination rules for<br>
+function equations as simplified instances of f.elims, analogous to<br>
+inductive_cases.  See ~~/src/HOL/ex/Fundefs.thy for some examples.</p>
+</li>
+</ul>
+<p>Kind regards,<br>
+Christian, Florian, and René<br>
+</p>
+</blockquote>
+</blockquote>
+</blockquote>
+<p><a href="/user_uploads/14278/CLo6hZbMYl8h6tCe1JcuRyN3/signature.asc">signature.asc</a></p>
+</blockquote>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,216 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] tactic being executed twice · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20tactic.20being.20executed.20twice.html">[isabelle] tactic being executed twice</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294734263"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20tactic%20being%20executed%20twice/near/294734263" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20tactic.20being.20executed.20twice.html#294734263">(Aug 22 2022 at 17:27)</a>:</h4>
+<p>From: Jeremy Dawson &lt;<a href="mailto:Jeremy.Dawson@anu.edu.au">Jeremy.Dawson@anu.edu.au</a>&gt;<br>
+Hi,</p>
+<p>I have a (part) theory file, with goal and tactic as follows</p>
+<p>theory Scratch imports ZF begin<br>
+lemma oracle_test: "A ⟶ A &amp; B"<br>
+   apply (rule impI)<br>
+   apply (rule conjI)<br>
+apply (tactic {* fn thm =&gt;<br>
+   let<br>
+     val _ = writeln "aaa" ;<br>
+     val _ = writeln (@{make_string} thm) ;<br>
+     val cps = Drule.cprems_of thm ;<br>
+     val _ = writeln "ccc" ;<br>
+     val _ = writeln (@{make_string} cps) ;<br>
+     val _ = writeln "ddd" ;<br>
+   in Seq.succeed thm end ; *})</p>
+<p>At this point it seems clear that the tactic is executed twice, the <br>
+first time seemingly with an argument thm which gets printed out as <br>
+"TERM _", and the second time with the actual goal state.</p>
+<p>Why is this?  What's going on here?  Is this how apply tactic ... should <br>
+be used?</p>
+<p>Thanks</p>
+<p>Jeremy</p>
+
+
+
+<a name="294734488"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20tactic%20being%20executed%20twice/near/294734488" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20tactic.20being.20executed.20twice.html#294734488">(Aug 22 2022 at 17:28)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Since tactics are by definition lazy and value-oriented, the system is<br>
+free to run them many times. Here it happens to be twice, because of an<br>
+additional stage to "intern" the proof method expression; in other<br>
+situations it might be more than twice.</p>
+<p>The writeln invocations above are not value-oriented, thus you see such<br>
+implementation details in the experiment. In production use, you would<br>
+never emit such messages from a tactic.</p>
+<p>If you want to experiment with Isar goal states, it works better via the<br>
+ML_val command with the @{Isar.state} antiquotation. You can put various<br>
+auxiliary ML val bindings into ML_val, but cannot export a modified<br>
+proof state.</p>
+<p>Anyway, can you generally say what you are trying to do? So far I merely<br>
+see attempts to fit the mindset of a different proof assistant<br>
+(Isabelle98) to Isabelle2017. There is a common name prefix, but almost<br>
+everything else has changed since then.</p>
+<p>To get started with Isabelle2017, I recommend to ignore Isabelle/ML<br>
+altogether, and do definitions, statements, proofs in the Isar source<br>
+language. Then maybe get acquainted with Eisbach for user-defined proof<br>
+methods.</p>
+<p>Makarius</p>
+
+
+
+<a name="294735022"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20tactic%20being%20executed%20twice/near/294735022" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20tactic.20being.20executed.20twice.html#294735022">(Aug 22 2022 at 17:31)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+Hi Jeremy,</p>
+<blockquote>
+<p>At this point it seems clear that the tactic is executed twice, the<br>
+first time seemingly with an argument thm which gets printed out as<br>
+"TERM _", and the second time with the actual goal state.</p>
+</blockquote>
+<p>this is a static check. The NEWS entry says:</p>
+<ul>
+<li>More static checking of proof methods, which allows the system to<br>
+form a closure over the concrete syntax.  Method arguments should be<br>
+processed in the original proof context as far as possible, before<br>
+operating on the goal state.  In any case, the standard discipline for<br>
+subgoal-addressing needs to be observed: no subgoals or a subgoal<br>
+number that is out of range produces an empty result sequence, not an<br>
+exception.  Potential INCOMPATIBILITY for non-conformant tactical<br>
+proof tools.</li>
+</ul>
+<p>Essentially, this check is trying to figure out whether or not a proof<br>
+method (in your case: tactic) observers some discipline.</p>
+<p>In my experience, the easiest way to make a tactic conform is to use the<br>
+various "Subgoal.FOCUS" combinators that are described in §6.3 of the<br>
+implementation manual. ("SUBGOAL" works too, it is a bit more low-level.)</p>
+<blockquote>
+<p>Why is this?  What's going on here?  Is this how apply tactic ... should<br>
+be used?</p>
+</blockquote>
+<p>When wrapped in the combinators I've mentioned, you don't have to worry<br>
+about these details.</p>
+<p>Cheers<br>
+Lars</p>
+
+
+
+<a name="294735051"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20tactic%20being%20executed%20twice/near/294735051" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20tactic.20being.20executed.20twice.html#294735051">(Aug 22 2022 at 17:31)</a>:</h4>
+<p>From: Jeremy Dawson &lt;<a href="mailto:Jeremy.Dawson@anu.edu.au">Jeremy.Dawson@anu.edu.au</a>&gt;<br>
+Hi Makarius,</p>
+<p>Well, if the system is going to run a tactic twice, one with a phoney <br>
+goal "TERM _", and then once with the actual goal, and it fails the <br>
+first time (because the subgoal list is empty), that's not going to be <br>
+much use.  Under what conditions is apply (tactic ...) usable?</p>
+<p>No, I realise that in production use I wouldn't be printing "aaa", <br>
+"bbb", etc.  They're there for the purpose of debugging.  Without them I <br>
+wouldn't have realised that the system was running the tactic twice, and <br>
+that "TERM _" must refer to what it uses as the goal state the first time.</p>
+<p>What I'm doing right now is trying to code up an absurdly trivial <br>
+example of a tactic which should succeed using an absurdly trivial <br>
+oracle, which isn't included in the code I showed, but fails in the same <br>
+way (at least, the same, in that the tactic gets applied to a goal which <br>
+does not have the requisite number of subgoals).</p>
+<p>Like printing "aaa", etc, using apply (tactic ...) was for the purpose <br>
+of debugging - ie exploring why it doesn't work.</p>
+<p>Jeremy</p>
+
+
+
+<a name="294735075"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20tactic%20being%20executed%20twice/near/294735075" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20tactic.20being.20executed.20twice.html#294735075">(Aug 22 2022 at 17:31)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Just some guesses from a long distance:</p>
+<p>* there is something wrong with the goal context (type Proof.context)</p>
+<p>* type-inference has produced unexpectedly general results (usually<br>
+due to a wrong context)</p>
+<p>Makarius</p>
+
+
+
+<a name="294735144"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20tactic%20being%20executed%20twice/near/294735144" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20tactic.20being.20executed.20twice.html#294735144">(Aug 22 2022 at 17:32)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Yet another guess:</p>
+<p>* You access the raw "thm" representation of the goal state outside<br>
+the parts that are meant for user tools (e.g. the main conclusion), and<br>
+thus bump into delicate details managed by the system.</p>
+<p>Semantic side-conditions on type tactic are specified in<br>
+"implementation" section 4.2. More side-condition on Isar proof methods<br>
+in section 7.2.</p>
+<p>In practice, it is often better to look at canonical examples, and<br>
+modify them to fit a particular application. The "isar-ref" manual has a<br>
+brief section 5.14 on Oracles, with a link to the worked example<br>
+~~/src/HOL/ex/IFF_Oracle.thy -- as usual it is best to study the<br>
+material in the Prover IDE (Isabelle/jEdit).</p>
+<p>Makarius</p>
+
+
+
+<a name="294735229"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20tactic%20being%20executed%20twice/near/294735229" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20tactic.20being.20executed.20twice.html#294735229">(Aug 22 2022 at 17:32)</a>:</h4>
+<p>From: Jeremy Dawson &lt;<a href="mailto:Jeremy.Dawson@anu.edu.au">Jeremy.Dawson@anu.edu.au</a>&gt;<br>
+Hi Lars,</p>
+<p>Thanks - it seems from what you are saying as implying that a tactic <br>
+shouldn't raise an exception even when applied to the wrong goal. <br>
+Anyhow proceeding this way has solved the problem, thanks.</p>
+<p>Also, using CSUBGOAL works.  I couldn't understand<br>
+what "Subgoal.FOCUS" does.  CSUBGOAL is similar to SUBGOAL which is <br>
+described clearly in the old Reference Manual.</p>
+<p>Thanks</p>
+<p>Jeremy</p>
+
+
+
+<a name="294735247"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20tactic%20being%20executed%20twice/near/294735247" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20tactic.20being.20executed.20twice.html#294735247">(Aug 22 2022 at 17:32)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+Subgoal.FOCUS is a very useful combinator. It allows you to destructure<br>
+a goal such that you can get your hands on the premises and fixed<br>
+variables easily. I found that its type is quite self-explanatory:</p>
+<p>type focus =<br>
+   {context: Proof.context, params: (string * cterm) list,<br>
+    prems: thm list, asms: cterm list,<br>
+    concl: cterm,<br>
+    schematics: ((indexname * sort) * ctyp) list * ((indexname * typ) *
+cterm) list}</p>
+<p>val FOCUS: (focus -&gt; tactic) -&gt; Proof.context -&gt; int -&gt; tactic</p>
+<p>I use it for almost all of my custom ML tactics.</p>
+<p>Cheers<br>
+Lars</p>
+
+
+
+<a name="294735258"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20tactic%20being%20executed%20twice/near/294735258" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20tactic.20being.20executed.20twice.html#294735258">(Aug 22 2022 at 17:32)</a>:</h4>
+<p>From: Jeremy Dawson &lt;<a href="mailto:Jeremy.Dawson@anu.edu.au">Jeremy.Dawson@anu.edu.au</a>&gt;<br>
+Hi Lars,</p>
+<p>Thanks - I'm afraid I don't get it. I guess that the focus type is <br>
+somehow related to the current proof state, or, if the int argument is a <br>
+subgoal, then I guess the focus is somehow related to the particular <br>
+subgoal in the current proof state, but I can't guess, beyond that, is <br>
+there some explanation in the documentation that you can point to?  Or <br>
+some examples?</p>
+<p>Thanks</p>
+<p>Jeremy</p>
+
+
+
+<a name="294735294"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20tactic%20being%20executed%20twice/near/294735294" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20tactic.20being.20executed.20twice.html#294735294">(Aug 22 2022 at 17:32)</a>:</h4>
+<p>From: Jeremy Dawson &lt;<a href="mailto:Jeremy.Dawson@anu.edu.au">Jeremy.Dawson@anu.edu.au</a>&gt;<br>
+Hi Lars,</p>
+<p>don't bother with this question, I've found it explained in the Isabelle <br>
+cookbook</p>
+<p>Thanks</p>
+<p>Jeremy</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,78 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Constructing terms in ML · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Constructing.20terms.20in.20ML.html">[isabelle] Constructing terms in ML</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294145090"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Constructing%20terms%20in%20ML/near/294145090" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Constructing.20terms.20in.20ML.html#294145090">(Aug 18 2022 at 18:26)</a>:</h4>
+<p>From: Steve Wong &lt;<a href="mailto:s.wong.731@gmail.com">s.wong.731@gmail.com</a>&gt;<br>
+Hi all,</p>
+<p>I'm trying to construct the term for "ALL x y. x = y". I know I could just<br>
+use Syntax.read_term, but what if I want to construct it term by term using<br>
+the constructor functions? I see that the term should look something like:</p>
+<p>Const ("HOL.All", "('a =&gt; HOL.bool) =&gt; HOL.bool") $<br>
+     Abs ("x", "'a",<br>
+       Const ("HOL.All", "('a =&gt; HOL.bool) =&gt; HOL.bool") $<br>
+         Abs ("y", "'a",<br>
+           Const ("HOL.eq", "'a =&gt; 'a =&gt; HOL.bool") $ Bound 1 $ Bound 0))</p>
+<p>Without fixing the types of x and y, HOLogic.mk_eq (Bound 0, Bound 1) gives<br>
+an error, because it can't find the type of Bound terms. I was just thinking<br>
+to create the mk_eq term first, then wrap it inside a mk_all and itself<br>
+inside another mk_all. Is there a better way to go about this?</p>
+<p>Thanks a lot in advance.</p>
+<p>Steve</p>
+
+
+
+<a name="294145103"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Constructing%20terms%20in%20ML/near/294145103" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Constructing.20terms.20in.20ML.html#294145103">(Aug 18 2022 at 18:26)</a>:</h4>
+<p>From: Thomas Sewell &lt;<a href="mailto:Thomas.Sewell@nicta.com.au">Thomas.Sewell@nicta.com.au</a>&gt;<br>
+Hello Steve.</p>
+<p>HOLogic.eq_const might be able to help you. You need to supply it the <br>
+type, which is expected.</p>
+<p>For instance<br>
+ML {* let val T = @{typ 'a} in<br>
+     HOLogic.mk_all ("x", T, HOLogic.mk_all ("y", T, HOLogic.eq_const T <br>
+$ Bound 1 $ Bound 0)) end<br>
+*}</p>
+<p>Or the slightly shorter<br>
+ML {* let val T = @{typ 'a} in<br>
+     HOLogic.list_all ([("x", T), ("y", T)], HOLogic.eq_const T $ Bound <br>
+1 $ Bound 0) end<br>
+*}</p>
+<p>There are usually many different ways to do things.</p>
+<p>Here is another one, which may come as something of a surprise:</p>
+<p>ML {* let val T = @{typ 'a} in<br>
+     HOLogic.mk_all ("x", T, HOLogic.mk_all ("y", T, HOLogic.eq_const T <br>
+$ Free ("x", T) $ Free ("y", T))) end<br>
+*}</p>
+<p>A number of the functions that construct lambda-terms call absfree, <br>
+which will captrue Free variables with the same name and type as the <br>
+variable being bound. It happens that mk_all calls this, but list_all <br>
+doesn't. Obviously.</p>
+<p>As for whether there's a better way to go about this, well, the example <br>
+is too limited. Usually you don't use ML to build any single thing, <br>
+rather to encode a recipe for producing many terms, theorems, etc.</p>
+<p>If you really do just want to produce this term once, you might as well <br>
+just quote it with @{term "ALL x y. x = y"}. Otherwise it depends what <br>
+you parameters really are. If you want to produce this term for various <br>
+types T, for instance, you could use the code above. In more complex <br>
+cases, you tend to end up tearing apart your input terms and thinking <br>
+carefully about which parts you can be certain are type-carrying. This <br>
+is not a lot of fun. The approach of using Free variables to represent <br>
+Bound variables whenever the Abs is not yet closed may help sometimes, <br>
+but requires some additional machinery for picking them at the right <br>
+time and making sure their names are fresh.</p>
+<p>Yours,<br>
+     Thomas.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

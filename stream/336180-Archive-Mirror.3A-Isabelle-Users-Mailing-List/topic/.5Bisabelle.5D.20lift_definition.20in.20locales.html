@@ -1,0 +1,174 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] lift_definition in locales · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20lift_definition.20in.20locales.html">[isabelle] lift_definition in locales</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294677271"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20lift_definition%20in%20locales/near/294677271" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20lift_definition.20in.20locales.html#294677271">(Aug 22 2022 at 13:36)</a>:</h4>
+<p>From: Mathias Fleury &lt;<a href="mailto:mathias.fleury12@gmail.com">mathias.fleury12@gmail.com</a>&gt;<br>
+Hello list,</p>
+<p>I would like to prepare code exportation within a locale, in such a way that I only have to instantiate the locale to generate code later. However, my functions do not unconditionally terminate and I need an invariant (called inv in the following email) to prove termination and correctness. Therefore, I wanted to define a typedef within the locale. </p>
+<p>But as there cannot be a typedef inside a locale, I axiomatised it (via the theorem that typedef generates) with the idea that I could instantiate it later, while still using the theorems and lift definitions:</p>
+<p>locale type_definition_locale =<br>
+  fixes Abs :: "'a ⇒ 'inv" and Rep :: "'inv ⇒ 'a" and inv :: "'a ⇒ bool"<br>
+  assumes<br>
+    Rep_inverse: "Abs (Rep x) = x" and<br>
+    Rep: "Rep x ∈ {a. inv a}" and<br>
+    Rep_inject: "Rep x = Rep y ⟷ x = y" and<br>
+    Abs_inverse: "z ∈ {a. inv a} ⟹ Rep (Abs z) = z" and<br>
+    Abs_induct: "(⋀y. y ∈ {a. inv a} ⟹ P (Abs y)) ⟹ P y" and<br>
+    Rep_induct: "z ∈ {a. inv a} ⟹ (⋀z. P' (Rep z)) ⟹ P' z" and<br>
+    Abs_cases: "(⋀y. x = Abs y ⟹ y ∈ {a. inv a} ⟹ Q) ⟹ Q" and<br>
+    Rep_cases: "z ∈ {a. inv a} ⟹ (⋀y. z = Rep y ⟹ Q) ⟹ Q" and<br>
+    Abs_inject: "z ∈ {a. inv a} ⟹ z' ∈ {a. inv a} ⟹ Abs z = Abs z' ⟷ z = z'"</p>
+<p>Now my question is the following: is there a way to use lift_definition within the previous locale? For now, an error is produced:</p>
+<p>context type_definition_locale<br>
+begin</p>
+<p>definition raw_K :: "'a ⇒ 'a ⇒ 'a" where<br>
+"raw_K a _ = a"</p>
+<p>lift_definition refined_K :: "'inv ⇒ 'inv ⇒ 'inv" is raw_K</p>
+<p>(* Fails with:<br>
+       Lifting failed for the following term:<br>
+       Term:  raw_K<br>
+       Type:  'a ⇒ 'a ⇒ 'a</p>
+<p>Reason:<br>
+         The type of the term cannot be instantiated to<br>
+         "'inv ⇒ 'inv ⇒ ‘inv”.<br>
+  *)<br>
+end</p>
+<p>I tried using setup_lifting, but this does not work either. The error message was not very precise ("The abstract type must be a type constructor.”), but I think that the error comes from:</p>
+<p>fun is_Type (Type _) = true<br>
+  | is_Type _ = false</p>
+<p>Types passed as parameters in locales use the constructor TFree instead of Type.</p>
+<p>Is there a way to avoid doing the lifting by hand? Would it be safe to extend the function is_Type to accept TFree?</p>
+<p>Thanks in advance,<br>
+Mathias</p>
+
+
+
+<a name="294677307"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20lift_definition%20in%20locales/near/294677307" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20lift_definition.20in.20locales.html#294677307">(Aug 22 2022 at 13:36)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear Mathias,</p>
+<p>The Lifting package manages the registered quotients in a map with the name of the type <br>
+constructor as a key. So even if you could trick setup_lifting into accepting a theorem of <br>
+the form</p>
+<p>type_definition Rep Abs {x. inv x}</p>
+<p>the lift_definition command would not be able to find the setup, because it constructs the <br>
+lifting relation based on the type constructors that appear in the types of the raw term <br>
+and the lifted constant. One would have to extend the implementation of <br>
+Lifting_Term.prove_schematic_quot_thm accordingly to also support TFree.</p>
+<p>Moreover, you'd have to make sure that the quotient theorem setup does not leak into any <br>
+interpretation, in which the type variables get instantiated or generalised. Otherwise, <br>
+the internal data structures of the Lifting package would be messed up.</p>
+<p>Finally, I am not sure that your approach will actually work for code generation. The <br>
+steps of lift_definition for a subtype copy are fairly limited except when it comes to <br>
+code generation for compound return types. For example, if your function returns something <br>
+like 'inv list (rather than a plain 'inv), then lift_definition internally generates a <br>
+number of types and auxiliary constants and lifts the invariant to those types such that <br>
+the code generator can handle them. I cannot see how this construction would work for an <br>
+unspecified 'inv (otherwise, we could have done the construction once and for all for such <br>
+an arbitrary 'inv and then just reused everything).</p>
+<p>Andreas</p>
+
+
+
+<a name="294677327"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20lift_definition%20in%20locales/near/294677327" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20lift_definition.20in.20locales.html#294677327">(Aug 22 2022 at 13:36)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Mathias,</p>
+<p>quoting NEWS for Isabelle2099-2:<br>
+<a href="/user_uploads/14278/cuxmbmLnKi0N2qtD4T_9buiu/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294677341"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20lift_definition%20in%20locales/near/294677341" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20lift_definition.20in.20locales.html#294677341">(Aug 22 2022 at 13:36)</a>:</h4>
+<p>From: Dmitriy Traytel &lt;<a href="mailto:traytel@inf.ethz.ch">traytel@inf.ethz.ch</a>&gt;<br>
+Hi Mathias,</p>
+<p>independently of lift_definition and code generation: a side remark on your locale.</p>
+<p>A type definition locale already exists. It is called type_definition (the term type_definition is actually a locale predicate; the locale is used by typedef). It assumes only three facts (Rep, Rep_inverse, and Abs_inverse) and derives the rest. </p>
+<p>There is no need to duplicate those things.</p>
+<p>Dmitriy</p>
+
+
+
+<a name="294677489"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20lift_definition%20in%20locales/near/294677489" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20lift_definition.20in.20locales.html#294677489">(Aug 22 2022 at 13:37)</a>:</h4>
+<p>From: Mathias Fleury &lt;<a href="mailto:mathias.fleury12@gmail.com">mathias.fleury12@gmail.com</a>&gt;<br>
+Dear Andreas and Florian,</p>
+<p>Thanks for your comments.</p>
+<blockquote>
+<p>I do not know whether your typedef specification satisfy the<br>
+precondition that no dependencies on parameters or assumptions are<br>
+introduced, but you may want to try this and see how far you can get.</p>
+</blockquote>
+<p>I am not in that case: I wanted to abstract the concrete representation of two watched literals scheme (allowing to instantiate the locale with arrays or red-black trees).</p>
+<blockquote>
+<p>Finally, I am not sure that your approach will actually work for code generation. The steps of lift_definition for a subtype copy are fairly limited except when it comes to code generation for compound return types. </p>
+</blockquote>
+<p>I am mostly interested in the steps of lift_definition for a subtype. I wanted to avoid writing the theorems by hand each time, but it does not matter so much. That seems also easier than changing the Lifting package.</p>
+<p>Thanks for your help,<br>
+Mathias</p>
+<blockquote>
+<p>On 16 Jun 2016, at 08:51, Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt; wrote:</p>
+<p>Dear Mathias,</p>
+<p>The Lifting package manages the registered quotients in a map with the name of the type constructor as a key. So even if you could trick setup_lifting into accepting a theorem of the form</p>
+<p>type_definition Rep Abs {x. inv x}</p>
+<p>the lift_definition command would not be able to find the setup, because it constructs the lifting relation based on the type constructors that appear in the types of the raw term and the lifted constant. One would have to extend the implementation of Lifting_Term.prove_schematic_quot_thm accordingly to also support TFree.</p>
+<p>Moreover, you'd have to make sure that the quotient theorem setup does not leak into any interpretation, in which the type variables get instantiated or generalised. Otherwise, the internal data structures of the Lifting package would be messed up.</p>
+<p>Finally, I am not sure that your approach will actually work for code generation. The steps of lift_definition for a subtype copy are fairly limited except when it comes to code generation for compound return types. For example, if your function returns something like 'inv list (rather than a plain 'inv), then lift_definition internally generates a number of types and auxiliary constants and lifts the invariant to those types such that the code generator can handle them. I cannot see how this construction would work for an unspecified 'inv (otherwise, we could have done the construction once and for all for such an arbitrary 'inv and then just reused everything).</p>
+<p>Andreas</p>
+<p>On 15/06/16 20:44, Mathias Fleury wrote:</p>
+<blockquote>
+<p>Hello list,</p>
+<p>I would like to prepare code exportation within a locale, in such a way that I only have to instantiate the locale to generate code later. However, my functions do not unconditionally terminate and I need an invariant (called inv in the following email) to prove termination and correctness. Therefore, I wanted to define a typedef within the locale.</p>
+<p>But as there cannot be a typedef inside a locale, I axiomatised it (via the theorem that typedef generates) with the idea that I could instantiate it later, while still using the theorems and lift definitions:</p>
+<p>locale type_definition_locale =<br>
+  fixes Abs :: "'a ⇒ 'inv" and Rep :: "'inv ⇒ 'a" and inv :: "'a ⇒ bool"<br>
+  assumes<br>
+    Rep_inverse: "Abs (Rep x) = x" and<br>
+    Rep: "Rep x ∈ {a. inv a}" and<br>
+    Rep_inject: "Rep x = Rep y ⟷ x = y" and<br>
+    Abs_inverse: "z ∈ {a. inv a} ⟹ Rep (Abs z) = z" and<br>
+    Abs_induct: "(⋀y. y ∈ {a. inv a} ⟹ P (Abs y)) ⟹ P y" and<br>
+    Rep_induct: "z ∈ {a. inv a} ⟹ (⋀z. P' (Rep z)) ⟹ P' z" and<br>
+    Abs_cases: "(⋀y. x = Abs y ⟹ y ∈ {a. inv a} ⟹ Q) ⟹ Q" and<br>
+    Rep_cases: "z ∈ {a. inv a} ⟹ (⋀y. z = Rep y ⟹ Q) ⟹ Q" and<br>
+    Abs_inject: "z ∈ {a. inv a} ⟹ z' ∈ {a. inv a} ⟹ Abs z = Abs z' ⟷ z = z'"</p>
+<p>Now my question is the following: is there a way to use lift_definition within the previous locale? For now, an error is produced:</p>
+<p>context type_definition_locale<br>
+begin</p>
+<p>definition raw_K :: "'a ⇒ 'a ⇒ 'a" where<br>
+"raw_K a _ = a"</p>
+<p>lift_definition refined_K :: "'inv ⇒ 'inv ⇒ 'inv" is raw_K</p>
+<p>(* Fails with:<br>
+       Lifting failed for the following term:<br>
+       Term:  raw_K<br>
+       Type:  'a ⇒ 'a ⇒ 'a</p>
+<p>Reason:<br>
+         The type of the term cannot be instantiated to<br>
+         "'inv ⇒ 'inv ⇒ ‘inv”.<br>
+  *)<br>
+end</p>
+<p>I tried using setup_lifting, but this does not work either. The error message was not very precise ("The abstract type must be a type constructor.”), but I think that the error comes from:</p>
+<p>fun is_Type (Type _) = true<br>
+  | is_Type _ = false</p>
+<p>Types passed as parameters in locales use the constructor TFree instead of Type.</p>
+<p>Is there a way to avoid doing the lifting by hand? Would it be safe to extend the function is_Type to accept TFree?</p>
+<p>Thanks in advance,<br>
+Mathias<br>
+</p>
+</blockquote>
+</blockquote>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

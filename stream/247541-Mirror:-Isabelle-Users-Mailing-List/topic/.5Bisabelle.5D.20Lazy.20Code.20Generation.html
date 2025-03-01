@@ -1,0 +1,73 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Lazy Code Generation · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Lazy.20Code.20Generation.html">[isabelle] Lazy Code Generation</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="246089420"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Lazy%20Code%20Generation/near/246089420" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Lazy.20Code.20Generation.html#246089420">(Jul 15 2021 at 12:57)</a>:</h4>
+<p>From: Simon Foster via Cl-isabelle-users &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Dear all,</p>
+<p>I've been experimenting with SML code generation for lazy evaluated<br>
+codatatypes using the theory Code_Lazy. It's a very nice development, and<br>
+it works pretty well on some examples. However, I've hit an issue with<br>
+generated code that seems to be related to polymorphism.</p>
+<p>Consider the following example. First, I create the following codatatype<br>
+and set up the lazy code generator:</p>
+<p>codatatype ('e, 'r) itree = Ret 'r | Tau "('e, 'r) itree" | Vis "'e ⇀ ('e,<br>
+'r) itree"<br>
+code_lazy_type itree</p>
+<p>then I create a simple definition</p>
+<p>definition deadlock :: "('e, 'r) itree" where "deadlock = Vis Map.empty"</p>
+<p>Finally, I try to evaluate this, which invokes the code generator:</p>
+<p>value "deadlock :: (int, int) itree"</p>
+<p>This raises an error in the generated code:</p>
+<p>Error: Type ('a, 'b) itree includes a free type variable<br>
+val deadlock : ('a, 'b) itree = Lazy_itree (Lazy.lazy (fn ... =&gt; ...))<br>
+At (line 155 of "generated code")<br>
+Error: Type error in function application.<br>
+   Function: term_of_itree typerep_int term_of_int :<br>
+      ('a, inta) itree -&gt; term<br>
+   Argument: deadlock : ('a, 'b) itree<br>
+   Reason: Can't unify inta to 'a (Cannot unify with explicit type variable)</p>
+<p>There seems to be an issue with the polymorphic type of deadlock, which<br>
+cannot be specialised when used in another definition. I attach a minimal<br>
+example that exhibits this behaviour. I can code generate Haskell for this<br>
+example (excluding Code_Lazy) without issue. Moreover, if I turn itree into<br>
+a datatype (i.e. inductive) and don't use code_lazy_type, the code also<br>
+works correctly.</p>
+<p>Is there a workaround for this issue?</p>
+<p>Regards,</p>
+<p>Simon.<br>
+<a href="/user_uploads/14278/V9WbWT2_Ladrz1VO5RrMW7Y8/Lazy.thy">Lazy.thy</a></p>
+
+
+
+<a name="246202091"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Lazy%20Code%20Generation/near/246202091" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Lazy.20Code.20Generation.html#246202091">(Jul 16 2021 at 09:29)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:mail@andreas-lochbihler.de">mail@andreas-lochbihler.de</a>&gt;<br>
+Dear Simon,</p>
+<p>You're running into SML's value restriction, which is independent of codatatypes and <br>
+code_lazy. See <a href="http://users.cis.fiu.edu/~smithg/cop4555/valrestr.html">http://users.cis.fiu.edu/~smithg/cop4555/valrestr.html</a> for an explanation. <br>
+Deadlock's right-hand side consists of a number of function applications and is therefore <br>
+not a syntactic ML value. So SML will not treat it as a polymorphic value.</p>
+<p>The standard way around is to introduce a unit closure:</p>
+<p>definition deadlock :: "unit =&gt; ('e, 'r) itree" where "deadlock _ = Vis Map.empty"</p>
+<p>Then export_code for deadlock results in a <code>fun</code> instead of a <code>val</code> and <code>fun</code> always is a <br>
+syntactic ML value. If you don't want to clutter your formalization with those unit <br>
+closures, you can also instruct the code generator's preprocessor to introduce those <br>
+closures. See the construction of Fail' in CryptHOL.Generative_Probabilistic_Value in the <br>
+AFP for a very similar example:</p>
+<p><a href="https://www.isa-afp.org/browser_info/current/AFP/CryptHOL/Generative_Probabilistic_Value.html">https://www.isa-afp.org/browser_info/current/AFP/CryptHOL/Generative_Probabilistic_Value.html</a></p>
+<p>Hope this helps<br>
+Andreas</p>
+
+
+
+<hr><p>Last updated: Jul 15 2022 at 23:21 UTC</p>
+</html>

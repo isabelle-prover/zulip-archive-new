@@ -1,0 +1,221 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Problems with code generation for the reals · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20code.20generation.20for.20the.20reals.html">[isabelle] Problems with code generation for the reals</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294238974"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20code%20generation%20for%20the%20reals/near/294238974" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20code.20generation.20for.20the.20reals.html#294238974">(Aug 19 2022 at 10:48)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Jesus,</p>
+<blockquote>
+<p>we were trying to generate code<br>
+for matrices of real numbers; we had been doing some experiments with<br>
+real numbers represented in SML by fractions of elements of type<br>
+"<a href="http://IntInf.int">IntInf.int</a>", but doing some profiling we detected that most of the<br>
+execution time was spent in computing the functions "gcd", "divmod",<br>
+"quotrem", "normalize" and so on, instead of on performing the<br>
+operations over matrices that were really interesting for us.</p>
+<p>We thought that giving a chance to Code_Real_Approx_By_Float could be<br>
+worth (even if we read about its potential accuracy matters), just to<br>
+see if we could reduce computing times of the arithmetic operations.</p>
+<p>Unfortunately, we got some problems with the Library, when generating<br>
+code, that we don't know how to avoid.</p>
+</blockquote>
+<p>The sort answer: insert the following snippet at the beginning of your<br>
+example theory:</p>
+<blockquote>
+<p>code_const Ratreal (SML)</p>
+<p>definition Realfract :: "int ⇒ int ⇒ real"<br>
+where<br>
+  "Realfract p q = of_int p / of_int q"</p>
+<p>code_datatype Realfract</p>
+<p>code_const Realfract<br>
+  (SML "Real.fromInt _/ '// Real.fromInt _")</p>
+<p>lemma [code]:<br>
+  "Ratreal r = split Realfract (quotient_of r)"<br>
+  by (cases r) (simp add: Realfract_def quotient_of_Fract of_rat_rat)</p>
+<p>lemma [code, code del]:<br>
+  "(plus :: real ⇒ real ⇒ real) = plus"<br>
+  ..</p>
+<p>lemma [code, code del]:<br>
+  "(times :: real ⇒ real ⇒ real) = times"<br>
+  ..</p>
+<p>lemma [code, code del]:<br>
+  "(divide :: real ⇒ real ⇒ real) = divide"<br>
+  ..</p>
+<p>lemma [code]:<br>
+  fixes r :: real<br>
+  shows "inverse r = 1 / r"<br>
+  by (fact inverse_eq_divide)</p>
+</blockquote>
+<p>Code_Real_Approx_By_Float seems indeed to be very approximative since it<br>
+cannot handle real numerals.  This snippet amends this by a specific<br>
+datatype constructor Realfract which is then mapped to a SML expression.</p>
+<p>This renders all code equations using the original datatype constructor<br>
+Ratreal invalid, and they must be dropped explicitly using the funny<br>
+[code, code del] pattern on reflexive equations.  I added only the ones<br>
+necessary for your examples, their might be more.  Inversions seems not<br>
+be implemented in Code_Real_Approx_By_Float, but it can be easily<br>
+delegated to division on reals which is.</p>
+<p>@Johannes: Maybe this stuff should be added to Code_Real_Approx_By_Float?</p>
+<blockquote>
+<p>In the file there can be also found some definitions from the SML<br>
+structure "Vector" (or type iarray, in Isabelle); we read your comment<br>
+on <a href="http://isabelle.in.tum.de/library/HOL/HOL-Library/IArray.html">http://isabelle.in.tum.de/library/HOL/HOL-Library/IArray.html</a> and<br>
+thought that the functions might be useful for someone else.</p>
+</blockquote>
+<p>This is indeed work by Tobias.  I did not experience any problem with it<br>
+in your examples.</p>
+<p>To get back to your original observation:</p>
+<blockquote>
+<p>we had been doing some experiments with<br>
+real numbers represented in SML by fractions of elements of type<br>
+"<a href="http://IntInf.int">IntInf.int</a>", but doing some profiling we detected that most of the<br>
+execution time was spent in computing the functions "gcd", "divmod",<br>
+"quotrem", "normalize" and so on, instead of on performing the<br>
+operations over matrices that were really interesting for us.</p>
+</blockquote>
+<p>It is indeed questionable whether it is a good idea to normalize<br>
+quotients always.  What do others implementations do here (e.g. Ocaml)?<br>
+ The implementation of rational numbers can be changed in user space<br>
+using the usual mechanisms of datatype refinement (see the tutorial on<br>
+code generation and the upcoming ITP paper<br>
+<a href="http://isabelle.in.tum.de/~haftmann/pdf/data_refinement_haftmann_kuncar_krauss_nipkow.pdf">http://isabelle.in.tum.de/~haftmann/pdf/data_refinement_haftmann_kuncar_krauss_nipkow.pdf</a>).</p>
+<p>Hope this helps,<br>
+    Florian<br>
+<a href="/user_uploads/14278/OYcKZdvCyVg-FMWvdOjFVTK-/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294239039"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20code%20generation%20for%20the%20reals/near/294239039" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20code.20generation.20for.20the.20reals.html#294239039">(Aug 19 2022 at 10:49)</a>:</h4>
+<p>From: Jesus Aransay &lt;<a href="mailto:jesus-maria.aransay@unirioja.es">jesus-maria.aransay@unirioja.es</a>&gt;<br>
+Dear all,</p>
+<p>regarding the mail I sent to Florian, I just wanted to add some<br>
+figures about the performance of our algorithm computing the reduced<br>
+row echelon form of a matrix; the algorithm is refined to "iarrays"<br>
+(<a href="http://isabelle.in.tum.de/library/HOL/HOL-Library/IArray.html">http://isabelle.in.tum.de/library/HOL/HOL-Library/IArray.html</a>) to<br>
+represent matrices. We implemented the algorithm over fields, and<br>
+generated the ML code associated to the algorithm. We used MLton to<br>
+compile the code and execute it over some instances of matrices; the<br>
+results obtained when profiling are the following ones.</p>
+<p>The following example is a randomly generated matrix of dimension<br>
+70*70 matrix with entries in the field "Z / 2Z"; these elements are<br>
+generated to "0::<a href="http://IntInf.int">IntInf.int</a>" and "1::<a href="http://IntInf.int">IntInf.int</a>", and the field<br>
+operations are defined by means of ad - hoc "fun" definitions<br>
+(execution time is 0.02 seconds).</p>
+<p>(*<br>
+0.02 seconds of CPU time (0.00 seconds GC)<br>
+         function            cur    raw</p>
+<hr>
+<p>Sequence.tabulate           50.0% (0.01s)<br>
+example_70_x_70_Z2.plus_z2a 50.0% (0.01s)<br>
+*)</p>
+<p>The following are the results obtained for the very same matrix as in<br>
+the previous example, but now the elements are labelled as being of<br>
+type "real"; following the standard setup for code generation of reals<br>
+they are generated in SML to fractions  of "<a href="http://IntInf.int">IntInf.int</a>" (execution<br>
+time gets multiplied by 100, most of the time is spent in computing<br>
+quotients and remainders):</p>
+<p>(*<br>
+2.46 seconds of CPU time (0.03 seconds GC)<br>
+                  function                    cur    raw</p>
+<hr>
+<p>Primitive.IntInf.bigQuot                     28.1% (0.70s)<br>
+Primitive.IntInf.bigRem                      28.1% (0.70s)<br>
+Primitive.IntInf.bigDivMod                   12.4% (0.31s)<br>
+Primitive.IntInf.make                        12.0% (0.30s)<br>
+example_70_x_70_binary_rat.abs_int            5.2% (0.13s)<br>
+example_70_x_70_binary_rat.sgn_int            3.6% (0.09s)<br>
+example_70_x_70_binary_rat.gcd_int            2.8% (0.07s)<br>
+example_70_x_70_binary_rat.divmod_int         2.0% (0.05s)<br>
+example_70_x_70_binary_rat.mod_int            1.6% (0.04s)<br>
+&lt;gc&gt;                                          1.2% (0.03s)<br>
+Sequence.tabulate                             1.2% (0.03s)<br>
+example_70_x_70_binary_rat.div_int            0.4% (0.01s)<br>
+example_70_x_70_binary_rat.divmod_int.fn      0.4% (0.01s)<br>
+example_70_x_70_binary_rat.apsnd              0.4% (0.01s)<br>
+example_70_x_70_binary_rat.mult_iarray.fn.fn  0.4% (0.01s)<br>
+*)</p>
+<p>Finally, this third example is the result of applying the algorithm to<br>
+a randomly generated "70*70" matrix, but in this case of real numbers<br>
+between 0 and 1000; they are again generated in SML to fractions of<br>
+"<a href="http://IntInf.int">IntInf.int</a>":</p>
+<p>(*<br>
+46.14 seconds of CPU time (1.19 seconds GC)<br>
+            function               cur    raw</p>
+<hr>
+<p>Primitive.IntInf.bigRem           32.5% (15.37s)<br>
+Primitive.IntInf.bigQuot          24.2% (11.46s)<br>
+Primitive.IntInf.make             11.3%  (5.37s)<br>
+Primitive.IntInf.bigDivMod         9.5%  (4.51s)<br>
+example_70_x_70_rat.sgn_int        7.6%  (3.62s)<br>
+example_70_x_70_rat.abs_int        6.1%  (2.87s)<br>
+example_70_x_70_rat.divmod_int     2.9%  (1.35s)<br>
+&lt;gc&gt;                               2.5%  (1.19s)<br>
+example_70_x_70_rat.gcd_int        1.4%  (0.65s)<br>
+example_70_x_70_rat.mod_int        0.9%  (0.43s)<br>
+example_70_x_70_rat.divmod_int.fn  0.7%  (0.34s)<br>
+example_70_x_70_rat.apsnd          0.3%  (0.12s)<br>
+Sequence.sub                       0.0%  (0.01s)<br>
+example_70_x_70_rat.plus_rata      0.0%  (0.01s)<br>
+example_70_x_70_rat.uminus_rata    0.0%  (0.01s)<br>
+example_70_x_70_rat.div_int        0.0%  (0.01s)<br>
+Primitive.IntInf.extdFromWord32    0.0%  (0.01s)<br>
+*)</p>
+<p>We thought that, in order to increase performance, it could be a good<br>
+idea  to try to use the SML "Real" type (as proposed in<br>
+<a href="http://isabelle.in.tum.de/library/HOL/HOL-Library/Code_Real_Approx_By_Float.html">http://isabelle.in.tum.de/library/HOL/HOL-Library/Code_Real_Approx_By_Float.html</a>),<br>
+instead of fractions of "<a href="http://IntInf.int">IntInf.int</a>". Any other ideas would be also<br>
+warmly welcome.</p>
+<p>Any suggestions are welcome,</p>
+<p>Jesus</p>
+
+
+
+<a name="294241893"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20code%20generation%20for%20the%20reals/near/294241893" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20code.20generation.20for.20the.20reals.html#294241893">(Aug 19 2022 at 11:08)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Just curious: How does that compared to Poly/ML, instead of Mlton?  It is <br>
+important here to distinguish Poly/ML with GNU MP and without.  (The <br>
+version that is shipped with Isabelle2013 includes libgmp only for Linux, <br>
+and it should work for Windows/Cygwin as well, but not for Mac OS X -- I <br>
+did not know how to compile that in a portable manner.)</p>
+<p>Makarius</p>
+
+
+
+<a name="294242078"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20code%20generation%20for%20the%20reals/near/294242078" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20code.20generation.20for.20the.20reals.html#294242078">(Aug 19 2022 at 11:10)</a>:</h4>
+<p>From: Jesus Aransay &lt;<a href="mailto:jesus-maria.aransay@unirioja.es">jesus-maria.aransay@unirioja.es</a>&gt;<br>
+Hi Makarius,</p>
+<p>the times compare as follows; a matrix of dimension 70 * 70 of real<br>
+numbers (randomly generated, with entries between 0 and 1000) mapped<br>
+to fractions of "<a href="http://IntInf.int">IntInf.int</a>" elements takes:</p>
+<ul>
+<li>
+<p>with MLton, 9 seconds to compile the stand-alone executable, 45<br>
+seconds of execution;</p>
+</li>
+<li>
+<p>with PolyML 5.5 (the version dispatched with Isabelle 2013), 111<br>
+seconds of execution;</p>
+</li>
+<li>
+<p>just for the record, with PolyML 5.2 (the version packaged for<br>
+ubuntu), 350 seconds of execution.</p>
+</li>
+</ul>
+<p>Thanks for your interest,</p>
+<p>Jesus</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

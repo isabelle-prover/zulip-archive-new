@@ -1,0 +1,50 @@
+[
+    {
+        "content": "<p>From: Lars Hupel &lt;<a href=\"mailto:hupel@in.tum.de\">hupel@in.tum.de</a>&gt;<br>\nDear Makarius,</p>\n<p>after testing RC0 some more, I can confirm that it works smoothly with<br>\nlibisabelle on Linux and OS X. However, I'm running into bootstrapping<br>\nproblems under Windows. Namely, recovering symlinks causes an exception.<br>\nThis time, I could even reproduce the problem on my local machine.</p>\n<p>The error message is:</p>\n<p>java.nio.file.NoSuchFileException:<br>\nC:\\Users\\appveyor\\AppData\\Local\\libisabelle\\setups\\Isabelle2016-RC0\\.\\contrib\\cygwin\\dev\\fd</p>\n<p>Some more context:</p>\n<p>&lt;<a href=\"https://ci.appveyor.com/project/larsrh/libisabelle/build/56/job/gcsrus017n6o6on0#L1092\">https://ci.appveyor.com/project/larsrh/libisabelle/build/56/job/gcsrus017n6o6on0#L1092</a>&gt;</p>\n<p>In Isabelle &lt;=2015 I just ignored the symlinks and bootstrapping still<br>\nworked (by accident?). For 2016, you moved this routine from isabelle.Main<br>\nto Isabelle_System.init, which I appreciate. But I don't understand the<br>\nabove error at all, given that the file appears to exists.</p>\n<p>Steps to reproduce:</p>\n<ol start=\"0\">\n<li>\n<p>Install sbt:<br>\n<a href=\"https://dl.bintray.com/sbt/native-packages/sbt/0.13.9/sbt-0.13.9.msi\">https://dl.bintray.com/sbt/native-packages/sbt/0.13.9/sbt-0.13.9.msi</a></p>\n</li>\n<li>\n<p>git clone --recursive <a href=\"https://github.com/larsrh/libisabelle.git\">https://github.com/larsrh/libisabelle.git</a></p>\n</li>\n<li>In the clone, using administrative prompt (!): sbt</li>\n<li>In sbt: Run \"publishLocal\" followed by \"appBootstrap/run --version<br>\n2016-RC0\"</li>\n</ol>\n<p>Cheers<br>\nLars</p>",
+        "id": 294664413,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661171178
+    },
+    {
+        "content": "<p>From: Lars Hupel &lt;<a href=\"mailto:hupel@in.tum.de\">hupel@in.tum.de</a>&gt;<br>\nI think I found the cause.</p>\n<p>I use native Java 7+ APIs to unpack the distribution tarballs. In<br>\nparticular, I use Java's facilities to create symlinks if I encounter one<br>\nin the tarball.</p>\n<p>Now, for some reason, \"contrib\\cygwin\\dev\\fd\" (and others) are broken<br>\nsymlinks (I need to figure out why). But since these files are being<br>\noverwritten anyway, my suggestion would be to delete the file in<br>\n\"recover_symlinks\" before a buffered writer is created for it. Makarius,<br>\nwhat do you think?</p>\n<p>Cheers<br>\nLars</p>",
+        "id": 294664422,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661171180
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nOn Wed, 6 Jan 2016, Lars Hupel wrote:</p>\n<blockquote>\n<blockquote>\n<p>The error message is:</p>\n<p>java.nio.file.NoSuchFileException:<br>\nC:\\Users\\appveyor\\AppData\\Local\\libisabelle\\setups\\Isabelle2016-RC0\\.\\contrib\\cygwin\\dev\\fd</p>\n</blockquote>\n<p>I think I found the cause.</p>\n<p>I use native Java 7+ APIs to unpack the distribution tarballs. In <br>\nparticular, I use Java's facilities to create symlinks if I encounter <br>\none in the tarball.</p>\n</blockquote>\n<p>What is the outcome of that on Windows? The result needs to be a Cygwin <br>\nsymlink, which is a funny special file for Windows.</p>\n<blockquote>\n<p>Now, for some reason, \"contrib\\cygwin\\dev\\fd\" (and others) are broken<br>\nsymlinks (I need to figure out why).</p>\n</blockquote>\n<p>The links points to /proc/self which presumably makes sense only for <br>\nCygwin processes, not for the java process.</p>\n<p>Makarius</p>",
+        "id": 294664433,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661171187
+    },
+    {
+        "content": "<p>From: Lars Hupel &lt;<a href=\"mailto:hupel@in.tum.de\">hupel@in.tum.de</a>&gt;</p>\n<blockquote>\n<p>What is the outcome of that on Windows? The result needs to be a Cygwin<br>\nsymlink, which is a funny special file for Windows.</p>\n</blockquote>\n<p>Apparently those are NTFS symlinks.</p>\n<p>Regardless of the actual outcome, deleting the file beforehand should be<br>\nsafe, because the code to recover Cygwin symlinks truncates the files<br>\nanyway, i.e. in the worst case it's a redundant operation.</p>\n<p>Cheers<br>\nLars</p>",
+        "id": 294664447,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661171193
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nShould this be done on my side or on your side?  In principle, the <br>\nassumption of Isabelle_System.init is that the distribution has been <br>\nunpacked as plain files on Windows, without any special Unix things.</p>\n<p>The Isabelle_windows.tar.gz with symblinks violates that in some sense, so <br>\nmaybe links should be removed by the release build process?  (What you <br>\nhave called \"Wurstfabrik\").</p>\n<p>Makarius</p>",
+        "id": 294664509,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661171217
+    },
+    {
+        "content": "<p>From: Lars Hupel &lt;<a href=\"mailto:hupel@in.tum.de\">hupel@in.tum.de</a>&gt;</p>\n<blockquote>\n<p>Should this be done on my side or on your side?  In principle, the<br>\nassumption of Isabelle_System.init is that the distribution has been<br>\nunpacked as plain files on Windows, without any special Unix things.</p>\n</blockquote>\n<p>I would prefer on your side. I try to avoid changing the copies of the<br>\nofficial Isabelle/Scala sources in libisabelle.</p>\n<p>I was suggesting this patch:</p>\n<p>--- a/src/Pure/System/cygwin.scala      Wed Jan 06 16:17:50 2016 +0100<br>\n+++ b/src/Pure/System/cygwin.scala      Thu Jan 07 13:30:33 2016 +0100<br>\n@@ -46,6 +46,7 @@<br>\n           case link :: content :: rest =&gt;<br>\n             val path = (new JFile(isabelle_root, link)).toPath</p>\n<ul>\n<li>Files.delete(path)<br>\n             val writer = Files.newBufferedWriter(path, UTF8.charset)<br>\n             try { writer.write(\"!&lt;symlink&gt;\" + content + \"\\u0000\") }<br>\n             finally { writer.close }</li>\n</ul>\n<blockquote>\n<p>The Isabelle_windows.tar.gz with symblinks violates that in some sense,<br>\nso maybe links should be removed by the release build process?  (What<br>\nyou have called \"Wurstfabrik\").</p>\n</blockquote>\n<p>Of course, that would also work. I didn't think of that, but it's<br>\nprobably the proper solution.</p>\n<p>Cheers<br>\nLars</p>",
+        "id": 294664524,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661171224
+    },
+    {
+        "content": "<p>From: Lars Hupel &lt;<a href=\"mailto:hupel@in.tum.de\">hupel@in.tum.de</a>&gt;<br>\nI forgot to add: This would also mean that administrative privileges are<br>\nnot required any more for unpacking the Windows tarball (mere users are<br>\nnot allowed to create symlinks).</p>",
+        "id": 294664542,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661171230
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nOK, I have changed it trivially as follows: <br>\n<a href=\"http://isabelle.in.tum.de/repos/isabelle/rev/8d5f2e3e836d\">http://isabelle.in.tum.de/repos/isabelle/rev/8d5f2e3e836d</a></p>\n<p>Makarius</p>",
+        "id": 294664727,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661171291
+    }
+]

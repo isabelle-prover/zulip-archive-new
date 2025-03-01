@@ -1,0 +1,137 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Sledgehammer 2015 oddity · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Sledgehammer.202015.20oddity.html">[isabelle] Sledgehammer 2015 oddity</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294641357"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Sledgehammer%202015%20oddity/near/294641357" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Sledgehammer.202015.20oddity.html#294641357">(Aug 22 2022 at 09:57)</a>:</h4>
+<p>From: Thomas Sewell &lt;<a href="mailto:thomas.sewell@nicta.com.au">thomas.sewell@nicta.com.au</a>&gt;<br>
+Hello isabelle-users.</p>
+<p>A friend of mine has recently updated to Isabelle 2015 and has come<br>
+across what looks like a sledgehammer bug.</p>
+<p>Short summary: in Isabelle 2015 all sledgehammer provers recommend "by<br>
+auto" to solve a goal that can be solved trivially but not by auto.</p>
+<p>A demo theory is attached.</p>
+<p>Cheers,<br>
+     Thomas.</p>
+<hr>
+<p>The information in this e-mail may be confidential and subject to legal professional privilege and/or copyright. National ICT Australia Limited accepts no liability for any damage caused by this email or its attachments.<br>
+<a href="/user_uploads/14278/T_0ekGp9UcfcF2ZpA9AneSOb/Test.thy">Test.thy</a></p>
+
+
+
+<a name="294641471"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Sledgehammer%202015%20oddity/near/294641471" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Sledgehammer.202015.20oddity.html#294641471">(Aug 22 2022 at 09:58)</a>:</h4>
+<p>From: Jasmin Blanchette &lt;<a href="mailto:jasmin.blanchette@inria.fr">jasmin.blanchette@inria.fr</a>&gt;<br>
+Hi Thomas,</p>
+<blockquote>
+<p>Short summary: in Isabelle 2015 all sledgehammer provers recommend "by<br>
+auto" to solve a goal that can be solved trivially but not by auto.</p>
+</blockquote>
+<p>Thanks for the example. I am very much dependent on user-provided examples for debugging this feature.</p>
+<p>Here, the problem is that Sledgehammer noticed that “using foo bar by auto” solved the problem, then its minimized kicked in and noticed that “foo” and “bar” were in the simpset and simply took them away. In most cases, this is a useful, time- and CPU-saving strategy, but in your example taking out “foo" turned out to be deadly. See change 7d278b0617d3 — unfortunately too late for Isabelle2015. The change joins 2c468c062589 and 533f6cfc04c0, done earlier this year.</p>
+<p>Appeal to the list: Please let me know if you run into other examples where either Sledgehammer finds a proof that doesn’t work and it claims it does or vice versa. The issues are normally easy to track down and address if you can provide me with an example that reproduces the problem.</p>
+<p>Jasmin</p>
+
+
+
+<a name="294642197"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Sledgehammer%202015%20oddity/near/294642197" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Sledgehammer.202015.20oddity.html#294642197">(Aug 22 2022 at 10:02)</a>:</h4>
+<p>From: "Eugene W. Stark" &lt;<a href="mailto:isabelle-users@starkeffect.com">isabelle-users@starkeffect.com</a>&gt;<br>
+Here is one I just ran into.  It was easy to abstract from the rest of the<br>
+theory so I am posting it.</p>
+<p>- Gene Stark</p>
+<p>theory Barf<br>
+imports Main<br>
+begin</p>
+<p>definition graph :: "'a set ⇒ 'a set ⇒ ('a ⇒ 'a) ⇒ 'a ⇒ 'a ⇒ bool"<br>
+  (*</p>
+<p>* With the more general type "'a set ⇒ ' b set ⇒ ('a ⇒ 'b) ⇒ 'a ⇒ 'b ⇒ bool"<br>
+   * the proof by fastforce succeeds below.<br>
+   *)<br>
+  where "graph A B f a b = (a ∈ A ∧ b ∈ B ∧ f a = b)"</p>
+<p>lemma "a ∈ A ∧ b ∈ B ∧ c ∈ C ∧ f a = b ∧ g b = c ⟹ graph A C (g o f) a c"<br>
+    using graph_def<br>
+    (* try0 (* Says: 'Try this: by fastforce' *) *)<br>
+    by fastforce  (* Fails to prove lemma -- unification bound exceeded, etc. *)</p>
+<p>end<br>
+<a href="/user_uploads/14278/eXqZFQFw86byUh0ENneNb9XV/Barf.thy">Barf.thy</a></p>
+
+
+
+<a name="294644693"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Sledgehammer%202015%20oddity/near/294644693" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Sledgehammer.202015.20oddity.html#294644693">(Aug 22 2022 at 10:19)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+The above actually works, but fastforce is stalled and waiting for <br>
+confirmation to spill out more "potentially useful tracing messages" at <br>
+the very bottom.</p>
+<p>This is a light form of denial-of-service attack on the front-end.  A <br>
+heavy form would be a bombing of the IDE process with tons of pointless <br>
+messages.</p>
+<p>The above example can be made to work as follows:</p>
+<p>using [[unify_trace_bound = 60]]<br>
+     by fastforce</p>
+<p>Sledgehammer is internally very careful to provide a sensible value to <br>
+such options, see "silence_methods" here: <br>
+<a href="http://isabelle.in.tum.de/repos/isabelle/file/Isabelle2015/src/HOL/Tools/try0.ML#l104">http://isabelle.in.tum.de/repos/isabelle/file/Isabelle2015/src/HOL/Tools/try0.ML#l104</a></p>
+<p>That setup is not active for the generated proof snippet, though.</p>
+<p>Makarius</p>
+
+
+
+<a name="294651270"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Sledgehammer%202015%20oddity/near/294651270" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Sledgehammer.202015.20oddity.html#294651270">(Aug 22 2022 at 11:03)</a>:</h4>
+<p>From: "Eugene W. Stark" &lt;<a href="mailto:isabelle-users@starkeffect.com">isabelle-users@starkeffect.com</a>&gt;<br>
+I just ran into a variant of this which I think is a bona fide example of what<br>
+Jasmin is looking for.</p>
+<p>- Gene Stark</p>
+<p>theory Barf<br>
+imports Main<br>
+begin</p>
+<p>definition graph :: "'a set ⇒ 'b set ⇒ ('a ⇒ 'b) ⇒ ('a × 'b) set"<br>
+  where "graph A B f = {(a, b). a ∈ A ∧ b ∈ B ∧ f a = b}"</p>
+<p>lemma "graph A B f ⊆ (graph A B f) O (Id_on B)"<br>
+    (* try<br>
+     Trying "solve_direct", "quickcheck", "try0", "sledgehammer", and "nitpick"...<br>
+     Ignoring duplicate rewrite rule:<br>
+     ?a1 ∈ Collect ?P1 ≡ ?P1 ?a1<br>
+     Ignoring duplicate rewrite rule:<br>
+     snd (?x1.1, ?y) ≡ ?y<br>
+     SMT: Solver z3: Counterexample found (possibly spurious)<br>
+     "cvc4": Try this: by (smt Collect_splitD Id_onI graph_def relcomp.simps snd_conv subrelI) (754 ms).</p>
+<p>The above one-liner succeeds. However, see below...<br>
+     *)<br>
+    using graph_def<br>
+    (* try<br>
+         "cvc4": Try this: by auto (37 ms).<br>
+         "z3": Try this: by auto (53 ms).<br>
+     *)<br>
+    by auto<br>
+    (* Failed to finish proof⌂:<br>
+       goal (1 subgoal):</p>
+<p>1. ⋀a b. (⋀A B f. graph A B f = {(a, b). a ∈ A ∧ b ∈ B ∧ f a = b}) ⟹<br>
+                  (a, b) ∈ graph A B f ⟹ (a, b) ∈ graph A B f O Id_on B<br>
+     *)</p>
+<p>end<br>
+<a href="/user_uploads/14278/FnBiKcBUwZfmNyCAzMHCda9B/Barf.thy">Barf.thy</a></p>
+
+
+
+<a name="294657142"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Sledgehammer%202015%20oddity/near/294657142" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Sledgehammer.202015.20oddity.html#294657142">(Aug 22 2022 at 11:41)</a>:</h4>
+<p>From: Jasmin Blanchette &lt;<a href="mailto:jasmin.blanchette@inria.fr">jasmin.blanchette@inria.fr</a>&gt;<br>
+Dear Eugene,</p>
+<p>Thank you for your report. It appears to work fine with a recent repository version (e.g. 48600872b12c). After the 2015 release, I sorted out a number of issues related to preplaying.</p>
+<p>Regards,</p>
+<p>Jasmin</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

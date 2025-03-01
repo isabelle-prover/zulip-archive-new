@@ -1,0 +1,208 @@
+<html>
+<head><meta charset="utf-8"><title>Inductive proof over accumulator · Beginner Questions · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/index.html">Beginner Questions</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Inductive.20proof.20over.20accumulator.html">Inductive proof over accumulator</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="241707047"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Inductive%20proof%20over%20accumulator/near/241707047" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Max Nowak <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Inductive.20proof.20over.20accumulator.html#241707047">(Jun 06 2021 at 19:30)</a>:</h4>
+<p>I'm stuck in a proof and thoroughly confused about what I am even doing. I have defined myself a loop composition operator which just starts a helper initalized with a neutral accumulator: <code>loop m p = loop_helper dummy m p</code>, and then I have (excessively simplified):</p>
+<div class="codehilite"><pre><span></span><code>function loop_helper where
+    (my_term_cond (acc p)) ==&gt; loop_helper acc m p = acc
+not (my_term_cond (acc p)) ==&gt; loop_helper acc m p = loop_helper (steppy acc m) m p
+</code></pre></div>
+<p>And now I want to prove something about loop, akin to <code>loop m p = loop m (f p)</code>, but I can't figure out the approach. I know of <code>loop_helper.induct</code>, but I don't think I can use it, or at least, I can't figure it out. Is there some canonical approach on how I can induct over the steps of loop?</p>
+
+
+
+<a name="241708563"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Inductive%20proof%20over%20accumulator/near/241708563" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Inductive.20proof.20over.20accumulator.html#241708563">(Jun 06 2021 at 20:09)</a>:</h4>
+<p>If you define a recursive function and want to prove anything about it, you're indeed going to have to use induction. Before you can use the induction rule, you will however also have to prove termination (not sure if you have – you did not really mention it). Before that, there is only a partial induction (<code>pinduct</code>) rule that has termination as an additional assumption. In most cases, you should aim to prove termination.</p>
+<p>Once that is done, you can use the <code>induct</code> rule to prove some property about <code>loop_helper</code> that is a generalisation of the thing you want to prove for <code>loop</code>.</p>
+<p>However, I should point out that you might fare better using one of the while combinators from <code>HOL-Library.While_Combinator</code>. You give them an initial state, a step function, and a breaking condition. There's one where you have to prove termination and one that does not require proving termination but only returns an option type (with <code>None</code> signifying non-termination). You can then prove whatever result you need about the result by providing a suitable loop invariant using e.g. <code>while_rule</code>.</p>
+
+
+
+<a name="241708862"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Inductive%20proof%20over%20accumulator/near/241708862" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Max Nowak <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Inductive.20proof.20over.20accumulator.html#241708862">(Jun 06 2021 at 20:16)</a>:</h4>
+<p>I have termination, yes. While While-Combinators look promising, sadly I am only adding new code to an existing framework which contains <code>loop</code>. Maybe if I had more time to delve into restructuring the existing code I'd give it a shot, but I don't :/.</p>
+
+
+
+<a name="241709103"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Inductive%20proof%20over%20accumulator/near/241709103" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Inductive.20proof.20over.20accumulator.html#241709103">(Jun 06 2021 at 20:22)</a>:</h4>
+<p>In that case, you have to figure out the loop invariant and prove that</p>
+<ul>
+<li>the initial state fulfils it</li>
+<li>the step function preserves it</li>
+<li>the invariant plus the termination condition imply what you want to show</li>
+</ul>
+<p>The rest is then a simple induction.</p>
+
+
+
+<a name="241710766"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Inductive%20proof%20over%20accumulator/near/241710766" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Max Nowak <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Inductive.20proof.20over.20accumulator.html#241710766">(Jun 06 2021 at 21:04)</a>:</h4>
+<p>The thing I can't figure out is the accumulator though. I need to prove my property just for <code>loop_helper dummy m p</code>, with dummy being the starting point, and then <code>loop_helper</code> expands it until it terminates. But <code>loop_helper.induct</code> gives me goals such as (base case:) <code>!!acc m p. my_term_cond (acc p) ==&gt; ?P acc m p</code>, so, do I have to prove it for all possible acc in the base case? Maybe you know of some (hopefully very) simple sample proofs so I can have a look at how to do it, since I'm just hopelessly confused.</p>
+
+
+
+<a name="241751243"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Inductive%20proof%20over%20accumulator/near/241751243" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mohammad Abdulaziz <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Inductive.20proof.20over.20accumulator.html#241751243">(Jun 07 2021 at 09:41)</a>:</h4>
+<p>I would like to note that the approach of using the function package gives you better flexibility if you want to prove partial termination. E.g. you will not need to learn any of the automation behind the while-combinator and you have greater flexibility in structuring your proofs.  A good reference on how to use the induction principle that comes out of the function package is in section 8 in the `functions' tutorial in the Isabelle documentation. The following paper uses the function package for an interesting small example:</p>
+<p><a href="https://files.sketis.net/Isabelle_Workshop_2020/Isabelle_2020_paper_1.pdf">https://files.sketis.net/Isabelle_Workshop_2020/Isabelle_2020_paper_1.pdf</a></p>
+
+
+
+<a name="241753120"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Inductive%20proof%20over%20accumulator/near/241753120" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Max Nowak <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Inductive.20proof.20over.20accumulator.html#241753120">(Jun 07 2021 at 09:58)</a>:</h4>
+<p>....I now noticed there <em>is</em> a small inductive proof example in the isabelle docs on functions, which I skipped when first learning Isabelle, and then forgot forever that it existed.</p>
+
+
+
+<a name="241762071"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Inductive%20proof%20over%20accumulator/near/241762071" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Max Nowak <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Inductive.20proof.20over.20accumulator.html#241762071">(Jun 07 2021 at 11:32)</a>:</h4>
+<p>Hmm, using <code>proof (induct p rule: loop_helper.induct)</code> just highlights the <code>proof (induct...)</code> line purple and Isabelle becomes unberably laggy forever, to the point I need to terminate the process.</p>
+
+
+
+<a name="241762189"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Inductive%20proof%20over%20accumulator/near/241762189" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jakub Kądziołka <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Inductive.20proof.20over.20accumulator.html#241762189">(Jun 07 2021 at 11:33)</a>:</h4>
+<p>Hmm, this means that the <code>induct</code> proof method does not terminate. Perhaps <code>induction</code> instead will work better?</p>
+
+
+
+<a name="241762316"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Inductive%20proof%20over%20accumulator/near/241762316" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Max Nowak <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Inductive.20proof.20over.20accumulator.html#241762316">(Jun 07 2021 at 11:34)</a>:</h4>
+<p>I wasn't aware there is a difference between the two. And nope, same issue sadly.</p>
+
+
+
+<a name="241762779"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Inductive%20proof%20over%20accumulator/near/241762779" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Max Nowak <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Inductive.20proof.20over.20accumulator.html#241762779">(Jun 07 2021 at 11:38)</a>:</h4>
+<p>Adding the remaining free variables as arbitraries worked somehow though. I have no clue why.</p>
+
+
+
+<a name="241762954"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Inductive%20proof%20over%20accumulator/near/241762954" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Max Nowak <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Inductive.20proof.20over.20accumulator.html#241762954">(Jun 07 2021 at 11:40)</a>:</h4>
+<p>But now (after clicking on the proof outline in jEdit ouput window), the <code>then show</code> statements have a squiggly underline. It fails to refine any pending goal.</p>
+
+
+
+<a name="241762988"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Inductive%20proof%20over%20accumulator/near/241762988" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Max Nowak <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Inductive.20proof.20over.20accumulator.html#241762988">(Jun 07 2021 at 11:41)</a>:</h4>
+<p>(Now I remember, this was the point where I gave up a month or two ago :D)</p>
+
+
+
+<a name="241763088"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Inductive%20proof%20over%20accumulator/near/241763088" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jakub Kądziołka <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Inductive.20proof.20over.20accumulator.html#241763088">(Jun 07 2021 at 11:42)</a>:</h4>
+<p>IIRC this sometimes happens when one of the goals was automatically solved because the assumptions were trivially contradictory</p>
+
+
+
+<a name="241763099"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Inductive%20proof%20over%20accumulator/near/241763099" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jakub Kądziołka <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Inductive.20proof.20over.20accumulator.html#241763099">(Jun 07 2021 at 11:42)</a>:</h4>
+<p>are there as many goals as there are <code>show</code>s?</p>
+
+
+
+<a name="241763148"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Inductive%20proof%20over%20accumulator/near/241763148" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jakub Kądziołka <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Inductive.20proof.20over.20accumulator.html#241763148">(Jun 07 2021 at 11:42)</a>:</h4>
+<p>anyway, you can always use <code>show</code> manually to show the expected thing</p>
+
+
+
+<a name="241763157"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Inductive%20proof%20over%20accumulator/near/241763157" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Max Nowak <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Inductive.20proof.20over.20accumulator.html#241763157">(Jun 07 2021 at 11:43)</a>:</h4>
+<p>I just have <code>lemma " ... = ..." proof (induct...)</code></p>
+
+
+
+<a name="241763175"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Inductive%20proof%20over%20accumulator/near/241763175" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Max Nowak <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Inductive.20proof.20over.20accumulator.html#241763175">(Jun 07 2021 at 11:43)</a>:</h4>
+<p>And yes two goals are generated</p>
+
+
+
+<a name="241763272"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Inductive%20proof%20over%20accumulator/near/241763272" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jakub Kądziołka <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Inductive.20proof.20over.20accumulator.html#241763272">(Jun 07 2021 at 11:44)</a>:</h4>
+<p>assumptions as in the goal is <code>?P 0</code> and you're inducting over <code>Suc n</code></p>
+
+
+
+<a name="241763301"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Inductive%20proof%20over%20accumulator/near/241763301" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jakub Kądziołka <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Inductive.20proof.20over.20accumulator.html#241763301">(Jun 07 2021 at 11:44)</a>:</h4>
+<p>is there a chance you could create a minimal example that reproduces the problem?</p>
+
+
+
+<a name="241770902"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Inductive%20proof%20over%20accumulator/near/241770902" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Max Nowak <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Inductive.20proof.20over.20accumulator.html#241770902">(Jun 07 2021 at 12:49)</a>:</h4>
+<p>Here you go. I didn't manage to recreate how adding arbitraries fixes it though, I'd have to copy over even more code then.<br>
+I had initially created an MWE without <code>Mutator</code>s, but adding those introduced the hanging again.</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">theory</span> <span class="n">LoopyLand</span> <span class="kp">imports</span> <span class="n">Main</span>
+<span class="k">begin</span>
+
+<span class="k">type_synonym</span> <span class="n n-Type">'a</span> <span class="n">Result</span> <span class="o">=</span> <span class="s">"('a set)"</span>
+<span class="k">type_synonym</span> <span class="n n-Type">'a</span> <span class="n">Module</span> <span class="o">=</span> <span class="s">"'a list ⇒ 'a Result"</span>
+<span class="k">type_synonym</span> <span class="n n-Type">'a</span> <span class="n">Mutator</span> <span class="o">=</span> <span class="s">"'a Result ⇒ 'a list ⇒ 'a list"</span> <span class="c">(* Modifies `as` given a Result. *)</span>
+<span class="k">type_synonym</span> <span class="n n-Type">'a</span> <span class="n">TermCond</span> <span class="o">=</span> <span class="s">"'a Result ⇒ bool"</span>
+
+<span class="c">(* Run m1, then mutate p, and pipe that into m2. Unify results. Probably irrelevant for MWE though. *)</span>
+<span class="k">fun</span> <span class="n">steppy</span> <span class="o">::</span> <span class="s">"'a Module ⇒ 'a Mutator ⇒ 'a Module ⇒ 'a Module"</span> <span class="kp">where</span>
+<span class="s">"steppy m1 M m2 p = (m1 p) ∪ (m2 (M (m1 p) p))"</span>
+
+<span class="c">(* loop_helper stops when user-provided termination condition tell us to, or</span>
+<span class="c"> when we reached a fixed point (result remains the same when we add more `m`). *)</span>
+<span class="k">fun</span> <span class="n">whendoesitstop</span> <span class="kp">where</span>
+<span class="s">"whendoesitstop acc m M t p = (t (acc p) ∨ (steppy acc M m) p = acc p)"</span>
+
+<span class="c">(* Build a chain of steppy. Which slowly grows our result set. *)</span>
+<span class="kn">function</span> <span class="n">loop_helper</span> <span class="o">::</span> <span class="s">"'a Module ⇒ 'a Module ⇒ 'a Mutator ⇒ 'a TermCond ⇒ 'a Module"</span> <span class="kp">where</span>
+<span class="s">"whendoesitstop acc m M t p    ⟹ loop_helper acc m M t p = acc p"</span> <span class="o">|</span>
+<span class="s">"¬(whendoesitstop acc m M t p) ⟹ loop_helper acc m M t p = loop_helper (steppy acc M m)  m M t p"</span>
+     <span class="kp">apply</span> <span class="n">fast</span> <span class="kp">apply</span> <span class="n">simp</span> <span class="kp">apply</span> <span class="n">simp</span> <span class="k">by</span> <span class="n">simp</span> <span class="kn">termination</span> <span class="gr">sorry</span>
+
+<span class="k">fun</span> <span class="n">dummy</span> <span class="o">::</span> <span class="s">"'a Module"</span> <span class="kp">where</span> <span class="s">"dummy p = {}"</span>
+<span class="k">fun</span> <span class="n">never_stop</span> <span class="o">::</span> <span class="s">"'a TermCond"</span> <span class="kp">where</span>  <span class="s">"never_stop result = False"</span>
+<span class="k">fun</span> <span class="n">fake_mutator</span> <span class="o">::</span> <span class="s">"'a Mutator"</span> <span class="kp">where</span> <span class="s">"fake_mutator result p = p"</span>
+
+<span class="c">(* The module we want to prove stuff for. In reality, does more exciting stuff. *)</span>
+<span class="k">fun</span> <span class="n">find_nemo</span> <span class="o">::</span> <span class="s">"'a Module"</span> <span class="kp">where</span> <span class="s">"find_nemo p = {}"</span>
+
+<span class="kn">lemma</span> <span class="s">"loop_helper dummy find_nemo fake_mutator never_stop p = loop_helper dummy find_nemo fake_mutator never_stop (f p)"</span>
+<span class="k">proof</span> <span class="o">(</span><span class="n">induct</span> <span class="n">p</span> <span class="n">rule</span><span class="o">:</span> <span class="n">loop_helper.induct</span> <span class="c">(* &lt;---- complete the brace *)</span>
+<span class="k">qed</span>
+
+<span class="k">end</span>
+</code></pre></div>
+
+
+
+<a name="241772804"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Inductive%20proof%20over%20accumulator/near/241772804" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Max Nowak <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Inductive.20proof.20over.20accumulator.html#241772804">(Jun 07 2021 at 13:03)</a>:</h4>
+<p>Actually, if you just completely get rid of <code>TermCond</code> (you want me to copy paste the code again?), it does manage to come up with some goals. Some very.... questionable goals :D</p>
+<div class="codehilite"><pre><span></span><code>proof (state)
+goal (2 subgoals):
+ 1. ⋀acc m M p.
+       whendoesitstop acc m M p ⟹
+       m p =
+       m (M (?Pa3 acc m M p)
+           (M (?Pa4 acc m M p)
+             (M (?Pa5 acc m M p)
+               (M (?Pa6 acc m M p)
+               ...
+                     (M (?Pa57 acc m M p) (f p))
+</code></pre></div>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

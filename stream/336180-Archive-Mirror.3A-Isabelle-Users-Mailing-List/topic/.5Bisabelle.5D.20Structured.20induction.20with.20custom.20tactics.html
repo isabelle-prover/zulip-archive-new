@@ -1,0 +1,295 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Structured induction with custom tactics · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Structured.20induction.20with.20custom.20tactics.html">[isabelle] Structured induction with custom tactics</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294100686"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Structured%20induction%20with%20custom%20tactics/near/294100686" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Structured.20induction.20with.20custom.20tactics.html#294100686">(Aug 18 2022 at 14:41)</a>:</h4>
+<p>From: Palle Raabjerg &lt;<a href="mailto:palle.raabjerg@it.uu.se">palle.raabjerg@it.uu.se</a>&gt;<br>
+I am currently trying to write custom tactics to resolve different<br>
+instances of some induction proofs. With some help from Christian Urban<br>
+on [nominal-isabelle], I found out how to invoke nominal_induct_tac from<br>
+the ML level, which has been a great help so far (thanks Christian!).</p>
+<p>But while it is possible to do much simply by combining an induction<br>
+tactic with a number of other tactics, I increasingly find that it would<br>
+be useful (possibly even necessary) in many cases to be able to<br>
+structure the tactics so that</p>
+<ol>
+<li>
+<p>The base case and the inductive cases are separated, such that<br>
+different tactics can be used for each.</p>
+</li>
+<li>
+<p>We have access to the induction term in each case.</p>
+</li>
+</ol>
+<p>Example. If we have the following datatype:<br>
+nominal_datatype trm = Name name | Pair trm trm</p>
+<p>The Isar-proof might be structured like this:<br>
+proof(induct T rule: trm.strong_inducts)<br>
+  case(Name a)<br>
+  ...<br>
+  case(Pair N M)<br>
+  ...<br>
+qed</p>
+<p>So we want to keep the cases separate in the tactic, or at least the<br>
+base case separate from the inductive steps.<br>
+And whenever we do a nested proof in the base case, for instance, we can<br>
+refer directly to 'a' as the induction term. This might not work well in<br>
+general in a tactic if we cannot assume knowledge about the datatype we<br>
+do the induction on, but in most cases at least, the base case would be<br>
+the same.<br>
+Any pointers on how this might be achieved, if it is possible?</p>
+<p>Best Regards,<br>
+Palle Raabjerg</p>
+
+
+
+<a name="294100945"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Structured%20induction%20with%20custom%20tactics/near/294100945" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Structured.20induction.20with.20custom.20tactics.html#294100945">(Aug 18 2022 at 14:42)</a>:</h4>
+<p>From: Palle Raabjerg &lt;<a href="mailto:palle.raabjerg@it.uu.se">palle.raabjerg@it.uu.se</a>&gt;<br>
+It occurs to me that I may not have been very clear or specific in my<br>
+previous mail on this subject. I am also wondering: Would this be more<br>
+appropriate for the [isabelle-dev] list, as we are dealing with Isabelle/ML?</p>
+<p>But in short, what I want to do is automate/manipulate Isar style<br>
+structured proofs in ML.</p>
+<p>Since the last mail I have been looking around to find out more. The<br>
+Isabelle Programming Tutorial has a section intended for the subject of<br>
+structured proofs in ML. But that section is marked TBD, and there is<br>
+only a very short example on a single page.<br>
+The Isabelle/Isar Implementation Manual has a chapter intended for Isar<br>
+(supposedly to explain how to manipulate Isar style proofs on the ML<br>
+level). It contains the empty sections "Proof commands", "Proof methods"<br>
+and "Attributes".</p>
+<p>If we look at the source files, it would seem that Pure/Isar/proof.ML<br>
+corresponds to "Proof commands", Pur/Isar/method.ML corresponds to<br>
+"Proof methods" and Pure/Isar/attrib.ML to "Attributes". And indeed,<br>
+many of the functions look interesting to me. I have been experimenting<br>
+a bit, but much of it still feels like a bit of a mystery.</p>
+<p>But am I on the right track at least?<br>
+I may well be on the wrong track, in which case most of the questions<br>
+below are probably pointless.</p>
+<p>It seems clear that most of the functions in proof.ML manipulate a proof<br>
+state. 'Proof.init @{context}' will give me a new (empty) proof state,<br>
+which looks promising. I can populate the state with facts using<br>
+Proof.put_facts and so on, but have so far been unable to give the state<br>
+a goal.</p>
+<p>Using 'Proof.theorem_i' as follows:<br>
+Proof.theorem_i NONE (K I) [[(@{prop "A ==&gt; A"}, [])]] @{context}<br>
+seems to yield a state with a stack of 3 nodes, the _second_ node<br>
+including the goal "A ==&gt; A", the other two empty. Puzzling. Maybe<br>
+theorem_i is not what I am looking for.</p>
+<p>So a few questions on this:<br>
+What is the intention of Proof.theorem/theorem_i?<br>
+How do we get an initial state with a goal we want to prove?<br>
+Is state-manipulation a recommended way of doing this in ML?<br>
+I am under the impression that the node stack corresponds to the levels<br>
+(scopes) of an Isar proof. Is that correct?</p>
+<p>Moving on to possibly the most puzzling subject: Methods. Or Proof<br>
+methods, as the implementation manual seems to call it.<br>
+There are two prevalent Method types seen in method.ML and proof.ML:<br>
+Method.method and Method.text</p>
+<p>A Method.method is simply a function type: thm list -&gt; cases_tactic<br>
+There are a number of basic methods in method.ML that seem to correspond<br>
+to some basic tactics (assumption, erule, drule...), and Method.text can<br>
+be a 'Basic of (Proof.context -&gt; method) * Position.T'.<br>
+Method.text can also be 'Source of src', which seems to indicate that we<br>
+may be able to include Isar code in a Method.text.</p>
+<p>Intuitively, it seems we should be able to use Proof.apply to apply<br>
+elements of type Method.text to states, and perform proofs that way. But<br>
+the 'Position.T' element indicates that this is not the whole story.</p>
+<p>So a few more questions:<br>
+What are Method.method and Method.text really intended for?<br>
+Are there functions for creating proof methods?<br>
+Can Isar scripts be included in a Method.text element?</p>
+<p>Best Regards,<br>
+The inquisitive<br>
+Palle Raabjerg</p>
+
+
+
+<a name="294101022"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Structured%20induction%20with%20custom%20tactics/near/294101022" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Structured.20induction.20with.20custom.20tactics.html#294101022">(Aug 18 2022 at 14:43)</a>:</h4>
+<p>From: Christian Urban &lt;<a href="mailto:urbanc@in.tum.de">urbanc@in.tum.de</a>&gt;<br>
+Hi Palle,</p>
+<p>I am afraid I cannot give an answer to all your questions.</p>
+<p>Palle Raabjerg writes:</p>
+<blockquote>
+<p>But in short, what I want to do is automate/manipulate Isar style<br>
+structured proofs in ML.</p>
+<p>Since the last mail I have been looking around to find out more. The<br>
+Isabelle Programming Tutorial has a section intended for the subject of<br>
+structured proofs in ML. But that section is marked TBD, and there is<br>
+only a very short example on a single page.</p>
+</blockquote>
+<p>Sorry. Writing tutorials takes time and it is usually<br>
+a thankless task (in terms of paper-counts etc). What<br>
+I thought I will describe in this section is how to <br>
+deal with manipulations of contexts. If I understood <br>
+your original question correctly, this will not be of<br>
+much help to you.</p>
+<blockquote>
+<p>Using 'Proof.theorem_i' as follows:<br>
+Proof.theorem_i NONE (K I) [[(@{prop "A ==&gt; A"}, [])]] @{context}<br>
+seems to yield a state with a stack of 3 nodes, the _second_ node<br>
+including the goal "A ==&gt; A", the other two empty. Puzzling. Maybe<br>
+theorem_i is not what I am looking for.</p>
+</blockquote>
+<p>Usually, if you want to set up a goal to be proved, then you<br>
+need to use the function Goal.prove. For this you need a tactic <br>
+that completely solves the goal. Not sure whether this is what<br>
+you want.</p>
+<blockquote>
+<p>What is the intention of Proof.theorem/theorem_i?</p>
+</blockquote>
+<p>The function theorem is for "outer layers" where the terms<br>
+are given as strings. Theorem_i is the "internal" interface<br>
+where parsing has been already done and terms are given<br>
+as "real" terms. Having said that, forget this convention <br>
+quickly, as it is already obsolete. I think today, functions<br>
+for "outer layers" are called foo_cmd, while the internal<br>
+functions are just called foo.</p>
+<p>To give more help, maybe it would be helpful if you describe <br>
+exactly what you like to do. In your last email you described <br>
+your problem in abstract terms. Judging from the absence of<br>
+replies, it seems nobody was able to give an appropriate<br>
+answer. Maybe a concrete example or even a small theory<br>
+file would be more helpful....though no promises ;o)</p>
+<p>Best wishes,<br>
+Christian</p>
+
+
+
+<a name="294101036"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Structured%20induction%20with%20custom%20tactics/near/294101036" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Structured.20induction.20with.20custom.20tactics.html#294101036">(Aug 18 2022 at 14:43)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Fine-grained control over the "structure" of proof states is usually very <br>
+delicate, but it can be done.  The proof methods "induct" and <br>
+"nominal_induct" are the most sophisticated examples for that.</p>
+<p>As a starting point, I recommend looking at the relatively new FOCUS <br>
+combinators in Isabelle2009-1/src/Pure/subgoal.ML -- the plain <br>
+Subgoal.focus versions together with Isar.goal() in interactive mode <br>
+should give you some idea how to get hold of the basic fix/assume/show <br>
+layout of a goal state.</p>
+<p>Makarius</p>
+
+
+
+<a name="294101049"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Structured%20induction%20with%20custom%20tactics/near/294101049" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Structured.20induction.20with.20custom.20tactics.html#294101049">(Aug 18 2022 at 14:43)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On Fri, 12 Feb 2010, Palle Raabjerg wrote:</p>
+<blockquote>
+<p>It occurs to me that I may not have been very clear or specific in my <br>
+previous mail on this subject. I am also wondering: Would this be more <br>
+appropriate for the [isabelle-dev] list, as we are dealing with <br>
+Isabelle/ML?</p>
+</blockquote>
+<p>Isabelle/ML is definitely part of the "user space" of Isabelle.  As long <br>
+as we speak about official releases for end-users, this is the correct <br>
+mailing list.</p>
+<blockquote>
+<p>If we look at the source files, it would seem that Pure/Isar/proof.ML<br>
+corresponds to "Proof commands", Pur/Isar/method.ML corresponds to<br>
+"Proof methods" and Pure/Isar/attrib.ML to "Attributes". And indeed,<br>
+many of the functions look interesting to me. I have been experimenting<br>
+a bit, but much of it still feels like a bit of a mystery.</p>
+<p>But am I on the right track at least?<br>
+I may well be on the wrong track, in which case most of the questions<br>
+below are probably pointless.</p>
+</blockquote>
+<p>I am impressed how far you've got in figuring out the sources.  These <br>
+modules implement the main concepts of the Isar proof language.  Chapter 2 <br>
+of the Isar reference manual provides some high-level explanations of all <br>
+this. You do not need to understand all these details to implement <br>
+advanced proof methods, though.</p>
+<blockquote>
+<p>It seems clear that most of the functions in proof.ML manipulate a proof <br>
+state. 'Proof.init @{context}' will give me a new (empty) proof state, <br>
+which looks promising. I can populate the state with facts using <br>
+Proof.put_facts and so on, but have so far been unable to give the state <br>
+a goal.</p>
+<p>Using 'Proof.theorem_i' as follows:<br>
+Proof.theorem_i NONE (K I) [[(@{prop "A ==&gt; A"}, [])]] @{context}<br>
+seems to yield a state with a stack of 3 nodes, the _second_ node<br>
+including the goal "A ==&gt; A", the other two empty. Puzzling. Maybe<br>
+theorem_i is not what I am looking for.</p>
+</blockquote>
+<p>It is unlikely that you will need any of this.  The proof state is already <br>
+given by the user -- you can access it via Isar.state() in interactive ML.</p>
+<p>The Proof.theorem_i function is the most basic entry point for producing a <br>
+toplevel goal; the 'theorem' command does this in regular user space (with <br>
+lots of extra sophistication).  The stack implements Isar block structure <br>
+-- just an internal detail.</p>
+<blockquote>
+<p>How do we get an initial state with a goal we want to prove?</p>
+</blockquote>
+<p>lemma "A ==&gt; A"<br>
+   ML_prf {* Isar.goal() *}</p>
+<p>You can also say this:</p>
+<p>apply (tactic {* ... *})</p>
+<p>but you need to give a closed ML expression of type tactic on the spot, so <br>
+it is advisable to play around with ML_prf or ML_val first.</p>
+<blockquote>
+<p>Is state-manipulation a recommended way of doing this in ML?</p>
+</blockquote>
+<p>No, unless you want to come up with new primary Isar commands, which <br>
+usually requires several years of intensive study of the machinery.</p>
+<blockquote>
+<p>I am under the impression that the node stack corresponds to the levels <br>
+(scopes) of an Isar proof. Is that correct?</p>
+</blockquote>
+<p>Yes.  User code normally only needs the top-of-stack, though.</p>
+<blockquote>
+<p>Moving on to possibly the most puzzling subject: Methods. Or Proof <br>
+methods, as the implementation manual seems to call it. There are two <br>
+prevalent Method types seen in method.ML and proof.ML: Method.method and <br>
+Method.text</p>
+</blockquote>
+<p>Method.method is what you need; the Method.text merely represents source <br>
+text.</p>
+<blockquote>
+<p>Are there functions for creating proof methods?</p>
+</blockquote>
+<p>Method.METHOD etc.  You should also grep for method_setup or Method.setup <br>
+in the existing theory/ML sources to get an idea how it is usually done <br>
+(but there are occasionally old forms that should not be copied blindly).</p>
+<p>Wrapping up a tactic as a proof method involves some standard boiler <br>
+plate, but the hard part is the logic behind the tactic itself.  Maybe we <br>
+should go back to some concrete examples from you nominal application.</p>
+<blockquote>
+<p>Can Isar scripts be included in a Method.text element?</p>
+</blockquote>
+<p>Not really.  You can probably ignore Method.text altogether for your <br>
+purposes.</p>
+<p>Makarius</p>
+
+
+
+<a name="294101060"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Structured%20induction%20with%20custom%20tactics/near/294101060" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Structured.20induction.20with.20custom.20tactics.html#294101060">(Aug 18 2022 at 14:43)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+According to Stefan Berghofer, this is how to implement sophisticated <br>
+proof tools:</p>
+<p>(1) Make some typical examples (in plain Isar source language).<br>
+   (2) You see the general idea.<br>
+   (3) Implement the general idea in ML.</p>
+<p>Steps 2 and 3 are not so trivial.  I recommend to take the concrete Isar <br>
+proofs and inspect intermediate situations with Isar.goal(), Isar.state() <br>
+etc. in ML.  Don't try to reconstruct situtions in ML by hand, let Isar <br>
+produce them and merely look at the results.</p>
+<p>For the actual goal manipulation part, combinators like SUBPROOF or <br>
+Subgoal.FOCUS can be helpful, beause they represent Isar structure quite <br>
+closely at the ML level.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

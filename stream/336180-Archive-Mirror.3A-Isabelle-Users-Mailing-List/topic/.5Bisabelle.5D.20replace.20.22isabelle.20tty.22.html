@@ -1,0 +1,558 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] replace &quot;isabelle tty&quot; · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20replace.20.22isabelle.20tty.22.html">[isabelle] replace &quot;isabelle tty&quot;</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294319015"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20replace%20%22isabelle%20tty%22/near/294319015" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20replace.20.22isabelle.20tty.22.html#294319015">(Aug 19 2022 at 16:25)</a>:</h4>
+<p>From: Walther Neuper &lt;<a href="mailto:wneuper@ist.tugraz.at">wneuper@ist.tugraz.at</a>&gt;<br>
+Hi Lars,</p>
+<p>with great interest I studied your code [1] (cited below), followed the <br>
+function calls into <del>/src/Pure/System, </del>/src/Pure/PIDE etc and tried <br>
+to understand.</p>
+<p>So far I understood, that<br>
+(1) Session.protocol_handler starts a persistent session<br>
+(2) Isabelle_Process.protocol_command takes a string list, interpretes <br>
+the strings, accordingly executes a predefined collection of ML <br>
+functions and returns results as strings.</p>
+<p>However, I could not yet find out, how to use isabelle_process or the <br>
+isabelle wrapper (or what else?) to feed the strings such that they <br>
+drive (1) and (2).</p>
+<p>Could you, please, help once more?</p>
+<p>Walther</p>
+
+
+
+<a name="294319062"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20replace%20%22isabelle%20tty%22/near/294319062" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20replace.20.22isabelle.20tty.22.html#294319062">(Aug 19 2022 at 16:25)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+Hello,</p>
+<blockquote>
+<p>So far I understood, that<br>
+(1) Session.protocol_handler starts a persistent session</p>
+</blockquote>
+<p>it works in the opposite direction. The JVM process spins up a prover<br>
+process. Then, the protocol is initialized and both sides "register"<br>
+some handler for bidirectional communication. That is,<br>
+"Session.protocol_handler" tells the JVM that the specified class should<br>
+receive messages from the prover.</p>
+<blockquote>
+<p>(2) Isabelle_Process.protocol_command takes a string list, interpretes<br>
+the strings, accordingly executes a predefined collection of ML<br>
+functions and returns results as strings.</p>
+</blockquote>
+<p>"protocol_command" is in some sense "dual" to "protocol_handler": it<br>
+tells the prover that the specified function should receive messages<br>
+from the JVM. You're correct in that the function is called with some<br>
+strings and can then do whatever is necessary. However, it does not<br>
+actually return anything.</p>
+<p>Bi-directional communication in the PIDE model is message-driven. That<br>
+means that sending data has a "fire and forget" semantics: It<br>
+immediately returns and there's no waiting for a reply or anything. Both<br>
+JVM and prover can send messages to each other at any point in time.</p>
+<p>In the sources, you can see that the "exec" function actually always<br>
+sends a reply, but does so via "protocol_message", which generates a new<br>
+message which is completely independent from the one the handler<br>
+received earlier.</p>
+<blockquote>
+<p>However, I could not yet find out, how to use isabelle_process or the<br>
+isabelle wrapper (or what else?) to feed the strings such that they<br>
+drive (1) and (2).</p>
+</blockquote>
+<p>As written above, your JVM application drives the whole process. You<br>
+invoke the appropriate functions for starting up the prover, load the<br>
+"Isac" section where your handler is waiting for input. Then you can<br>
+send messages to your handler.</p>
+<p>I hope that sheds some light onto the somewhat delicate procedure. We<br>
+could definitely do with more documentation on the system integration<br>
+aspect of Isabelle/Scala (which would presumably go into system.pdf,<br>
+whose chapter on that topic is very sparse). I reckon that with the<br>
+removal of "isabelle tty", more applications of Isabelle/Scala will emerge.</p>
+<p>Cheers<br>
+Lars</p>
+
+
+
+<a name="294319097"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20replace%20%22isabelle%20tty%22/near/294319097" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20replace.20.22isabelle.20tty.22.html#294319097">(Aug 19 2022 at 16:25)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On Fri, 21 Nov 2014, Lars Hupel wrote:</p>
+<blockquote>
+<p>I hope that sheds some light onto the somewhat delicate procedure. We<br>
+could definitely do with more documentation on the system integration<br>
+aspect of Isabelle/Scala (which would presumably go into system.pdf,<br>
+whose chapter on that topic is very sparse).</p>
+</blockquote>
+<p>Isabelle/Scala is indeed the main system programming language for <br>
+Isabelle, so the manual should say more about it.  The reason why so <br>
+little Isabelle/Scala is in the manuals is that code snippets cannot be <br>
+formally checked, as is done for Isabelle/ML. Without formal checking, it <br>
+is pointless to make examples, because they will stop working in no time,<br>
+after the next round of refinements of the system implementation.</p>
+<blockquote>
+<p>I reckon that with the removal of "isabelle tty", more applications of <br>
+Isabelle/Scala will emerge.</p>
+</blockquote>
+<p>Probably yes, and for two reasons:</p>
+<p>(1) Without the TTY baggage it becomes more feasible to introduce formal<br>
+       Isabelle/Scala checking in the documentation, in the sense above.</p>
+<p>(2) Removal of obsolete things makes people active, who are still using<br>
+       very old archeological layers of the system.  Actual use of new<br>
+       programming interfaces always helps to make them more smooth and<br>
+       easier to use.</p>
+<p>The Isabelle process protocol concepts covered here are in fact already <br>
+quite well-established and polished for some years. So now is the right <br>
+time to convert old applications, and to forget that there was ever a TTY <br>
+loop in Isabelle.</p>
+<p>Makarius</p>
+<hr>
+<p><a href="http://stop-ttip.org">http://stop-ttip.org</a>  925,281 people so far</p>
+<hr>
+
+
+
+<a name="294319264"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20replace%20%22isabelle%20tty%22/near/294319264" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20replace.20.22isabelle.20tty.22.html#294319264">(Aug 19 2022 at 16:26)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+Indeed.</p>
+<p>What could be done is writing a minimal PIDE application demonstrating<br>
+bi-directional communication, possibly in the style of literate<br>
+programming. This could then be executed and tested as part of a regular<br>
+(nightly?) build against the repository version.</p>
+<p>Cheers<br>
+Lars</p>
+
+
+
+<a name="294319350"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20replace%20%22isabelle%20tty%22/near/294319350" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20replace.20.22isabelle.20tty.22.html#294319350">(Aug 19 2022 at 16:26)</a>:</h4>
+<p>From: Cezary Kaliszyk &lt;<a href="mailto:cezarykaliszyk@gmail.com">cezarykaliszyk@gmail.com</a>&gt;<br>
+Dear Walther,</p>
+<p>There is also a different approach to simulating the TTY/ProofGeneral<br>
+interaction with Isabelle.</p>
+<p>I have written a small 20-line script that lets me imitate<br>
+minimal Isar-interaction via isabelle-console. It only allows<br>
+sending single lines to Isabelle, there is no "back" or error<br>
+handling, but this is enough for simple sending of commands to<br>
+Isabelle and analysing their outputs.</p>
+<p>The reason why I use this script, is because I use Isabelle<br>
+on a headless server. It has enough memory to do bigger<br>
+experiments, but I cannot run graphical applications there,<br>
+in particular I cannot run PIDE. As ProofGeneral and TTY<br>
+support have been removed, I needed to implement some minimal<br>
+interaction, and the minimum, following the indispensable<br>
+help from Makarius is:</p>
+<p>The script runs:<br>
+  "isabelle console",<br>
+Then sends it:<br>
+  "val s = Toplevel.toplevel;"<br>
+And for every line of user input sends:<br>
+  "val s = fold (Toplevel.command_exception true) (Outer_Syntax.parse<br>
+Position.start \"%s\") s;"</p>
+<p>I suppose this could be extended to support a "go-back" or even<br>
+some more complicated protocol like the one from ProofGeneral<br>
+which I presume you are currently using.</p>
+<p>Attached, sorry for yet another programming language, but the<br>
+above should explain it.</p>
+<p>Regards,</p>
+<p>Cezary<br>
+<a href="/user_uploads/14278/mSSFu86sf6e6iXweP65vq2OX/isatty.ml">isatty.ml</a></p>
+
+
+
+<a name="294319357"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20replace%20%22isabelle%20tty%22/near/294319357" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20replace.20.22isabelle.20tty.22.html#294319357">(Aug 19 2022 at 16:26)</a>:</h4>
+<p>From: Walther Neuper &lt;<a href="mailto:wneuper@ist.tugraz.at">wneuper@ist.tugraz.at</a>&gt;<br>
+Dear Cezary,</p>
+<p>thank you for the surprising mini-solution ...</p>
+<p>... we have an even simpler protocol than ProofGeneral, so your solution <br>
+would be quite appropriate for a quick shortcut.</p>
+<p>Such a shortcut would be necessary, if the efforts required for a <br>
+solution via Isabelle/Scala would be beyond our present resources.</p>
+<p>So, probably we come back to your solution after some trials.</p>
+<p>Regards,<br>
+Walther</p>
+
+
+
+<a name="294319386"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20replace%20%22isabelle%20tty%22/near/294319386" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20replace.20.22isabelle.20tty.22.html#294319386">(Aug 19 2022 at 16:26)</a>:</h4>
+<p>From: Walther Neuper &lt;<a href="mailto:wneuper@ist.tugraz.at">wneuper@ist.tugraz.at</a>&gt;<br>
+Lars,</p>
+<p>thank you for the helpful explanations.</p>
+<p>Now I studied [2] and see, that this scala colde establishes the other <br>
+side for communication with Session.protocol_handler and <br>
+Isabelle_Process.protocol_command from [1].<br>
+So I prepare to adapt both [1]+[2] for Isac and come back to your <br>
+discussion with Makarius:</p>
+<blockquote>
+<blockquote>
+<p>My impression in<br>
+the past 7 years was that these things do change between major releases<br>
+of Scala, and direct Java access is not properly supported.</p>
+</blockquote>
+<p>Indeed. The only guarantee is calling Java from Scala, and even that<br>
+breaks from time to time because of mismatches between their type systems.<br>
+;-(( we need to call Scala from Java</p>
+<blockquote>
+<p>The Isabelle/Scala attitude towards that problem is to ask users to<br>
+write their own little Scala module to access the PIDE infrastructure,<br>
+and expose it to an existing Java program, if they really have to.</p>
+</blockquote>
+<p>Exactly. If there are only a handful of different commands which need to<br>
+be supported, such a wrapper seems to be the best idea. But even then,<br>
+one needs to think about whether the interaction is supposed to be<br>
+asynchronous, because Java is lacking in that regard.</p>
+</blockquote>
+<p>In order to start with a minimal solution, I'd like to bypass <br>
+asynchronous interaction (which is no restriction on Isac's present <br>
+solution).</p>
+<p>First question: what is your experience with NetBeans versus Eclipse in <br>
+projects combining Java and Scala?</p>
+<p>Walther</p>
+<p>[1]<br>
+&lt;<a href="https://github.com/larsrh/leon/blob/8a01cfea513376821c02a2390b3a7ed3266d336c/src/main/isabelle/Isabelle_Leon/Protocol.thy#L248-L264">https://github.com/larsrh/leon/blob/8a01cfea513376821c02a2390b3a7ed3266d336c/src/main/isabelle/Isabelle_Leon/Protocol.thy#L248-L264</a>&gt;</p>
+<p>[2]<br>
+&lt;<a href="https://github.com/larsrh/leon/blob/8a01cfea513376821c02a2390b3a7ed3266d336c/src/main/scala/leon/solvers/isa/System.scala">https://github.com/larsrh/leon/blob/8a01cfea513376821c02a2390b3a7ed3266d336c/src/main/scala/leon/solvers/isa/System.scala</a>&gt;</p>
+<p>On 14-11-21 09:51 AM, Lars Hupel wrote:</p>
+<blockquote>
+<p>Hello,</p>
+<blockquote>
+<p>So far I understood, that<br>
+(1) Session.protocol_handler starts a persistent session<br>
+it works in the opposite direction. The JVM process spins up a prover<br>
+process. Then, the protocol is initialized and both sides "register"<br>
+some handler for bidirectional communication. That is,<br>
+"Session.protocol_handler" tells the JVM that the specified class should<br>
+receive messages from the prover.</p>
+</blockquote>
+<blockquote>
+<p>(2) Isabelle_Process.protocol_command takes a string list, interpretes<br>
+the strings, accordingly executes a predefined collection of ML<br>
+functions and returns results as strings.<br>
+"protocol_command" is in some sense "dual" to "protocol_handler": it<br>
+tells the prover that the specified function should receive messages<br>
+from the JVM. You're correct in that the function is called with some<br>
+strings and can then do whatever is necessary. However, it does not<br>
+actually return anything.</p>
+</blockquote>
+<p>Bi-directional communication in the PIDE model is message-driven. That<br>
+means that sending data has a "fire and forget" semantics: It<br>
+immediately returns and there's no waiting for a reply or anything. Both<br>
+JVM and prover can send messages to each other at any point in time.</p>
+<p>In the sources, you can see that the "exec" function actually always<br>
+sends a reply, but does so via "protocol_message", which generates a new<br>
+message which is completely independent from the one the handler<br>
+received earlier.</p>
+<blockquote>
+<p>However, I could not yet find out, how to use isabelle_process or the<br>
+isabelle wrapper (or what else?) to feed the strings such that they<br>
+drive (1) and (2).<br>
+As written above, your JVM application drives the whole process. You<br>
+invoke the appropriate functions for starting up the prover, load the<br>
+"Isac" section where your handler is waiting for input. Then you can<br>
+send messages to your handler.</p>
+</blockquote>
+<p>I hope that sheds some light onto the somewhat delicate procedure. We<br>
+could definitely do with more documentation on the system integration<br>
+aspect of Isabelle/Scala (which would presumably go into system.pdf,<br>
+whose chapter on that topic is very sparse). I reckon that with the<br>
+removal of "isabelle tty", more applications of Isabelle/Scala will emerge.</p>
+<p>Cheers<br>
+Lars</p>
+</blockquote>
+
+
+
+<a name="294319697"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20replace%20%22isabelle%20tty%22/near/294319697" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20replace.20.22isabelle.20tty.22.html#294319697">(Aug 19 2022 at 16:28)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+The problem posed here is technically trivial, i.e. a non-problem.  It is <br>
+just a matter to overcome old ways of thinking about it.</p>
+<p>Isabelle/Scala is well-established as the main system programming <br>
+interface for several years.  When you want to connect to some Isabelle <br>
+prover process, the Scala APIs are the way to do it.</p>
+<p>Pretty soon, it will be no longer possible to use the Isabelle process at <br>
+all, without the Scala process around it.  The remaining TTY loop was <br>
+hindering important reforms long enough.  After Isabelle2014 it is no <br>
+longer there, without any traces of it left.</p>
+<p>Then it becomes possible to assume that things like Invoke_Scala.method <br>
+work in Isabelle/ML all the time, and many problems from the past can be <br>
+resolved in the proper way.  (E.g. a brushed-up version of document <br>
+preparation.)</p>
+<p>Makarius</p>
+<hr>
+<p><a href="http://stop-ttip.org">http://stop-ttip.org</a>  927,487 people so far</p>
+<hr>
+
+
+
+<a name="294319714"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20replace%20%22isabelle%20tty%22/near/294319714" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20replace.20.22isabelle.20tty.22.html#294319714">(Aug 19 2022 at 16:28)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On Fri, 21 Nov 2014, Walther Neuper wrote:</p>
+<blockquote>
+<p>In order to start with a minimal solution, I'd like to bypass <br>
+asynchronous interaction (which is no restriction on Isac's present <br>
+solution).</p>
+</blockquote>
+<p>Asynchronous interaction is already the minimal solution.  It is simpler <br>
+than synchronous interaction in many ways.</p>
+<p>Just give up the notion that you are mutating an implicit "current state". <br>
+You can easily pass around explicit handles to immutable values that are <br>
+bounced back and forth between the ML and Scala process in an asynchronous <br>
+manner.</p>
+<p>The application by Lars demonstrates that nicely.</p>
+<blockquote>
+<p>First question: what is your experience with NetBeans versus Eclipse in <br>
+projects combining Java and Scala?</p>
+</blockquote>
+<p>The current high-end IDE is probably IntelliJ IDEA, but I am using myself <br>
+just jEdit as plain text editor for Scala.</p>
+<p>Makarius</p>
+<hr>
+<p><a href="http://stop-ttip.org">http://stop-ttip.org</a>  927,491 people so far</p>
+<hr>
+
+
+
+<a name="294319826"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20replace%20%22isabelle%20tty%22/near/294319826" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20replace.20.22isabelle.20tty.22.html#294319826">(Aug 19 2022 at 16:28)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;</p>
+<blockquote>
+<p>First question: what is your experience with NetBeans versus Eclipse in<br>
+projects combining Java and Scala?</p>
+</blockquote>
+<p>Last time I used NetBeans with Scala was in 2010. It was quite unstable,<br>
+and when I revisited it a couple of months ago, the situation has not<br>
+improved significantly.</p>
+<p>IntelliJ is good, but implements its own type checker for Scala which<br>
+may or may not agree with the official Scala compiler. I found its "type<br>
+aware" highlighting annoying to use because of spurious error markers.</p>
+<p>The recommended IDE to use with Scala/Java is Eclipse. It is<br>
+commercially supported from Typesafe and should be stable enough. I<br>
+don't have practical experience with it, though.</p>
+
+
+
+<a name="294319880"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20replace%20%22isabelle%20tty%22/near/294319880" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20replace.20.22isabelle.20tty.22.html#294319880">(Aug 19 2022 at 16:28)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Concerning the general topic of the relation Isabelle/Scala/PIDE vs. the <br>
+now removed TTY / Proof General interaction mode, see also this blog entry <br>
+of mine: <a href="http://sketis.net/2014/discontinuation-of-isabelle-proof-general">http://sketis.net/2014/discontinuation-of-isabelle-proof-general</a></p>
+<p>Makarius</p>
+<hr>
+<p><a href="http://stop-ttip.org">http://stop-ttip.org</a>  935,236 people so far</p>
+<hr>
+
+
+
+<a name="294322197"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20replace%20%22isabelle%20tty%22/near/294322197" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20replace.20.22isabelle.20tty.22.html#294322197">(Aug 19 2022 at 16:41)</a>:</h4>
+<p>From: Walther Neuper &lt;<a href="mailto:wneuper@ist.tugraz.at">wneuper@ist.tugraz.at</a>&gt;<br>
+We did not engage for "Remaining uses of Proof General" because we hope <br>
+for easy ways to replace "isabelle tty" in our prototype, and because we <br>
+look forward to replace our self-made front-end by Isabelle/jEdit as <br>
+soon as Isabelle goes collaboration and includes session management.</p>
+<p>Until Isabelle2013-2, our prototype had the communication between its <br>
+front-end (client) in Java and its mathematics-engine (server) in <br>
+Isabelle/ML via stdin/stdout of the server process:</p>
+<p>(a) Java started the server by<br>
+      "isabelle tty -l Isac"<br>
+(b) the first text line written to stdin was<br>
+      "theory TTY_Communication imports Build_Isac begin"<br>
+(c) the client requests were ML functions   f : a1 -&gt; .. -&gt; an -&gt; unit<br>
+      written to stdin as text "ML {* f a1 .. an *}"<br>
+(d) the functions f wrote data in XML-format, which was read from stdout<br>
+      by a Java XML parser.</p>
+<p>We want to invest into replacement of this outdated communication the <br>
+more, the closer Isabelle comes to a session management. So presently <br>
+our questions are</p>
+<p>(1) Is the code around the removed "isabelle tty" already stable enough <br>
+to start replacement of "isabelle tty" in our project now ?<br>
+(2) If "yes", what are the options to replace the above (a..d) "isabelle <br>
+tty" communication in our prototype ? Where should we start to look to <br>
+in the Isabelle code ?</p>
+<p>We are aware, that the above questions are at the borderline of this <br>
+mailing list's scope --- so we are really grateful for any help!</p>
+<p>Walther</p>
+<p>[1] <a href="http://www.ist.tugraz.at/isac">http://www.ist.tugraz.at/isac</a></p>
+
+
+
+<a name="294322210"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20replace%20%22isabelle%20tty%22/near/294322210" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20replace.20.22isabelle.20tty.22.html#294322210">(Aug 19 2022 at 16:41)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+Hello,</p>
+<blockquote>
+<p>(d) the functions f wrote data in XML-format, which was read from<br>
+stdout by a Java XML parser.</p>
+</blockquote>
+<p>firstly, I'm going to assume that your front end is running on the JVM.</p>
+<p>I did something highly relevant in August, when I was visiting Viktor<br>
+Kuncak's group at EPFL. There, I integrated Isabelle into their existing<br>
+system which was written in Scala.</p>
+<p>This was really easy, because the protocol with which the prover and<br>
+Isabelle/jEdit communicate is exposed as a somewhat stable API. By<br>
+putting a specific JAR file ("Pure.jar" somewhere in $ISABELLE_HOME) in<br>
+your client's classpath, you have access to all the necessary<br>
+functionality (i.e. spawning up a prover, sending protocol messages etc.).</p>
+<blockquote>
+<p>(a) Java started the server by<br>
+     "isabelle tty -l Isac"<br>
+(b) the first text line written to stdin was<br>
+     "theory TTY_Communication imports Build_Isac begin"</p>
+</blockquote>
+<p>This can be trivially done with the above mechanism. You can even<br>
+trigger the build of the "Isac" session first.</p>
+<blockquote>
+<p>(c) the client requests were ML functions   f : a1 -&gt; .. -&gt; an -&gt; unit<br>
+     written to stdin as text "ML {* f a1 .. an *}"</p>
+</blockquote>
+<p>This is more interesting. Is the scope of what these functions do<br>
+limited, or can the user somehow specify arbitrary functions?</p>
+<p>If the scope is limited, then you can do something like [1] and treat<br>
+the prover process as some sort of "REPL" which only understands a fixed<br>
+set of commands and acts accordingly. Notably, the support of multiple<br>
+clients in a single Isabelle session is almost trivial.</p>
+<p>If not, there should be a way to make it work (after all, an ML block is<br>
+a regular command), but I can't offer any concrete advice there, except<br>
+maybe studying the implementation of the ML and ML_val commands in Isar.</p>
+<blockquote>
+<p>(1) Is the code around the removed "isabelle tty" already stable enough<br>
+to start replacement of "isabelle tty" in our project now ?</p>
+</blockquote>
+<p>I would say yes, even though a canonical discipline on how to write an<br>
+application using only a minimal subset of the features of PIDE has not<br>
+emerged yet.</p>
+<blockquote>
+<p>(2) If "yes", what are the options to replace the above (a..d) "isabelle<br>
+tty" communication in our prototype ? Where should we start to look to<br>
+in the Isabelle code ?</p>
+</blockquote>
+<p>The other relevant bit in the code I wrote at EPFL is [2], although it<br>
+is cluttered with rather ad hoc session management required by the<br>
+system I was integrating with. If you're inclined, I can put together a<br>
+smaller example which should be sufficient to demonstrate the general<br>
+patterns.</p>
+<p>There's one caveat left: All of the above presumes that using Scala is<br>
+not a problem. It's certainly possible to do all of the above with Java,<br>
+although I guess it's going to be rather verbose syntactically.</p>
+<p>Cheers<br>
+Lars</p>
+<p>[1]<br>
+&lt;<a href="https://github.com/larsrh/leon/blob/8a01cfea513376821c02a2390b3a7ed3266d336c/src/main/isabelle/Isabelle_Leon/Protocol.thy#L248-L264">https://github.com/larsrh/leon/blob/8a01cfea513376821c02a2390b3a7ed3266d336c/src/main/isabelle/Isabelle_Leon/Protocol.thy#L248-L264</a>&gt;</p>
+<p>[2]<br>
+&lt;<a href="https://github.com/larsrh/leon/blob/8a01cfea513376821c02a2390b3a7ed3266d336c/src/main/scala/leon/solvers/isa/System.scala">https://github.com/larsrh/leon/blob/8a01cfea513376821c02a2390b3a7ed3266d336c/src/main/scala/leon/solvers/isa/System.scala</a>&gt;</p>
+
+
+
+<a name="294322232"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20replace%20%22isabelle%20tty%22/near/294322232" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20replace.20.22isabelle.20tty.22.html#294322232">(Aug 19 2022 at 16:41)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+That is the old question of accessing a Scala library from Java.</p>
+<p>You probably understand yourself more about the Scala compiler and its <br>
+representation of Scala things on the JVM than I do.  My impression in the <br>
+past 7 years was that these things do change between major releases of <br>
+Scala, and direct Java access is not properly supported.</p>
+<p>The Isabelle/Scala attitude towards that problem is to ask users to write <br>
+their own little Scala module to access the PIDE infrastructure, and <br>
+expose it to an existing Java program, if they really have to.  In some <br>
+sense, Isabelle/jEdit does the same, because jEdit is just another Java <br>
+program.</p>
+<p>Big commercial frameworks like Akka advertize dual Java and Scala APIs, <br>
+but that is not for free -- it was implemented like that from the start <br>
+(with the intention to make money in the Java market).</p>
+<p>Makarius</p>
+<hr>
+<p><a href="http://stop-ttip.org">http://stop-ttip.org</a>  909,835 people so far</p>
+<hr>
+
+
+
+<a name="294322247"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20replace%20%22isabelle%20tty%22/near/294322247" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20replace.20.22isabelle.20tty.22.html#294322247">(Aug 19 2022 at 16:41)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;</p>
+<blockquote>
+<p>You probably understand yourself more about the Scala compiler and its<br>
+representation of Scala things on the JVM than I do.  My impression in<br>
+the past 7 years was that these things do change between major releases<br>
+of Scala, and direct Java access is not properly supported.</p>
+</blockquote>
+<p>Indeed. The only guarantee is calling Java from Scala, and even that<br>
+breaks from time to time because of mismatches between their type systems.</p>
+<blockquote>
+<p>The Isabelle/Scala attitude towards that problem is to ask users to<br>
+write their own little Scala module to access the PIDE infrastructure,<br>
+and expose it to an existing Java program, if they really have to.  In<br>
+some sense, Isabelle/jEdit does the same, because jEdit is just another<br>
+Java program.</p>
+</blockquote>
+<p>Exactly. If there are only a handful of different commands which need to<br>
+be supported, such a wrapper seems to be the best idea. But even then,<br>
+one needs to think about whether the interaction is supposed to be<br>
+asynchronous, because Java is lacking in that regard.</p>
+<p>Lars</p>
+
+
+
+<a name="294322267"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20replace%20%22isabelle%20tty%22/near/294322267" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20replace.20.22isabelle.20tty.22.html#294322267">(Aug 19 2022 at 16:41)</a>:</h4>
+<p>From: Walther Neuper &lt;<a href="mailto:wneuper@ist.tugraz.at">wneuper@ist.tugraz.at</a>&gt;<br>
+thanks a lot for the quick replies!</p>
+<blockquote>
+<blockquote>
+<p>(1) Is the code around the removed "isabelle tty" already stable enough<br>
+to start replacement of "isabelle tty" in our project now ?<br>
+I would say yes, even though a canonical discipline on how to write an<br>
+application using only a minimal subset of the features of PIDE has not<br>
+emerged yet.<br>
+Very good. so let's start.<br>
+(d) the functions f wrote data in XML-format, which was read from<br>
+stdout by a Java XML parser.<br>
+firstly, I'm going to assume that your front end is running on the JVM.<br>
+Right.<br>
+Our protocol is very primitive, it is NOT asynchronous:<br>
+(c) the client requests were ML functions   f : a1 -&gt; .. -&gt; an -&gt; unit<br>
+      written to stdin as text "ML {* f a1 .. an *}"<br>
+This is more interesting. Is the scope of what these functions do<br>
+limited, or can the user somehow specify arbitrary functions?<br>
+The set of functions f is fixed and cannot be expanded by the user, <br>
+<a href="https://intra.ist.tugraz.at/hg/isa/file/c06c18fe06e0/src/Tools/isac/Frontend/interface.sml#l10">https://intra.ist.tugraz.at/hg/isa/file/c06c18fe06e0/src/Tools/isac/Frontend/interface.sml#l10</a>.</p>
+</blockquote>
+</blockquote>
+<blockquote>
+<p>If the scope is limited, then you can do something like [1] and treat<br>
+the prover process as some sort of "REPL" which only understands a fixed<br>
+set of commands and acts accordingly. Notably, the support of multiple<br>
+clients in a single Isabelle session is almost trivial.<br>
+The other relevant bit in the code I wrote at EPFL is [2], although it<br>
+is cluttered with rather ad hoc session management required by the<br>
+system I was integrating with. If you're inclined, I can put together a<br>
+smaller example which should be sufficient to demonstrate the general<br>
+patterns.<br>
+So I'll go to study [1,2].<br>
+My hope is still, to stay within Java, because you say<br>
+The only guarantee is calling Java from Scala, and even that<br>
+breaks from time to time because of mismatches between their type systems.</p>
+</blockquote>
+<p>Thanks a lot,<br>
+Walther</p>
+<blockquote>
+<p>[1]<br>
+&lt;<a href="https://github.com/larsrh/leon/blob/8a01cfea513376821c02a2390b3a7ed3266d336c/src/main/isabelle/Isabelle_Leon/Protocol.thy#L248-L264">https://github.com/larsrh/leon/blob/8a01cfea513376821c02a2390b3a7ed3266d336c/src/main/isabelle/Isabelle_Leon/Protocol.thy#L248-L264</a>&gt;<br>
+[2]<br>
+&lt;<a href="https://github.com/larsrh/leon/blob/8a01cfea513376821c02a2390b3a7ed3266d336c/src/main/scala/leon/solvers/isa/System.scala">https://github.com/larsrh/leon/blob/8a01cfea513376821c02a2390b3a7ed3266d336c/src/main/scala/leon/solvers/isa/System.scala</a>&gt;</p>
+</blockquote>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,121 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] instance declaration problem with axiomatic cl... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20instance.20declaration.20problem.20with.20axiomatic.20cl.2E.2E.2E.html">[isabelle] instance declaration problem with axiomatic cl...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294051078"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20instance%20declaration%20problem%20with%20axiomatic%20cl.../near/294051078" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20instance.20declaration.20problem.20with.20axiomatic.20cl.2E.2E.2E.html#294051078">(Aug 18 2022 at 10:45)</a>:</h4>
+<p>From: Michael Norrish &lt;<a href="mailto:michael.norrish@nicta.com.au">michael.norrish@nicta.com.au</a>&gt;<br>
+It seems that I cannot do the following</p>
+<p>instance tyop :: (class1, class2) myclass<br>
+    &lt;some proof&gt;</p>
+<p>instance tyop :: (class3, class4) myclass<br>
+    &lt;some other proof&gt;</p>
+<p>where there is no connection between the various class&lt;n&gt;.  This is<br>
+despite the fact that the proofs themselves do work.</p>
+<p>My reading of the "Order-Sorted Unification" paper suggests to me that<br>
+I'm bumping my head against the "unnecessarily strong" co-regularity<br>
+condition.  Is there any prospect of this being weakened?</p>
+<p>Failing that, how might I achieve the desired effect?  The myclass<br>
+axclass has as one of its axioms that the "size" of its types not be<br>
+greater than a particular limit.  In the binary type operator (array),<br>
+the "size" of the type is the product of the "size" of the first<br>
+argument to array, and the "number" of the second.</p>
+<p>At the moment, in order to get something like</p>
+<p>(word32, "10") array</p>
+<p>accepted as an instance of myclass, I first have to invent a class<br>
+into which I can put word32 (I call it sz4), and then a class for the<br>
+type "10", which I call count10.  I can then use the definition of the<br>
+"size" calculation and the axioms for sz4 and count10 to prove that<br>
+the "size" of</p>
+<p>('a::sz4, 'b::count10) array</p>
+<p>is 40, which is less than the limit in myclass.</p>
+<p>But if I'm interested in also showing</p>
+<p>(some_user_type, "13") array</p>
+<p>is in myclass, I'm now stuck.</p>
+<p>Thanks,<br>
+Michael.</p>
+
+
+
+<a name="294051099"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20instance%20declaration%20problem%20with%20axiomatic%20cl.../near/294051099" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20instance.20declaration.20problem.20with.20axiomatic.20cl.2E.2E.2E.html#294051099">(Aug 18 2022 at 10:45)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+Michael Norrish schrieb:<br>
+Did I write "unnecessarily strong"? Because I don't think it is. If <br>
+(during type inference) you unify a type of class myclass with a type <br>
+"('a,'b) tyop", in your example it is not clear what the classes of the <br>
+subtypes 'a and 'b should be. You have lost the principal types property.</p>
+<p>Best<br>
+Tobias</p>
+
+
+
+<a name="294051113"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20instance%20declaration%20problem%20with%20axiomatic%20cl.../near/294051113" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20instance.20declaration.20problem.20with.20axiomatic.20cl.2E.2E.2E.html#294051113">(Aug 18 2022 at 10:45)</a>:</h4>
+<p>From: Brian Huffman &lt;<a href="mailto:brianh@cs.pdx.edu">brianh@cs.pdx.edu</a>&gt;<br>
+Hi Michael,</p>
+<p>Instead of using the type class mechanism here, you could accomplish what you <br>
+want using predicates on types. I'll explain what I mean by this using an <br>
+example:</p>
+<p>definition<br>
+  sizelimit :: "nat =&gt; 'a itself =&gt; bool" where<br>
+  "sizelimit n (t::'a itself) == ALL x::'a. size x &lt;= n"</p>
+<p>Now you can use this predicate to represent sort constraints. For example, <br>
+instead of proving "instance word32 :: sz4" you would prove a theorem that <br>
+says "sizelimit 4 TYPE(word32)". This is basically what Isabelle's axclass <br>
+system does internally (except that it doesn't allow you to parametrize a <br>
+class by a natural number, of course).</p>
+<p>You could also prove an inference rule like this for tyop:</p>
+<p>[| sizelimit m TYPE('a); sizelimit n TYPE('b); m * n &lt;= k|]<br>
+    ==&gt; sizelimit k TYPE(('a,'b)tyop)</p>
+<p>This is much more flexible than any instance declaration in Isabelle could be. <br>
+But the drawback is that you lose automation: Instead of sort annotations you <br>
+will need to add explicit sizelimit assumptions to your theorems, which you <br>
+will then have to discharge manually using inference rules like the one <br>
+above.</p>
+<ul>
+<li>Brian</li>
+</ul>
+
+
+
+<a name="294051135"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20instance%20declaration%20problem%20with%20axiomatic%20cl.../near/294051135" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20instance.20declaration.20problem.20with.20axiomatic.20cl.2E.2E.2E.html#294051135">(Aug 18 2022 at 10:45)</a>:</h4>
+<p>From: Michael Norrish &lt;<a href="mailto:Michael.Norrish@nicta.com.au">Michael.Norrish@nicta.com.au</a>&gt;<br>
+Brian Huffman wrote:</p>
+<blockquote>
+<p>Instead of using the type class mechanism here, you could accomplish<br>
+what you want using predicates on types. ...</p>
+</blockquote>
+<blockquote>
+<p>This is much more flexible than any instance declaration in Isabelle<br>
+could be.  But the drawback is that you lose automation: Instead of<br>
+sort annotations you will need to add explicit sizelimit assumptions<br>
+to your theorems, which you will then have to discharge manually<br>
+using inference rules like the one above.</p>
+</blockquote>
+<p>Yes, this would definitely suffice.  But I'm afraid it's not really an<br>
+option given what we're doing and where we're up to at the moment.  We<br>
+are making pretty heavy use of our "memtype" class, which encodes "is<br>
+representable in memory", and it would be a pain to lose that<br>
+automation.  We also don't have the time to go back and re-engineer<br>
+everything.</p>
+<p>We will get round the problem by showing</p>
+<p>instance array :: (oneMB_orless, lt_four_thousand) mem_type</p>
+<p>once and for all, and then showing that the examples we're working<br>
+with satisfy those constraints.  (Declaring an array of 5000 ints<br>
+won't be allowed, but we're working with a pretty restricted codebase,<br>
+so we can be confident that we're happy with this restriction.)</p>
+<p>Michael.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,246 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Proofterms reification function to the metalogic · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proofterms.20reification.20function.20to.20the.20metalogic.html">[isabelle] Proofterms reification function to the metalogic</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="307766222"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proofterms%20reification%20function%20to%20the%20metalogic/near/307766222" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proofterms.20reification.20function.20to.20the.20metalogic.html#307766222">(Nov 03 2022 at 16:12)</a>:</h4>
+<p>From: Nicolas Méric &lt;<a href="mailto:nicolas.meric@lri.fr">nicolas.meric@lri.fr</a>&gt;<br>
+Dear Isabelle's users,</p>
+<p>I try to use the Isabelle's Metalogic by Tobias Nipkow and Simon Roßkopf<br>
+(<a href="https://www.isa-afp.org/entries/Metalogic_ProofChecker.html">https://www.isa-afp.org/entries/Metalogic_ProofChecker.html</a>)<br>
+with Isabelle/DOF (<a href="https://zenodo.org/record/6810799">https://zenodo.org/record/6810799</a>).</p>
+<p>I want to write a reification function of terms and proofterms in ML to<br>
+this metalogic, to offer a kind of introspection over proofterms or<br>
+the possibility to add metadata to proofterms to maybe make<br>
+their rewriting to other ITPs easier.</p>
+<p>But I do not understand some part of the definition of the proof<br>
+datatype in proofterm.ML, the constructor PAxm for example,<br>
+and the implementation of PAxm in the metalogic.</p>
+<p>In Pure we have (in proofterm.ML):</p>
+<p>datatype proof =<br>
+      MinProof<br>
+    | PBound of int<br>
+    | Abst of string * typ option * proof<br>
+    | AbsP of string * term option * proof<br>
+    | % of proof * term option<br>
+    | %% of proof * proof<br>
+    | Hyp of term<br>
+    | PAxm of string * term * typ list option<br>
+    | PClass of typ * class<br>
+    | Oracle of string * term * typ list option<br>
+    | PThm of thm_header * thm_body<br>
+   and proof_body = PBody of<br>
+     {oracles: ((string * Position.T) * term option) Ord_List.T,<br>
+      thms: (serial * thm_node) Ord_List.T,<br>
+      proof: proof}</p>
+<p>Of what use is the typ list option for PAxm?</p>
+<p>In the metalogic, we have a similar contructor (in ProofTerm.thy):</p>
+<p>type_synonym tyinst = "(variable × sort) × typ"</p>
+<p>datatype proofterm = PAxm "term" "tyinst list"<br>
+   | PBound nat<br>
+   | Abst "typ" proofterm<br>
+   | AbsP "term" proofterm<br>
+   | Appt proofterm "term"<br>
+   | AppP proofterm proofterm<br>
+   | OfClass "typ" "class"<br>
+   | Hyp "term"</p>
+<p>variable in tyinst is defined in Core.thy:</p>
+<p>datatype variable = Free name | Var indexname</p>
+<p>So, for a proofterm in Pure,<br>
+it seems to me that the typ list option of the PAxm constructor<br>
+in ML should be translated to the tyinst list of the PAxm constructor<br>
+in the metalogic.<br>
+Is this the idea?<br>
+Then, for PAxm in the metalogic, are the variable and the sort in tyinst<br>
+an extract of the typ also in tyinst?<br>
+If no, how are they linked?</p>
+<p>Best regards.</p>
+<p>Nicolas Méric</p>
+
+
+
+<a name="307809563"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proofterms%20reification%20function%20to%20the%20metalogic/near/307809563" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proofterms.20reification.20function.20to.20the.20metalogic.html#307809563">(Nov 03 2022 at 18:18)</a>:</h4>
+<p>From: Dominique Unruh &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Hello,</p>
+<p>I am not aware of documentation on this, but during my own work in <br>
+translating proofterms, I found that the following seems consistent:</p>
+<p>The typ-list-option argument is the instantiation for the TVar's <br>
+occurring in the axiom's proposition (the term argument). The order of <br>
+those arguments is the reverse order of what Term.add_tvars returns.</p>
+<p>So you should get the tyinst argument with roughly the following code:</p>
+<p>PAxm (name, prop, typ_args) =&gt; zip (rev (add_tvars prop []), typ_args)</p>
+<p>(up to a conversion to the type "variable" in the Metalogic, I don't <br>
+know what it is exactly since I am not familiar with the Metalogic.)</p>
+<p>Best wishes,<br>
+Dominique.</p>
+
+
+
+<a name="308812497"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proofterms%20reification%20function%20to%20the%20metalogic/near/308812497" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proofterms.20reification.20function.20to.20the.20metalogic.html#308812497">(Nov 09 2022 at 15:33)</a>:</h4>
+<p>From: Nicolas Méric &lt;<a href="mailto:nicolas.meric@lri.fr">nicolas.meric@lri.fr</a>&gt;<br>
+Hi Dominique,</p>
+<p>thanks for the info and the tip. It helped a lot.</p>
+<p>I have a related question.</p>
+<p>During my few tests, I did not find any schematic variables (Tvars) with <br>
+a sort other than Nil in the PAxms' proposition (the term argument) or <br>
+in the PThms' prop (inside the thm_header argument).</p>
+<p>A basic example with Pure.symmetric:</p>
+<p>ML‹<br>
+val thm = @{thm "Pure.symmetric"}<br>
+val PAxm (name, term, typ_list_option) % t % u = Thm.proof_of thm<br>
+val tvars = rev (Term.add_tvars term [])<br>
+›</p>
+<p>Do you an idea of an axiom or theorem whose sort of Tvars of the <br>
+proposition will not be a Nil list, i.e, will have some classes?</p>
+<p>Best regards.</p>
+<p>Nicolas.</p>
+
+
+
+<a name="308822577"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proofterms%20reification%20function%20to%20the%20metalogic/near/308822577" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proofterms.20reification.20function.20to.20the.20metalogic.html#308822577">(Nov 09 2022 at 16:23)</a>:</h4>
+<p>From: Dominique Unruh &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Hi,</p>
+<p>again, what I'm saying now is purely based on my experiments:</p>
+<p>There are two ways to get proofterm. One is to get a theorem from the <br>
+theory (e.g., Proof_Context.get_thm) and then get the proofterm from <br>
+that (e.g., Thm.proof_of). I haven't checked right now, but I believe if <br>
+you apply this to a theorem with sorts, you get sorts in the prop of <br>
+that theorem.</p>
+<p>The second way is to take the proofterm gotten like this, and to descend <br>
+to the first PThm. This is always a very shallow proof, and you get a <br>
+PThm with the same name (in the header) as the name you gave to <br>
+Proof_Context.get_thm. But that PThm contains a prop that has been <br>
+processed. All sorts have been removed and instead explicit <br>
+"OFCLASS(...)" assumptions have been added. This is logically <br>
+equivalent. The proof of the processed theorem has no sorts whatsoever <br>
+(all the typeclass-logic is encoded using explicit assumptions in the <br>
+theorems). The advantage of this is that, if you want to check a proof, <br>
+you will never have to export deal with sorts.</p>
+<p>The same seems to hold for axioms, too. They also do not contain sorts.</p>
+<p>I do not know whether it is possible for exceptions to this to occur or <br>
+whether the kernel ensures that a pthm always contains a cleaned proof <br>
+and that an axiom does not contain a sort ever.</p>
+<p>The approach that I am taking is to ignore the unprocessed theorems <br>
+altogether and to implement proofterm translation without typeclasses.</p>
+<p>By the way: I did a quick check: all the axioms and theorems recursively <br>
+encountered when checking the proof of Nat.add_0_right do not contain <br>
+sorts.  (Assuming my check-code does not have a bug, of course.)</p>
+<p>Another note: constant types (gotten via Sign.const_typargs) sometimes <br>
+seem to have sorts (and not only HOL.type). Since the corresponding <br>
+axioms do not have sorts, these sorts seem to be more informative than <br>
+binding. I am ignoring them.</p>
+<p>Best wishes,<br>
+Dominique.</p>
+
+
+
+<a name="316932611"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proofterms%20reification%20function%20to%20the%20metalogic/near/316932611" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proofterms.20reification.20function.20to.20the.20metalogic.html#316932611">(Dec 20 2022 at 11:53)</a>:</h4>
+<p>From: Nicolas Méric &lt;<a href="mailto:nicolas.meric@lri.fr">nicolas.meric@lri.fr</a>&gt;<br>
+Dear Dominique,</p>
+<p>I had some time to work on that again.</p>
+<p>Thanks again for the explanation.</p>
+<p>I have another question and maybe you'll accept to share your knowledge, <br>
+one more time.</p>
+<p>In the metalogic, the PAxm constructor takes a typ list and not a typ <br>
+list option as in the Isabelle PAxm.</p>
+<p>I was wondering how to deal with that, and I found the <br>
+Proof_Syntax.standard_proof_of function in proof_syntax.ML. It seems <br>
+that this function reconstructs the proofs (using, <br>
+Thm.reconstruct_proof_of) and, in the case of a PAxm, updates the typ <br>
+list option argument, at least if the list is NONE.</p>
+<p>An example with Pure.symmetric:</p>
+<p>ML‹<br>
+val full = false<br>
+val thm = @{thm "Pure.symmetric"}<br>
+val proof_of = Thm.proof_of thm</p>
+<p>val standard_proof = Proof_Syntax.standard_proof_of<br>
+           {full = full, expand_name = Thm.expand_name thm} thm<br>
+›</p>
+<p>Here, proof_of will have the value:</p>
+<p>val proof_of =<br>
+    PAxm ("Pure.symmetric",<br>
+          Const ("Pure.imp", "prop ⇒ prop ⇒ prop") $<br>
+            (Const ("Pure.eq", "?'a::{} ⇒ ?'a::{} ⇒ prop") $<br>
+              Var (("x", 0), "?'a::{}") $ Var (("y", 0), "?'a::{}")) $<br>
+            (Const ("Pure.eq", "?'a::{} ⇒ ?'a::{} ⇒ prop") $<br>
+              Var (("y", 0), "?'a::{}") $ Var (("x", 0), "?'a::{}")),<br>
+          NONE) %<br>
+      NONE % NONE:<br>
+    proof</p>
+<p>And standard_proof will have the value:</p>
+<p>val standard_proof =<br>
+    PAxm ("Pure.symmetric",<br>
+          Const ("Pure.imp", "prop ⇒ prop ⇒ prop") $<br>
+            (Const ("Pure.eq", "?'a::{} ⇒ ?'a::{} ⇒ prop") $<br>
+              Var (("x", 0), "?'a::{}") $ Var (("y", 0), "?'a::{}")) $<br>
+            (Const ("Pure.eq", "?'a::{} ⇒ ?'a::{} ⇒ prop") $<br>
+              Var (("y", 0), "?'a::{}") $ Var (("x", 0), "?'a::{}")),<br>
+          SOME ["?'a::{}"]) %<br>
+      NONE % NONE:<br>
+    proof</p>
+<p>We can see that the typ list option has been updated with a schematic <br>
+variable.</p>
+<p>Do you think this is a good idea to deal with the typ list option <br>
+argument of a PAxm in the same way, and then be able to reify a PAxm <br>
+even when the typ list option is NONE, as the PAxm in the metalogic does <br>
+not take and option as argument?</p>
+<p>Maybe standardizing the proof (I don't really know what Stefan Berghofer <br>
+means by that) with the standard_proof_of function will also deal with <br>
+the other option types in the proof datatype, like the typ option <br>
+argument of the Abst constructor, or the term option of the % constructor.</p>
+<p>Best regards,</p>
+<p>Nicolas</p>
+
+
+
+<a name="316933813"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proofterms%20reification%20function%20to%20the%20metalogic/near/316933813" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proofterms.20reification.20function.20to.20the.20metalogic.html#316933813">(Dec 20 2022 at 12:01)</a>:</h4>
+<p>From: Simon Roßkopf &lt;<a href="mailto:rosskops@in.tum.de">rosskops@in.tum.de</a>&gt;<br>
+Hi,</p>
+<blockquote>
+<p>In the metalogic, the PAxm constructor takes a typ list and not a typ<br>
+list option as in the Isabelle PAxm.</p>
+</blockquote>
+<p>This is mostly because the formalization does not support compressed <br>
+proof terms (where the typ instantiation info is omitted). In general, <br>
+all the _ option types in the proofterms are for information that could <br>
+be omitted for compression. In my experience it is enough to get the <br>
+fully reconstructed proof terms using for example <br>
+Thm.reconstruct_proof_of and work with them.</p>
+<p>Regards<br>
+Simon Roßkopf</p>
+
+
+
+<a name="318054615"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proofterms%20reification%20function%20to%20the%20metalogic/near/318054615" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proofterms.20reification.20function.20to.20the.20metalogic.html#318054615">(Dec 27 2022 at 08:50)</a>:</h4>
+<p>From: Dominique Unruh &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Hello,</p>
+<p>as I understand it, the option arguments in Isabelle proof terms are <br>
+used to omit redundant information. Basically, None can be inserted <br>
+whenever it is possible to reconstruct what should be there if we know <br>
+what theorem the proofterm proves (basically type-inference on the <br>
+proofterm level). While if everything is filled in, then for any <br>
+proofterm, we can find out what it proves without additional <br>
+information. After Thm.reconstruct_proof_of, there should be no None <br>
+left in the proofs.</p>
+<p>I do not know what Proof_Syntax.standard_proof_of does (or what a <br>
+standard proof is) but I would be interested to know...</p>
+<p>Best wishes,<br>
+Dominique.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

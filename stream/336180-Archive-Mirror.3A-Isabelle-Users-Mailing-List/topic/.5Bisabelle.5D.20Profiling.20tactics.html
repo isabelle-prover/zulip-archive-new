@@ -1,0 +1,97 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Profiling tactics · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Profiling.20tactics.html">[isabelle] Profiling tactics</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294729313"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Profiling%20tactics/near/294729313" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Profiling.20tactics.html#294729313">(Aug 22 2022 at 16:57)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:lammich@in.tum.de">lammich@in.tum.de</a>&gt;<br>
+Hi,</p>
+<p>are there any tools to profile tactics in Isabelle?</p>
+<p>I basically have a tactic of the form</p>
+<p>REPEAT ( tac1 ORELSE ... ORELSE tacN )</p>
+<p>I want to figure out how long each of the tactics runs, to identify<br>
+hot-spots for optimization. </p>
+<p>I may need to do this in a nested way, e.g.</p>
+<p>tac1 = tac12 THEN simp_tac ...</p>
+<p>and I want to know how much time is spent on the simplification.</p>
+<p>Is there any (how basic so-ever) support for such profiling? I'm only<br>
+aware of the timing panel, which is very cumbersome to use for this<br>
+case, as it displays the timings of all commands, and cannot be focused<br>
+on the command(s) I'm interested in. </p>
+<p>For first, It would be enough if "apply" and "back" could output the<br>
+required time, depending on a configuration flag (this option used to<br>
+be in old Isabelles, but has apparently be removed in favour of the<br>
+timing panel?) Then I could unfold a particular run of my tactic into a<br>
+sequence of apply and back, and see the relevant timings.</p>
+<p>Of course I would be happy to hear of any more advanced profiling<br>
+techniques available for Isabelle.</p>
+
+
+
+<a name="294729948"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Profiling%20tactics/near/294729948" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Profiling.20tactics.html#294729948">(Aug 22 2022 at 17:00)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Profiling in Isabelle/ML works via the following combinators:<br>
+profile_time, profile_time_thread, profile_allocations -- these are<br>
+based on mechanisms provided by the Poly/ML runtime system.</p>
+<p>The result is somewhat unstructured, though: it measures everything that<br>
+happens globally in the running ML program. For profile_time_thread that<br>
+is restricted to the current thread -- it may be used only on a single<br>
+thread at a time.</p>
+<p>Profiling tactics is more challenging, due to lazy evaluation and<br>
+multiple results (for potential backtracking). I usually do this by<br>
+pushing the profiling to the bottom of it (e.g. the Simplifier<br>
+invocation behind simp_tac) or to the top (e.g. the outermost apply<br>
+command: it has only one result).</p>
+<p>Here is also a tactical (from src/HOL/Tools/Nitpick/nitpick_util.ML)<br>
+that make a tactic behave like a strict deterministic function and<br>
+applies a timeout to it:</p>
+<p>fun DETERM_TIMEOUT delay tac st =<br>
+  Seq.of_list (the_list (Timeout.apply delay (fn () =&gt; SINGLE tac st) ()))</p>
+<p>The same approach should work e.g. with profile_time_thread instead of<br>
+Timeout.apply, but the potential for backtracking will get lost.</p>
+<p>Makarius</p>
+
+
+
+<a name="294729961"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Profiling%20tactics/near/294729961" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Profiling.20tactics.html#294729961">(Aug 22 2022 at 17:00)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+The timing tooltip for 'back' was last working before this changeset:</p>
+<p>changeset:   51595:8e9746e584c9<br>
+user:        wenzelm<br>
+date:        Tue Apr 02 11:41:50 2013 +0200<br>
+files:       src/Pure/Isar/toplevel.ML src/Pure/PIDE/command.ML<br>
+description:<br>
+more centralized command timing;<br>
+clarified old-style timing message;</p>
+<p>The change is not directly relevant, though. The deeper reason is an<br>
+accidental change of order of markup for a command with arguments<br>
+('apply') and one that consists of a single keyword ('back'). Apparently<br>
+nobody noticed it, because 'back' is used very rarely these days.</p>
+<p>I have now refined that here:</p>
+<p>changeset:   67933:604da273e18d<br>
+tag:         tip<br>
+user:        wenzelm<br>
+date:        Fri Mar 23 17:09:36 2018 +0100<br>
+files:       src/Pure/PIDE/rendering.scala<br>
+description:<br>
+more robust timing info: do not rely on order of markup;</p>
+<p>Included is a small example. I have used the APPEND tactical here,<br>
+because it preserves all possibilities for backtracking. The ORELSE<br>
+tactical (which corresponds to "|" in Isar) commits on the first success<br>
+and ignores the remaining possibilities.</p>
+<p>Makarius<br>
+<a href="/user_uploads/14278/FJRi-yaRmYNdcBfcIdN0BWe2/Scratch.thy">Scratch.thy</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

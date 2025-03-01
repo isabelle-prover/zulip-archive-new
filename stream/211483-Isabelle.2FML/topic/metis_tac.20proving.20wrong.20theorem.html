@@ -1,0 +1,61 @@
+<html>
+<head><meta charset="utf-8"><title>metis_tac proving wrong theorem · Isabelle/ML · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/index.html">Isabelle/ML</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/metis_tac.20proving.20wrong.20theorem.html">metis_tac proving wrong theorem</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="463441161"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/metis_tac%20proving%20wrong%20theorem/near/463441161" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Christian Zimmerer <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/metis_tac.20proving.20wrong.20theorem.html#463441161">(Aug 19 2024 at 15:50)</a>:</h4>
+<p>Somehow, <code>metis_tac</code> swallows variables of my predicate when I want to prove a theorem.  See the following code: </p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kt">ML_val</span><span class="w"> </span><span class="ss">\&lt;open&gt;</span>
+<span class="s">val t = @{thm allE}</span>
+<span class="s">val x = writeln ("Original thm: " ^ @{make_string} t)</span>
+<span class="s">val y = writeln ("Proven thm: " ^ @{make_string}</span>
+<span class="s">  (Goal.prove @{context} [] [] (Thm.prop_of t)</span>
+<span class="s">  (K (Metis_Tactic.metis_tac ["no_types"]</span>
+<span class="s">        ATP_Problem_Generate.combsN @{context} [] 1))))</span><span class="ss">\&lt;close&gt;</span>
+</code></pre></div>
+<p>It prints <a href="/user_uploads/14278/9GRTf_8aADBY9LFY8hiTt-oZ/image.png">this</a>:</p>
+<div class="message_inline_image"><a href="/user_uploads/14278/9GRTf_8aADBY9LFY8hiTt-oZ/image.png" title="this"><img data-original-dimensions="183x102" src="/user_uploads/thumbnail/14278/9GRTf_8aADBY9LFY8hiTt-oZ/image.png/840x560.webp"></a></div><p>As one can clearly see, the schematic variable <code>?x</code> got destroyed and the type of <code>?P</code> got changed from <code>'a =&gt; bool</code> to <code>bool</code>. I don't quite understand why.</p>
+
+
+
+<a name="463625921"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/metis_tac%20proving%20wrong%20theorem/near/463625921" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Kevin Kappelmann <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/metis_tac.20proving.20wrong.20theorem.html#463625921">(Aug 20 2024 at 08:04)</a>:</h4>
+<p>Metis does not prove the wrong theorem. But metis does use unification and you are feeding in a problem with higher-order meta variables (often also called schematic variables). Those are the variables prefixed with <code>?</code>. </p>
+<p>In higher-order unification, some problems don't have a most-general solution. In such cases, Isabelle's higher-order unifier delays those problems not offering a most-general solution. Those problems are also referred to as "flex-flex pairs". You can see that your code creates a flex-flex pair using the code snippet I provide below (just comment out the indicated line). You have to use <code>show_hyps</code> to display these delayed problems. </p>
+<p>When Isabelle is done proving a theorem, it checks if there are any flex-flex pairs that are still unsolved. In your case, there is one. Since there is no canonical solution to it, Isabelle will pick some solution for you. In your case, it decides to instantiate <code>?P</code> by <code>\x -&gt; ?P'</code>, that is the argument provided to <code>?P</code> is simply ignored.</p>
+<p>So what can you do? Presumably, you do not want to have those meta variables in your goal to begin with: you want to show the claim for arbitrary <code>P</code> and <code>R</code>. So you fix <code>P</code> and <code>R</code> and show it for the fixed, but arbitrary <code>P</code> and <code>R</code>. And once you are done, you should be allowed to use the theorem for every <code>P</code> and <code>R</code> you can dream of - that's what they teach you in maths departments.</p>
+<p>Indeed, Isabelle allows you to do just that as you can see in the code below: First fix the meta variables, then prove the claim, then generalise it to use meta variables again. </p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">declare</span><span class="w"> </span><span class="o">[[</span><span class="n">show_hyps</span><span class="o">]]</span>
+<span class="kt">ML_val</span><span class="w"> </span><span class="s">‹</span>
+<span class="s">  val ctxt1 = @{context}</span>
+<span class="s">  val thm = @{thm allE}</span>
+<span class="s">  val _ = writeln ("Original thm: " ^ @{make_string} thm)</span>
+<span class="s">  val ((_, [thm]), ctxt2) = Variable.import true [thm] ctxt1 (*comment this line to see flex-flex pairs*)</span>
+<span class="s">  val _ = writeln ("thm with fixed meta variables: " ^ @{make_string} thm)</span>
+<span class="s">  fun tac {context,...} st =</span>
+<span class="s">    (Metis_Tactic.metis_tac ["no_types"] ATP_Problem_Generate.combsN context [] 1 st</span>
+<span class="s">    |&gt; Seq.map (tap (fn st =&gt; writeln ("state: " ^ @{make_string} st))))</span>
+<span class="s">  val res_thm = Goal.prove ctxt2 [] [] (Thm.prop_of thm) tac</span>
+<span class="s">  val _ = writeln ("Proven thm: " ^ @{make_string} res_thm)</span>
+<span class="s">  val res_thm = singleton (Variable.export ctxt2 ctxt1) res_thm</span>
+<span class="s">  val _ = writeln ("Result thm: " ^ @{make_string} res_thm)</span>
+<span class="s">›</span>
+</code></pre></div>
+
+
+
+<a name="463628894"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/metis_tac%20proving%20wrong%20theorem/near/463628894" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Christian Zimmerer <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/metis_tac.20proving.20wrong.20theorem.html#463628894">(Aug 20 2024 at 08:20)</a>:</h4>
+<p>That makes sense. Thank you!</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

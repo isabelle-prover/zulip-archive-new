@@ -1,0 +1,80 @@
+<html>
+<head><meta charset="utf-8"><title>relating list indices to appended lists · Beginner Questions · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/index.html">Beginner Questions</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/relating.20list.20indices.20to.20appended.20lists.html">relating list indices to appended lists</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="226197957"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/relating%20list%20indices%20to%20appended%20lists/near/226197957" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jakub Kądziołka <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/relating.20list.20indices.20to.20appended.20lists.html#226197957">(Feb 12 2021 at 21:23)</a>:</h4>
+<p>I have defined a property of lists:</p>
+<div class="codehilite"><pre><span></span><code>definition property :: &quot;color list ⇒ bool&quot; where
+  &quot;property clrs ⟷ (∀a &lt; length clrs. ∀b &lt; length clrs.
+    a &lt; b ∧ clrs ! a = clrs ! b ⟶ (∃m ∈ {a..b}. clrs ! m ≠ clrs ! a))&quot;
+</code></pre></div>
+<p>I would now like to show that <code>property (xs @ ys) ==&gt; property (ys @ zs) ==&gt; property (xs @ zs) ==&gt; property (xs @ ys @ zs)</code>. AFAICS, the proof would involve some unpleasant index arithmetic to distinguish the cases of which list <code>a</code> and <code>b</code> point into. Is there an easier way to express this? Maybe some way of manipulating sequences where "m is between a and b" is more of a first-class construct?</p>
+
+
+
+<a name="226214356"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/relating%20list%20indices%20to%20appended%20lists/near/226214356" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/relating.20list.20indices.20to.20appended.20lists.html#226214356">(Feb 13 2021 at 00:17)</a>:</h4>
+<p>Your property is just a very complicated way to say that the list must not have adjacent equal elements:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">lemma</span> <span class="n">successively_conv_nth</span><span class="o">:</span> <span class="s">"successively R xs ⟷ (∀i&lt;length xs - 1. R (xs ! i) (xs ! Suc i))"</span>
+  <span class="k">by</span> <span class="o">(</span><span class="n">induction</span> <span class="n">xs</span> <span class="n">rule</span><span class="o">:</span> <span class="n">induct_list012</span><span class="err">;</span> <span class="n">force</span> <span class="n">simp</span><span class="o">:</span> <span class="n">nth_Cons</span> <span class="n">split</span><span class="o">:</span> <span class="n">nat.splits</span><span class="o">)</span>
+
+<span class="k">definition</span> <span class="n">property</span> <span class="o">::</span> <span class="s">"'a list ⇒ bool"</span> <span class="kp">where</span>
+  <span class="s">"property clrs ⟷ (∀a &lt; length clrs. ∀b &lt; length clrs.</span>
+<span class="s">    a &lt; b ∧ clrs ! a = clrs ! b ⟶ (∃m ∈ {a..b}. clrs ! m ≠ clrs ! a))"</span>
+
+<span class="kn">lemma</span> <span class="n">propertyD</span><span class="o">:</span> <span class="s">"property xs ⟹ i &lt; j ⟹ j &lt; length xs ⟹ xs ! i = xs ! j ⟹ ∃m ∈ {i..j}. xs ! m ≠ xs ! i"</span>
+  <span class="k">unfolding</span> <span class="n">property_def</span> <span class="k">by</span> <span class="n">auto</span>
+
+<span class="kn">lemma</span> <span class="n">property_altdef</span><span class="o">:</span> <span class="s">"property xs ⟷ distinct_adj xs"</span>
+<span class="k">proof</span> <span class="o">(</span><span class="n">intro</span> <span class="n">iffI</span><span class="o">)</span>
+  <span class="k">assume</span> <span class="n">p</span><span class="o">:</span> <span class="s">"property xs"</span>
+  <span class="k">show</span> <span class="s">"distinct_adj xs"</span>
+    <span class="k">unfolding</span> <span class="n">distinct_adj_def</span> <span class="n">successively_conv_nth</span>
+  <span class="k">proof</span> <span class="o">(</span><span class="n">intro</span> <span class="n">allI</span> <span class="n">impI</span><span class="o">)</span>
+    <span class="k">fix</span> <span class="n">i</span> <span class="k">assume</span> <span class="n">i</span><span class="o">:</span> <span class="s">"i &lt; length xs - 1"</span>
+    <span class="k">show</span> <span class="s">"xs ! i ≠ xs ! Suc i"</span>
+    <span class="k">proof</span>
+      <span class="k">assume</span> <span class="err">*</span><span class="o">:</span> <span class="s">"xs ! i = xs ! Suc i"</span>
+      <span class="k">with</span> <span class="n">p</span> <span class="n">i</span> <span class="k">have</span> <span class="s">"∃m∈{i..Suc i}. xs ! m ≠ xs ! i"</span>
+        <span class="k">by</span> <span class="o">(</span><span class="n">intro</span> <span class="n">propertyD</span><span class="o">)</span> <span class="n">auto</span>
+      <span class="k">thus</span> <span class="n">False</span> <span class="k">using</span> <span class="err">*</span> <span class="k">by</span> <span class="o">(</span><span class="n">auto</span> <span class="n">simp</span><span class="o">:</span> <span class="n">le_Suc_eq</span><span class="o">)</span>
+    <span class="k">qed</span>
+  <span class="k">qed</span>
+<span class="k">next</span>
+  <span class="k">assume</span> <span class="s">"distinct_adj xs"</span>
+  <span class="k">show</span> <span class="s">"property xs"</span> <span class="k">unfolding</span> <span class="n">property_def</span>
+  <span class="k">proof</span> <span class="n">safe</span>
+    <span class="k">fix</span> <span class="n">i</span> <span class="n">j</span> <span class="k">assume</span> <span class="n">ij</span><span class="o">:</span> <span class="s">"i &lt; j"</span> <span class="s">"j &lt; length xs"</span> <span class="s">"xs ! i = xs ! j"</span>
+    <span class="k">from</span> <span class="err">‹</span><span class="n">distinct_adj</span> <span class="n">xs</span><span class="err">›</span> <span class="k">have</span> <span class="s">"xs ! i ≠ xs ! Suc i"</span>
+      <span class="k">using</span> <span class="n">ij</span> <span class="k">by</span> <span class="o">(</span><span class="n">auto</span> <span class="n">simp</span><span class="o">:</span> <span class="n">successively_conv_nth</span> <span class="n">distinct_adj_def</span><span class="o">)</span>
+    <span class="k">thus</span> <span class="s">"∃m∈{i..j}. xs ! m ≠ xs ! i"</span>
+      <span class="k">using</span> <span class="n">ij</span> <span class="k">by</span> <span class="o">(</span><span class="n">intro</span> <span class="n">bexI</span><span class="o">[</span><span class="n">of</span> <span class="o">_</span> <span class="s">"Suc i"</span><span class="o">])</span> <span class="n">auto</span>
+  <span class="k">qed</span>
+<span class="k">qed</span>
+</code></pre></div>
+<p>Your property then easily follows with the library theorems:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">lemma</span> <span class="s">"property (xs @ ys) ⟹ property (ys @ zs) ⟹ property (xs @ zs) ⟹ property (xs @ ys @ zs)"</span>
+  <span class="k">by</span> <span class="o">(</span><span class="n">auto</span> <span class="n">simp</span><span class="o">:</span> <span class="n">property_altdef</span> <span class="n">distinct_adj_append_iff</span> <span class="n">hd_append</span> <span class="n">split</span><span class="o">:</span> <span class="n">if_splits</span><span class="o">)</span>
+</code></pre></div>
+<p>Note that this uses <code>successively</code> and <code>distinct_adj</code>, which is not yet in Isabelle2020 (but in Isabelle2021).</p>
+<div class="codehilite"><pre><span></span><code>
+</code></pre></div>
+
+
+
+<a name="226214473"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/relating%20list%20indices%20to%20appended%20lists/near/226214473" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/relating.20list.20indices.20to.20appended.20lists.html#226214473">(Feb 13 2021 at 00:19)</a>:</h4>
+<p>And, yes, you are right in thinking that with the indices it would end up being quite messy (quite a few more case distinctions). Even more so with your original definition of <code>property</code> using an existential quantifier, since the automation is not good at instantiating existentials.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

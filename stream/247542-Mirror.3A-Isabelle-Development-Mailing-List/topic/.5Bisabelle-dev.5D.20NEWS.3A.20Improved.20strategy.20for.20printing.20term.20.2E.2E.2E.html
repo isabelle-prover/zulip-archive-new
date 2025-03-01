@@ -1,0 +1,81 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle-dev] NEWS: Improved strategy for printing term ... · Mirror: Isabelle Development Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/index.html">Mirror: Isabelle Development Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20NEWS.3A.20Improved.20strategy.20for.20printing.20term.20.2E.2E.2E.html">[isabelle-dev] NEWS: Improved strategy for printing term ...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="478802334"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20NEWS%3A%20Improved%20strategy%20for%20printing%20term%20.../near/478802334" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20NEWS.3A.20Improved.20strategy.20for.20printing.20term.20.2E.2E.2E.html#478802334">(Oct 24 2024 at 21:30)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+<strong>* General </strong>*</p>
+<ul>
+<li>Printing term abbreviations now uses a different strategy: alternate<br>
+top-down, bottom-up, top-down etc. until a normal form is reached. This<br>
+is more efficient than the former top-down strategy. It also conforms to<br>
+AST rewriting (command 'translations'). Rare INCOMPATIBILITY, slightly<br>
+different results could be printed (often slightly "better" ones).</li>
+</ul>
+<p><strong>* ML </strong>*</p>
+<ul>
+<li>The new operation Pattern.rewrite_term_yoyo alternates top-down,<br>
+bottom-up, top-down etc. until a normal form is reached. This often<br>
+works better than former rewrite_term_top --- that is still available,<br>
+but has been renamed to rewrite_term_topdown to emphasize that something<br>
+notable has changed here.</li>
+</ul>
+<p>This refers to Isabelle/bbed9f218158 and AFP/b347675c7769.</p>
+<p>I've brushed up the Ast.normalize implementation slightly: it stems from my <br>
+own Isabelle student project from 3 decades ago (under the informal title of <br>
+"Rewriting Isabelle"). The current version is here <br>
+<a href="https://isabelle-dev.sketis.net/source/isabelle/browse/default/src/Pure/Syntax/ast.ML;bbed9f218158$227">https://isabelle-dev.sketis.net/source/isabelle/browse/default/src/Pure/Syntax/ast.ML;bbed9f218158$227</a></p>
+<p>The corresponding version of Pattern.rewrite_term_yoyo is here <br>
+<a href="https://isabelle-dev.sketis.net/source/isabelle/browse/default/src/Pure/more_pattern.ML;bbed9f218158$57">https://isabelle-dev.sketis.net/source/isabelle/browse/default/src/Pure/more_pattern.ML;bbed9f218158$57</a> <br>
+--- I've changed the typical Berghofer style into more contemporary <br>
+Haftmann-Wenzel Isabelle/ML, with moderate use of combinators like "perhaps" <br>
+and "perhaps_loop".</p>
+<p>The performance of Ast.normalize is still pretty good, even with all these <br>
+encoded position constraints that we now have in input and output. In <br>
+performance measurements of Syntax.read_term / string_of_term this part can be <br>
+usually ignored.</p>
+<p>The corresponding term normalization operations in Syntax.check_terms / <br>
+uncheck_terms are much slower, because so many other things are going on here: <br>
+e.g. somewhat slow type-inference in check_term. The term abbreviations in <br>
+uncheck_term are now reasonably fast.</p>
+<p>This is also due to another change is here: <br>
+<a href="https://isabelle-dev.sketis.net/rISABELLEb61abd1e5027">https://isabelle-dev.sketis.net/rISABELLEb61abd1e5027</a> --- it amends earlier <br>
+attempts on performance tuning for terms with schematic variables, but that <br>
+had bad consequences for the average situation.</p>
+<p>I've also revisited the Earley parser recently (for markup), and got the <br>
+impression that it is rather fast --- after doing only sporadic measurements. <br>
+We can usually ignore that part in the measurements.</p>
+<p>In conclusion, here is an example by Hanno Becker (18-Jul-2024 on isabelle-users):</p>
+<p>abbreviation ‹y x ≡ (x + x)›</p>
+<p>abbreviation (input) ‹pow3 f t ≡ (f (f (f t)))›<br>
+abbreviation (input) ‹id0 ≡ pow3 id›<br>
+abbreviation (input) ‹id1 ≡ pow3 id0›<br>
+abbreviation (input) ‹id2 ≡ pow3 id1›<br>
+abbreviation (input) ‹id3 ≡ pow3 id2›<br>
+abbreviation (input) ‹id4 ≡ pow3 id3›<br>
+abbreviation (input) ‹id5 ≡ pow3 id4›<br>
+abbreviation (input) ‹id6 ≡ pow3 id5›</p>
+<p>term ‹id6 ((0::nat) + 0)›</p>
+<p>That is now &lt; 0.5s on my 3.6 GHz Intel Linux box from 2017, instead of <br>
+"seconds on Apple M1". Inflating the term further towards id7 or id8 makes it <br>
+"seconds" again.</p>
+<p>If there are more concrete, real world examples, now would be an opportunity <br>
+to look at performance profiles.</p>
+<p>Makarius</p>
+<hr>
+<p>isabelle-dev mailing list<br>
+<a href="mailto:isabelle-dev@in.tum.de">isabelle-dev@in.tum.de</a><br>
+<a href="https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev">https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

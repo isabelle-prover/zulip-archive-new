@@ -1,0 +1,412 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Problems with linear orders and strings · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20linear.20orders.20and.20strings.html">[isabelle] Problems with linear orders and strings</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294131994"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20linear%20orders%20and%20strings/near/294131994" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20linear.20orders.20and.20strings.html#294131994">(Aug 18 2022 at 17:19)</a>:</h4>
+<p>From: René Thiemann &lt;<a href="mailto:rene.thiemann@uibk.ac.at">rene.thiemann@uibk.ac.at</a>&gt;<br>
+Dear Florian and Peter,</p>
+<p>thanks again. However, there now seems to be an incompatibility of Char_ord with RBTMapImpl from the AFP:</p>
+<p>If I try to load both modules (to use RBTMaps with strings as keys), then there is class conflict <br>
+since the dependent theories of Char_ord and RBTMapImpl both define the ordering on pairs <br>
+(Product_ord and AFP/common/Misc).</p>
+<p>Peter, can you remove the pair-ordering in common/Misc and load Product_ord instead (it is the same definition)?</p>
+<p>I have the following workaround, but of course this should be fixed in a better way.</p>
+<p>theory Linorders<br>
+imports List_lexord Char_nat (* but not Char_prod *)<br>
+begin</p>
+<p>instantiation char :: linorder<br>
+begin<br>
+fun less_eq_char :: "char \&lt;Rightarrow&gt; char \&lt;Rightarrow&gt; bool" where "less_eq_char c d = (nat_of_char c \&lt;le&gt; nat_of_char d)"<br>
+fun less_char :: "char \&lt;Rightarrow&gt; char \&lt;Rightarrow&gt; bool" where "less_char c d = (nat_of_char c &lt; nat_of_char d)"</p>
+<p>instance<br>
+proof<br>
+  fix x y :: char<br>
+  assume "x \&lt;le&gt; y" and "y \&lt;le&gt; x"<br>
+  hence "nat_of_char x = nat_of_char y" (is "?x = ?y") by auto<br>
+  hence "char_of_nat ?x = char_of_nat ?y" by simp<br>
+  thus "x = y" unfolding char_of_nat_of_char .<br>
+qed auto<br>
+end</p>
+<p>Afterwards strings are in class linorder, code-generation works also after Code_Char_chr,<br>
+and I can use RBTMapImpl as there is no conflict between Misc and Product_ord.</p>
+<p>Cheers,<br>
+René</p>
+
+
+
+<a name="294132076"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20linear%20orders%20and%20strings/near/294132076" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20linear.20orders.20and.20strings.html#294132076">(Aug 18 2022 at 17:19)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:peter.lammich@uni-muenster.de">peter.lammich@uni-muenster.de</a>&gt;</p>
+<blockquote>
+<p>Peter, can you remove the pair-ordering in common/Misc and load Product_ord instead (it is the same definition)?<br>
+</p>
+</blockquote>
+<p>If it is the same definition, and Product_ord is in the Isabelle<br>
+standard library, it should of course be changed to avoid duplication<br>
+and clashes!<br>
+  @Rene: For the first time, you should change it in your local copy. If<br>
+you are using the stable version, there is no other way.<br>
+     For the development version, someone (probably me or some of the<br>
+afp maintainers) should setup a development snapshot, do the change,<br>
+test if nothing breaks, and push it into the hg-repository.</p>
+<p>Otherwise, it highlights some general problem with type classes:<br>
+  If there is more than one way to say order a datatype, which one<br>
+should go into the typeclass.<br>
+  I think there is such a problem for multisets, where there are two<br>
+orderings that are both "the natural" one when viewed from the right<br>
+perspective.<br>
+  And, if formalizations get large, there may be parts where one order<br>
+is the "natural" one, and other parts where the other order is the<br>
+"natural" one, and<br>
+  then things seems to clash ...</p>
+<p>Unfortunately, the ICF interfaces are currently not parameterizable by<br>
+the used order, hash-function, equality-operator, ...<br>
+  @Andreas: What was the state of discussion there, is it possible/worth<br>
+the effort to parameterize?</p>
+<p>Best,<br>
+  Peter</p>
+<blockquote>
+<p>I have the following workaround, but of course this should be fixed in a better way.</p>
+<p>theory Linorders<br>
+imports List_lexord Char_nat (* but not Char_prod *)<br>
+begin</p>
+<p>instantiation char :: linorder<br>
+begin<br>
+fun less_eq_char :: "char \&lt;Rightarrow&gt; char \&lt;Rightarrow&gt; bool" where "less_eq_char c d = (nat_of_char c \&lt;le&gt; nat_of_char d)"<br>
+fun less_char :: "char \&lt;Rightarrow&gt; char \&lt;Rightarrow&gt; bool" where "less_char c d = (nat_of_char c &lt; nat_of_char d)"</p>
+<p>instance<br>
+proof<br>
+  fix x y :: char<br>
+  assume "x \&lt;le&gt; y" and "y \&lt;le&gt; x"<br>
+  hence "nat_of_char x = nat_of_char y" (is "?x = ?y") by auto<br>
+  hence "char_of_nat ?x = char_of_nat ?y" by simp<br>
+  thus "x = y" unfolding char_of_nat_of_char .<br>
+qed auto<br>
+end</p>
+<p>Afterwards strings are in class linorder, code-generation works also after Code_Char_chr,<br>
+and I can use RBTMapImpl as there is no conflict between Misc and Product_ord.</p>
+<p>Cheers,<br>
+René<br>
+</p>
+</blockquote>
+
+
+
+<a name="294132084"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20linear%20orders%20and%20strings/near/294132084" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20linear.20orders.20and.20strings.html#294132084">(Aug 18 2022 at 17:19)</a>:</h4>
+<p>From: Jeremy Siek &lt;<a href="mailto:jeremy.siek@colorado.edu">jeremy.siek@colorado.edu</a>&gt;<br>
+2011/3/4 Peter Lammich &lt;<a href="mailto:peter.lammich@uni-muenster.de">peter.lammich@uni-muenster.de</a>&gt;</p>
+<blockquote>
+<blockquote>
+<p>Peter, can you remove the pair-ordering in common/Misc and load<br>
+Product_ord instead (it is the same definition)?<br>
+</p>
+</blockquote>
+<p>If it is the same definition, and Product_ord is in the Isabelle<br>
+standard library, it should of course be changed to avoid duplication<br>
+and clashes!<br>
+ @Rene: For the first time, you should change it in your local copy. If<br>
+you are using the stable version, there is no other way.<br>
+    For the development version, someone (probably me or some of the<br>
+afp maintainers) should setup a development snapshot, do the change,<br>
+test if nothing breaks, and push it into the hg-repository.</p>
+<p>Otherwise, it highlights some general problem with type classes:<br>
+ If there is more than one way to say order a datatype, which one<br>
+should go into the typeclass.<br>
+ I think there is such a problem for multisets, where there are two<br>
+orderings that are both "the natural" one when viewed from the right<br>
+perspective.<br>
+ And, if formalizations get large, there may be parts where one order<br>
+is the "natural" one, and other parts where the other order is the<br>
+"natural" one, and<br>
+ then things seems to clash ...<br>
+</p>
+</blockquote>
+<p>Can't help but comment on this... there are alternative designs for<br>
+type classes in which instance declarations are lexically scoped.<br>
+This allows different instance declarations to be in effect for different<br>
+scopes.</p>
+<p>@inproceedings{Siek:2005:ELS:1065010.1065021,<br>
+ author = {Siek, Jeremy G. and Lumsdaine, Andrew},<br>
+ title = {Essential language support for generic programming},<br>
+ booktitle = {Proceedings of the 2005 ACM SIGPLAN conference on<br>
+Programming language design and implementation},<br>
+ series = {PLDI '05},<br>
+ year = {2005},<br>
+ isbn = {1-59593-056-6},<br>
+ location = {Chicago, IL, USA},<br>
+ pages = {73--84},<br>
+ numpages = {12},<br>
+ url = {http://doi.acm.org/10.1145/1065010.1065021},<br>
+ doi = {http://doi.acm.org/10.1145/1065010.1065021},<br>
+ acmid = {1065021},<br>
+ publisher = {ACM},<br>
+ address = {New York, NY, USA},<br>
+ keywords = {C++, Haskell, generic programming, polymorphism, standard ML},</p>
+<p>}</p>
+<p>@inproceedings{Dreyer:2007:MTC:1190216.1190229,<br>
+ author = {Dreyer, Derek and Harper, Robert and Chakravarty, Manuel M.<br>
+T. and Keller, Gabriele},<br>
+ title = {Modular type classes},<br>
+ booktitle = {Proceedings of the 34th annual ACM SIGPLAN-SIGACT<br>
+symposium on Principles of programming languages},<br>
+ series = {POPL '07},<br>
+ year = {2007},<br>
+ isbn = {1-59593-575-4},<br>
+ location = {Nice, France},<br>
+ pages = {63--70},<br>
+ numpages = {8},<br>
+ url = {http://doi.acm.org/10.1145/1190216.1190229},<br>
+ doi = {http://doi.acm.org/10.1145/1190216.1190229},<br>
+ acmid = {1190229},<br>
+ publisher = {ACM},<br>
+ address = {New York, NY, USA},<br>
+ keywords = {modules, type classes, type inference, type systems},<br>
+}</p>
+<p>Cheers,<br>
+Jeremy</p>
+<blockquote>
+<p>Unfortunately, the ICF interfaces are currently not parameterizable by<br>
+the used order, hash-function, equality-operator, ...<br>
+ @Andreas: What was the state of discussion there, is it possible/worth<br>
+the effort to parameterize?</p>
+<p>Best,<br>
+ Peter</p>
+<blockquote>
+<p>I have the following workaround, but of course this should be fixed in a<br>
+better way.</p>
+<p>theory Linorders<br>
+imports List_lexord Char_nat (* but not Char_prod *)<br>
+begin</p>
+<p>instantiation char :: linorder<br>
+begin<br>
+fun less_eq_char :: "char \&lt;Rightarrow&gt; char \&lt;Rightarrow&gt; bool" where<br>
+"less_eq_char c d = (nat_of_char c \&lt;le&gt; nat_of_char d)"<br>
+fun less_char :: "char \&lt;Rightarrow&gt; char \&lt;Rightarrow&gt; bool" where<br>
+"less_char c d = (nat_of_char c &lt; nat_of_char d)"</p>
+<p>instance<br>
+proof<br>
+  fix x y :: char<br>
+  assume "x \&lt;le&gt; y" and "y \&lt;le&gt; x"<br>
+  hence "nat_of_char x = nat_of_char y" (is "?x = ?y") by auto<br>
+  hence "char_of_nat ?x = char_of_nat ?y" by simp<br>
+  thus "x = y" unfolding char_of_nat_of_char .<br>
+qed auto<br>
+end</p>
+<p>Afterwards strings are in class linorder, code-generation works also<br>
+after Code_Char_chr,<br>
+and I can use RBTMapImpl as there is no conflict between Misc and<br>
+Product_ord.</p>
+<p>Cheers,<br>
+René<br>
+</p>
+</blockquote>
+</blockquote>
+
+
+
+<a name="294132240"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20linear%20orders%20and%20strings/near/294132240" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20linear.20orders.20and.20strings.html#294132240">(Aug 18 2022 at 17:20)</a>:</h4>
+<p>From: René Thiemann &lt;<a href="mailto:rene.thiemann@uibk.ac.at">rene.thiemann@uibk.ac.at</a>&gt;<br>
+Dear all,</p>
+<p>the problem I have is as follows: </p>
+<ul>
+<li>I want to use the AFP/Collection/RBT... theories to have efficient implementations of sets.</li>
+<li>to use this framework, the carrier has to be in the class linorder</li>
+<li>moreover, I need to operate on sets of strings<br>
+==&gt; strings (= char list) must be in the class linorder</li>
+</ul>
+<p>unfortunately, neither char nor list are contained in the linorder class.<br>
+So here I have three questions:</p>
+<p>1) are there already theories which make char and string members of linorder</p>
+<p>2) I have defined my own class instance for char as follows:</p>
+<p>fun nibble_to_nat :: "nibble =&gt; nat" where <br>
+  "nibble_to_nat Nibble0 = 0"<br>
+| "nibble_to_nat Nibble1 = 1"<br>
+...</p>
+<p>fun char_to_nat :: "char =&gt; nat" where <br>
+  "char_to_nat (Char n1 n2) = (16 * nibble_to_nat n1 + nibble_to_nat n2)"</p>
+<p>fun less_eq_char :: "char =&gt; char =&gt; bool" <br>
+  where "less_eq_char c d = (char_to_nat c &lt;= char_to_nat d)"</p>
+<p>and then proven that this implementation satisfies the class conditions.<br>
+Unfortunately, after loading Code_Char_chr I cannot export the code anymore<br>
+since it is complains as follows:<br>
+*** Illegal character expression,<br>
+*** in equation char_to_nat (Char ?n1.0 ?n2.0) \&lt;equiv&gt;<br>
+*** plus_nat_inst.plus_nat<br>
+***  (times_nat_inst.times_nat<br>
+***    (nat (number_int_inst.number_of_int<br>
+***           (Int.Bit0 (Int.Bit0 (Int.Bit0 (Int.Bit0 (Int.Bit1 Int.Pls)))))))<br>
+***    (nibble_to_nat ?n1.0))<br>
+***  (nibble_to_nat ?n2.0)</p>
+<p>3) In reality I need linorder not only for strings, but also for more<br>
+   complex datatypes like the following for labeled symbols:</p>
+<p>datatype ('f,'l)lab = <br>
+  Lab "('f,'l)lab" 'l <br>
+| Funlab "('f,'l)lab" "('f,'l)lab list" <br>
+| Unlab 'f </p>
+<p>The generation of an arbitrary linearization of each<br>
+   datatype is trivial via a lexicographic comparison. However, the proof<br>
+   obligations are tedious to prove. Is there some automatic way to<br>
+   let Isabelles generate a linearization?</p>
+<p>Best regards,<br>
+René</p>
+
+
+
+<a name="294132421"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20linear%20orders%20and%20strings/near/294132421" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20linear.20orders.20and.20strings.html#294132421">(Aug 18 2022 at 17:21)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi René,</p>
+<blockquote>
+<p>1) are there already theories which make char and string members of linorder</p>
+</blockquote>
+<p>there are theories in HOL/Library, e.g. Char_ord and List_lexord and<br>
+List_Prefix -- note that strings are just char lists, no type on their own</p>
+<blockquote>
+<p>2) I have defined my own class instance for char as follows:</p>
+</blockquote>
+<blockquote>
+<p>and then proven that this implementation satisfies the class conditions.<br>
+Unfortunately, after loading Code_Char_chr I cannot export the code anymore<br>
+since it is complains as follows:</p>
+</blockquote>
+<p>Does this persists if you use the »official« Char_ord theory?</p>
+<p>Hope this helps,<br>
+    Florian<br>
+<a href="/user_uploads/14278/eIBhqPG_OWqf2cKO_cNtt4dd/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294133016"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20linear%20orders%20and%20strings/near/294133016" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20linear.20orders.20and.20strings.html#294133016">(Aug 18 2022 at 17:24)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@kit.edu">andreas.lochbihler@kit.edu</a>&gt;<br>
+Peter Lammich schrieb:<br>
+There is no theoretical problem to parametrise ordering, equality, <br>
+hash-functions, etc. However, the current state results from what has been <br>
+available before: The Isabelle Collections Framework reuses various existing <br>
+formalisations, e.g. red black trees (RBT), associative and distinct lists from <br>
+HOL/Library. All of them have been phrased in terms of type class operators ("op <br>
+&lt;=" and "op &lt;" for rbts) or HOL equality "op =". If one of these is to be <br>
+parametrised, these developments must first be changed or replicated. Thus, this <br>
+is mainly an engineering problem.</p>
+<p>In fact, a few weeks ago, I changed the red black tree development on my local <br>
+copy such that the type class constraint vanishes and the ordering can now be a <br>
+parameter. It was not a big deal, but the new version is not backward-compatible <br>
+  (w.r.t. HOL/Library/RBT_Impl), because I had to rename operations to avoid <br>
+name clashes. The key was to shift the definitions and lemmas in RBT_Impl from <br>
+the theory context with sort constraint linorder to the locale context <br>
+ord/order/linorder that is associated with the respective type class.<br>
+The locale context takes the order as parameter, i.e. only few changes are <br>
+necessary to the rbt formalisation (except for name clashes, etc.).</p>
+<p>Since the ICF supports explicit invariants, different order implementations for <br>
+different RBTs should be relatively easy: In addition to the RBT itself, each <br>
+map also stores the comparison operation. Upon the first creation of the (empty) <br>
+map, one has to decide which order to use and stick with that. Even operations <br>
+on multiple RBTs like union and intersection are no problems if they are <br>
+implemented via iterators.</p>
+<p>However, the ICF currently builds on the type RBT.rbt from HOL/Library/RBT, <br>
+which hides the data structure invariant of the raw implementation RBT_Impl.rbt <br>
+in a typedef. Hence, the red black tree implementation from the ICF requires <br>
+<em>no</em> invariants. If one wants to hide the invariant from one's formalisation, <br>
+there are two options:</p>
+<p>Either, one introduces a typedef of its own for each order operation of <br>
+interest. This scales only to a few and requires to replicate HOL/Library/RBT <br>
+for each of them.</p>
+<p>Or, one defines the type of all well-formed red black trees together with their <br>
+ordering, and adapts HOL/Library/RBT once for this more general type. But now, <br>
+equality tests via "op =" are no longer computable because equality of the order <br>
+operations is not. Thus, one would also have to replace "op =" with a <br>
+user-defined equality operation and redo all the above. With "op =", however, it <br>
+does not suffice to shift definitions from the theory context to a locale <br>
+context because "op =" is a HOL constant, not a type class parameter. Hence, <br>
+everything that depends on "op =" would have to be generalised w.r.t. an <br>
+explicit equality operator. Since "op =" is at the very core of HOL, this would <br>
+probably be a lot of work.</p>
+<p>All the above should work fine for the ICF. HOL/Library also contains Mapping <br>
+and Cset as isomorphic types for 'a =&gt; 'b option and 'a set, and a setup to <br>
+implement these types via associative lists and red black trees. If you want to <br>
+take the above approach to Mapping and Cset, this would require even more work <br>
+and thought.</p>
+<p>To sum everything up: I think it would be no big deal to provide a map and set <br>
+implementation for a variant of red black trees where the user can specify his <br>
+own ordering of the keys. User-specified equality would be a much bigger task.</p>
+<p>Andreas</p>
+
+
+
+<a name="294133057"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20linear%20orders%20and%20strings/near/294133057" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20linear.20orders.20and.20strings.html#294133057">(Aug 18 2022 at 17:25)</a>:</h4>
+<p>From: René Thiemann &lt;<a href="mailto:rene.thiemann@uibk.ac.at">rene.thiemann@uibk.ac.at</a>&gt;</p>
+<blockquote>
+<blockquote>
+<p>1) are there already theories which make char and string members of linorder</p>
+</blockquote>
+<p>there are theories in HOL/Library, e.g. Char_ord and List_lexord and<br>
+List_Prefix</p>
+</blockquote>
+<p>thanks Florian for the pointers.</p>
+<blockquote>
+<blockquote>
+<p>2) I have defined my own class instance for char as follows:</p>
+</blockquote>
+<blockquote>
+<p>and then proven that this implementation satisfies the class conditions.<br>
+Unfortunately, after loading Code_Char_chr I cannot export the code anymore<br>
+since it is complains as follows:</p>
+</blockquote>
+<p>Does this persists if you use the »official« Char_ord theory?</p>
+</blockquote>
+<p>Unfortunately: yes.</p>
+<p>theory Test<br>
+imports Char_ord Code_Char_chr<br>
+begin</p>
+<p>definition f where "f x \&lt;equiv&gt; (x :: char) &lt;= x"<br>
+export_code f in Haskell file -</p>
+<p>yields a similar error message as my own definition of &lt;= on characters.</p>
+
+
+
+<a name="294133524"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20linear%20orders%20and%20strings/near/294133524" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20linear.20orders.20and.20strings.html#294133524">(Aug 18 2022 at 17:27)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hallo René,</p>
+<blockquote>
+<blockquote>
+<p>Does this persists if you use the »official« Char_ord theory?</p>
+</blockquote>
+<p>Unfortunately: yes.</p>
+<p>theory Test<br>
+imports Char_ord Code_Char_chr<br>
+begin</p>
+<p>definition f where "f x \&lt;equiv&gt; (x :: char) &lt;= x"<br>
+export_code f in Haskell file -</p>
+<p>yields a similar error message as my own definition of &lt;= on characters.</p>
+</blockquote>
+<p>the key issue is that the code lemmas for less_eq, less on char should<br>
+use nat_of_char rather than relying on the exact representation of nats.</p>
+<blockquote>
+<p>lemma [code]:<br>
+  "c1 \&lt;le&gt; c2 \&lt;longleftrightarrow&gt; nat_of_char c1 \&lt;le&gt; nat_of_char c2"</p>
+</blockquote>
+<blockquote>
+<p>lemma [code]:<br>
+  "c1 &lt; c2 \&lt;longleftrightarrow&gt; nat_of_char c1 &lt; nat_of_char c2"</p>
+</blockquote>
+<p>I would appreciate if these would go to the Char_ord theory.</p>
+<p>Hope this helps,<br>
+    Florian<br>
+<a href="/user_uploads/14278/bydbXxmTIb6FYnn4nRSqRjW7/signature.asc">signature.asc</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

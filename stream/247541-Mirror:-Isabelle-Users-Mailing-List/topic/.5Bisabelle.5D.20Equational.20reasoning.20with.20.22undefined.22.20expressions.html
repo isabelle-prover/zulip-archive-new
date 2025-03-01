@@ -1,0 +1,122 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Equational reasoning with &quot;undefined&quot; expressions · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Equational.20reasoning.20with.20.22undefined.22.20expressions.html">[isabelle] Equational reasoning with &quot;undefined&quot; expressions</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="289184625"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Equational%20reasoning%20with%20%22undefined%22%20expressions/near/289184625" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Equational.20reasoning.20with.20.22undefined.22.20expressions.html#289184625">(Jul 11 2022 at 12:47)</a>:</h4>
+<p>From: Dominique Unruh &lt;<a href="mailto:unruh@ut.ee">unruh@ut.ee</a>&gt;<br>
+Hello,</p>
+<p>The calculational reasoning feature of Isabelle/Isar (commands "also" <br>
+and "finally") is very useful for many complex calculations but I <br>
+repeatedly found one area where it is hard to use.</p>
+<p>Namely, when working with potentially undefined expressions (e.g., <br>
+limits, series, integrals, suprema, division by zero, etc.).</p>
+<p>(Side note: I am aware that Isabelle/HOL is total. I do not wish to <br>
+resurrect the discussion whether things such as division by zero should <br>
+have a fixed default value or not. When I say "undefined", I mean it in <br>
+the sense of "the limit doesn't exist" etc. in common mathematical <br>
+parlance, irrespective of how the HOL-constant is precisely defined. <br>
+Also, my meaning of "undefined" has nothing to do with the existing <br>
+HOL-constant "undefined".)</p>
+<p>For example, in a mathematical proof involving series, I may have a <br>
+calculation saying \ \sum_{ }^{ }f_i\le\sum_{ }^{ }g_i\le\sum_{ }^{ <br>
+}h_i=z, with a comment explaining something like "here the left series <br>
+exist because the right one exists". Or somewhat more formally, we <br>
+consider each of the series as an expression that can be a number, or <br>
+"undefined", and we interpret x\le y as meaning "if /y/ is defined, then <br>
+/x/ is defined and x\le y".</p>
+<p>When translating such proofs to Isabelle/HOL, I very often end up having <br>
+to do the calculation twice. I do one part of the proof that has a <br>
+sequence of steps of the form "summable h_i \implies summable g_i". And <br>
+then once these are established, I do the steps "\sum_{ }^{ <br>
+}g_i\le\sum_{ }^{ }h_i" etc. This increases duplication and reduces <br>
+readability a lot. Especially when I have nested series (where the <br>
+summands of a series might also be series that are potentially <br>
+undefined), things get hard to read).</p>
+<p>Instead of this, one could recreate what is implicitly done in the <br>
+mathematical proof as follows:</p>
+<p>* One rewrites the expressions \sum_{ }^{ }g_i (of type real) into<br>
+    expressions of type "real option", returning None if the series does<br>
+    not exist (or any of the summands does not exist).<br>
+    (Essentially, treating the computation as something that happens in<br>
+    the maybe-monad.)</p>
+<p>* One defines a relation \le' on "real option" that has the meaning<br>
+    "smaller-equal, and left is defined if right is" as described above.</p>
+<p>There are two problems with that. First, one needs to define a lot of <br>
+new relations (e.g., "smaller, left if right", "smaller-equal, right if <br>
+left", "..., right if and only if left", etc.) I think this would not be <br>
+a big one problem (e.g., one could have second order constants such as <br>
+"left_if_right" mapping \le into \le' and define some appropriate <br>
+syntactic sugar for readability).</p>
+<p>The second problem is more substantial: Rewriting an expression of type <br>
+"real" (or any other type involved in calculational reasoning) into <br>
+"real option" is difficult. (Not conceptually difficult but difficult to <br>
+do correctly.) \sum_{ }^{ }g_i would be replaced by "if summable g_i <br>
+then Some \sum_{ }^{ }g_i else None". (This can be made more readable <br>
+with a new constant "series_lifted", of course.) And even worse, <br>
+something like \sum_i^{ }\left(g_i+\sum_j^{ }h_{ij}\right) becomes a <br>
+very unreadable term since it is None if any of the inner series diverge <br>
+or if the outer one diverges.</p>
+<p>I would like to resolve these difficulties, and my idea is the following:</p>
+<p>* Write an ML function "lift: term -&gt; term" that transforms normal<br>
+    expressions (e.g., of type real) to "lifted" expression (of type<br>
+    "real option").<br>
+    This function would of course need some configuration, e.g., to know<br>
+    that "series :: (nat real -&gt; real)" is something that can return<br>
+    something "undefined" and under what conditions this happens.<br>
+    This is the hard part and needs careful thinking about the details,<br>
+    I think.</p>
+<p>* Add some syntactic sugar and parse/print translations so that this<br>
+    function would be applied when parsing terms.<br>
+    (E.g., "\sum_{ }^{ }g_i\ \left[\le\right]_{\leftarrow}\ \sum_{ }^{<br>
+    }h_i" might be replaced by something like "series_lifted g_i \le'<br>
+    series_lifted h'" on parsing and translated back on printing, where<br>
+    "series_lifted" is what the ML-function lift returns.)</p>
+<p>* Add a bunch of additional lemmas to ease working with these things.<br>
+    (E.g., trans-rules for constants such as \le'. And wrapper-lemmas<br>
+    expressing existing results in terms of "series_lifted" etc., e.g.)</p>
+<p>Before I set out on this endeavor, I would like to hear from others <br>
+whether there are other, better approaches to deal with calculational <br>
+reasoning in these situations. Or whether there are existing <br>
+implementations of this or a similar idea (in Isabelle, or in other <br>
+provers).</p>
+<p>Best wishes,<br>
+Dominique.</p>
+
+
+
+<a name="289294861"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Equational%20reasoning%20with%20%22undefined%22%20expressions/near/289294861" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Equational.20reasoning.20with.20.22undefined.22.20expressions.html#289294861">(Jul 12 2022 at 08:51)</a>:</h4>
+<p>From: Claudio Sacerdoti Coen &lt;<a href="mailto:claudio.sacerdoticoen@unibo.it">claudio.sacerdoticoen@unibo.it</a>&gt;<br>
+Dear Dominique,</p>
+<p>just an observation: what you propose reminds me of what I suggested<br>
+years ago for Matita/Coq</p>
+<p>Claudio Sacerdoti Coen and Enrico Zoli. “A Note on Formalising<br>
+Undefined Terms in Real Analysis”. In: PATE’07 (2007), p. 3. url:<br>
+<a href="https://www.cs.unibo.it/˜sacerdot/PAPERS/pate07.pdf">https://www.cs.unibo.it/˜sacerdot/PAPERS/pate07.pdf</a>.</p>
+<p>Indeed one needs multiple relations, but the interesting part is that<br>
+one observes in practice in real-world proofs very long zig-zags of the<br>
+form  &lt;&lt;&lt;&lt;&lt; &gt;&gt;&gt;&gt;&gt;&gt; &lt;&lt;&lt;&lt;&lt;&lt; &gt;&gt;&gt;&gt;   etc. where &gt; means "if lhs is defined,<br>
+rhs is" and &lt; the opposite. This allows to provide explicit proofs of<br>
+definedness only at the peaks of the zig-zags, like mathematicians do<br>
+informally.</p>
+<p>At the time there were not many easy ways to automate what we proposed<br>
+in Coq/Matita, but I think that nowadays it should be much simpler to<br>
+do, letting the system infer automatically what decorations to use for<br>
+relations and for the lemmas.</p>
+<p>Since you are reviving my interest into that, please let me know if you<br>
+plan to actually work on that for Isar.</p>
+<p>Cheers,<br>
+C.S.C.</p>
+
+
+
+<hr><p>Last updated: Jul 15 2022 at 23:21 UTC</p>
+</html>

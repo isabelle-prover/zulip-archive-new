@@ -1,0 +1,38 @@
+[
+    {
+        "content": "<p>From: Gergely Buday &lt;<a href=\"mailto:buday.gergely@uni-eszterhazy.hu\">buday.gergely@uni-eszterhazy.hu</a>&gt;<br>\nHi,</p>\n<p>I would like to write a forward proof in Isar to have </p>\n<p>P ⟶ (Q ⟶ R) ⟹ Q ⟶ (P ⟶ R)</p>\n<p>by hand it can be done through two implication eliminations using P and Q as assumptions, and then re-introducing implications but in the reverse order.</p>\n<p>I wrote the following to formalise this:</p>\n<p>theory Logic</p>\n<p>imports Main</p>\n<p>begin</p>\n<p>lemma \"P ⟶ (Q ⟶ R) ⟹ Q ⟶ (P ⟶ R)\" </p>\n<p>proof -</p>\n<p>assume premise : \"P ⟶ (Q ⟶ R)\"</p>\n<p>assume p: \"P\"</p>\n<p>have qr: \"Q ⟶ R\" by (simp add: p premise)</p>\n<p>assume q: \"Q\"</p>\n<p>have r: \"R\" by (simp add: q qr)</p>\n<p>from this have \"P ⟶ R\" by (simp add: p)</p>\n<p>from this have \"Q ⟶ (P ⟶ R)\" by (simp add: q)</p>\n<p>thus \"P ⟶ (Q ⟶ R) ⟹ Q ⟶ (P ⟶ R)\" by assumption</p>\n<p>Failed to refine any pending goal </p>\n<p>Local statement fails to refine any pending goal</p>\n<p>Failed attempt to solve goal by exported rule:</p>\n<p>(P ⟶ Q ⟶ R) ⟹ (P) ⟹ (Q) ⟹ (P ⟶ Q ⟶ R) ⟹ Q ⟶ P ⟶ R</p>\n<p>It fails at the last line, it is not really clear why. Can you give a clue?</p>\n<ul>\n<li>Gergely</li>\n</ul>",
+        "id": 294685097,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661177701
+    },
+    {
+        "content": "<p>From: Mark Wassell &lt;<a href=\"mailto:mpwassell@gmail.com\">mpwassell@gmail.com</a>&gt;<br>\nHi,</p>\n<p>My non-expert view:</p>\n<p>You have made too many assumptions - namely your assumptions p and q.</p>\n<p>Try starting your proof with</p>\n<p>proof(rule impI)+</p>\n<p>Cheers</p>\n<p>Mark</p>",
+        "id": 294685159,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661177718
+    },
+    {
+        "content": "<p>From: Lawrence Paulson &lt;<a href=\"mailto:lp15@cam.ac.uk\">lp15@cam.ac.uk</a>&gt;<br>\nIf you look at the State with the cursor after the proof keyword, you will see displayed what you are allowed to assume, which variables you must fix, and which conclusion you must show. Here you may assume \"P ⟶ (Q ⟶ R)” and must show \"Q ⟶ (P ⟶ R)”; to do that in single steps requires a nested proof. Or else do it as Mark suggested.</p>\n<p>Larry</p>",
+        "id": 294685166,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661177720
+    },
+    {
+        "content": "<p>From: Alexander Kogtenkov via Cl-isabelle-users &lt;<a href=\"mailto:cl-isabelle-users@lists.cam.ac.uk\">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>\n\"assume\" is used to state what is used as a premise of a goal, and neither P nor Q are given, that's why the proof fails. So, instead of proving a fact relying on \"assume\" you can prove a fact relying on \"if we assume...\":</p>\n<p>proof -<br>\n assume \"P ⟶ (Q ⟶ R)\"<br>\n then have \"Q ⟶ R\" if p: P by (simp add: p)<br>\n then have \"R\"       if p: P and q: Q by (simp add: p q)<br>\n then have \"P ⟶ R\" if q: Q by (simp add: q)<br>\n then have \"Q ⟶ (P ⟶ R)\" by simp<br>\n then show ?thesis by assumption<br>\nqed</p>\n<p>Given that \"simp\" is too powerful and could be used to prove the original lemma right away, you can also use explicit rules:</p>\n<p>proof -<br>\n   assume \"P ⟶ (Q ⟶ R)\"<br>\n   then have \"Q ⟶ R\"         if p: P using p by (rule mp)<br>\n   then have \"R\"               if p: P and q: Q using q by (rule mp) (insert p)<br>\n   then have \"P ⟶ R\"         if q: Q by (rule impI) (insert q)<br>\n   then show \"Q ⟶ (P ⟶ R)\" by (rule impI)<br>\nqed</p>\n<p>Alexander Kogtenkov</p>",
+        "id": 294685199,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661177730
+    },
+    {
+        "content": "<p>From: Gergely Buday &lt;<a href=\"mailto:buday.gergely@uni-eszterhazy.hu\">buday.gergely@uni-eszterhazy.hu</a>&gt;<br>\nAlexander Kogtenkov wrote:</p>\n<p>Thanks.</p>\n<p>A question:</p>\n<p>if I write</p>\n<p>lemma assumes pqr: \"P ⟶ (Q ⟶ R)\" shows \"Q ⟶ (P ⟶ R)\"<br>\nproof -<br>\n assume \"P ⟶ Q ⟶ R\"<br>\n then have \"Q ⟶ R\"         if p: P using p by (rule mp)<br>\n then have \"R\"               if p: P and q: Q using q by (rule mp) (insert p)<br>\n then have \"P ⟶ R\"         if q: Q by (rule impI) (insert q)<br>\n then have \"Q ⟶ (P ⟶ R)\" by (rule impI)</p>\n<p>I have </p>\n<p>have Q ⟶ P ⟶ R <br>\nproof (state)<br>\nthis:<br>\n  Q ⟶ P ⟶ R</p>\n<p>goal (1 subgoal):</p>\n<ol>\n<li>Q ⟶ P ⟶ R</li>\n</ol>\n<p>which I guess should be trivial to solve but it resisted any attempt.</p>\n<p>What is wrong here?</p>\n<ul>\n<li>Gergely</li>\n</ul>",
+        "id": 294685203,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661177732
+    },
+    {
+        "content": "<p>From: Alexander Kogtenkov via Cl-isabelle-users &lt;<a href=\"mailto:cl-isabelle-users@lists.cam.ac.uk\">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>\nThe form \"assumes-shows\" separates facts, so if in the proof you want to rely on the facts from \"assumes\", you need to tell it by adding</p>\n<p>using assms proof -</p>\n<p>Then your version completes without an issue. (You can also use \"pqr\" instead of a general \"assms\" to refer to the particular fact.)</p>\n<p>Another variant is to replace \"assume\" with the fact itself. In this case \"using assms\" is not required:</p>\n<p>proof -<br>\n   note pqr<br>\n   ...</p>\n<p>Finally, you can just use \"pqr\" in the proof itself. Then neither \"assume\" nor \"note\" is required:</p>\n<p>lemma assumes pqr: \"P ⟶ (Q ⟶ R)\" shows \"Q ⟶ (P ⟶ R)\"<br>\nproof -<br>\n have \"Q ⟶ R\" if p: P using pqr p by (rule mp)<br>\n then have \"R\" if p: P and q: Q using q by (rule mp) (insert p pqr)<br>\n then have \"P ⟶ R\" if q: Q by (rule impI) (insert q pqr)<br>\n then show \"Q ⟶ (P ⟶ R)\" by (rule impI) (insert pqr)<br>\nqed</p>\n<p>Alexander Kogtenkov</p>",
+        "id": 294690971,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661177765
+    }
+]

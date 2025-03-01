@@ -1,0 +1,231 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Unwanted type annotations · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Unwanted.20type.20annotations.html">[isabelle] Unwanted type annotations</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294240905"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Unwanted%20type%20annotations/near/294240905" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Unwanted.20type.20annotations.html#294240905">(Aug 19 2022 at 11:02)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On Tue, 21 May 2013, Jasmin Blanchette wrote:</p>
+<blockquote>
+<p>Am 21.05.2013 um 17:42 schrieb Steffen Juilf Smolka <br>
+&lt;<a href="mailto:steffen.smolka@in.tum.de">steffen.smolka@in.tum.de</a>&gt;:</p>
+<blockquote>
+<p>Is there a way to turn this feature off or to predict reliably when <br>
+annotations are inserted? From the code it seems that numerals with <br>
+polymorphic types are annotated, then again i know @{term 1} is <br>
+polymorhpic but printed without annotation. I guess I don't understand <br>
+the code completely…</p>
+</blockquote>
+</blockquote>
+<p>These syntax applications in the Isabelle/HOL library should be understood <br>
+as examples of what could be done in typical (ambitious) applications. <br>
+Studying such empirical material is then the starting point for trying to <br>
+pin down a situation that successfully work under certain minimal <br>
+assumptions. This requires revisit the question what "unwanted" actually <br>
+means here.</p>
+<p>BTW, the syntax layers of Isabelle are even thicker than seen here wrt. <br>
+parse/print translations.  In particular, there are also check/uncheck <br>
+phases with multiple stages that could do quite sophisticated things to <br>
+term input and output.</p>
+<blockquote>
+<blockquote>
+<p>The code I am working on equips terms with a minimal set of type <br>
+annotations which ensures the types of the terms are preserved (when <br>
+printing and reparsing the terms).</p>
+</blockquote>
+<p>I think I found a workaround. There seems to be no requirement that the <br>
+term that's printed is type-correct. Hence, you could type all numerals <br>
+with the type "nat" or "real" or probably even "unit" to avoid the <br>
+spurious type annotations. For example:</p>
+<p>ML {*<br>
+   @{term "0::nat"}<br>
+   |&gt; Type.constraint @{typ "'b"}<br>
+   |&gt; Syntax.string_of_term @{context}<br>
+   |&gt; warning<br>
+   *}</p>
+</blockquote>
+<p>Here is another example:</p>
+<p>declare [[show_markup = false]]</p>
+<p>ML {*<br>
+   fun test s =<br>
+     let<br>
+       val ctxt = @{context};<br>
+       val t = Syntax.read_term ctxt s;<br>
+       val t' = map_types (fn _ =&gt; dummyT) t;<br>
+     in<br>
+       writeln (Syntax.string_of_term ctxt t);<br>
+       writeln (Syntax.string_of_term ctxt t')<br>
+     end<br>
+*}</p>
+<p>ML_command {* test "0" *}<br>
+ML_command {* test "1" *}</p>
+<p>ML_command {* test "x ⟷ y" *}<br>
+ML_command {* test "x ≠ y" *}</p>
+<p>Types are not strictly necessary for printing, but the presence or absence <br>
+of types is important for certain fine points.  In the examples above the <br>
+difference is merely the folding of term abbreviations; without proper <br>
+types this "uncheck" stage is omitted.  There are further things that <br>
+break down without types.</p>
+<p>So we are back to figure out what is actually required -- and what is <br>
+possible.  We should probably continue this in a private mail thread.</p>
+<p>Makarius</p>
+
+
+
+<a name="294240957"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Unwanted%20type%20annotations/near/294240957" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Unwanted.20type.20annotations.html#294240957">(Aug 19 2022 at 11:02)</a>:</h4>
+<p>From: Jasmin Blanchette &lt;<a href="mailto:jasmin.blanchette@gmail.com">jasmin.blanchette@gmail.com</a>&gt;<br>
+We can certainly continue in a private thread, but what we want is plain and might be generally interesting to other people on the mailing list:</p>
+<ol>
+<li>A string_of_term function such that parse(string_of_term t)) aconv t (or at least they are equivalent for metis) and the output string is highly readable (in particular, not marred by type annotations).</li>
+</ol>
+<p>There are of course many issues involved here, including output-only syntaxes, but in practice with Sledgehammer the most urgent problem, already mentioned by Paulson and Susanto in their 2007 paper, is the type annotations. None of the default print modes quite does the trick, quickly leading to replay failures. So we refined goal 1 into goal 1b:</p>
+<p>1b. A string_of_term function such that parse(string_of_term t)) aconv t (or at least they are equivalent for metis) and the output contains a (locally) minimal number of type annotations (i.e., removing one would lead to a more general proposition).</p>
+<p>Steffen was quite successful with goal 1b -- so far numerals are the only corner case in which his approach fails and sometimes produces not only nonminimal solutions (which we can live with), but also horrors like ((0::'a)::'a) -- which parses OK but it disappointing after spending so much energy tying to come up with minimal annotations.</p>
+<p>Jasmin</p>
+
+
+
+<a name="294241537"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Unwanted%20type%20annotations/near/294241537" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Unwanted.20type.20annotations.html#294241537">(Aug 19 2022 at 11:06)</a>:</h4>
+<p>From: Steffen Juilf Smolka &lt;<a href="mailto:steffen.smolka@in.tum.de">steffen.smolka@in.tum.de</a>&gt;<br>
+Hi,</p>
+<p>For some reason, I can't get Isabelle to print the following term without type annotations:</p>
+<p>val t = @{term "0∷'a∷comm_monoid_add"}</p>
+<p>I have tried</p>
+<p>val ctxt = @{context}<br>
+ |&gt; Config.put show_markup                false<br>
+ |&gt; Config.put show_types                 false<br>
+ |&gt; Config.put show_free_types            false<br>
+ |&gt; Config.put show_all_types             false<br>
+ |&gt; Config.put show_sorts                 false<br>
+val _ = t |&gt; Syntax.string_of_term ctxt |&gt; writeln</p>
+<p>which produces the output "0∷'a". Am I doing something wrong?</p>
+<p>Best Regards,<br>
+Steffen</p>
+
+
+
+<a name="294241544"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Unwanted%20type%20annotations/near/294241544" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Unwanted.20type.20annotations.html#294241544">(Aug 19 2022 at 11:06)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:lammich@in.tum.de">lammich@in.tum.de</a>&gt;<br>
+I think this behaviour is hard-coded into the pretty-printer. On<br>
+numerals with variable types, it always prints the type.</p>
+<p>Peter</p>
+
+
+
+<a name="294241573"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Unwanted%20type%20annotations/near/294241573" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Unwanted.20type.20annotations.html#294241573">(Aug 19 2022 at 11:06)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+The question is what all these flags mean in detail, also what you mean by <br>
+"unwanted".  Do you just don't want to see it as end-user, or does some ML <br>
+code of yours depend critically on a certain behaviour?</p>
+<p>The inner syntax pretty printing infrastructure of Isabelle is very <br>
+flexible, and many details are determined by translation functions in user <br>
+space (here the HOL library).</p>
+<p>You can search the Isabelle/HOL sources for the syntax const "_constrain" <br>
+to get an idea where certain notation takes special care about such extra <br>
+type constraints.  You can then make educated guesses on which kind of <br>
+behaviour you can bet, or better not.</p>
+<p>Makarius</p>
+
+
+
+<a name="294241595"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Unwanted%20type%20annotations/near/294241595" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Unwanted.20type.20annotations.html#294241595">(Aug 19 2022 at 11:06)</a>:</h4>
+<p>From: Brian Huffman &lt;<a href="mailto:huffman.brian.c@gmail.com">huffman.brian.c@gmail.com</a>&gt;<br>
+On Thu, May 16, 2013 at 2:32 PM, Peter Lammich &lt;<a href="mailto:lammich@in.tum.de">lammich@in.tum.de</a>&gt; wrote:</p>
+<blockquote>
+<p>I think this behaviour is hard-coded into the pretty-printer. On<br>
+numerals with variable types, it always prints the type.</p>
+</blockquote>
+<p>Pretty-printing for numerals is implemented with a<br>
+"typed_print_translation (advanced)" command in HOL/Num.thy. The bit<br>
+of ML code there implements the logic for deciding when to add a type<br>
+annotation.</p>
+<p>This is an intentional feature. Without it, a numeral like "0" might<br>
+be parsed with a too-general type like "0::'a::zero" without the<br>
+user's knowledge, leading to much confusion.</p>
+<ul>
+<li>Brian</li>
+</ul>
+<blockquote>
+<p>On Do, 2013-05-16 at 18:41 +0200, Steffen Juilf Smolka wrote:</p>
+<blockquote>
+<p>Hi,</p>
+<p>For some reason, I can't get Isabelle to print the following term without type annotations:</p>
+<p>val t = @{term "0∷'a∷comm_monoid_add"}</p>
+<p>I have tried</p>
+<p>val ctxt = @{context}<br>
+ |&gt; Config.put show_markup                false<br>
+ |&gt; Config.put show_types                 false<br>
+ |&gt; Config.put show_free_types            false<br>
+ |&gt; Config.put show_all_types             false<br>
+ |&gt; Config.put show_sorts                 false<br>
+val _ = t |&gt; Syntax.string_of_term ctxt |&gt; writeln</p>
+<p>which produces the output "0∷'a". Am I doing something wrong?</p>
+<p>Best Regards,<br>
+Steffen</p>
+</blockquote>
+</blockquote>
+
+
+
+<a name="294241608"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Unwanted%20type%20annotations/near/294241608" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Unwanted.20type.20annotations.html#294241608">(Aug 19 2022 at 11:06)</a>:</h4>
+<p>From: Steffen Juilf Smolka &lt;<a href="mailto:steffen.smolka@in.tum.de">steffen.smolka@in.tum.de</a>&gt;</p>
+<blockquote>
+<p>Do you just don't want to see it as end-user, or does some ML code of yours depend critically on a certain behaviour?</p>
+</blockquote>
+<p>In Sledgehammer, we generate proof texts with a minimal amount of type annotations. The code assumes that only the annotations introduced with Type.constraint will be printed. (Therefore, I refer to any other annotations procuced by the pretty printer as "unwanted").</p>
+<p>The example I posted is the first one I encountered for which this assumption does not hold. The "unwanted annotations" do not break the generated Isar-Proof, they just look ugly (and are useless).</p>
+<p>-- Steffen</p>
+
+
+
+<a name="294241924"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Unwanted%20type%20annotations/near/294241924" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Unwanted.20type.20annotations.html#294241924">(Aug 19 2022 at 11:08)</a>:</h4>
+<p>From: Steffen Juilf Smolka &lt;<a href="mailto:steffen.smolka@in.tum.de">steffen.smolka@in.tum.de</a>&gt;<br>
+Is there a way to turn this feature off or to predict reliably when annotations are inserted?<br>
+From the code it seems that numerals with polymorphic types are annotated, then again i know @{term 1} is polymorhpic but printed without annotation. I guess I don't understand the code completely…</p>
+<p>The code I am working on equips terms with a minimal set of type annotations which ensures the types of the terms are preserved (when printing and reparsing the terms).</p>
+<p>Thanks for you help!<br>
+Steffen</p>
+
+
+
+<a name="294241963"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Unwanted%20type%20annotations/near/294241963" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Unwanted.20type.20annotations.html#294241963">(Aug 19 2022 at 11:09)</a>:</h4>
+<p>From: Jasmin Blanchette &lt;<a href="mailto:jasmin.blanchette@gmail.com">jasmin.blanchette@gmail.com</a>&gt;<br>
+Hi Steffen,</p>
+<p>I think I found a workaround. There seems to be no requirement that the term that's printed is type-correct. Hence, you could type all numerals with the type "nat" or "real" or probably even "unit" to avoid the spurious type annotations. For example:</p>
+<p>ML {*<br>
+    @{term "0::nat"}<br>
+    |&gt; Type.constraint @{typ "'b"}<br>
+    |&gt; Syntax.string_of_term @{context}<br>
+    |&gt; warning<br>
+    *}</p>
+<p>Cheers,</p>
+<p>Jasmin</p>
+
+
+
+<a name="294241985"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Unwanted%20type%20annotations/near/294241985" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Unwanted.20type.20annotations.html#294241985">(Aug 19 2022 at 11:09)</a>:</h4>
+<p>From: Steffen Juilf Smolka &lt;<a href="mailto:steffen.smolka@in.tum.de">steffen.smolka@in.tum.de</a>&gt;<br>
+That does the trick!</p>
+<p>Thanks,<br>
+Steffen</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

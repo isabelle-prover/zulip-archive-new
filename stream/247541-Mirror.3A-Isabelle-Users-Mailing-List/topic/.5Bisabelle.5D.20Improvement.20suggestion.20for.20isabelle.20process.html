@@ -1,0 +1,120 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Improvement suggestion for isabelle process · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Improvement.20suggestion.20for.20isabelle.20process.html">[isabelle] Improvement suggestion for isabelle process</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="212906593"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Improvement%20suggestion%20for%20isabelle%20process/near/212906593" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Improvement.20suggestion.20for.20isabelle.20process.html#212906593">(Oct 10 2020 at 09:03)</a>:</h4>
+<p>From: "Devant, Pascal" &lt;<a href="mailto:pascal.devant@rwth-aachen.de">pascal.devant@rwth-aachen.de</a>&gt;<br>
+Lately I have been working on a script that automatically runs sledgehammer on unproven lemmas in a given theory. The subcommand 'isabelle process' seemed to be sufficient for this purpose. And this is true if the only goal is to find proofs. However, when it comes to evaluating search times you quickly run into a problem with this approach because 'isabelle process' only returns the output of the underlaying poly process after its' termination.</p>
+<p>This "output-after-termination" behaviour has two unpleasant effects:</p>
+<ol>
+<li>There is no way to measure the actual search time of specific provers.</li>
+<li>A prover might find a proof fairly quick (e.g. after a few seconds) but the user will only get to see the proof ones all other provers have terminated. Since for most non-trivial lemmas there is almost always a prover that will run into a timeout. Hence the whole process is blocked for the set sledgehammer timeout.</li>
+</ol>
+<p>After some code inspection, I backtracked the described behaviour to the scala definition of 'result' in "Pure/System/bash.scala". In this definition Isabelle is waiting synchronously for the termination of the poly process by waiting for the result of "File.read_lines".</p>
+<p>To "solve" this behaviour I extended the given "Process" class in bash.scala by a modifed version of the existing "result()" method that reads the output stream of poly line by line and immediately redirects it to the console. After creating this method all that was left to do is using this method instead of "result()" in "ml_process.scala"<br>
+My modifed version of the result method it attached below. It's most likly not a clean implementation since this is my first scala code but it works. (And this is what matters, I guess)</p>
+<p>Is there a special resason why this whole procedure is not made async in the current implementation of Isabelle?<br>
+Is there a chance that isabelle process will redirect the output of poly async in future versions of Isabelle, so I don't need to use my own "patched" version?</p>
+<p>Thanks for reading!</p>
+<p>Best regards,<br>
+Pascal</p>
+<p>def logAsyncAndWaitForExit(<br>
+      progress_stdout: String =&gt; Unit = (_: String) =&gt; (),<br>
+      progress_stderr: String =&gt; Unit = (_: String) =&gt; (),<br>
+      progress_limit: Option[Long] = None,<br>
+      strict: Boolean = true): Process_Result =<br>
+    {<br>
+      stdin.close</p>
+<p>var out_lines = new ListBuffer[String]()<br>
+      Future.thread("async_stdout") {<br>
+        while(true)<br>
+        {<br>
+          val line = stdout.readLine()<br>
+          if (line != null)<br>
+          {<br>
+            Console.println(line)</p>
+<p>this.synchronized {<br>
+              out_lines += line<br>
+            }<br>
+          }<br>
+        }<br>
+      }</p>
+<p>var err_lines = new ListBuffer[String]()<br>
+      Future.thread("async_stderr") {<br>
+        while(true)<br>
+        {<br>
+          val line = stdout.readLine()<br>
+          if (line != null)<br>
+          {<br>
+            Console.println(line)</p>
+<p>this.synchronized {<br>
+              err_lines += line<br>
+            }<br>
+          }<br>
+        }<br>
+      }</p>
+<p>val rc =<br>
+        try { join }<br>
+        catch { case Exn.Interrupt() =&gt; terminate(); Exn.Interrupt.return_code }<br>
+      if (strict &amp;&amp; rc == Exn.Interrupt.return_code) throw Exn.Interrupt()</p>
+<p>Process_Result(rc, out_lines.toList, err_lines.toList, false, get_timing)<br>
+    }</p>
+
+
+
+<a name="215962414"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Improvement%20suggestion%20for%20isabelle%20process/near/215962414" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Improvement.20suggestion.20for.20isabelle.20process.html#215962414">(Nov 07 2020 at 16:31)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On 10/10/2020 00:43, Devant, Pascal wrote:</p>
+<blockquote>
+<p>Lately I have been working on a script that automatically runs sledgehammer on unproven lemmas in a given theory. The subcommand 'isabelle process' seemed to be sufficient for this purpose. And this is true if the only goal is to find proofs. However, when it comes to evaluating search times you quickly run into a problem with this approach because 'isabelle process' only returns the output of the underlaying poly process after its' termination.</p>
+<p>This "output-after-termination" behaviour has two unpleasant effects:<br>
+1. There is no way to measure the actual search time of specific provers.<br>
+2. A prover might find a proof fairly quick (e.g. after a few seconds) but the user will only get to see the proof ones all other provers have terminated. Since for most non-trivial lemmas there is almost always a prover that will run into a timeout. Hence the whole process is blocked for the set sledgehammer timeout.</p>
+</blockquote>
+<p>This old thread is still open, but it is about potential refinements for the<br>
+next release, so an answer now is still on time.</p>
+<blockquote>
+<p>After some code inspection, I backtracked the described behaviour to the scala definition of 'result' in "Pure/System/bash.scala". In this definition Isabelle is waiting synchronously for the termination of the poly process by waiting for the result of "File.read_lines".</p>
+</blockquote>
+<p>I was at first confused by the proposed changes to Process.result, because the<br>
+existing operation already supports incremental output via<br>
+progress_stdout/progress_stderr.</p>
+<p>So here is my minor change to "isabelle process" for incremental output on<br>
+stdout/stderr (separately): <a href="https://isabelle-dev.sketis.net/rISABELLE6345cce0e576">https://isabelle-dev.sketis.net/rISABELLE6345cce0e576</a></p>
+<blockquote>
+<p>Is there a special resason why this whole procedure is not made async in the current implementation of Isabelle?</p>
+</blockquote>
+<p>Historically, we used to have sophisticated interaction between the prover<br>
+process and Proof General / Emacs: it worked to some extent, but was more<br>
+delicate and fragile than one would hope for.</p>
+<p>So with the emergence of Isabelle/PIDE process management and interaction<br>
+independently of stdin/stdout/stderr, I downgraded old-fashioned processes to<br>
+become atomic functions (non-interactive). Only gradually, I added things like<br>
+progress_stdout later on.</p>
+<p>Depending what you are actually trying to do, the above incremental<br>
+stdout/stderr stream might be OK for the purpose.</p>
+<p>More ambitious applications could work better with "isabelle server" and and<br>
+its explicit JSON message protocol: but that is some extra complexity. You<br>
+could also try to implement your tool directly in Isabelle/Scala and use the<br>
+underlying Headless.Session directly, without the extra JSON non-sense.</p>
+<p>There is quite some documentation on the server in the "system" manual,<br>
+chapter 4. For its Headless.Session, the "isabelle dump" tool may serve as<br>
+canonical example.</p>
+<p>Note that you can browse Isabelle/Scala sources easily with IntelliJ IDEA,<br>
+using the project generated by "isabelle scala_project" (see "system" manual<br>
+section 5.5).</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

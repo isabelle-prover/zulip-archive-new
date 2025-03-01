@@ -1,0 +1,134 @@
+<html>
+<head><meta charset="utf-8"><title>Eisbach matching meta forall in conclusions · General · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/202961-General/index.html">General</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Eisbach.20matching.20meta.20forall.20in.20conclusions.html">Eisbach matching meta forall in conclusions</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="263573811"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/Eisbach%20matching%20meta%20forall%20in%20conclusions/near/263573811" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Matthew Torrence <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Eisbach.20matching.20meta.20forall.20in.20conclusions.html#263573811">(Dec 03 2021 at 12:43)</a>:</h4>
+<p>I'm having trouble matching meta-universally quantified variables in my conclusion in Eisabach with the match command. Let's say I want to match an HOL \&lt;forall&gt; . I can do that as follows:</p>
+<div class="codehilite"><pre><span></span><code>method mymethod =
+  (match conclusion in &quot;∀x. A x&quot; for A ⇒ blah)
+</code></pre></div>
+<p>And that works fine:</p>
+<div class="codehilite"><pre><span></span><code>lemma &quot;∀x::nat. x + x = 2*x&quot;
+  apply(mymethod) (* matches, does blah *)
+</code></pre></div>
+<p>However, a similar looking method with an \&lt;And&gt; instead doesn't match:</p>
+<div class="codehilite"><pre><span></span><code>method mymethod2 =
+  (match conclusion in &quot;⋀x. A x&quot; for A ⇒ blah)
+
+lemma &quot;⋀x::nat. x + x = 2*x&quot;
+  apply(mymethod) (* fails *)
+</code></pre></div>
+<p>I can kind of see why, since:</p>
+<div class="codehilite"><pre><span></span><code>method debugabit =
+  (match conclusion in A for A ⇒ ‹print_term A›)
+
+lemma &quot;⋀x::nat. x + x = 2*x&quot;
+  apply(debugabit)
+</code></pre></div>
+<p>gives:</p>
+<div class="codehilite"><pre><span></span><code>print_term: A: x + x = 2 * x
+</code></pre></div>
+<p>Which obviously doesn't have an explicit \&lt;And&gt;. What ways are there for dealing with this? One solution is that I can match very broadly:</p>
+<div class="codehilite"><pre><span></span><code>method mymethod2 =
+  (match conclusion in &quot;A x&quot; for A x ⇒ blah)
+</code></pre></div>
+<p>But this is annoying, since it picks up x = a billion things other than the variable I'm interested in, and that was breaking some of my other methods. Are there any suggestions for matching this correctly, or getting a reference to the quantified variable?</p>
+
+
+
+<a name="263578405"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/Eisbach%20matching%20meta%20forall%20in%20conclusions/near/263578405" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Matthew Torrence <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Eisbach.20matching.20meta.20forall.20in.20conclusions.html#263578405">(Dec 03 2021 at 13:23)</a>:</h4>
+<p>(An email thread that may be relevant: <a href="https://lists.cam.ac.uk/mailman/htdig/cl-isabelle-users/2016-October/msg00091.html">https://lists.cam.ac.uk/mailman/htdig/cl-isabelle-users/2016-October/msg00091.html</a>)</p>
+
+
+
+<a name="263673267"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/Eisbach%20matching%20meta%20forall%20in%20conclusions/near/263673267" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Wolfgang Jeltsch <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Eisbach.20matching.20meta.20forall.20in.20conclusions.html#263673267">(Dec 04 2021 at 01:08)</a>:</h4>
+<p>Yes, interestingly, the application of <code>match</code> seems to fix the universally quantified variable.</p>
+<p>When matching a pattern like <code>A x</code>, you need to make sure that <code>x</code> refers to the <code>x</code> in your conclusion. For this, I think, you need to manually fix the variable and then reference it inside your method application as follows (I’m using <code>n</code> instead of <code>x</code>):</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">lemma</span>
+  <span class="kp">fixes</span> <span class="n">n</span> <span class="o">::</span> <span class="n">nat</span>
+  <span class="kp">shows</span> <span class="s">"n + n = 2 * n"</span>
+  <span class="kp">apply</span> <span class="o">(</span><span class="n">match</span> <span class="n">conclusion</span> <span class="kp">in</span> <span class="s">"A n"</span> <span class="kp">for</span> <span class="n">A</span> <span class="err">⇒</span> <span class="err">‹</span><span class="n">print_term</span> <span class="n">A</span><span class="err">›</span><span class="o">)</span>
+</code></pre></div>
+<p>This correctly prints <code>λa. a + a = 2 * a</code>. Note that fixing the variable only affects the proof; from the outside, <code>n</code> appears as a schematic variable, like if you had explicitly universally quantified it.</p>
+<p>Now the above example uses <code>match</code> directly inside <code>apply</code>. What if you wanted to have it in a separate, custom proof method? Then you would have to explicitly communicate the variable to be considered the argument of <code>A</code> to the method (it’s good you have to do that, because it ensures that your proof method is independent of the naming of the argument in the respective conclusion). Here’s how you could achieved that:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="n">method</span> <span class="n">print_predicate</span> <span class="kp">for</span> <span class="n">n</span> <span class="o">=</span> <span class="o">(</span><span class="n">match</span> <span class="n">conclusion</span> <span class="kp">in</span> <span class="s">"A n"</span> <span class="kp">for</span> <span class="n">A</span> <span class="err">⇒</span> <span class="err">‹</span><span class="n">print_term</span> <span class="n">A</span><span class="err">›</span><span class="o">)</span>
+
+<span class="kn">lemma</span>
+  <span class="kp">fixes</span> <span class="n">n</span> <span class="o">::</span> <span class="n">nat</span>
+  <span class="kp">shows</span> <span class="s">"n + n = 2 * n"</span>
+  <span class="kp">apply</span> <span class="o">(</span><span class="n">print_predicate</span> <span class="n">n</span><span class="o">)</span>
+</code></pre></div>
+<p>I hope that helps. <span aria-label="smile" class="emoji emoji-1f642" role="img" title="smile">:smile:</span></p>
+
+
+
+<a name="263844606"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/Eisbach%20matching%20meta%20forall%20in%20conclusions/near/263844606" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Matthew Torrence <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Eisbach.20matching.20meta.20forall.20in.20conclusions.html#263844606">(Dec 06 2021 at 12:48)</a>:</h4>
+<p>This is helpful information, thanks. Unfortunately, there's still a slight problem with it, which is that I can't refer to the variable <code>x</code> when it's universally quantified in my goal. For instance, your example works well when we have</p>
+<div class="codehilite"><pre><span></span><code>lemma
+  fixes n :: nat
+  shows &quot;n + n = 2 * n&quot;
+</code></pre></div>
+<p>but if we have</p>
+<div class="codehilite"><pre><span></span><code>lemma
+  shows &quot;!!n. n + n = 2 * n&quot;
+</code></pre></div>
+<p>we're kind of out of luck, since we have no name to refer to n with. In this simple example, the solution is very obvious (just use <code>fix n</code>). However, I encounter this situation often where I'm in the middle of an apply-style proof, and my subgoals have all these "un-referable" variables, and I need to break out Isar to get anything done. I encountered the main problem here when trying to create methods to help deal with this</p>
+
+
+
+<a name="263844786"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/Eisbach%20matching%20meta%20forall%20in%20conclusions/near/263844786" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Matthew Torrence <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Eisbach.20matching.20meta.20forall.20in.20conclusions.html#263844786">(Dec 06 2021 at 12:50)</a>:</h4>
+<p>For instance, I encounter this type of situation when I <code>apply(insert atheorem[of stuff])</code> where I haven't filled in all the unknowns in <code>atheorem</code>, or when I <code>apply(induction)</code> (in the inductive hypothesis)</p>
+
+
+
+<a name="263846038"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/Eisbach%20matching%20meta%20forall%20in%20conclusions/near/263846038" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Matthew Torrence <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Eisbach.20matching.20meta.20forall.20in.20conclusions.html#263846038">(Dec 06 2021 at 13:01)</a>:</h4>
+<p>It looks like <code>apply(atomize)</code> might be of some help: <a href="https://stackoverflow.com/questions/21430238/how-to-replace-%E2%8B%80-and-%E2%9F%B9-with-%E2%88%80-and-%E2%9F%B6-in-assumption">https://stackoverflow.com/questions/21430238/how-to-replace-%E2%8B%80-and-%E2%9F%B9-with-%E2%88%80-and-%E2%9F%B6-in-assumption</a>, but I can't quite get it to work on the example I gave...</p>
+
+
+
+<a name="263846860"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/Eisbach%20matching%20meta%20forall%20in%20conclusions/near/263846860" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Matthew Torrence <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Eisbach.20matching.20meta.20forall.20in.20conclusions.html#263846860">(Dec 06 2021 at 13:08)</a>:</h4>
+<p>aha! What I was looking for was <code>apply(atomize (full))</code> (<a href="https://stackoverflow.com/questions/53487024/pull-all-occurrences-of-the-induction-variable-into-the-conclusion-in-isabelle">https://stackoverflow.com/questions/53487024/pull-all-occurrences-of-the-induction-variable-into-the-conclusion-in-isabelle</a>). To summarize, this takes meta quantifiers to HOL quantifiers, which (as we started with) might be easier to match over. I'll have to play around, because this feels fairly hack-y, but I'm glad to at least have a solution</p>
+
+
+
+<a name="263939146"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/Eisbach%20matching%20meta%20forall%20in%20conclusions/near/263939146" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Wolfgang Jeltsch <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Eisbach.20matching.20meta.20forall.20in.20conclusions.html#263939146">(Dec 06 2021 at 23:23)</a>:</h4>
+<p>Why are you using <code>apply</code>-style?</p>
+<p>Personally, I find <code>apply</code> style great for experimenting in order to find concise proof method expressions to be used with <code>by</code> (for example, to come up with something like <code>by transfer (auto simp del: shift_append simp add: shift_append [symmetric])</code>. For the final code, I never use <code>apply</code> but exclusively Isar.</p>
+
+
+
+<a name="264013982"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/Eisbach%20matching%20meta%20forall%20in%20conclusions/near/264013982" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Matthew Torrence <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Eisbach.20matching.20meta.20forall.20in.20conclusions.html#264013982">(Dec 07 2021 at 15:09)</a>:</h4>
+<p>In this case, it's mostly so I can automate the reasoning with <code>method</code>s, but I also find it nicer for certain subgoals to work backwards rather than forwards (for example, when you're repeatedly applying rules, end up with lots of subgoals, and want to know which ones disappear by <code>auto</code>)</p>
+
+
+
+<a name="264014052"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/Eisbach%20matching%20meta%20forall%20in%20conclusions/near/264014052" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Matthew Torrence <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Eisbach.20matching.20meta.20forall.20in.20conclusions.html#264014052">(Dec 07 2021 at 15:09)</a>:</h4>
+<p>I guess dropping into a forward proof in these cases is by far the more maintainable option though</p>
+
+
+
+<a name="264014208"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/Eisbach%20matching%20meta%20forall%20in%20conclusions/near/264014208" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Matthew Torrence <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Eisbach.20matching.20meta.20forall.20in.20conclusions.html#264014208">(Dec 07 2021 at 15:10)</a>:</h4>
+<p>Another case is when I have a very complicated algebraic term, and I want to apply a lot of substitutions. In that case, my Isar proofs get very long very quickly, because I'm having to repeat myself. I find myself in this case a lot</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

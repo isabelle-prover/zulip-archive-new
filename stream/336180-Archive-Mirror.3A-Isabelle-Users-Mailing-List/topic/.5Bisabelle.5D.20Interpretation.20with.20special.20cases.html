@@ -1,0 +1,113 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Interpretation with special cases · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Interpretation.20with.20special.20cases.html">[isabelle] Interpretation with special cases</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294077899"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Interpretation%20with%20special%20cases/near/294077899" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Interpretation.20with.20special.20cases.html#294077899">(Aug 18 2022 at 13:33)</a>:</h4>
+<p>From: Tim McKenzie &lt;<a href="mailto:tjm1983@gmail.com">tjm1983@gmail.com</a>&gt;<br>
+In the attached file, I define a locale called metric, and I prove</p>
+<p>interpretation real_euclid: metric dist</p>
+<p>I also define a locale (based on metric) called non_exact_metric, and I try to <br>
+begin proving</p>
+<p>interpretation real_euclid: non_exact_metric "dist:: [real^2, real^2] =&gt; real"</p>
+<p>Isabelle 2009 balks at the last show in the file, complaining "Local statement <br>
+will fail to refine any pending goal", even though I've specified that I only <br>
+want to prove the interpretation for the two-dimensional case of dist. If I <br>
+remove the bit that specifies that ?x is of type real^2, then Isabelle happily <br>
+processes the show command. I don't think I'd be able to finish the proof, <br>
+though, since one-dimensional Euclidean space doesn't satisfy non_exact.</p>
+<p>Can someone explain to me what's going on here?</p>
+<p>Tim<br>
+&lt;&gt;&lt;<br>
+<a href="/user_uploads/14278/5g472vYNgjWiFCerqB28i1AB/Metric.thy">Metric.thy</a><br>
+<a href="/user_uploads/14278/MV4yOC4hD2Um-nKn3AcOg5Ga/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294077911"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Interpretation%20with%20special%20cases/near/294077911" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Interpretation.20with.20special.20cases.html#294077911">(Aug 18 2022 at 13:33)</a>:</h4>
+<p>From: Brian Huffman &lt;<a href="mailto:brianh@cs.pdx.edu">brianh@cs.pdx.edu</a>&gt;<br>
+Hi Tim,</p>
+<p>Running your proof script with "show sorts" enabled highlights exactly<br>
+what the problem is. In your first "show" statement, the goal you have<br>
+stated has a more general type than what you intended: "real^2" is<br>
+replaced with "real ^ 'a". Since the more general statement still<br>
+resolves with the original goal, Isar does not complain. Now Isabelle<br>
+is expecting you to prove this new, more general goal, which of course<br>
+is impossible. To fix the problem, just add a type annotation to the<br>
+"show" statement to force x y and z to have type "real^2".</p>
+<p>interpretation real_euclid: non_exact_metric "dist :: [real^2, real^2] =&gt; real"<br>
+proof<br>
+(* the subgoal at this point is for type "real ^ 2" *)<br>
+  show "EX x y z.<br>
+    ~ real_euclid.exact x y z &amp;<br>
+    ~ real_euclid.exact y z x &amp;<br>
+    ~ real_euclid.exact z x y"<br>
+(* the subgoal at this point is for type "real ^ 'a" *)<br>
+  proof<br>
+    let ?x = "0 :: real^2"<br>
+    show "EX y z.<br>
+      ~ real_euclid.exact ?x y z &amp;<br>
+      ~ real_euclid.exact y z ?x &amp;<br>
+      ~ real_euclid.exact z ?x y"</p>
+<p>I am actually surprised that no warning message is generated after the<br>
+first "show", since you are adding a new type variable "'a" to the<br>
+proof state that wasn't there before. I think there <em>should</em> be a<br>
+warning message in this case, because inventing a new type variable is<br>
+probably not what anyone would intend to do.</p>
+<ul>
+<li>Brian</li>
+</ul>
+
+
+
+<a name="294077945"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Interpretation%20with%20special%20cases/near/294077945" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Interpretation.20with.20special.20cases.html#294077945">(Aug 18 2022 at 13:34)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:lochbihl@ipd.info.uni-karlsruhe.de">lochbihl@ipd.info.uni-karlsruhe.de</a>&gt;<br>
+Hi Tim,</p>
+<p>if you turn on "show types" in Isabelle, you see that the goal in your <br>
+interpretation proof for real_euclid : non_exact_metric after the first <br>
+"proof" command still contains the type "real ^ 2" for the existentially <br>
+quantified x y z.</p>
+<p>Your show statement however replaces this type constraint with "real ^ <br>
+'a" because this is the most general type that can be inferred for the <br>
+proposition to be shown. Since this type is more general than the typing <br>
+for the actual goal to be shown, Isabelle does not complain.<br>
+Hence, inside your second proof, the type for ?x should be "real ^ 'a" <br>
+with 'a being now fixed.</p>
+<p>The solution is to include a type constraint already in the first show <br>
+statement:</p>
+<p>interpretation real_euclid: non_exact_metric "dist :: [real2, real2] <br>
+\&lt;Rightarrow&gt; real"<br>
+proof<br>
+   show "\&lt;exists&gt;x y z :: real ^ 2.<br>
+     \&lt;not&gt; real_euclid.exact x y z \&lt;and&gt;<br>
+     \&lt;not&gt; real_euclid.exact y z x \&lt;and&gt;<br>
+     \&lt;not&gt; real_euclid.exact z x y"</p>
+<p>Regards,<br>
+Andreas</p>
+<p>Tim McKenzie schrieb:</p>
+
+
+
+<a name="294078003"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Interpretation%20with%20special%20cases/near/294078003" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Interpretation.20with.20special.20cases.html#294078003">(Aug 18 2022 at 13:34)</a>:</h4>
+<p>From: Tim McKenzie &lt;<a href="mailto:tjm1983@gmail.com">tjm1983@gmail.com</a>&gt;<br>
+Thanks Brian and Andreas for your excellent explanations. I think I<br>
+understand the problem now, and I've also found out how to turn on<br>
+"show types" and "show sorts" in Proof General, so I should be able to<br>
+diagnose similar problems in future.</p>
+<p>Tim<br>
+&lt;&gt;&lt;</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,103 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Iteration until saturation · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Iteration.20until.20saturation.html">[isabelle] Iteration until saturation</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294045746"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Iteration%20until%20saturation/near/294045746" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Iteration.20until.20saturation.html#294045746">(Aug 18 2022 at 10:06)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:peter.lammich@uni-muenster.de">peter.lammich@uni-muenster.de</a>&gt;<br>
+Hi list,</p>
+<p>I want to formalize a saturation algorithm.<br>
+That is, I start with some initial set v_0:: 's set and have a function <br>
+f:: 's set =&gt; 's set that maps sets to additional elements that should <br>
+be added.</p>
+<p>Imperatively, I have the following algorithm:<br>
+input: v0<br>
+precondition: v0 \subseteq U &amp;  P v0<br>
+  v:=v_0<br>
+  while there is some x with x \in f v and not x \in v do v:=v \cup {x}; od<br>
+output: v</p>
+<p>Function f is monotonous.</p>
+<p>Termination is because I have a finite set U such that v_0 \subseteq U <br>
+and v\subseteq U ==&gt; f v \subseteq U.</p>
+<p>To prove something about the result, I have an invariant P, such that P <br>
+v_0 and [|P v; x\in f v - v |] ==&gt; P (v \cup {x}).</p>
+<p>What approach should I use to formalize this algorithm in isabelle, i.e. <br>
+define some Isabelle function algo: 's set =&gt; 's set that describes the <br>
+algorithm above, and<br>
+how to prove<br>
+  v0 \subseteq U &amp; P v0 ==&gt; P algo v0<br>
+and<br>
+  v0 \subseteq U &amp; P v0 ==&gt; f(algo v0) \subseteq algo v0</p>
+<p>My main problem with using inductive definition, i.e. somthing like<br>
+  inductive "algo v0"<br>
+  intros<br>
+    "x\in v0  ==&gt; x \in algo v0"<br>
+    "x\in f (algo v0) ==&gt; x \in (algo v0)"<br>
+  monos f_mono</p>
+<p>is, that I cannot use the invariant P to reason about the correctness of <br>
+the result. Using algo.induct, I can only reason about single elements <br>
+of (algo v0), but not<br>
+about the set as whole (as this reasoning would not be correct in <br>
+general for infinite sets).</p>
+<p>Thanks in advance for any hints or pointers to examples of formalization <br>
+of such algorithms.</p>
+<p>-- Peter</p>
+
+
+
+<a name="294045785"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Iteration%20until%20saturation/near/294045785" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Iteration.20until.20saturation.html#294045785">(Aug 18 2022 at 10:07)</a>:</h4>
+<p>From: Alexander Krauss &lt;<a href="mailto:krauss@in.tum.de">krauss@in.tum.de</a>&gt;<br>
+Peter,</p>
+<blockquote>
+<p>I want to formalize a saturation algorithm.<br>
+That is, I start with some initial set v_0:: 's set and have a function<br>
+f:: 's set =&gt; 's set that maps sets to additional elements that should<br>
+be added.</p>
+<p>Imperatively, I have the following algorithm:<br>
+input: v0<br>
+precondition: v0 \subseteq U &amp;  P v0<br>
+ v:=v_0<br>
+ while there is some x with x \in f v and not x \in v do v:=v \cup <br>
+{x}; od<br>
+output: v</p>
+<p>Function f is monotonous.</p>
+<p>Termination is because I have a finite set U such that v_0 \subseteq U<br>
+and v\subseteq U ==&gt; f v \subseteq U.</p>
+</blockquote>
+<p>It seems the best way to to this is using recdef (I assume you are using <br>
+Isabelle 2005, otherwise the new "function" package for partial <br>
+functions would be just what you need)</p>
+<p>The problem here is that the function might not terminate if called <br>
+outside the finite set U you mention...? In this case, you might need to <br>
+have an extra check for this:</p>
+<p>recdef algo "???"<br>
+   "algo v = (if v \subseteq U then<br>
+               then if f v \subseteq v then v else algo (v \union f v)<br>
+               else arbitrary)"</p>
+<p>for the termination relation, you should be able to construct something <br>
+using the predefined wellfounded relation "finite_psubset".</p>
+<p>I replaced the "pointwise" addition by a union, which should be the same <br>
+if f is monotone...</p>
+<blockquote>
+<p>To prove something about the result, I have an invariant P, such that P<br>
+v_0 and [|P v; x\in f v - v |] ==&gt; P (v \cup {x}).</p>
+</blockquote>
+<p>From this you should also be able to prove<br>
+   "[| v \subseteq U; P v |] ==&gt; P (v \union f v)"<br>
+(using your finiteness assumptions and induction) which together with <br>
+algo.induct gives you your result.</p>
+<p>Hope this helps...<br>
+Alex</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

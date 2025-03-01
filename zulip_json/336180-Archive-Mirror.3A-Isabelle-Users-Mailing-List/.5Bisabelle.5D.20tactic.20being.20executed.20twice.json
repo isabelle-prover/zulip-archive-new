@@ -1,0 +1,62 @@
+[
+    {
+        "content": "<p>From: Jeremy Dawson &lt;<a href=\"mailto:Jeremy.Dawson@anu.edu.au\">Jeremy.Dawson@anu.edu.au</a>&gt;<br>\nHi,</p>\n<p>I have a (part) theory file, with goal and tactic as follows</p>\n<p>theory Scratch imports ZF begin<br>\nlemma oracle_test: \"A ⟶ A &amp; B\"<br>\n   apply (rule impI)<br>\n   apply (rule conjI)<br>\napply (tactic {* fn thm =&gt;<br>\n   let<br>\n     val _ = writeln \"aaa\" ;<br>\n     val _ = writeln (@{make_string} thm) ;<br>\n     val cps = Drule.cprems_of thm ;<br>\n     val _ = writeln \"ccc\" ;<br>\n     val _ = writeln (@{make_string} cps) ;<br>\n     val _ = writeln \"ddd\" ;<br>\n   in Seq.succeed thm end ; *})</p>\n<p>At this point it seems clear that the tactic is executed twice, the <br>\nfirst time seemingly with an argument thm which gets printed out as <br>\n\"TERM _\", and the second time with the actual goal state.</p>\n<p>Why is this?  What's going on here?  Is this how apply tactic ... should <br>\nbe used?</p>\n<p>Thanks</p>\n<p>Jeremy</p>",
+        "id": 294734263,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661189236
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nSince tactics are by definition lazy and value-oriented, the system is<br>\nfree to run them many times. Here it happens to be twice, because of an<br>\nadditional stage to \"intern\" the proof method expression; in other<br>\nsituations it might be more than twice.</p>\n<p>The writeln invocations above are not value-oriented, thus you see such<br>\nimplementation details in the experiment. In production use, you would<br>\nnever emit such messages from a tactic.</p>\n<p>If you want to experiment with Isar goal states, it works better via the<br>\nML_val command with the @{Isar.state} antiquotation. You can put various<br>\nauxiliary ML val bindings into ML_val, but cannot export a modified<br>\nproof state.</p>\n<p>Anyway, can you generally say what you are trying to do? So far I merely<br>\nsee attempts to fit the mindset of a different proof assistant<br>\n(Isabelle98) to Isabelle2017. There is a common name prefix, but almost<br>\neverything else has changed since then.</p>\n<p>To get started with Isabelle2017, I recommend to ignore Isabelle/ML<br>\naltogether, and do definitions, statements, proofs in the Isar source<br>\nlanguage. Then maybe get acquainted with Eisbach for user-defined proof<br>\nmethods.</p>\n<p>Makarius</p>",
+        "id": 294734488,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661189304
+    },
+    {
+        "content": "<p>From: Lars Hupel &lt;<a href=\"mailto:hupel@in.tum.de\">hupel@in.tum.de</a>&gt;<br>\nHi Jeremy,</p>\n<blockquote>\n<p>At this point it seems clear that the tactic is executed twice, the<br>\nfirst time seemingly with an argument thm which gets printed out as<br>\n\"TERM _\", and the second time with the actual goal state.</p>\n</blockquote>\n<p>this is a static check. The NEWS entry says:</p>\n<ul>\n<li>More static checking of proof methods, which allows the system to<br>\nform a closure over the concrete syntax.  Method arguments should be<br>\nprocessed in the original proof context as far as possible, before<br>\noperating on the goal state.  In any case, the standard discipline for<br>\nsubgoal-addressing needs to be observed: no subgoals or a subgoal<br>\nnumber that is out of range produces an empty result sequence, not an<br>\nexception.  Potential INCOMPATIBILITY for non-conformant tactical<br>\nproof tools.</li>\n</ul>\n<p>Essentially, this check is trying to figure out whether or not a proof<br>\nmethod (in your case: tactic) observers some discipline.</p>\n<p>In my experience, the easiest way to make a tactic conform is to use the<br>\nvarious \"Subgoal.FOCUS\" combinators that are described in §6.3 of the<br>\nimplementation manual. (\"SUBGOAL\" works too, it is a bit more low-level.)</p>\n<blockquote>\n<p>Why is this?  What's going on here?  Is this how apply tactic ... should<br>\nbe used?</p>\n</blockquote>\n<p>When wrapped in the combinators I've mentioned, you don't have to worry<br>\nabout these details.</p>\n<p>Cheers<br>\nLars</p>",
+        "id": 294735022,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661189488
+    },
+    {
+        "content": "<p>From: Jeremy Dawson &lt;<a href=\"mailto:Jeremy.Dawson@anu.edu.au\">Jeremy.Dawson@anu.edu.au</a>&gt;<br>\nHi Makarius,</p>\n<p>Well, if the system is going to run a tactic twice, one with a phoney <br>\ngoal \"TERM _\", and then once with the actual goal, and it fails the <br>\nfirst time (because the subgoal list is empty), that's not going to be <br>\nmuch use.  Under what conditions is apply (tactic ...) usable?</p>\n<p>No, I realise that in production use I wouldn't be printing \"aaa\", <br>\n\"bbb\", etc.  They're there for the purpose of debugging.  Without them I <br>\nwouldn't have realised that the system was running the tactic twice, and <br>\nthat \"TERM _\" must refer to what it uses as the goal state the first time.</p>\n<p>What I'm doing right now is trying to code up an absurdly trivial <br>\nexample of a tactic which should succeed using an absurdly trivial <br>\noracle, which isn't included in the code I showed, but fails in the same <br>\nway (at least, the same, in that the tactic gets applied to a goal which <br>\ndoes not have the requisite number of subgoals).</p>\n<p>Like printing \"aaa\", etc, using apply (tactic ...) was for the purpose <br>\nof debugging - ie exploring why it doesn't work.</p>\n<p>Jeremy</p>",
+        "id": 294735051,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661189498
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nJust some guesses from a long distance:</p>\n<p>* there is something wrong with the goal context (type Proof.context)</p>\n<p>* type-inference has produced unexpectedly general results (usually<br>\ndue to a wrong context)</p>\n<p>Makarius</p>",
+        "id": 294735075,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661189510
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nYet another guess:</p>\n<p>* You access the raw \"thm\" representation of the goal state outside<br>\nthe parts that are meant for user tools (e.g. the main conclusion), and<br>\nthus bump into delicate details managed by the system.</p>\n<p>Semantic side-conditions on type tactic are specified in<br>\n\"implementation\" section 4.2. More side-condition on Isar proof methods<br>\nin section 7.2.</p>\n<p>In practice, it is often better to look at canonical examples, and<br>\nmodify them to fit a particular application. The \"isar-ref\" manual has a<br>\nbrief section 5.14 on Oracles, with a link to the worked example<br>\n~~/src/HOL/ex/IFF_Oracle.thy -- as usual it is best to study the<br>\nmaterial in the Prover IDE (Isabelle/jEdit).</p>\n<p>Makarius</p>",
+        "id": 294735144,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661189525
+    },
+    {
+        "content": "<p>From: Jeremy Dawson &lt;<a href=\"mailto:Jeremy.Dawson@anu.edu.au\">Jeremy.Dawson@anu.edu.au</a>&gt;<br>\nHi Lars,</p>\n<p>Thanks - it seems from what you are saying as implying that a tactic <br>\nshouldn't raise an exception even when applied to the wrong goal. <br>\nAnyhow proceeding this way has solved the problem, thanks.</p>\n<p>Also, using CSUBGOAL works.  I couldn't understand<br>\nwhat \"Subgoal.FOCUS\" does.  CSUBGOAL is similar to SUBGOAL which is <br>\ndescribed clearly in the old Reference Manual.</p>\n<p>Thanks</p>\n<p>Jeremy</p>",
+        "id": 294735229,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661189549
+    },
+    {
+        "content": "<p>From: Lars Hupel &lt;<a href=\"mailto:hupel@in.tum.de\">hupel@in.tum.de</a>&gt;<br>\nSubgoal.FOCUS is a very useful combinator. It allows you to destructure<br>\na goal such that you can get your hands on the premises and fixed<br>\nvariables easily. I found that its type is quite self-explanatory:</p>\n<p>type focus =<br>\n   {context: Proof.context, params: (string * cterm) list,<br>\n    prems: thm list, asms: cterm list,<br>\n    concl: cterm,<br>\n    schematics: ((indexname * sort) * ctyp) list * ((indexname * typ) *\ncterm) list}</p>\n<p>val FOCUS: (focus -&gt; tactic) -&gt; Proof.context -&gt; int -&gt; tactic</p>\n<p>I use it for almost all of my custom ML tactics.</p>\n<p>Cheers<br>\nLars</p>",
+        "id": 294735247,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661189555
+    },
+    {
+        "content": "<p>From: Jeremy Dawson &lt;<a href=\"mailto:Jeremy.Dawson@anu.edu.au\">Jeremy.Dawson@anu.edu.au</a>&gt;<br>\nHi Lars,</p>\n<p>Thanks - I'm afraid I don't get it. I guess that the focus type is <br>\nsomehow related to the current proof state, or, if the int argument is a <br>\nsubgoal, then I guess the focus is somehow related to the particular <br>\nsubgoal in the current proof state, but I can't guess, beyond that, is <br>\nthere some explanation in the documentation that you can point to?  Or <br>\nsome examples?</p>\n<p>Thanks</p>\n<p>Jeremy</p>",
+        "id": 294735258,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661189562
+    },
+    {
+        "content": "<p>From: Jeremy Dawson &lt;<a href=\"mailto:Jeremy.Dawson@anu.edu.au\">Jeremy.Dawson@anu.edu.au</a>&gt;<br>\nHi Lars,</p>\n<p>don't bother with this question, I've found it explained in the Isabelle <br>\ncookbook</p>\n<p>Thanks</p>\n<p>Jeremy</p>",
+        "id": 294735294,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661189578
+    }
+]

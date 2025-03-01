@@ -1,0 +1,107 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Jinja-Threads build problem · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Jinja-Threads.20build.20problem.html">[isabelle] Jinja-Threads build problem</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294251488"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Jinja-Threads%20build%20problem/near/294251488" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Jinja-Threads.20build.20problem.html#294251488">(Aug 19 2022 at 12:08)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:lammich@in.tum.de">lammich@in.tum.de</a>&gt;<br>
+Finally, I broke down the problem to a strange behaviour of<br>
+Proof-General:</p>
+<p>Take the following minimal example:<br>
+  theory A<br>
+  imports Main  <br>
+  begin<br>
+    ML_val {*<br>
+      tracing "Looping ...";<br>
+      fun f a = f a;<br>
+      f 1<br>
+      *}<br>
+  end</p>
+<p>theory B imports A<br>
+  begin</p>
+<p>end</p>
+<p>Then use PG to load theory B. It will happily do so, ignoring that the<br>
+ML_val command is still running. Actually, the ML_val command is<br>
+started, and still running when PG displays the theory as processed.</p>
+<p>However, when loading the theory A with PG, it gets stuck at the ML_val<br>
+command as expected.</p>
+<p>What has happened here? Is this a problem of PG, or of some<br>
+Isabelle-stuff used elsewhere (As PG does not do loading of required<br>
+theories itself, I suspect the problem lies somewhere in Isabelle)</p>
+<p>This raises another question about the semantics of ML_val:<br>
+  Is a theory correct, where some ML-val command diverges?</p>
+
+
+
+<a name="294258031"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Jinja-Threads%20build%20problem/near/294258031" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Jinja-Threads.20build.20problem.html#294258031">(Aug 19 2022 at 12:48)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On Fri, 18 Oct 2013, Peter Lammich wrote:</p>
+<blockquote>
+<p>Finally, I broke down the problem to a strange behaviour of<br>
+Proof-General:</p>
+<p>Take the following minimal example:<br>
+ theory A<br>
+ imports Main<br>
+ begin<br>
+   ML_val {*<br>
+     tracing "Looping ...";<br>
+     fun f a = f a;<br>
+     f 1<br>
+     *}<br>
+ end</p>
+<p>theory B imports A<br>
+ begin</p>
+<p>end</p>
+<p>Then use PG to load theory B. It will happily do so, ignoring that the<br>
+ML_val command is still running. Actually, the ML_val command is<br>
+started, and still running when PG displays the theory as processed.</p>
+</blockquote>
+<p>ML_val is a diagnostic command and these get forked by default, just like <br>
+proofs.  Non-termination and errors need to be exposed by a proper join in <br>
+the right place by the system, but this was actually broken for TTY / <br>
+Proof General, which is in some sense legacy for quite some time already.</p>
+<p>In Isabelle2013-1-RC4 I've addressed this issue, such that it works like <br>
+the standard batch build or the document model of Isabelle/Scala/jEdit.</p>
+<p>Remaining users of Proof General should take a very close look at <br>
+Isabelle2013-1-RC4.  There has been significantly less testing of the old <br>
+TTY mode, due to constantly decreasing numbers of every day users.  I use <br>
+myself Proof General mainly for "ispell", and only until I've found some <br>
+time to activate spell-checking in jEdit properly.</p>
+<blockquote>
+<p>However, when loading the theory A with PG, it gets stuck at the ML_val<br>
+command as expected.</p>
+</blockquote>
+<p>Here you are on the bare TTY loop, and that does not fork diagnostic <br>
+commands.</p>
+<blockquote>
+<p>This raises another question about the semantics of ML_val:<br>
+ Is a theory correct, where some ML-val command diverges?</p>
+</blockquote>
+<p>Formally yes, since there is no connection of the diagnostic command to <br>
+the thm values derived from the LCF kernel.</p>
+<p>Practically no, since all the forks of a theory body should be properly <br>
+joined.  This is an important computational aspect outside of the logic.</p>
+<blockquote>
+<p>The diverging ML_val command was introduced by my changes, that<br>
+accidently produced a code equation of the form "f a b = f a b"</p>
+</blockquote>
+<p>In Isabelle/jEdit you see non-terminating commands as dark-violet areas in <br>
+the Theories panel, or the individual buffer overview (right column next <br>
+to text area).</p>
+<p>What is still missing is some kind of "Status panel" to make a summary of <br>
+the whole session, similar to what isabelle build does in batch mode to <br>
+wrap up in the very end.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

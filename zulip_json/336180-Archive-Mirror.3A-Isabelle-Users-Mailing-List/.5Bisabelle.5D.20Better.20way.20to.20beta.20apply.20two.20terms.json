@@ -1,0 +1,20 @@
+[
+    {
+        "content": "<p>From: Steve Wong &lt;<a href=\"mailto:s.wong.731@gmail.com\">s.wong.731@gmail.com</a>&gt;<br>\nHi,</p>\n<p>What is a better way to beta-apply two terms without using betapply, which<br>\ncan cause a type mismatch. For example:</p>\n<p>consts<br>\na :: nat<br>\nF :: \"'a =&gt; nat\"<br>\nML {*<br>\nval ftrm = @{term \"F\"};<br>\nval atrm = @{term \"a\"};<br>\nval res = betapply((ftrm,atrm));<br>\ntype_of res<br>\n*}</p>\n<p>The application succeeds, but the resulting term isn't well-typed (thus<br>\ntype_of fails). betapply doesn't seem to change the input type of F from a<br>\nvariable to \"Nat.nat\". Is there a better way of beta applying such that the<br>\ninput type can automatically be updated?</p>\n<p>Thanks for the help in advance!</p>\n<p>Steve</p>",
+        "id": 294143142,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660846567
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nTerm.betapply is not used that often, although there is nothing wrong with <br>\nit.  Other term constructions (even plain Abs and $) are used more <br>\nfrequently.</p>\n<p>The experiment above has failed for other reasons: the example terms are <br>\ninternalized independently, i.e. the system did not know they are <br>\ncorrelated.  Normally you use something like Syntax.read_terms, <br>\nSyntax.check_terms or even Specification.read_specification / <br>\ncheck_specification for simultaneous processing of formal input in an <br>\nshared syntactic context.</p>\n<p>An alternative is to compose untyped preterms (using dummyT) in some <br>\nplaces and then let Syntax.check_term(s) work out the details.  (It also <br>\nrequires some care because many basic term operations assume fully typed <br>\nterms.)</p>\n<p>Another note concerning readability of ML sources: \"ftrm\" and \"atrm\" are <br>\nrather long and unwieldy names for plain formal entities that could be <br>\njust called \"f\" and \"a\", or \"t\" and \"u\".</p>\n<p>Makarius</p>",
+        "id": 294143294,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660846622
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nDepends what you want to do exactly.  The following reconstructs types for <br>\nthe given schematic term, treating schematic type variables as fixed in <br>\ntype-inference.  The context needs to be configured to allow <br>\nschematic terms explicitly:</p>\n<p>ML {*<br>\nval ctxt = @{context} |&gt; Proof_Context.set_mode <br>\nProof_Context.mode_schematic;<br>\nval s = Var ((\"s\", 0), dummyT);<br>\nval t = Var ((\"t\", 0), TVar ((\"'a\", 0), HOLogic.typeS));<br>\nSyntax.check_term ctxt (s $ t)<br>\n*}</p>\n<p>Note that I have used proper type variable name \"'a\" here.  The system <br>\ndoes not insist in that, but the behaviour for a TVar called \"a\" is <br>\nundefined.</p>\n<p>This variant is slightly different, it uses a named type inference <br>\nparameter that may get instantiated in type-inference:</p>\n<p>ML {*<br>\nval ctxt = @{context} |&gt; Proof_Context.set_mode <br>\nProof_Context.mode_schematic;<br>\nval s = Var ((\"s\", 0), dummyT);<br>\nval t = Var ((\"t\", 0), Type_Infer.mk_param 0 @{sort HOL.type});<br>\nSyntax.check_term ctxt (s $ t)<br>\n*}</p>\n<p>Makarius</p>",
+        "id": 294146335,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660847634
+    }
+]

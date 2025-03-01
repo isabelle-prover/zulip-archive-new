@@ -1,0 +1,224 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Eliminating two quantifiers in structural proof · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Eliminating.20two.20quantifiers.20in.20structural.20proof.html">[isabelle] Eliminating two quantifiers in structural proof</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294222431"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Eliminating%20two%20quantifiers%20in%20structural%20proof/near/294222431" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Eliminating.20two.20quantifiers.20in.20structural.20proof.html#294222431">(Aug 19 2022 at 08:36)</a>:</h4>
+<p>From: Edward Schwartz &lt;<a href="mailto:edmcman@cmu.edu">edmcman@cmu.edu</a>&gt;<br>
+Hi,</p>
+<p>I am new to Isabelle, and am stuck on a fairly trivial part of my<br>
+proof.  I have an assumption "\forall x y. P x y".  I'd simply like to<br>
+show (P a b) for two terms I have (a and b).  Surprisingly, I am<br>
+having trouble doing this in a structural way.</p>
+<p>With one quantified variable, there is no problem:</p>
+<p>lemma single_proof : "(\&lt;forall&gt;x. P x) \&lt;Longrightarrow&gt; P a"<br>
+proof (erule allE)<br>
+  fix c<br>
+  assume A: "P c"<br>
+  from A show "P c" by assumption<br>
+qed</p>
+<p>My understanding of what is happening is that allE removes the<br>
+quantifier, and so we really just prove /\ c. P c ==&gt; P c.  It seems<br>
+like a better proof would be of /\ c. P ?c ==&gt; P c.  Is there any way<br>
+to do this instead?</p>
+<p>lemma double : "(\&lt;forall&gt;x y. P x y) \&lt;Longrightarrow&gt; P a b"<br>
+apply (erule allE, erule allE)<br>
+apply assumption<br>
+done</p>
+<p>Here is a way to do the proof with tactics.  Unfortunately, in my<br>
+larger proof, the erule commands do not find the correct assumption,<br>
+and so I must specify P manually, which is <em>very</em> ugly.</p>
+<p>lemma double_proof : "(\&lt;forall&gt;x y. P x y) \&lt;Longrightarrow&gt; P a b"<br>
+proof (erule allE)<br>
+  fix c<br>
+  assume "\&lt;forall&gt;y. P c y"<br>
+  have "P c b"<br>
+  proof (erule allE) (* error: proof command failed *)</p>
+<p>Finally, I try to do a structural proof, eliminating one quantifier at<br>
+a time, and fail.  I've tried many variations, but can't seem to<br>
+understand how to do this.  If someone could show how to finish this<br>
+proof, and explain why it works, I would greatly appreciate it.</p>
+<p>Overall, Isabelle/HOL seems to make it very difficult to instantiate<br>
+free variables in foralls.  In Coq, this is very easy, since \forall<br>
+x. P x is actually a function that accepts a variable v and returns<br>
+proof that (P v).  What am I missing?</p>
+<p>Thanks,</p>
+<p>Ed</p>
+
+
+
+<a name="294222452"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Eliminating%20two%20quantifiers%20in%20structural%20proof/near/294222452" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Eliminating.20two.20quantifiers.20in.20structural.20proof.html#294222452">(Aug 19 2022 at 08:36)</a>:</h4>
+<p>From: Edward Schwartz &lt;<a href="mailto:edmcman@cmu.edu">edmcman@cmu.edu</a>&gt;<br>
+Hi all,</p>
+<p>I made a few breakthroughs in understand Isar:</p>
+<ol>
+<li>
+<p>"proof" is not the same thing as "proof -".  In particular, proof<br>
+looks for a classical logic introduction rule that matches the current<br>
+goal.  It will not work with goals like "A ==&gt; B" as I had.  "proof -"<br>
+works on these.  This is really confusing, and if any Isabelle devs<br>
+read this, please consider changing it!</p>
+</li>
+<li>
+<p>Here are the modified proofs of my examples:</p>
+</li>
+</ol>
+<p>The first example can be rewritten where the assumption is more general:</p>
+<p>lemma single_proof : "(\&lt;forall&gt;x. P x) \&lt;Longrightarrow&gt; P a"<br>
+proof -<br>
+  assume A: "\&lt;forall&gt;x. P x"<br>
+  fix c<br>
+  from A show "P c" ..<br>
+qed</p>
+<p>And here is the two variable example:</p>
+<p>lemma double_proof : "(\&lt;forall&gt;x y. P x y) \&lt;Longrightarrow&gt; P a b"<br>
+proof -<br>
+  assume H: "\&lt;forall&gt;x y. P x y"<br>
+  fix a b<br>
+  from H have "\&lt;forall&gt;y. P a y" ..<br>
+  thus "P a b" ..<br>
+qed</p>
+<p>This is a big improvement over my previous attempts, but still seems<br>
+overly verbose for just instantiating bound variables.  Is there a<br>
+quicker way that works on multiple bound variables at the same time?</p>
+<p>Thanks again,</p>
+<p>Ed</p>
+
+
+
+<a name="294222460"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Eliminating%20two%20quantifiers%20in%20structural%20proof/near/294222460" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Eliminating.20two.20quantifiers.20in.20structural.20proof.html#294222460">(Aug 19 2022 at 08:36)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+Try to use the meta-quantifier !! instead of \&lt;forall&gt; whenever you can, and in<br>
+your examples you can. Now if you have an assumption A: "!!x y. P x y" you can<br>
+instantiate the quantifiers very easily: just write A[of "t1" "t2"]. Then it is<br>
+hardly more verbose than Coq. Note that the instantiation order is not the order<br>
+of quantification but the order in which x and y occur in P (from left to<br>
+right). In fact, if you inspect A in the proof (eg via command thm) you see that<br>
+the !! have disappeared and x/y became ?x/?y.</p>
+<p>Unfortunately the "of" operator only works for !!, and !! can only occur at the<br>
+"outermost" level, ie not inside HOL formulas. But in many situations that suffices.</p>
+<p>Tobias</p>
+
+
+
+<a name="294222469"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Eliminating%20two%20quantifiers%20in%20structural%20proof/near/294222469" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Eliminating.20two.20quantifiers.20in.20structural.20proof.html#294222469">(Aug 19 2022 at 08:37)</a>:</h4>
+<p>From: Alfio Martini &lt;<a href="mailto:alfio.martini@acm.org">alfio.martini@acm.org</a>&gt;<br>
+Hi Edward,</p>
+<p>I am not sure if this is what you what, but in Isar is fairly natural to do<br>
+such proofs. I use it to teach natural deduction to students.<br>
+Here goes three proofs of this conjecture:</p>
+<p>theorem th11a:<br>
+   assumes prem: "∀x. ∀y. P x y"<br>
+   shows "P a b"<br>
+     proof -<br>
+       from prem have "∀y. P a y" by (rule spec)<br>
+       thus "P a b" by (rule spec)<br>
+     qed</p>
+<p>theorem th11b:<br>
+   assumes prem: "∀x. ∀y. P x y"<br>
+   shows "P a b"<br>
+     proof -<br>
+       from prem have "∀y. P a y" by (rule allE)<br>
+       thus "P a b" by (rule allE)<br>
+     qed</p>
+<p>theorem th11c:<br>
+   assumes prem: "∀x. ∀y. P x y"<br>
+   shows "P a b"<br>
+     proof -<br>
+       from prem have "∀y. P a y" by (rule spec[where x =a])<br>
+       from this show  "P a b" by (rule spec[where x=b])<br>
+     qed</p>
+<p>I assume you hardly have to use the qualifieres (e(limination),<br>
+d(estruction)) when<br>
+working in Isar. I use this style only when I am playing with linear<br>
+scripts.</p>
+<p>All the Best!</p>
+
+
+
+<a name="294222484"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Eliminating%20two%20quantifiers%20in%20structural%20proof/near/294222484" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Eliminating.20two.20quantifiers.20in.20structural.20proof.html#294222484">(Aug 19 2022 at 08:37)</a>:</h4>
+<p>From: Alfio Martini &lt;<a href="mailto:alfio.martini@acm.org">alfio.martini@acm.org</a>&gt;<br>
+Forgot this one:</p>
+<p>theorem th11d:<br>
+   "∀x. ∀y. P x y ==&gt; P a b"<br>
+     proof -<br>
+       assume  "∀x. ∀y. P x y"<br>
+       from this have "∀y. P a y" by (rule spec[where x =a])<br>
+       from this show  "P a b" by (rule spec[where x=b])<br>
+     qed</p>
+
+
+
+<a name="294222874"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Eliminating%20two%20quantifiers%20in%20structural%20proof/near/294222874" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Eliminating.20two.20quantifiers.20in.20structural.20proof.html#294222874">(Aug 19 2022 at 08:40)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+This is an important observation.  The "erule" and "drule" rule <br>
+application forms are never required in structure proof.  Instead you <br>
+indicate the forward deduction explicitly via the 'then' language element, <br>
+and then just use a normal "rule" step, which is often not spelled out but <br>
+left implicit.</p>
+<p>Roughly speaking a tactic script with "apply (erule r)" corresponds to an <br>
+Isar proof text fragment "then show proof (rule r)", and "apply (drule r)" <br>
+corresponds to "then have proof (rule r)".</p>
+<p>Note that the abbreviations "thus == then show" and "hence == then have" <br>
+are merely historical accidents.  They require fewer bytes in memory, but <br>
+more typing by the user and more explanations to newcomers.  The reason is <br>
+that the chaining or not chaining for elementary 'show' and 'have' <br>
+elements are often changed during the proof development.  And there are <br>
+further combinators like 'also' and 'moreover' that can be combined with <br>
+'have' or 'show', and other goal elements like 'obtain' that can <br>
+participate in the chaining of facts in the same manner.</p>
+<p>So there is a large combinatorial space of</p>
+<p>(then | from | with | ... | also | finally | moreover | ultimately)<br>
+     (have | show | obtain | interpret ...)</p>
+<p>which is better spelled out as such explicitly, without the somewhat <br>
+pointless shortcuts 'hence' and 'thus' getting in the way.</p>
+<p>Makarius</p>
+
+
+
+<a name="294222888"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Eliminating%20two%20quantifiers%20in%20structural%20proof/near/294222888" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Eliminating.20two.20quantifiers.20in.20structural.20proof.html#294222888">(Aug 19 2022 at 08:41)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Yet more examples on this thread, using native natural deduction <br>
+statements in Isabelle/Pure, without any auxiliary HOL connectives getting <br>
+in the way:</p>
+<p>lemma<br>
+   assumes "⋀x y. P x y"<br>
+   shows "P a b"<br>
+proof -<br>
+   from <code>P a b</code> show ?thesis .<br>
+qed</p>
+<p>Using the Pure quantifier in the assumption, you get arbitrary instances <br>
+of the proposition for free, using unification behind the scenes.  The <br>
+backquote notation is a "literal fact reference", stating an instance of <br>
+something you have already visibly in the proof context.</p>
+<p>Here is the same, without the initial goal statement getting between you <br>
+and the understanding of natural deduction reasoning in a local context:</p>
+<p>notepad<br>
+begin</p>
+<p>assume "⋀x y. P x y"</p>
+<p>note <code>P a b</code></p>
+<p>have "P a b" by fact<br>
+end</p>
+<p>So you build up a context with some general fact, and then project <br>
+instances from it.  The backquote and "by fact" form are operationally <br>
+equalivalent, but the latter works via a local result with nested goal <br>
+state.  Both forms have there uses in practical applications.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

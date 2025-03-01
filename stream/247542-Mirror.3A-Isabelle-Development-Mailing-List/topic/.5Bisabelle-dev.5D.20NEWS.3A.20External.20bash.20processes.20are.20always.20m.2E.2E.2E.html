@@ -1,0 +1,185 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle-dev] NEWS: External bash processes are always m... · Mirror: Isabelle Development Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/index.html">Mirror: Isabelle Development Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20NEWS.3A.20External.20bash.20processes.20are.20always.20m.2E.2E.2E.html">[isabelle-dev] NEWS: External bash processes are always m...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="227356755"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20NEWS%3A%20External%20bash%20processes%20are%20always%20m.../near/227356755" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20NEWS.3A.20External.20bash.20processes.20are.20always.20m.2E.2E.2E.html#227356755">(Feb 22 2021 at 23:22)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+<strong>* ML </strong>*</p>
+<ul>
+<li>External bash processes are always managed by Isabelle/Scala, in<br>
+contrast to Isabelle2021 where this was only done for macOS on Apple<br>
+Silicon.</li>
+</ul>
+<p>The main Isabelle/ML interface is Isabelle_System.bash_process with<br>
+result type Process_Result.T (resembling class Process_Result in Scala);<br>
+derived operations Isabelle_System.bash and Isabelle_System.bash_output<br>
+provide similar functionality as before. Rare INCOMPATIBILITY due to<br>
+subtle semantic differences:</p>
+<p>- Processes invoked from Isabelle/ML actually run in the context of<br>
+    the Java VM of Isabelle/Scala. The settings environment and current<br>
+    working directory are usually the same on both sides, but there can be<br>
+    subtle corner cases (e.g. unexpected uses of "cd" or "putenv" in ML).</p>
+<p>- Output via stdout and stderr is line-oriented: Unix vs. Windows<br>
+    line-endings are normalized towards Unix; presence or absence of a<br>
+    final newline is irrelevant. The original lines are available as<br>
+    Process_Result.out_lines/err_lines; the concatenated versions<br>
+    Process_Result.out/err <em>omit</em> a trailing newline (using<br>
+    Library.trim_line, which was occasional seen in applications before,<br>
+    but is no longer necessary).</p>
+<p>- Output needs to be plain text encoded in UTF-8: Isabelle/Scala<br>
+    recodes it temporarily as UTF-16. This works for well-formed Unicode<br>
+    text, but not for arbitrary byte strings. In such cases, the bash<br>
+    script should write tempory files, managed by Isabelle/ML operations<br>
+    like Isabelle_System.with_tmp_file to create a file name and<br>
+<a href="http://File.read">File.read</a> to retrieve its content.</p>
+<p>New Process_Result.timing works as in Isabelle/Scala, based on direct<br>
+measurements of the bash_process wrapper in C: elapsed time is always<br>
+available, CPU time is only available on Linux and macOS, GC time is<br>
+unavailable.</p>
+<p>This refers to Isabelle/04c9a2cd7686, which provides these updated NEWS. A lot<br>
+of text for previously to adjust previous customs of weakly specified<br>
+behaviour, or mere customs. Also an interesting consequence of providing Scala<br>
+function invocation in ML, and using it on the spot to avoid macOS/Rosetto<br>
+problems with threads vs. processes (for Isabelle2021).</p>
+<p>There might be very fine points still to be sorted out, but conceptually it is<br>
+right to do the systems programming in Scala instead of ML. (A few more system<br>
+operations will move from ML to Scala soon.)</p>
+<p>Makarius</p>
+<hr>
+<p>isabelle-dev mailing list<br>
+<a href="mailto:isabelle-dev@in.tum.de">isabelle-dev@in.tum.de</a><br>
+<a href="https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev">https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev</a></p>
+
+
+
+<a name="227514643"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20NEWS%3A%20External%20bash%20processes%20are%20always%20m.../near/227514643" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20NEWS.3A.20External.20bash.20processes.20are.20always.20m.2E.2E.2E.html#227514643">(Feb 23 2021 at 22:18)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Here is another fine point:</p>
+<p>- Just like any other Scala function invoked from ML,<br>
+    Isabelle_System.bash_process requires a proper PIDE session context.<br>
+    This could be a regular batch session (e.g. "isabelle build"), a<br>
+    PIDE editor session (e.g. "isabelle jedit"), or headless PIDE (e.g.<br>
+    "isabelle dump" or "isabelle server"). Note that old "isabelle<br>
+    console" or raw "isabelle process" don't have that.</p>
+<p>See also Isabelle/637e3e85cd6f.</p>
+<p>In principle the requirement of a proper PIDE session context is already<br>
+present in Isabelle2021, but there are hardly any relevant Scala functions<br>
+invoked from ML.</p>
+<p>From now on there will be more and more coming, to do the hardcore system<br>
+programming properly in the physical world (Scala) instead of mathematics<br>
+(ML). (To download a file, copy a directory hierarchy etc.)</p>
+<p>I am still unsure what to do about "isabelle console" and "isabelle process".</p>
+<p>My main use of the console is with option -r, to bootstrap Pure in case of<br>
+error, when the PIDE editing of Pure does not work. So it could be replaced by<br>
+"isabelle bootstrap" as administrative tool (unavailable in a regular Isabelle<br>
+release).</p>
+<p>The "isabelle process" was once our main "isabelle" script, e.g. for direct<br>
+TTY use or as inferior Emacs process. Now it is occasionally used for<br>
+generated code from the ML environment. So it could become another Scala<br>
+function from ML, using the ML_Process module in Isabelle/Scala. That would<br>
+make it much lighter, because the surrounding Scala/JVM is already running,<br>
+i.e. the one of the required PIDE session context.</p>
+<p>So are there other remaining uses of "isabelle console" or "isabelle process"<br>
+that don't fit into this picture? And that cannot be done more directly in<br>
+Isabelle/Scala, instead of old-fashioned scripting in bash/perl/python/...?</p>
+<p>Makarius</p>
+<hr>
+<p>isabelle-dev mailing list<br>
+<a href="mailto:isabelle-dev@in.tum.de">isabelle-dev@in.tum.de</a><br>
+<a href="https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev">https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev</a></p>
+
+
+
+<a name="227790841"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20NEWS%3A%20External%20bash%20processes%20are%20always%20m.../near/227790841" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20NEWS.3A.20External.20bash.20processes.20are.20always.20m.2E.2E.2E.html#227790841">(Feb 25 2021 at 16:03)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Makarius,</p>
+<blockquote>
+<p>My main use of the console is with option -r, to bootstrap Pure in case of<br>
+error, when the PIDE editing of Pure does not work. So it could be replaced by<br>
+"isabelle bootstrap" as administrative tool (unavailable in a regular Isabelle<br>
+release).</p>
+</blockquote>
+<p>I also have an ancient tool which does something similar: check the Pure<br>
+sources and issue a parsable error message if something goes utterly wrong.</p>
+<p>I would appreciate an official tool for that.</p>
+<blockquote>
+<p>So are there other remaining uses of "isabelle console" or "isabelle process"<br>
+that don't fit into this picture? And that cannot be done more directly in<br>
+Isabelle/Scala, instead of old-fashioned scripting in bash/perl/python/...?</p>
+</blockquote>
+<p>In my drawer I found the following funny one-line to find out how many<br>
+threads PolyML thinks are available.</p>
+<blockquote>
+<p>isabelle process -e 'writeln ("\n~~~ " ^ string_of_int (Thread.numProcessors ()) ^ " ~~~\n")' | grep -Po '(?&lt;=~~~ )\d+(?= ~~~)'</p>
+</blockquote>
+<p>To get a clue how the threads option could look like.</p>
+<p>Don't know whether this is still of general interest.</p>
+<p>Cheers,<br>
+    Florian<br>
+<a href="/user_uploads/14278/L-ED6q3m4Rz8Khg7M8CAq1U3/signature.asc">signature.asc</a></p>
+
+
+
+<a name="228063922"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20NEWS%3A%20External%20bash%20processes%20are%20always%20m.../near/228063922" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20NEWS.3A.20External.20bash.20processes.20are.20always.20m.2E.2E.2E.html#228063922">(Feb 27 2021 at 15:14)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On 25/02/2021 17:03, Florian Haftmann wrote:</p>
+<blockquote>
+<blockquote>
+<p>My main use of the console is with option -r, to bootstrap Pure in case of<br>
+error, when the PIDE editing of Pure does not work. So it could be replaced by<br>
+"isabelle bootstrap" as administrative tool (unavailable in a regular Isabelle<br>
+release).</p>
+</blockquote>
+<p>I also have an ancient tool which does something similar: check the Pure<br>
+sources and issue a parsable error message if something goes utterly wrong.</p>
+</blockquote>
+<p>Do you want to show me that (privately)?</p>
+<blockquote>
+<blockquote>
+<p>So are there other remaining uses of "isabelle console" or "isabelle process"<br>
+that don't fit into this picture? And that cannot be done more directly in<br>
+Isabelle/Scala, instead of old-fashioned scripting in bash/perl/python/...?</p>
+</blockquote>
+<p>In my drawer I found the following funny one-line to find out how many<br>
+threads PolyML thinks are available.</p>
+<blockquote>
+<p>isabelle process -e 'writeln ("\n~~~ " ^ string_of_int (Thread.numProcessors ()) ^ " ~~~\n")' | grep -Po '(?&lt;=~~~ )\d+(?= ~~~)'</p>
+</blockquote>
+<p>To get a clue how the threads option could look like.</p>
+</blockquote>
+<p>See the included scala script, to be placed in a directory mentioned in<br>
+ISABELLE_TOOLS. I have used the stderr channel for clean output, without the<br>
+ML toplevel interfering.</p>
+<p>Moreover, I have looked around where "isabelle process" still occurs in our<br>
+sources (Isabelle/736b8853189a):</p>
+<p>* In the "system" manual, section about "The raw Isabelle ML process" /<br>
+"Batch mode": it gives a wrong / outdated impression of being able to process<br>
+theories etc: this strengthens my inclination to remove the tool altogether.</p>
+<p>* In src/Tools/Code/code_ml.ML to invoke an external ML process to compile<br>
+generated modules. This used to be similar in src/HOL/Library/code_test.ML,<br>
+until I changed that for the Isabelle2021 release, e.g. see:</p>
+<p><a href="https://isabelle-dev.sketis.net/rISABELLEdfe150a246e6">https://isabelle-dev.sketis.net/rISABELLEdfe150a246e6</a></p>
+<p><a href="https://isabelle-dev.sketis.net/rISABELLE697e5688f370">https://isabelle-dev.sketis.net/rISABELLE697e5688f370</a></p>
+<p>This approach to use the existing ML environment (and Scala, too) is much<br>
+simpler and lighter. Could it be done for regular Code_Target.add_language as<br>
+well?</p>
+<p>Thus the old "isabelle process" (and "isabelle console") could just disappear,<br>
+without any special tricks replacing them.</p>
+<p>Makarius<br>
+<a href="/user_uploads/14278/jLhTCPhOe4ERI_vQakq1yaUO/ml_processors.scala">ml_processors.scala</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,89 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Invoking parse translations for subterms insid... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Invoking.20parse.20translations.20for.20subterms.20insid.2E.2E.2E.html">[isabelle] Invoking parse translations for subterms insid...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294124116"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Invoking%20parse%20translations%20for%20subterms%20insid.../near/294124116" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Invoking.20parse.20translations.20for.20subterms.20insid.2E.2E.2E.html#294124116">(Aug 18 2022 at 16:39)</a>:</h4>
+<p>From: Rafal Kolanski &lt;<a href="mailto:rafalk@cse.unsw.edu.au">rafalk@cse.unsw.edu.au</a>&gt;<br>
+Dear Isabelle Gurus,</p>
+<p>I am doing a tricky parse_translation where the term I substitute in <br>
+depends on the type of the left-hand-side term that gets passed into the <br>
+translation.</p>
+<p>E.g. (p :: struct_s1 pptr) &amp;-&gt; ''z''<br>
+      becomes struct_s1_field_z :: "struct_s1 pptr =&gt; 32 word pptr"<br>
+      but<br>
+      (p :: struct_s2 pptr) &amp;-&gt; ''x''<br>
+      becomes struct_s2_field_x :: "struct_s2 pptr =&gt; struct_s1 pptr"</p>
+<p>This means that in my parse_translation I need to type-check the LHS <br>
+term, and I'd also like to get at the string on the right-hand side.</p>
+<p>I've got all the underlying infrastructure and examples working, but I <br>
+really, really need to invoke the parse translation mechanism for my LHS <br>
+subterm (to figure out the pointer type) and to be able to call <br>
+HOLogic.dest_string on my RHS.</p>
+<p>Otherwise I get something like (for example):<br>
+    Const ("\\&lt;^const&gt;Pointers.addr_add", "_") $ Free ("p", "_") $<br>
+      Const ("\\&lt;^const&gt;HOL.one_class.one", "_")<br>
+    : term<br>
+or<br>
+    Const ("_constrain", "_") $ Free ("p", "_") $<br>
+      (Free ("pptr", "_") $ Free ("struct_s1", "_"))<br>
+    : term</p>
+<p>Needless to say, passing these to read_term won't work as they're not <br>
+strings, passing them to check_term will fail because those constants <br>
+aren't real constants (e.g. "_constrain" is not a constant).</p>
+<p>So what do I pass them to such that it figures out the syntax and gives <br>
+me back a term I can either use or pass into check_term with dummy types?</p>
+<p>My actual syntax is:<br>
+syntax<br>
+   "_struct_get_field" :: "('v, 'p, 't) ptr_t ⇒ string ⇒ ('v, 'p, 't2) <br>
+ptr_t"<br>
+   (infixl "&amp;→" 51)</p>
+<p>I've been looking through the code for a few hours. I've also looked at <br>
+the "alternative" mechanism of Syntax.add_term_check, but I can't figure <br>
+out how to use it to do what I want. I don't think any documentation for <br>
+it exists. Perhaps someone's scribbled some notes on it?</p>
+<p>As this relates to my PhD, which is on a tighter schedule than my other <br>
+work, I'd really appreciate hints towards a practical solution rather <br>
+than an elegant/generic one. I hope I'm just missing something obvious <br>
+rather than doing it all wrong.</p>
+<p>Does anyone have any advice?</p>
+<p>Sincerely,</p>
+<p>Rafal Kolanski.</p>
+
+
+
+<a name="294124124"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Invoking%20parse%20translations%20for%20subterms%20insid.../near/294124124" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Invoking.20parse.20translations.20for.20subterms.20insid.2E.2E.2E.html#294124124">(Aug 18 2022 at 16:39)</a>:</h4>
+<p>From: Rafal Kolanski &lt;<a href="mailto:rafalk@cse.unsw.edu.au">rafalk@cse.unsw.edu.au</a>&gt;<br>
+Dear All,</p>
+<p>It turns out I was missing something simple. I finally tracked down a <br>
+function called ProofContext.decode_term. It turns out that this <br>
+function converts the "syntactic-style" term I've been having trouble <br>
+with into one that can be passed to Syntax.check_term to get a properly <br>
+typed term.</p>
+<p>So, here's a "before" term:<br>
+  Const ("_constrain", "_") $ Free ("p", "_") $<br>
+    (Free ("pptr", "_") $ Free ("struct_s1", "_"))</p>
+<p>(note that _constrain is not a constant)</p>
+<p>and here it is after passing it through ProofContext.decode:<br>
+    Const ("_type_constraint_",<br>
+           "StructExample.struct_s1 TypedHeap.pptr<br>
+            ⇒ StructExample.struct_s1 TypedHeap.pptr") $<br>
+      Free ("p", "_")</p>
+<p>Note that all constants are now identified by their proper names, so <br>
+Syntax.check_term can deal with them.</p>
+<p>Perhaps my discovery will be of service to someone else in the future.</p>
+<p>Sincerely,</p>
+<p>Rafal Kolanski.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

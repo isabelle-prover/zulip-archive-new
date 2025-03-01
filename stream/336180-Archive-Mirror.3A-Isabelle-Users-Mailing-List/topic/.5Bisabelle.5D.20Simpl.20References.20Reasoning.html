@@ -1,0 +1,154 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Simpl References Reasoning · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Simpl.20References.20Reasoning.html">[isabelle] Simpl References Reasoning</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294274494"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Simpl%20References%20Reasoning/near/294274494" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Simpl.20References.20Reasoning.html#294274494">(Aug 19 2022 at 14:11)</a>:</h4>
+<p>From: "George K." &lt;<a href="mailto:g_karab@encs.concordia.ca">g_karab@encs.concordia.ca</a>&gt;<br>
+Hello all,</p>
+<p>I have been using Schirmer's Simpl for the past couple of months now.  <br>
+I am stuck when trying to reason with a procedure that deals with<br>
+references.  In particular, I cannot discharge the procedure's<br>
+specification when the procedure calls other procedures that allocate<br>
+memory and set field values.</p>
+<p>I am attaching a theory that illustrates the issues I have.  This theory<br>
+contains:<br>
+1) A globals_memory hoarestate, containing a list of allocated<br>
+references and a free counter of available memory.  Taken straight out<br>
+of the examples of the AFP SIMPL distro.</p>
+<p>2) A globals_First hoarestate that declares a data structure that just<br>
+holds a single field of int type</p>
+<p>3) A procedure First() that is, in essence, a constructor.</p>
+<p>4) A globals_Second hoarestate which contain two fields each one being a<br>
+"ref =&gt; ref".  The intent is to model a data structure that contains<br>
+references to other structures.</p>
+<p>5) A Second_1 procedure that is a constructor accepting a two<br>
+references.</p>
+<p>6) A Second_2 procedure that is also a constructor--however, we pass<br>
+integer values and invoke the First() procedure twice.  It is this<br>
+procedure I cannot prove the functional specification.</p>
+<p>The functional spec looks as follows:<br>
+  lemma (in Second_2_impl) Second_2_spec:<br>
+    "<br>
+      ∀σ x1 x2. Γ,Θ ⊢⇩t<br>
+        ⦃σ. ´x1 = x1 ∧ ´x2 = x2 ∧ (sz_Second + sz_First + sz_First) ≤<br>
+        ´free ⦄<br>
+        ´result' :== PROC Second_2(´x1,´x2)<br>
+        ⦃ <br>
+          ´result' ≠ Null ∧ ´result'→´Y ≠ Null ∧ ´result'→´Z ≠ Null ∧<br>
+          ´free = ⇗σ⇖free - sz_Second - sz_First - sz_First ∧<br>
+          ´result'→´Z→´X = x2 ∧ <br>
+          ´result'→´Y→´X = x1 ∧<br>
+          ´result' ∈ set ´alloc<br>
+        ⦄<br>
+    "</p>
+<p>The last two conjucts (i.e. ´result'→´Y→´X = x1 ∧ ´result' ∈ set ´alloc)<br>
+are giving me hard time.  I believe the issues I have are related to<br>
+letting Isabelle know that the references allocated within the Second_2<br>
+procedure are distinct (at least this is what I understand when reading<br>
+on the split heap model used in Simpl).  Unfortunately, I am not sure<br>
+how I can express this kind of distinctness in Isabelle.  </p>
+<p>Furthermore, I am unsure on whether I need to abstract simple data<br>
+structures (such as the one in the attached theory) in HOL, similarly to<br>
+the manner linked lists in the heap are abstracted to HOL lists using<br>
+the List predicate.</p>
+<p>Any help is appreciated.</p>
+<p>George.<br>
+<a href="/user_uploads/14278/lOhsqjbxsDAfGeA9t6VxNTma/SimplMemTester.thy">SimplMemTester.thy</a></p>
+
+
+
+<a name="294274678"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Simpl%20References%20Reasoning/near/294274678" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Simpl.20References.20Reasoning.html#294274678">(Aug 19 2022 at 14:12)</a>:</h4>
+<p>From: Thomas Sewell &lt;<a href="mailto:thomas.sewell@nicta.com.au">thomas.sewell@nicta.com.au</a>&gt;<br>
+Hello George.</p>
+<p>Indeed you need a lot of distinctness. The problem with this kind of <br>
+hoare level reasoning about heaps is that you need to establish not only <br>
+that the modified values are modified as expected, but that everything <br>
+else is unchanged.</p>
+<p>I can fix your proof by extending First_spec as follows:</p>
+<p>lemma (in First_impl) First_spec:<br>
+     "<br>
+       \&lt;forall&gt;\&lt;sigma&gt; x. \&lt;Gamma&gt;,\&lt;Theta&gt; \&lt;turnstile&gt;\&lt;^sub&gt;t<br>
+          \&lt;lbrace&gt;\&lt;sigma&gt;. \&lt;acute&gt;x = x \&lt;and&gt; sz_First \&lt;le&gt; <br>
+\&lt;acute&gt;free \&lt;rbrace&gt;<br>
+          \&lt;acute&gt;result' :== PROC First(\&lt;acute&gt;x)<br>
+          \&lt;lbrace&gt; \&lt;acute&gt;result' \&lt;noteq&gt; Null \&lt;and&gt; <br>
+\&lt;acute&gt;result'\&lt;rightarrow&gt;\&lt;acute&gt;X = x \&lt;and&gt;<br>
+            \&lt;acute&gt;result' \&lt;in&gt; set \&lt;acute&gt;alloc \&lt;and&gt; <br>
+\&lt;acute&gt;result' \&lt;notin&gt; set (\&lt;^bsup&gt;\&lt;sigma&gt;\&lt;^esup&gt;alloc)<br>
+            \&lt;and&gt; set \&lt;acute&gt;alloc = insert \&lt;acute&gt;result' (set <br>
+(\&lt;^bsup&gt;\&lt;sigma&gt;\&lt;^esup&gt;alloc))<br>
+            \&lt;and&gt; \&lt;acute&gt;free = \&lt;^bsup&gt;\&lt;sigma&gt;\&lt;^esup&gt;free - sz_First<br>
+            \&lt;and&gt; (\&lt;forall&gt;x \&lt;in&gt; set <br>
+(\&lt;^bsup&gt;\&lt;sigma&gt;\&lt;^esup&gt;alloc). x\&lt;rightarrow&gt;\&lt;acute&gt;X = <br>
+x\&lt;rightarrow&gt;\&lt;^bsup&gt;\&lt;sigma&gt;\&lt;^esup&gt;X )\&lt;rbrace&gt;<br>
+     "</p>
+<p>(you might have to save that and load it in jEdit to read it).</p>
+<p>I've additionally asserted that the allocated address was not previously <br>
+allocated, that the set of allocated addresses has grown by the one <br>
+allocated address, and that all values previously allocated are unchanged.</p>
+<p>The current fashion is to avoid this tedious enumeration of everything <br>
+that stays the same by using some kind of separation logic. Perhaps you <br>
+should investigate whether Simpl provides something like that, or some <br>
+standard idiom for expressing what hasn't changed.</p>
+<p>Good luck,<br>
+     Thomas.</p>
+
+
+
+<a name="294274703"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Simpl%20References%20Reasoning/near/294274703" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Simpl.20References.20Reasoning.html#294274703">(Aug 19 2022 at 14:12)</a>:</h4>
+<p>From: Holger Gast &lt;<a href="mailto:gast@informatik.uni-tuebingen.de">gast@informatik.uni-tuebingen.de</a>&gt;<br>
+Hello George,</p>
+<p>Thomas mentions using separation logic in his reply.<br>
+As it happens, I have build the usual symbolic<br>
+execution approach on top of Simpl for a project [1].<br>
+The basic idea is to reconstruct the original execution<br>
+sequence of heap operations as much as necessary in the form<br>
+of nested let expressions, by considering the nesting<br>
+of the heap access expressions and various side-conditions.</p>
+<p>The latest version of the implementation is available from<br>
+the homepage of last year's lecture on software verification:<br>
+<a href="https://www21.in.tum.de/teaching/isv/SS13">https://www21.in.tum.de/teaching/isv/SS13</a><br>
+The file SimplC.zip also contains a (rudimentary)<br>
+C parser, translator to Simpl, the reconstruction<br>
+mentioned above, and symbolic execution/heap matching.</p>
+<p>Hope this helps,</p>
+<p>Holger</p>
+<p>[1] Gast, H. "Semi-automatic proofs about object graphs in separation logic",<br>
+  in: Merz, S. and Lüttgen, G.: Automated Verification of Critical Systems<br>
+  (AVoCS '12)</p>
+
+
+
+<a name="294274822"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Simpl%20References%20Reasoning/near/294274822" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Simpl.20References.20Reasoning.html#294274822">(Aug 19 2022 at 14:13)</a>:</h4>
+<p>From: "George K." &lt;<a href="mailto:g_karab@encs.concordia.ca">g_karab@encs.concordia.ca</a>&gt;<br>
+Thank you Thomas!  Indeed this is tedious, but it does make sense.  My<br>
+initial understanding was that specifying the frame condition would<br>
+suffice but I was wrong.  </p>
+<p>I will start tackling Separation Logic as soon as I can.</p>
+<p>Cheers,<br>
+George</p>
+
+
+
+<a name="294274845"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Simpl%20References%20Reasoning/near/294274845" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Simpl.20References.20Reasoning.html#294274845">(Aug 19 2022 at 14:13)</a>:</h4>
+<p>From: "George K." &lt;<a href="mailto:g_karab@encs.concordia.ca">g_karab@encs.concordia.ca</a>&gt;<br>
+Thank you Holger.  I will certainly have look at your extensions.<br>
+Cheers,<br>
+George</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

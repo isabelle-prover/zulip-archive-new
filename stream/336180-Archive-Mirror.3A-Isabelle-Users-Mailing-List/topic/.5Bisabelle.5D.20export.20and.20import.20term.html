@@ -1,0 +1,88 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] export and import term · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20export.20and.20import.20term.html">[isabelle] export and import term</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294241495"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20export%20and%20import%20term/near/294241495" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20export.20and.20import.20term.html#294241495">(Aug 19 2022 at 11:06)</a>:</h4>
+<p>From: Yuhui Lin &lt;<a href="mailto:Y.H.Lin-2@sms.ed.ac.uk">Y.H.Lin-2@sms.ed.ac.uk</a>&gt;<br>
+Hi,</p>
+<p>I've got a an exception "exception XML_ATOM term raised"  when I use Syntax.parse_term  to parse a string which is exported by Syntax.string_of_term, e.g.</p>
+<p>Syntax.string_of_term @{context} @{term" a + b"} |&gt; Syntax.parse_term @{context};</p>
+<p>The reason for me to do this is that the system, which I am developing, need to communicate with Isabelle. So I want to export and import terms in Isabelle as string to my system in the json format in ML. But I get the above exception. Where do I  go wrong here ? Thanks in advance.</p>
+<p>best,<br>
+Yuhui</p>
+
+
+
+<a name="294241511"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20export%20and%20import%20term/near/294241511" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20export.20and.20import.20term.html#294241511">(Aug 19 2022 at 11:06)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On Wed, 15 May 2013, Yuhui Lin wrote:</p>
+<blockquote>
+<p>I've got a an exception "exception XML_ATOM term raised"  when I use <br>
+Syntax.parse_term to parse a string which is exported by <br>
+Syntax.string_of_term, e.g.</p>
+<p>Syntax.string_of_term @{context} @{term" a + b"} |&gt; Syntax.parse_term <br>
+@{context};</p>
+</blockquote>
+<p>Conceptually, functions like Syntax.string_of_term from Isabelle inner <br>
+syntax produce a pretty tree with additional markup.  Its main purpose is <br>
+to be output via one of the standard Isabelle channels (writeln, warning <br>
+etc.), e.g. like this:</p>
+<p>ML {*<br>
+   val s = Syntax.string_of_term @{context} @{term" a + b"};<br>
+   writeln s;<br>
+*}</p>
+<p>The front-end on the Isabelle/Scala side then renders the pretty tree as <br>
+best as it can -- Isabelle/jEdit presently uses a lot of this information <br>
+for hilighting, hyperlinks, tooltips etc.</p>
+<p>You can peek at that raw XML tree representation in Isabelle/ML using <br>
+YXML.parse_body on the string s above.  This is mainly for information, <br>
+normally you don't work with these internal representations directly.</p>
+<p>There are some tricks to avoid producing extra markup, and get back to <br>
+nostalgic raw text output, but one should try first to stay within the <br>
+regular mode of operation.  Note that Syntax.parse_term cannot recover <br>
+exactly the same term in general, even when printed without YXML markup.</p>
+<blockquote>
+<p>The reason for me to do this is that the system, which I am developing, <br>
+need to communicate with Isabelle. So I want to export and import terms <br>
+in Isabelle as string to my system in the json format in ML. But I get <br>
+the above exception.</p>
+</blockquote>
+<p>There are various ways to do that, depending what you actually need.</p>
+<p>For example, you can use encode/decode functions from the XML and Term_XML <br>
+module (both in Isabelle/ML and Isabelle/Scala) to get structured values <br>
+back and forth, without concrete syntax getting in between.</p>
+<p>The Isabelle term parser also accepts low-level YXML terms directly like <br>
+this:</p>
+<p>ML {*<br>
+   val t = @{term "a + b"};<br>
+   val yxml = YXML.string_of_body (Term_XML.Encode.term t);</p>
+<p>writeln (YXML.embed_controls yxml);<br>
+*}</p>
+<p>Now the Output panel in Isabelle/jEdit shows some funny string with bold X <br>
+and Y characters.  This is you externalized term, it can be sent around <br>
+between process, over the Net etc.</p>
+<p>It can be re-internalized in Isabelle/Isar, e.g. like this:</p>
+<p>term "XY5XXY:..."</p>
+<p>The same in Isabelle/ML:</p>
+<p>ML {*<br>
+   val t' = Term_XML.Decode.term (YXML.parse_body yxml);<br>
+   @{assert} (t = t');<br>
+*}</p>
+<p>Thus you can bypass traditional troubles with official "XML", even json.</p>
+<p>Note that Isabelle/Scala hardly provides any operations on logical Term <br>
+language.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

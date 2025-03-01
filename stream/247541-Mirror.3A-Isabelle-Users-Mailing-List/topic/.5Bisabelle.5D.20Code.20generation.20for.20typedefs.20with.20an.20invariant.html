@@ -1,0 +1,126 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Code generation for typedefs with an invariant · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20typedefs.20with.20an.20invariant.html">[isabelle] Code generation for typedefs with an invariant</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="257669928"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20for%20typedefs%20with%20an%20invariant/near/257669928" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20typedefs.20with.20an.20invariant.html#257669928">(Oct 15 2021 at 09:29)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:manuel@pruvisto.org">manuel@pruvisto.org</a>&gt;<br>
+Hello,</p>
+<p>I have a typedef of the form</p>
+<p>typedef good_nat = "{n::nat. good n}"</p>
+<p>and I have an executable function that produces a "nat list" where I <br>
+have proven that all entries are good.</p>
+<p>How can I lift that to an <em>executable</em> function that produces a <br>
+"good_nat list" instead?</p>
+<p>The way I see it, the usual approach of doing a "code abstype" and <br>
+specifying the code equation in terms of some projection out of the <br>
+"type with invariant" to "type without invariant" doesn't work here <br>
+because I have lists of these things.</p>
+<p>I do have a workaround involving a second typedef for intermediate <br>
+results, but it is very boilerplatey and I'd be happy to know if there <br>
+is something easier.</p>
+<p>See attachment for all the details.</p>
+<p>Thanks,</p>
+<p>Manuel<br>
+<a href="/user_uploads/14278/eu2f9LT_aB14YO46QjH_B3UH/Test.thy">Test.thy</a></p>
+
+
+
+<a name="257710368"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20for%20typedefs%20with%20an%20invariant/near/257710368" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20typedefs.20with.20an.20invariant.html#257710368">(Oct 15 2021 at 14:52)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:manuel@pruvisto.org">manuel@pruvisto.org</a>&gt;<br>
+Small addition: another application of this is to make a "safe" <br>
+constructor for types with invariants that returns "None" if the given <br>
+value does not fulfil the invariant, e.g.:</p>
+<p>mk_pos_nat :: nat ⇒ good_nat option<br>
+mk_pos_nat n = (if good_nat n then Some (Abs_good_nat n) else None)</p>
+<p>One can do this with an auxiliary function that returns a default value <br>
+instead of None, but then you have to check the condition twice.</p>
+<p>The best possible solution I see here is if "code abstype" could handle <br>
+not only equations of the form "projection (fun_with_invariant x y z) = <br>
+…" but relations involving "canonical" relators on types. In the above <br>
+case, one would then not have a code equation but a code relation:</p>
+<p>rel_fun (=) (rel_option pcr_good_nat)<br>
+      (λn. if good n then Some n else None) mk_good_nat</p>
+<p>Similarly, the function in my last email have the following relations:</p>
+<p>rel_fun (=) (list_all2 pcr_good_nat)<br>
+      my_complicated_computation my_complicated_computation'</p>
+<p>The actual generated code should of course be:</p>
+<p>mk_pos_nat n = (if good_nat n then Some (Abs_good_nat n) else None</p>
+<p>my_complicated_computation' xs = map Abs_good_nat <br>
+(my_complicated_computation xs)</p>
+<p>Which is exactly the m_complicated_computation' that comes out of the <br>
+lift_definition anyway (and I imagine there's a one-to-one <br>
+correspondence between the map operations in the def lemma and the <br>
+relators in the transfer lemma).</p>
+<p>So, not sure – is there some fundamental problem with implementation <br>
+something like this in the code generator?</p>
+<p>Manuel</p>
+
+
+
+<a name="257723416"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20for%20typedefs%20with%20an%20invariant/near/257723416" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20typedefs.20with.20an.20invariant.html#257723416">(Oct 15 2021 at 16:12)</a>:</h4>
+<p>From: Dmitriy Traytel &lt;<a href="mailto:traytel@di.ku.dk">traytel@di.ku.dk</a>&gt;<br>
+Hi Manuel,</p>
+<p>lift_definition already implements your workaround. Try:</p>
+<p>context notes[[typedef_overloaded]] begin<br>
+lift_definition (code_dt) my_complicated_computation' :: "nat ⇒ good_nat list" is my_complicated_computation<br>
+  using my_complicated_computation_good by (auto simp: list.pred_set)<br>
+end</p>
+<p>(The context is only needed because your typedef is overloaded. If you have a concrete non-overloaded definition for good you can drop it.)</p>
+<p>This is documented in Ondra's PhD thesis (<a href="https://www21.in.tum.de/~kuncar/documents/kuncar-phdthesis.pdf">https://www21.in.tum.de/~kuncar/documents/kuncar-phdthesis.pdf</a>, Section 6.4) and in isar-ref (page 282 for the Isabelle2021 edition).</p>
+<p>IIRC, Ondra had also considered extending the code generator but decided against as it would significantly increase the trusted code base (which now would need to take map functions into account).</p>
+<p>Dmitriy</p>
+
+
+
+<a name="257726864"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20for%20typedefs%20with%20an%20invariant/near/257726864" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20typedefs.20with.20an.20invariant.html#257726864">(Oct 15 2021 at 16:35)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:manuel@pruvisto.org">manuel@pruvisto.org</a>&gt;<br>
+Interesting, thanks!</p>
+<p>Unfortunately, there seems to be a problem with the implementation. <br>
+Consider e.g. this example:</p>
+<p>typedef mynat = "{n::nat. n &gt; 0 ∧ even n}"<br>
+   by (rule exI[of _ 2]) auto</p>
+<p>typedef foo = "{(a :: nat,bs :: (nat × nat) list). ∀b∈set bs. fst b &gt; 0 <br>
+∧ even (fst b)}"<br>
+   by (rule exI[of _ "(0, [])"]) auto</p>
+<p>setup_lifting type_definition_foo<br>
+setup_lifting type_definition_mynat</p>
+<p>lift_definition (code_dt) bar :: "foo ⇒ (mynat × nat) list" is snd<br>
+   by (force simp: list.pred_set)</p>
+<p>This gives me a "tactic failed".</p>
+<p>Manuel</p>
+
+
+
+<a name="257727780"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20for%20typedefs%20with%20an%20invariant/near/257727780" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20typedefs.20with.20an.20invariant.html#257727780">(Oct 15 2021 at 16:41)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:manuel@pruvisto.org">manuel@pruvisto.org</a>&gt;<br>
+NB: if I wrap the conjunction in the typedef of mynat into another <br>
+definition, everything works fine. So there seems to be some problem <br>
+with the conjunction.</p>
+<p>Manuel</p>
+
+
+
+<a name="261293464"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20for%20typedefs%20with%20an%20invariant/near/261293464" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20typedefs.20with.20an.20invariant.html#261293464">(Nov 12 2021 at 18:36)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi all,</p>
+<p>I can confirm this since I backed this decision.  Sorry for the late reply.</p>
+<p>Florian<br>
+<a href="/user_uploads/14278/8C4qZvo5GU-iM1wOzQULEB8c/OpenPGP_signature">OpenPGP_signature</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

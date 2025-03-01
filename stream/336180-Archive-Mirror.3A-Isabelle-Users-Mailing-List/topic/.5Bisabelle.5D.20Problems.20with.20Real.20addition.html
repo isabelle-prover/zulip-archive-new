@@ -1,0 +1,109 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Problems with Real addition · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20Real.20addition.html">[isabelle] Problems with Real addition</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294098539"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20Real%20addition/near/294098539" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20Real.20addition.html#294098539">(Aug 18 2022 at 14:30)</a>:</h4>
+<p>From: Steve W &lt;<a href="mailto:s.wong.731@googlemail.com">s.wong.731@googlemail.com</a>&gt;<br>
+Hi,</p>
+<p>I'm trying out addition in Real, but have run into some problems. Does<br>
+anyone know why the first example below doesn't work but the second does? Is<br>
+it a problem with the types?</p>
+<p>1)</p>
+<p>theory Test<br>
+imports Real<br>
+begin</p>
+<p>typedecl T</p>
+<p>consts<br>
+F :: "T =&gt; real"<br>
+t :: "T"</p>
+<p>axioms<br>
+ax : "F(t) = 0"</p>
+<p>lemma test: "EX x. F(x) + 1 ~= 0"<br>
+using ax<br>
+by auto</p>
+<p>2)</p>
+<p>theory Test<br>
+imports Real<br>
+begin</p>
+<p>typedecl T</p>
+<p>consts<br>
+F :: "T =&gt; real"<br>
+t :: "T"</p>
+<p>axioms<br>
+ax : "F(t) = 0"</p>
+<p>lemma test: "EX x. F(x) + 0 = 0"<br>
+using ax<br>
+by auto</p>
+<p>Thanks in advance for any help.</p>
+<p>Regards,<br>
+Steve</p>
+
+
+
+<a name="294098634"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20Real%20addition/near/294098634" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20Real.20addition.html#294098634">(Aug 18 2022 at 14:31)</a>:</h4>
+<p>From: Brian Huffman &lt;<a href="mailto:brianh@cs.pdx.edu">brianh@cs.pdx.edu</a>&gt;<br>
+On Wed, Jan 20, 2010 at 7:51 PM, Steve W &lt;<a href="mailto:s.wong.731@googlemail.com">s.wong.731@googlemail.com</a>&gt; wrote:</p>
+<blockquote>
+<p>I'm trying out addition in Real, but have run into some problems. Does<br>
+anyone know why the first example below doesn't work but the second does? Is<br>
+it a problem with the types?</p>
+</blockquote>
+<p>Hi Steve,</p>
+<p>This is not a problem with the types. It works exactly the same with<br>
+type int or rat as it does with real.</p>
+<blockquote>
+<p>axioms<br>
+ax : "F(t) = 0"</p>
+<p>lemma test: "EX x. F(x) + 1 ~= 0"<br>
+using ax<br>
+by auto</p>
+</blockquote>
+<p>You should realize that you are asking a lot of "auto" here, since<br>
+proving this lemma requires it to guess a witness for the existential<br>
+quantifier. The "auto" tactic can only guess witnesses in very limited<br>
+circumstances.</p>
+<blockquote>
+<p>axioms<br>
+ax : "F(t) = 0"</p>
+<p>lemma test: "EX x. F(x) + 0 = 0"<br>
+using ax<br>
+by auto</p>
+</blockquote>
+<p>Your second example happens to be one of the limited circumstances<br>
+where auto <em>can</em> solve an existential. Simplification replaces "F(x) +<br>
+0" with "F(x)", leaving the subgoal</p>
+<p>"EX x. F(x) = 0"</p>
+<p>which just happens to match up perfectly with the rule "ax" that you<br>
+provided. In general, you should only expect "auto" to solve<br>
+existentials if they can be solved in one step by rule exI.</p>
+<p>Other tactics besides "auto" are better at solving existentials. For<br>
+example, the "metis" tactic can solve your goal:</p>
+<p>lemma test: "EX x. F(x) + 1 ~= 0"<br>
+using ax<br>
+by (metis one_neq_zero add_0_left)</p>
+<p>The drawback with metis is that you need to supply all the other<br>
+lemmas needed to solve the goal.</p>
+<p>In the end, it is often easiest to just provide the witness yourself:</p>
+<p>lemma test: "EX x. F(x) + 1 ~= 0"<br>
+proof<br>
+  show "F(t) + 1 ~= 0"<br>
+    using ax by simp<br>
+qed</p>
+<p>Hope this helps,</p>
+<ul>
+<li>Brian</li>
+</ul>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

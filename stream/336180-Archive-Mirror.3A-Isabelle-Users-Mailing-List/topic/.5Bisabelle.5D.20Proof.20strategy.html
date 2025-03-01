@@ -1,0 +1,86 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Proof strategy · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof.20strategy.html">[isabelle] Proof strategy</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294761494"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof%20strategy/near/294761494" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof.20strategy.html#294761494">(Aug 22 2022 at 20:23)</a>:</h4>
+<p>From: "John F. Hughes" &lt;<a href="mailto:jfh@cs.brown.edu">jfh@cs.brown.edu</a>&gt;<br>
+I often find myself trying to prove things in a context like this:</p>
+<p>Theorem: Given this, that, and the other, there's a widget X with these<br>
+properties.</p>
+<p>An example might be</p>
+<p>Theorem: Given two real numbers r and s, with r &lt; s there's a real number t<br>
+between them, i.e., with r &lt; t and t &lt; s.</p>
+<p>My approach, as a mathematician, is often to explicitly construct the<br>
+widget described, and show it has the properties needed. In the example<br>
+theorem, I'd say: let t = (r+s)/2. Then because r &lt; s, we know that r+r &lt;<br>
+r + s, so (dividing by 2) r &lt; (r+s)/2, so r &lt; t. [Then I'd write a similar<br>
+proof for t &lt; s. ]</p>
+<p>I seem, in Isar, to often reach a state where I've done exactly this --<br>
+I've established the existence of the missing widget by explicitly<br>
+constructing it -- but I can't make Isar say, "Oh, good...we're done here!"</p>
+<p>In the example above, Isar can figure out a proof all on its own, but since<br>
+that's not true in general (most of the constructive proofs I'm doing are<br>
+beyond its 'i can do that' skills), I'd like to work through the details to<br>
+get the general structure.</p>
+<p>I have a feeling that part of the problem is that there's an implict<br>
+"forall r, forall s" in front of the theorem, while I want to do my proof<br>
+by doing it for a particular (but arbitrary) r (and s, of course).</p>
+<p>I'm pretty sure I'm supposed to do that with "fix r" and "fix s". But then<br>
+I need to do something more. I figured that because I was trying to prove<br>
+that "r &lt; s" implies something, I should assume that r &lt; s, and proceed.</p>
+<p>Here's a start:</p>
+<p>theory Proof_practice<br>
+  imports Complex_Main<br>
+begin</p>
+<p>theorem mid: "(r::real) &lt; s⟹∃t. ((r &lt; t) ∧ (t &lt; s))"<br>
+proof<br>
+  fix r<br>
+  fix s<br>
+  assume "r &lt; s"<br>
+  let t = "(r+s)/2"<br>
+qed<br>
+end</p>
+<p>The type-ascription on "r" seemed to be necessary; without it, auto<br>
+Quickcheck claimed to have a counterexample (apparently by assuming that I<br>
+meant r and s to be Enums rather than reals). Even so, the "r" in the first<br>
+line of the proof appears to be unrelated to the "r" in the theorem<br>
+statement, for it's described as a Skolem variable with type 'a, so that<br>
+the "let" line completely fails (complaining that "+" is not defined for<br>
+items of type 'a, quite reasonably).</p>
+<p>Can someone describe a general pattern for proofs like this (where I<br>
+construct some object, and show that it has some properties, and then say<br>
+"see, that's proof that such a thing exists!"? It's clear that I'm headed<br>
+down the wrong path.</p>
+
+
+
+<a name="294761500"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof%20strategy/near/294761500" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof.20strategy.html#294761500">(Aug 22 2022 at 20:23)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;</p>
+<blockquote>
+<p>theorem mid: "(r::real) &lt; s⟹∃t. ((r &lt; t) ∧ (t &lt; s))"</p>
+</blockquote>
+<p>You statement already introduces r and s, fixing them again introduces new r and <br>
+s, which is not what you want. You can also write the goal with assumes/shows <br>
+instead of ==&gt; so you don't have to assume the assumptions once more but can <br>
+refer to them by the predefined name "assms". This leads to</p>
+<p>theorem mid: assumes "(r::real) &lt; s" shows "∃t. r &lt; t ∧ t &lt; s"<br>
+proof<br>
+   let ?t = "(r+s)/2"<br>
+   show "r &lt; ?t ∧ ?t &lt; s" using assms by simp<br>
+qed</p>
+<p>Tobias<br>
+<a href="/user_uploads/14278/_xlJFxF5dYYMC4hGAi3_dmTZ/smime.p7s">smime.p7s</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

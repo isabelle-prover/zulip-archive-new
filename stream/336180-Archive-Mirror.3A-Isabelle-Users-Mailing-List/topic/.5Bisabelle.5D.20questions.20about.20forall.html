@@ -1,0 +1,147 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] questions about forall · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20questions.20about.20forall.html">[isabelle] questions about forall</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294309462"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20questions%20about%20forall/near/294309462" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20questions.20about.20forall.html#294309462">(Aug 19 2022 at 16:09)</a>:</h4>
+<p>From: Amarin Phaosawasdi &lt;<a href="mailto:phaosaw2@illinois.edu">phaosaw2@illinois.edu</a>&gt;<br>
+Hello,</p>
+<p>This question is based on some definitions defined in the book Concrete <br>
+Semantics. Here's a high-level description of the problem.</p>
+<p>I have to prove something in the form<br>
+"⋀ x. assumption1 ⟹ ... ⟹ assumptionN ⟹ thesis"</p>
+<p>However, the assumptions give me the exact value of x I needed. All <br>
+other values make the assumptions false (hence making the thesis true).</p>
+<p>How would I go about proving the theorem, removing "⋀ x" and <br>
+instantiating x to be that specific value I wanted?</p>
+<p>In particular, given the big step semantics of while loops in a simple <br>
+programming language (see below), I'm trying to prove the following lemma.</p>
+<p>lemma "⟦(WHILE b DO c,s) ⇒ s'';<br>
+         bval b s;<br>
+         (c,s) ⇒ s'⟧ ⟹<br>
+   (WHILE b DO c,s') ⇒ s''"</p>
+<p>I'm stuck at the step where I need to prove.<br>
+"⋀s2. bval b s ⟹<br>
+        (c, s) ⇒ s' ⟹<br>
+        bval b s ⟹<br>
+        (c, s) ⇒ s2 ⟹<br>
+        (WHILE b DO c, s2) ⇒ s'' ⟹<br>
+  (WHILE b DO c, s') ⇒ s''"</p>
+<p>In this case, I know that s2 has to be s'.</p>
+<p>Below is the code.</p>
+<p>Thank you,<br>
+Amarin</p>
+<p>============================================<br>
+theory SemanticsQuestion imports Main begin</p>
+<p>type_synonym vname = string<br>
+type_synonym val = int<br>
+type_synonym state = "vname ⇒ val"</p>
+<p>datatype bexp = Bc bool<br>
+fun bval :: "bexp ⇒ state ⇒ bool" where<br>
+"bval (Bc v) s = v"</p>
+<p>datatype<br>
+   com = SKIP |<br>
+         While bexp com ("(WHILE _/ DO _)"  [0, 61] 61)</p>
+<p>inductive<br>
+   big_step :: "com × state ⇒ state ⇒ bool" (infix "⇒" 55)<br>
+where<br>
+WhileFalse: "⟦¬bval b s⟧ ⟹ (WHILE b DO c,s) ⇒ s" |<br>
+WhileTrue: "⟦ bval b s1;  (c,s1) ⇒ s2;  (WHILE b DO c,s2) ⇒ s3 ⟧<br>
+   ⟹ (WHILE b DO c, s1) ⇒ s3"</p>
+<p>declare big_step.intros [intro]<br>
+lemmas big_step_induct = big_step.induct[split_format(complete)]<br>
+inductive_cases WhileE[elim]: "(WHILE b DO c,s) ⇒ t"</p>
+<p>theorem big_step_determ: "⟦ (c,s) ⇒ t; (c,s) ⇒ u ⟧ ⟹ u = t"<br>
+   by (induction arbitrary: u as3 rule: big_step_induct) blast+</p>
+<p>lemma "⟦(WHILE b DO c,s) ⇒ s'';<br>
+         bval b s;<br>
+         (c,s) ⇒ s'⟧ ⟹<br>
+   (WHILE b DO c,s') ⇒ s''"<br>
+apply (erule WhileE)<br>
+apply simp<br>
+sorry</p>
+<p>end</p>
+
+
+
+<a name="294309485"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20questions%20about%20forall/near/294309485" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20questions.20about.20forall.html#294309485">(Aug 19 2022 at 16:09)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:lammich@in.tum.de">lammich@in.tum.de</a>&gt;<br>
+You need to exploit determinism of your semantics, e.g.</p>
+<p>lemma "⟦(WHILE b DO c,s) ⇒ s'';<br>
+         bval b s;<br>
+         (c,s) ⇒ s'⟧ ⟹<br>
+   (WHILE b DO c,s') ⇒ s''"<br>
+apply (erule WhileE)<br>
+apply simp<br>
+apply (drule (1) big_step_determ, simp)<br>
+done</p>
+
+
+
+<a name="294315798"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20questions%20about%20forall/near/294315798" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20questions.20about.20forall.html#294315798">(Aug 19 2022 at 16:10)</a>:</h4>
+<p>From: Amarin Phaosawasdi &lt;<a href="mailto:phaosaw2@illinois.edu">phaosaw2@illinois.edu</a>&gt;<br>
+Thanks. It seems like the simplifier can do the job when I have the <br>
+right assumptions.</p>
+<p>I have some follow up questions.</p>
+<p>What does the "(1)" do?</p>
+<p>I see that using drule (without the "(1)") requires me to prove the <br>
+other assumption in big_step_determ, while when using "drule (1)"I am <br>
+not required to do so.</p>
+<p>In general, what does adding "(number)" to a drule do? Also can I use it <br>
+with rule, erule, frule as well?</p>
+<p>Also, what is the difference between the following?</p>
+<p>apply (drule (1) big_step_determ, simp)</p>
+<p>and</p>
+<p>apply (drule (1)big_step_determ)<br>
+   apply (simp)</p>
+<p>Amarin</p>
+
+
+
+<a name="294315933"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20questions%20about%20forall/near/294315933" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20questions.20about.20forall.html#294315933">(Aug 19 2022 at 16:11)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:lammich@in.tum.de">lammich@in.tum.de</a>&gt;<br>
+On Mo, 2014-10-27 at 11:37 -0500, Amarin Phaosawasdi wrote:</p>
+<blockquote>
+<p>What does the "(1)" do?</p>
+<p>I see that using drule (without the "(1)") requires me to prove the <br>
+other assumption in big_step_determ, while when using "drule (1)"I am <br>
+not required to do so.</p>
+<p>In general, what does adding "(number)" to a drule do? Also can I use it <br>
+with rule, erule, frule as well?</p>
+</blockquote>
+<p>The (n) means, that n extra assumptions should be discharged. It's<br>
+roughly the same as adding ",assumption,...,assumption" n times.</p>
+<blockquote>
+<p>Also, what is the difference between the following?</p>
+<p>apply (drule (1) big_step_determ, simp)</p>
+<p>and</p>
+<p>apply (drule (1)big_step_determ)<br>
+   apply (simp)</p>
+</blockquote>
+<p>In your case, it should be the same, as the drule matches the<br>
+assumptions unambiguously.<br>
+In general, the "," allows backtracking, while a new "apply"<br>
+only takes the first result.</p>
+
+
+
+<a name="294316040"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20questions%20about%20forall/near/294316040" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20questions.20about.20forall.html#294316040">(Aug 19 2022 at 16:11)</a>:</h4>
+<p>From: Amarin Phaosawasdi &lt;<a href="mailto:phaosaw2@illinois.edu">phaosaw2@illinois.edu</a>&gt;<br>
+Got it, thank you for the help.</p>
+<p>Amarin</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

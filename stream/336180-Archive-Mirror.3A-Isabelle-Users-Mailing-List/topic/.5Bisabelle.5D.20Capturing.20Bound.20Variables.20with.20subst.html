@@ -1,0 +1,171 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Capturing Bound Variables with subst · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Capturing.20Bound.20Variables.20with.20subst.html">[isabelle] Capturing Bound Variables with subst</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294632422"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Capturing%20Bound%20Variables%20with%20subst/near/294632422" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Capturing.20Bound.20Variables.20with.20subst.html#294632422">(Aug 22 2022 at 09:00)</a>:</h4>
+<p>From: scott constable &lt;<a href="mailto:sdconsta@syr.edu">sdconsta@syr.edu</a>&gt;<br>
+Hi All,</p>
+<p>I'm currently trying to simplify a subgoal via a substitution. What I would<br>
+like to do is the following:</p>
+<p>apply (subst whileLoop_add_inv [where M="\&lt;lambda&gt; (n', _). ptr_val n'" and<br>
+I ="\&lt;lambda&gt; n' _. n' &lt; p"])</p>
+<p>The problem is that "p" is bound by all (!!) to the entire scope of the<br>
+current subgoal, and subst apparently cannot express instantiations that<br>
+refer to such bound variables. The other alternative is to use an erule_tac<br>
+applied to subst. But I cannot figure out a way to invoke this rule while<br>
+also defining the schematic variables required by the rule<br>
+whileLoop_add_inv.</p>
+<p>So it looks like I need something like a "subst_tac", which is not<br>
+currently a feature of Isabelle/HOL. Is there a way around this?</p>
+<p>Many thanks in advance,</p>
+<p>~Scott Constable</p>
+
+
+
+<a name="294632634"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Capturing%20Bound%20Variables%20with%20subst/near/294632634" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Capturing.20Bound.20Variables.20with.20subst.html#294632634">(Aug 22 2022 at 09:01)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:lammich@in.tum.de">lammich@in.tum.de</a>&gt;</p>
+<blockquote>
+<p>Unfortunatelz, there is no subst_tac method that would allow you to refer to the parameters of the goal as the old-style tactic emulations *rule_tac.</p>
+</blockquote>
+<p>There is a subst_tac in AFP/Automatic_Refinement/Lib/Refine_Util.<br>
+Unfortunately, those things are unlikely to end up in the official<br>
+Isabelle Release, as apply-style reasoning is considered ancient style,<br>
+and the official philosophy seems to be trying to abandon all<br>
+apply-style reasoning in favour of Isar-proofs. </p>
+<p>For the domain of verification condition generation/discharging, and<br>
+program synthesis, however, I'm not yet aware of viable Isar<br>
+alternatives. However, Lars Noschinski has done some initial work there.</p>
+<p>For subst_tac, you can either include the Refine_Util-theory, or use the<br>
+following code snippet:</p>
+<p>ML ‹<br>
+  local<br>
+    (* Substitution with dynamic instantiation of parameters.<br>
+       By Lars Noschinski. *)<br>
+    fun eqsubst_tac' ctxt asm =<br>
+      if asm then EqSubst.eqsubst_asm_tac ctxt else EqSubst.eqsubst_tac<br>
+ctxt</p>
+<p>fun subst_method inst_tac tac =<br>
+      Args.goal_spec --<br>
+      Scan.lift (Args.mode "asm" -- Scan.optional (Args.parens<br>
+(Scan.repeat Parse.nat)) [0]) --<br>
+      Scan.optional (Scan.lift<br>
+        (Parse.and_list1 <br>
+          (Args.var -- (Args.$$$ "=" |-- Parse.!!!<br>
+Args.name_inner_syntax)) --|<br>
+          Args.$$$ "in")) [] --<br>
+      Attrib.thms &gt;&gt;<br>
+      (fn (((quant, (asm, occL)), insts), thms) =&gt; fn ctxt =&gt; METHOD <br>
+        (fn facts =&gt;<br>
+          if null insts then <br>
+            quant (Method.insert_tac facts THEN' tac ctxt asm occL thms)<br>
+          else<br>
+            (case thms of<br>
+              [thm] =&gt; quant (<br>
+                Method.insert_tac facts THEN' inst_tac ctxt asm occL<br>
+insts thm)<br>
+            | _ =&gt; error "Cannot have instantiations with multiple<br>
+rules")));</p>
+<p>in<br>
+    fun eqsubst_inst_tac ctxt asm occL insts thm = <br>
+      Subgoal.FOCUS (<br>
+        fn {context=ctxt,...} =&gt; let<br>
+          val ctxt' = ctxt |&gt; Proof_Context.set_mode<br>
+Proof_Context.mode_schematic  (* FIXME !? *)<br>
+          val thm' = thm |&gt; Rule_Insts.read_instantiate ctxt' insts []<br>
+        in eqsubst_tac' ctxt asm occL [thm'] 1 end<br>
+      ) ctxt</p>
+<p>val eqsubst_inst_meth = subst_method eqsubst_inst_tac eqsubst_tac'<br>
+  end<br>
+›</p>
+<p>setup ‹ Method.setup @{binding subst_tac} eqsubst_inst_meth<br>
+           "single-step substitution (dynamic instantiation)"›</p>
+<blockquote>
+<p>Hope this helps,<br>
+Andreas</p>
+<hr>
+<p>Von: <a href="mailto:cl-isabelle-users-bounces@lists.cam.ac.uk">cl-isabelle-users-bounces@lists.cam.ac.uk</a> [cl-isabelle-users-bounces@lists.cam.ac.uk]&quot; im Auftrag von &quot;scott constable [sdconsta@syr.edu]<br>
+Gesendet: Dienstag, 3. März 2015 18:09<br>
+An: <a href="mailto:isabelle-users@cl.cam.ac.uk">isabelle-users@cl.cam.ac.uk</a><br>
+Cc: Akash Waran<br>
+Betreff: [isabelle] Capturing Bound Variables with subst</p>
+<p>Hi All,</p>
+<p>I'm currently trying to simplify a subgoal via a substitution. What I would<br>
+like to do is the following:</p>
+<p>apply (subst whileLoop_add_inv [where M="\&lt;lambda&gt; (n', _). ptr_val n'" and<br>
+I ="\&lt;lambda&gt; n' _. n' &lt; p"])</p>
+<p>The problem is that "p" is bound by all (!!) to the entire scope of the<br>
+current subgoal, and subst apparently cannot express instantiations that<br>
+refer to such bound variables. The other alternative is to use an erule_tac<br>
+applied to subst. But I cannot figure out a way to invoke this rule while<br>
+also defining the schematic variables required by the rule<br>
+whileLoop_add_inv.</p>
+<p>So it looks like I need something like a "subst_tac", which is not<br>
+currently a feature of Isabelle/HOL. Is there a way around this?</p>
+<p>Many thanks in advance,</p>
+<p>~Scott Constable<br>
+</p>
+</blockquote>
+
+
+
+<a name="294632637"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Capturing%20Bound%20Variables%20with%20subst/near/294632637" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Capturing.20Bound.20Variables.20with.20subst.html#294632637">(Aug 22 2022 at 09:01)</a>:</h4>
+<p>From: Lochbihler  Andreas &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear Scott,</p>
+<p>In Isabelle2014, the instantiation attributes "of" and "where" support a "for" clause. This allows you to generalise over the variables in the instantiation expressions. For example, in the theorem</p>
+<p>whileLoop_add_inv [where M="\&lt;lambda&gt; (n', _). ptr_val n'" and I ="\&lt;lambda&gt; n' _. n' &lt; p" for p]</p>
+<p>the variable p is a schematic again, which the normal subst method can then unify with the parameter of the goal. In most cases, this is sufficient. Unfortunatelz, there is no subst_tac method that would allow you to refer to the parameters of the goal as the old-style tactic emulations *rule_tac.</p>
+<p>Hope this helps,<br>
+Andreas</p>
+
+
+
+<a name="294632640"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Capturing%20Bound%20Variables%20with%20subst/near/294632640" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Capturing.20Bound.20Variables.20with.20subst.html#294632640">(Aug 22 2022 at 09:01)</a>:</h4>
+<p>From: scott constable &lt;<a href="mailto:sdconsta@syr.edu">sdconsta@syr.edu</a>&gt;<br>
+Worked like a charm. Thanks so much!</p>
+<p>~Scott Constable</p>
+
+
+
+<a name="294632668"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Capturing%20Bound%20Variables%20with%20subst/near/294632668" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Capturing.20Bound.20Variables.20with.20subst.html#294632668">(Aug 22 2022 at 09:01)</a>:</h4>
+<p>From: Gerwin Klein &lt;<a href="mailto:Gerwin.Klein@nicta.com.au">Gerwin.Klein@nicta.com.au</a>&gt;</p>
+<blockquote>
+<p>On 4 Mar 2015, at 9:46 pm, Peter Lammich &lt;<a href="mailto:lammich@in.tum.de">lammich@in.tum.de</a>&gt; wrote:</p>
+<blockquote>
+<p>Unfortunatelz, there is no subst_tac method that would allow you to refer to the parameters of the goal as the old-style tactic emulations *rule_tac.</p>
+</blockquote>
+<p>There is a subst_tac in AFP/Automatic_Refinement/Lib/Refine_Util.<br>
+Unfortunately, those things are unlikely to end up in the official<br>
+Isabelle Release, as apply-style reasoning is considered ancient style,<br>
+and the official philosophy seems to be trying to abandon all<br>
+apply-style reasoning in favour of Isar-proofs.</p>
+</blockquote>
+<p>I don’t agree with that. First of all, apply-style is Isar as well, it’s just not structured proof. The actually ancient proof style is ML script, pasted manually from your editor into the ML top-level in a shell ;-) Second, there are quite a few situations where apply style is entirely adequate.</p>
+<p>Structured proof is nicer and more readable for many, maybe even most situations, but not for everything.</p>
+<blockquote>
+<p>For the domain of verification condition generation/discharging, and<br>
+program synthesis, however, I'm not yet aware of viable Isar<br>
+alternatives.</p>
+</blockquote>
+<p>Precisely :-)</p>
+<p>Regarding subst_tac, the upcoming Eisbach will have a few language mechanisms that should make it easier to treat name bindings more nicely and naturally (and to further reduce long apply scripts). It’s not quite there yet, but Dan is working on it.</p>
+<p>Cheers,<br>
+Gerwin</p>
+<hr>
+<p>The information in this e-mail may be confidential and subject to legal professional privilege and/or copyright. National ICT Australia Limited accepts no liability for any damage caused by this email or its attachments.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

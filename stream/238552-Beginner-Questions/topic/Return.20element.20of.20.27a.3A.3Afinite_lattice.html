@@ -1,0 +1,145 @@
+<html>
+<head><meta charset="utf-8"><title>Return element of &#x27;a::finite_lattice · Beginner Questions · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/index.html">Beginner Questions</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Return.20element.20of.20.27a.3A.3Afinite_lattice.html">Return element of &#x27;a::finite_lattice</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="296080388"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Return%20element%20of%20%27a%3A%3Afinite_lattice/near/296080388" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> waynee95 <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Return.20element.20of.20.27a.3A.3Afinite_lattice.html#296080388">(Aug 30 2022 at 11:20)</a>:</h4>
+<p>I want to write a function that reverses the order of a lattice</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">fun</span> <span class="n">reverse_lattice</span> <span class="o">::</span> <span class="s">"'a::finite_lattice =&gt; 'a::finite_lattice"</span>
+</code></pre></div>
+<p>But I am not sure how to work with an element of that type or how to even create such. Is that even possible?</p>
+
+
+
+<a name="296092765"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Return%20element%20of%20%27a%3A%3Afinite_lattice/near/296092765" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Return.20element.20of.20.27a.3A.3Afinite_lattice.html#296092765">(Aug 30 2022 at 12:41)</a>:</h4>
+<p>No, at least not like this. The order of the lattice comes from the type class and is thus fixed for any given type. What you <em>can</em> do is to define a type constructor <code>dual</code> that takes a type parameter <code>'a</code> and then instantiates the type class with the order reversed. You also get morphisms <code>to_dual :: 'a ⇒ 'a dual</code> and <code>from_dual :: 'a dual ⇒ 'a</code> that map between the type's copy and the type itself. The <code>to_dual</code> sort of corresponds to the <code>reverse_lattice</code> you tried to define above.</p>
+<p>This requires quite a bit of boilerplate to set up, but it's not that hard if you know what needs to be done. In fact, I think something like this should probably be put into <code>HOL-Library</code> (if it doesn't exist already).</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">typedef</span> <span class="n n-Type">'a</span> <span class="n">dual</span> <span class="o">=</span> <span class="s">"UNIV :: 'a set"</span>
+  <span class="kp">morphisms</span> <span class="n">from_dual</span> <span class="n">to_dual</span> <span class="k">by</span> <span class="n">blast</span>
+
+<span class="k">setup_lifting</span> <span class="n">type_definition_dual</span>
+
+
+<span class="k">instantiation</span> <span class="n">dual</span> <span class="o">::</span> <span class="o">(</span><span class="n">ord</span><span class="o">)</span> <span class="n">ord</span>
+<span class="k">begin</span>
+
+<span class="kn">lift_definition</span> <span class="n">less_eq_dual</span> <span class="o">::</span> <span class="s">"'a dual ⇒ 'a dual ⇒ bool"</span> <span class="kp">is</span> <span class="s">"(≥)"</span> <span class="ow">.</span>
+<span class="kn">lift_definition</span> <span class="n">less_dual</span> <span class="o">::</span> <span class="s">"'a dual ⇒ 'a dual ⇒ bool"</span> <span class="kp">is</span> <span class="s">"(&gt;)"</span> <span class="ow">.</span>
+
+<span class="kn">instance</span> <span class="ow">..</span>
+
+<span class="k">end</span>
+
+
+<span class="kn">instance</span> <span class="n">dual</span> <span class="o">::</span> <span class="o">(</span><span class="n">order</span><span class="o">)</span> <span class="n">order</span>
+  <span class="k">by</span> <span class="n">standard</span> <span class="o">(</span><span class="n">transfer</span><span class="err">;</span> <span class="n">force</span><span class="o">)+</span>
+
+<span class="kn">instance</span> <span class="n">dual</span> <span class="o">::</span> <span class="o">(</span><span class="n">preorder</span><span class="o">)</span> <span class="n">preorder</span>
+  <span class="k">by</span> <span class="n">standard</span> <span class="o">(</span><span class="n">transfer</span><span class="err">;</span> <span class="n">force</span> <span class="n">simp</span><span class="o">:</span> <span class="n">less_le_not_le</span> <span class="n">intro</span><span class="o">:</span> <span class="n">order.trans</span><span class="o">)+</span>
+
+<span class="kn">instance</span> <span class="n">dual</span> <span class="o">::</span> <span class="o">(</span><span class="n">linorder</span><span class="o">)</span> <span class="n">linorder</span>
+  <span class="k">by</span> <span class="n">standard</span> <span class="o">(</span><span class="n">transfer</span><span class="err">;</span> <span class="n">force</span><span class="o">)+</span>
+
+
+<span class="k">instantiation</span> <span class="n">dual</span> <span class="o">::</span> <span class="o">(</span><span class="n">sup</span><span class="o">)</span> <span class="n">inf</span>
+<span class="k">begin</span>
+<span class="kn">lift_definition</span> <span class="n">inf_dual</span> <span class="o">::</span> <span class="s">"'a dual ⇒ 'a dual ⇒ 'a dual"</span> <span class="kp">is</span> <span class="n">sup</span> <span class="ow">.</span>
+<span class="kn">instance</span> <span class="ow">..</span>
+<span class="k">end</span>
+
+<span class="kn">instance</span> <span class="n">dual</span> <span class="o">::</span> <span class="o">(</span><span class="n">semilattice_sup</span><span class="o">)</span> <span class="n">semilattice_inf</span>
+  <span class="k">by</span> <span class="n">standard</span> <span class="o">(</span><span class="n">transfer</span><span class="err">;</span> <span class="n">simp</span><span class="o">)+</span>
+
+<span class="k">instantiation</span> <span class="n">dual</span> <span class="o">::</span> <span class="o">(</span><span class="n">inf</span><span class="o">)</span> <span class="n">sup</span>
+<span class="k">begin</span>
+<span class="kn">lift_definition</span> <span class="n">sup_dual</span> <span class="o">::</span> <span class="s">"'a dual ⇒ 'a dual ⇒ 'a dual"</span> <span class="kp">is</span> <span class="n">inf</span> <span class="ow">.</span>
+<span class="kn">instance</span> <span class="ow">..</span>
+<span class="k">end</span>
+
+<span class="k">instantiation</span> <span class="n">dual</span> <span class="o">::</span> <span class="o">(</span><span class="n">Sup</span><span class="o">)</span> <span class="n">Inf</span>
+<span class="k">begin</span>
+<span class="kn">lift_definition</span> <span class="n">Inf_dual</span> <span class="o">::</span> <span class="s">"'a dual set ⇒ 'a dual"</span> <span class="kp">is</span> <span class="n">Sup</span> <span class="ow">.</span>
+<span class="kn">instance</span> <span class="ow">..</span>
+<span class="k">end</span>
+
+<span class="k">instantiation</span> <span class="n">dual</span> <span class="o">::</span> <span class="o">(</span><span class="n">Inf</span><span class="o">)</span> <span class="n">Sup</span>
+<span class="k">begin</span>
+<span class="kn">lift_definition</span> <span class="n">Sup_dual</span> <span class="o">::</span> <span class="s">"'a dual set ⇒ 'a dual"</span> <span class="kp">is</span> <span class="n">Inf</span> <span class="ow">.</span>
+<span class="kn">instance</span> <span class="ow">..</span>
+<span class="k">end</span>
+
+<span class="k">instantiation</span> <span class="n">dual</span> <span class="o">::</span> <span class="o">(</span><span class="n">top</span><span class="o">)</span> <span class="n">bot</span>
+<span class="k">begin</span>
+<span class="kn">lift_definition</span> <span class="n">bot_dual</span> <span class="o">::</span> <span class="s">"'a dual"</span> <span class="kp">is</span> <span class="n">top</span> <span class="ow">.</span>
+<span class="kn">instance</span> <span class="ow">..</span>
+<span class="k">end</span>
+
+<span class="k">instantiation</span> <span class="n">dual</span> <span class="o">::</span> <span class="o">(</span><span class="n">bot</span><span class="o">)</span> <span class="n">top</span>
+<span class="k">begin</span>
+<span class="kn">lift_definition</span> <span class="n">top_dual</span> <span class="o">::</span> <span class="s">"'a dual"</span> <span class="kp">is</span> <span class="n">bot</span> <span class="ow">.</span>
+<span class="kn">instance</span> <span class="ow">..</span>
+<span class="k">end</span>
+
+
+<span class="kn">instance</span> <span class="n">dual</span> <span class="o">::</span> <span class="o">(</span><span class="n">semilattice_inf</span><span class="o">)</span> <span class="n">semilattice_sup</span>
+  <span class="k">by</span> <span class="n">standard</span> <span class="o">(</span><span class="n">transfer</span><span class="err">;</span> <span class="n">simp</span><span class="o">)+</span>
+
+<span class="kn">instance</span> <span class="n">dual</span> <span class="o">::</span> <span class="o">(</span><span class="n">lattice</span><span class="o">)</span> <span class="n">lattice</span>
+  <span class="k">by</span> <span class="n">standard</span>
+
+<span class="kn">instance</span> <span class="n">dual</span> <span class="o">::</span> <span class="o">(</span><span class="n">distrib_lattice</span><span class="o">)</span> <span class="n">distrib_lattice</span>
+  <span class="k">by</span> <span class="n">standard</span> <span class="o">(</span><span class="n">transfer</span><span class="err">;</span> <span class="n">simp</span> <span class="n">add</span><span class="o">:</span> <span class="n">inf_sup_distrib1</span><span class="o">)</span>
+
+<span class="kn">instance</span> <span class="n">dual</span> <span class="o">::</span> <span class="o">(</span><span class="n">complete_lattice</span><span class="o">)</span> <span class="n">complete_lattice</span>
+  <span class="k">by</span> <span class="n">standard</span> <span class="o">(</span><span class="n">transfer</span><span class="err">;</span> <span class="n">force</span> <span class="n">intro</span><span class="o">:</span> <span class="n">Sup_upper</span> <span class="n">Inf_lower</span> <span class="n">simp</span><span class="o">:</span> <span class="n">Sup_le_iff</span> <span class="n">le_Inf_iff</span><span class="err">;</span> <span class="n">fail</span><span class="o">)+</span>
+
+<span class="kn">instance</span> <span class="n">dual</span> <span class="o">::</span> <span class="o">(</span><span class="n">finite_lattice</span><span class="o">)</span> <span class="n">finite_lattice</span>
+  <span class="k">by</span> <span class="n">standard</span> <span class="o">(</span><span class="n">transfer</span><span class="err">;</span> <span class="n">simp</span><span class="err">;</span> <span class="n">fail</span><span class="o">)+</span>
+
+
+<span class="kn">lemma</span> <span class="n">from_dual_le_iff</span> <span class="o">[</span><span class="n">simp</span><span class="o">]:</span> <span class="s">"from_dual x ≤ from_dual y ⟷ x ≥ y"</span>
+  <span class="k">by</span> <span class="n">transfer</span> <span class="n">auto</span>
+
+<span class="kn">lemma</span> <span class="n">from_dual_less_iff</span> <span class="o">[</span><span class="n">simp</span><span class="o">]:</span> <span class="s">"from_dual x &lt; from_dual y ⟷ x &gt; y"</span>
+  <span class="k">by</span> <span class="n">transfer</span> <span class="n">auto</span>
+
+<span class="kn">lemma</span> <span class="n">to_dual_le_iff</span> <span class="o">[</span><span class="n">simp</span><span class="o">]:</span> <span class="s">"to_dual x ≤ to_dual y ⟷ x ≥ y"</span>
+  <span class="k">by</span> <span class="n">transfer</span> <span class="n">auto</span>
+
+<span class="kn">lemma</span> <span class="n">to_dual_less_iff</span> <span class="o">[</span><span class="n">simp</span><span class="o">]:</span> <span class="s">"to_dual x &lt; to_dual y ⟷ x &gt; y"</span>
+  <span class="k">by</span> <span class="n">transfer</span> <span class="n">auto</span>
+</code></pre></div>
+
+
+
+<a name="296176496"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Return%20element%20of%20%27a%3A%3Afinite_lattice/near/296176496" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> waynee95 <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Return.20element.20of.20.27a.3A.3Afinite_lattice.html#296176496">(Aug 30 2022 at 17:28)</a>:</h4>
+<p><span class="user-mention" data-user-id="232736">@Manuel Eberl</span> I already feared that it might be more involved to do that. How would I use <code>to_dual</code>?</p>
+<p>Maybe I can give a bit more context on what I am trying to do in Isabelle.</p>
+<p>I have these datatypes</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">datatype</span> <span class="n">variance</span> <span class="o">=</span>
+  <span class="n">Plus</span>
+  <span class="o">|</span> <span class="n">Minus</span>
+  <span class="o">|</span> <span class="n">PlusMinus</span>
+
+<span class="k">datatype</span> <span class="n">ty</span> <span class="o">=</span>
+  <span class="n">Base</span>
+  <span class="o">|</span> <span class="n">Fun</span> <span class="n">ty</span> <span class="n">variance</span> <span class="n">ty</span>
+</code></pre></div>
+<p>The variances are used to specify the dependency of the values of a function on their arguments, e.g. <code>Plus</code> indicates a _monotonic_ dependency. </p>
+<p>We can mathematically define the following constructions on complete lattices: inverse, flattening, product of lattices and creating the lattice of component-wise ordered monotonic functions between two lattices. </p>
+<p>These constructions are then used to associate with each <code>ty</code> a complete lattice.</p>
+<p>So to continue I need to figure out to achieve these constructions in Isabelle.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

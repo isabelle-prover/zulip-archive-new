@@ -1,0 +1,77 @@
+<html>
+<head><meta charset="utf-8"><title>Specifying simprocs · Beginner Questions · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/index.html">Beginner Questions</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Specifying.20simprocs.html">Specifying simprocs</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="361175538"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Specifying%20simprocs/near/361175538" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Matt Griffin <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Specifying.20simprocs.html#361175538">(May 25 2023 at 22:12)</a>:</h4>
+<p>Is there a way to limit the simplifier to a single <code>simproc</code>, in my case fun_upd2? I understand that I can specify a list of theorems and omit all others with <code>only</code> but this doesn't seem to extend to simproc(s). IE: `simp only: fun_upd2' fails with "Undefined fact".</p>
+
+
+
+<a name="361214948"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Specifying%20simprocs/near/361214948" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Specifying.20simprocs.html#361214948">(May 26 2023 at 04:51)</a>:</h4>
+<p>It is hard to recommend.  The ML version:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="w">  </span><span class="kp">apply</span><span class="w"> </span><span class="o">(</span><span class="n">tactic</span><span class="w"> </span><span class="s">‹ALLGOALS (Simplifier.simp_tac (empty_simpset @{context} addsimprocs [</span><span class="ss">\&lt;^simproc&gt;</span><span class="s">‹fun_upd2›]))›</span><span class="o">)</span>
+</code></pre></div>
+<p>Better is probably the "one simproc is going rogue, let's deactivate it":</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="w">  </span><span class="k">using</span><span class="w">  </span><span class="o">[[</span><span class="n">simproc</span><span class="w"> </span><span class="n">del</span><span class="o">:</span><span class="w"> </span><span class="n">fun_upd2</span><span class="o">]]</span>
+</code></pre></div>
+
+
+
+<a name="361360108"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Specifying%20simprocs/near/361360108" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Matt Griffin <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Specifying.20simprocs.html#361360108">(May 26 2023 at 15:17)</a>:</h4>
+<p><span class="user-mention silent" data-user-id="233198">Mathias Fleury</span> <a href="#narrow/stream/238552-Beginner-Questions/topic/Specifying.20simprocs/near/361214948">said</a>:</p>
+<blockquote>
+<p>It is hard to recommend.  The ML version:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="w">  </span><span class="kp">apply</span><span class="w"> </span><span class="o">(</span><span class="n">tactic</span><span class="w"> </span><span class="s">‹ALLGOALS (Simplifier.simp_tac (empty_simpset @{context} addsimprocs [</span><span class="ss">\&lt;^simproc&gt;</span><span class="s">‹fun_upd2›]))›</span><span class="o">)</span>
+</code></pre></div>
+<p>Better is probably the "one simproc is going rogue, let's deactivate it":</p>
+<p><div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="w">  </span><span class="k">using</span><span class="w">  </span><span class="o">[[</span><span class="n">simproc</span><span class="w"> </span><span class="n">del</span><span class="o">:</span><span class="w"> </span><span class="n">fun_upd2</span><span class="o">]]</span>
+</code></pre></div><br>
+</p>
+</blockquote>
+<p>Thanks for this. For context, I needed to run <code>fun_upd2</code> to simplify a very large map structure with repeating keys and the simp method took too long (mainly due to arith_simps/rel_simps which would persist even with "del:"). Unfortunately, the ML version you suggested doesn't solve the speed issue but I think I understand why. Looking at the definition of <code>fun_upd2</code> it invokes the simplifier in the last step of "Goal.prove". </p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="n">Goal.prove</span><span class="w"> </span><span class="n">ctxt</span><span class="w"> </span><span class="o">[]</span><span class="w"> </span><span class="o">[]</span><span class="w"> </span><span class="o">(</span><span class="n">Logic.mk_equals</span><span class="w"> </span><span class="o">(</span><span class="n">t</span><span class="o">,</span><span class="w"> </span><span class="n">rhs</span><span class="o">))</span>
+<span class="w">              </span><span class="o">(</span><span class="n">fn</span><span class="w"> </span><span class="o">_</span><span class="w"> </span><span class="o">=</span><span class="n">&gt;</span>
+<span class="w">                </span><span class="n">resolve_tac</span><span class="w"> </span><span class="n">ctxt</span><span class="w"> </span><span class="o">[</span><span class="n">eq_reflection</span><span class="o">]</span><span class="w"> </span><span class="n">1</span><span class="w"> </span><span class="n">THEN</span>
+<span class="w">                </span><span class="n">resolve_tac</span><span class="w"> </span><span class="n">ctxt</span><span class="w"> </span><span class="n">@</span><span class="ow">{</span><span class="n">thms</span><span class="w"> </span><span class="n">ext</span><span class="ow">}</span><span class="w"> </span><span class="n">1</span><span class="w"> </span><span class="n">THEN</span>
+<span class="w">                </span><span class="n">simp_tac</span><span class="w"> </span><span class="o">(</span><span class="n">put_simpset</span><span class="w"> </span><span class="n">ss</span><span class="w"> </span><span class="n">ctxt</span><span class="o">)</span><span class="w"> </span><span class="n">1</span><span class="o">)</span>
+</code></pre></div>
+<p>Is there any way I can limit the simpset in this call, or alternately pass the goal back to the caller to solve?</p>
+
+
+
+<a name="361363676"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Specifying%20simprocs/near/361363676" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Specifying.20simprocs.html#361363676">(May 26 2023 at 15:29)</a>:</h4>
+<p>I think that this is only doing the rewriting and should not be the cause of your problem</p>
+
+
+
+<a name="361363884"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Specifying%20simprocs/near/361363884" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Specifying.20simprocs.html#361363884">(May 26 2023 at 15:30)</a>:</h4>
+<p>can you try</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="w">  </span><span class="n">supply</span><span class="o">[[</span><span class="n">simp_trace</span><span class="o">,</span><span class="w"> </span><span class="n">simp_debug</span><span class="o">]]</span>
+</code></pre></div>
+<p>to see if there is something weird?</p>
+
+
+
+<a name="361406388"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Specifying%20simprocs/near/361406388" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Matt Griffin <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Specifying.20simprocs.html#361406388">(May 26 2023 at 18:13)</a>:</h4>
+<p>I had to extend the <code>simp_trace_depth_limit</code> to get meaningful results</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">using</span><span class="w"> </span><span class="o">[[</span><span class="n">simp_trace</span><span class="o">,</span><span class="w"> </span><span class="n">simp_debug</span><span class="o">,</span><span class="w"> </span><span class="n">simp_trace_depth_limit</span><span class="o">=</span><span class="n">40</span><span class="o">]]</span><span class="w">  </span><span class="kp">apply</span><span class="w"> </span><span class="o">(</span><span class="n">tactic</span><span class="w"> </span><span class="s">‹ALLGOALS (Simplifier.simp_tac (empty_simpset @{context} addsimprocs [</span><span class="ss">\&lt;^simproc&gt;</span><span class="s">‹fun_upd2›]))›</span><span class="o">)[</span><span class="n">1</span><span class="o">]</span>
+</code></pre></div>
+<p>Seems to produce output as I would expect. I guess rewriting for such a large map takes time.  I am able to prove the goal much faster than the rewriting rule using a custom proof method (my use case can make a number of assumptions fun_upd2 cannot) so I've added my own <code>simproc</code> goal. Thank you for the help.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,133 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] imp_program replace more bindings by let · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20imp_program.20replace.20more.20bindings.20by.20let.html">[isabelle] imp_program replace more bindings by let</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294726982"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20imp_program%20replace%20more%20bindings%20by%20let/near/294726982" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20imp_program.20replace.20more.20bindings.20by.20let.html#294726982">(Aug 22 2022 at 16:45)</a>:</h4>
+<p>From: Mathias Fleury &lt;<a href="mailto:mathias.fleury12@gmail.com">mathias.fleury12@gmail.com</a>&gt;<br>
+Dear code-generator experts,</p>
+<p>does anyone understand the code and the assumptions of the function imp_program (used for example by the code target SML_imp)? Currently, it is able to replace some of the (fn f_ =&gt; fn () =&gt; f_ args) by lets, but not in every case.</p>
+<p>For example, consider the following variant of the identity function:</p>
+<p>definition f1 where<br>
+  ‹f1 n = (if False then do {a ← return n; return a} else return n)›</p>
+<p>The code can be exported by<br>
+export_code f1 in SML_imp</p>
+<p>Readable code is produced:</p>
+<p>fun f1 (A1_, A2_) n =<br>
+  (if false<br>
+    then (fn () =&gt;<br>
+           let<br>
+             val x = n;<br>
+           in<br>
+             x<br>
+           end)<br>
+    else (fn () =&gt; n));</p>
+<p>However, if I change the definition by adding a return at the end of the function:</p>
+<p>definition f2 where<br>
+  ‹f2 n = (if False then  do {a ← return n; return a} else return n) ⤜ return›</p>
+<p>Then the exported code is less readable:</p>
+<p>fun f2 (A1_, A2_) n =<br>
+  (fn () =&gt;<br>
+    let<br>
+      val x =<br>
+        (if false<br>
+          then  (fn f_ =&gt; fn () =&gt; f_ ((fn () =&gt; n) ()) ())<br>
+                 (fn a =&gt; (fn () =&gt; a))<br>
+          else (fn () =&gt; n))<br>
+          ();<br>
+    in<br>
+      x<br>
+    end);</p>
+<p>This kind of code appears frequently in the code I generate with the Refinement Framework, because of while-loops. An extreme version of this behaviour can be found in the code generated from my verified SAT solver <a href="https://bitbucket.org/isafol/isafol/src/020eeeda9228b809b1977bc54b5fa853c5a8ef14/Weidenbach_Book/code/IsaSAT_solver.sml?at=master&amp;fileviewer=file-view-default#IsaSAT_solver.sml-1720">https://bitbucket.org/isafol/isafol/src/020eeeda9228b809b1977bc54b5fa853c5a8ef14/Weidenbach_Book/code/IsaSAT_solver.sml?at=master&amp;fileviewer=file-view-default#IsaSAT_solver.sml-1720</a> &lt;<a href="https://bitbucket.org/isafol/isafol/src/020eeeda9228b809b1977bc54b5fa853c5a8ef14/Weidenbach_Book/code/IsaSAT_solver.sml?at=master&amp;fileviewer=file-view-default#IsaSAT_solver.sml-1720">https://bitbucket.org/isafol/isafol/src/020eeeda9228b809b1977bc54b5fa853c5a8ef14/Weidenbach_Book/code/IsaSAT_solver.sml?at=master&amp;fileviewer=file-view-default#IsaSAT_solver.sml-1720</a>&gt;. Changing this behaviour would improve readability, make it easier for me to try how changes perform before verifying them in Isabelle, and make it easier to see if there are performance bugs in my code, like copying of arrays.</p>
+<p>I know of a workaround: giving a name to ‹do {a ← return n; return a}› works.</p>
+<p>By looking at the code of imp_monad_bind/imp_monad_bind' in SML_imp and comparing the calls for ICase (imp_monad_bind') and functions (imp_monad_bind'), I believe that</p>
+<p>imp_monad_bind'' [(t1, ty1), (t2, ty2)]</p>
+<p>is missing recursive calls and could be:</p>
+<p>imp_monad_bind'' [(imp_monad_bind t1, ty1), (imp_monad_bind t2, ty2)]</p>
+<p>However,</p>
+<p>1. this change might make the code generator unsound. I don't know what assumptions are made here.<br>
+  2. this change prevents the grouping of lets to happen:</p>
+<p>definition f3 where<br>
+  ‹f3 n = (if False then  do {a ← return n; a ← return n; return a} else return n)›</p>
+<p>now gets:</p>
+<p>fun f3 (A1_, A2_) n =<br>
+  (if false<br>
+    then (fn () =&gt;<br>
+           let<br>
+             val _ =  n;<br>
+           in<br>
+             (fn () =&gt;<br>
+               let<br>
+                 val x = n;<br>
+               in<br>
+                 x<br>
+               end)<br>
+               ()<br>
+           end)<br>
+    else (fn () =&gt; n));</p>
+<p>instead of</p>
+<p>fun f3 (A1_, A2_) n =<br>
+  (if false<br>
+    then (fn () =&gt;<br>
+           let<br>
+             val _ = n;<br>
+             val x = n;<br>
+           in<br>
+             x<br>
+           end)<br>
+    else (fn () =&gt; n));</p>
+<p>Best,<br>
+Mathias</p>
+
+
+
+<a name="294728198"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20imp_program%20replace%20more%20bindings%20by%20let/near/294728198" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20imp_program.20replace.20more.20bindings.20by.20let.html#294728198">(Aug 22 2022 at 16:51)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Dear Mathias,</p>
+<blockquote>
+<p>does anyone understand the code and the assumptions of the function imp_program (used for example by the code target SML_imp)? Currently, it is able to replace some of the (fn f_ =&gt; fn () =&gt; f_ args) by lets, but not in every case.<br>
+well, imp_monad_bind is a transformation on expressions of the code<br>
+generation intermediate language and imp_program lifts that to transform<br>
+whole programs of the code generation intermediate language.</p>
+</blockquote>
+<p>As is always the case with such extra-logical transformations, they are<br>
+error-prone; most of this code goes back to the first<br>
+(over-)enthusiastic Imperative-HOL experiments in 2008 (rev.<br>
+54bf1fea9252) and has only been changed in cases of urgent need.</p>
+<blockquote>
+<blockquote>
+<p>By looking at the code of imp_monad_bind/imp_monad_bind' in SML_imp and comparing the calls for ICase (imp_monad_bind') and functions (imp_monad_bind'), I believe that</p>
+<p>imp_monad_bind'' [(t1, ty1), (t2, ty2)]</p>
+<p>is missing recursive calls and could be:</p>
+<p>imp_monad_bind'' [(imp_monad_bind t1, ty1), (imp_monad_bind t2, ty2)]</p>
+</blockquote>
+</blockquote>
+<blockquote>
+<blockquote>
+<p>1. this change might make the code generator unsound. I don't know what assumptions are made here.</p>
+</blockquote>
+</blockquote>
+<p>Since imp_monad_bind is supposed to be semantic-preserving, it could be<br>
+assumed that the recursive calls are safe.</p>
+<blockquote>
+<blockquote>
+<p>2. this change prevents the grouping of lets to happen:</p>
+</blockquote>
+</blockquote>
+<p>It is indeed hard to tell on the spot how this could be resolved.</p>
+<p>Cheers,<br>
+    Florian<br>
+<a href="/user_uploads/14278/i5wKxRJNu0dh6sT2EreAfPc7/signature.asc">signature.asc</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

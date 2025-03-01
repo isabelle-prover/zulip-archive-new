@@ -1,0 +1,107 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Strange Behaviour of ALLGOALS · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Strange.20Behaviour.20of.20ALLGOALS.html">[isabelle] Strange Behaviour of ALLGOALS</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294075574"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Strange%20Behaviour%20of%20ALLGOALS/near/294075574" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Strange.20Behaviour.20of.20ALLGOALS.html#294075574">(Aug 18 2022 at 13:18)</a>:</h4>
+<p>From: Burkhart Wolff &lt;<a href="mailto:Burkhart.Wolff@lri.fr">Burkhart.Wolff@lri.fr</a>&gt;<br>
+Dear all,</p>
+<p>I encountered a strange behaviour of ALLGOALS under<br>
+Isabelle/HOL 2008.</p>
+<p>apply(tactic "ALLGOALS(COND' contains_eval thyp_ify (K all_tac))")</p>
+<p>results in the error message:</p>
+<p>*** Unknown context<br>
+*** At command "apply".</p>
+<p>while each individual call:</p>
+<p>apply(tactic "(COND' contains_eval thyp_ify (K all_tac)) 4")<br>
+   apply(tactic "(COND' contains_eval thyp_ify (K all_tac)) 3")<br>
+   apply(tactic "(COND' contains_eval thyp_ify (K all_tac)) 2")<br>
+   apply(tactic "(COND' contains_eval thyp_ify (K all_tac)) 1")</p>
+<p>works fine.</p>
+<p>According specification in tctical.ML, they should behave the same ...</p>
+<p>Can you help me?</p>
+<p>bu</p>
+<p>PS: In case that you need slightly more context<br>
+(but it should actually not matter):</p>
+<p>ML{*<br>
+fun COND' C T1 T2 n = COND (C n) (T1 n) (T2 n);<br>
+fun contains_eval n thm =<br>
+     let fun T("Natural.evalc",_) = true | T _ = false<br>
+     in  Term.exists_Const T (term_of(cprem_of thm n)) end*}</p>
+
+
+
+<a name="294075636"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Strange%20Behaviour%20of%20ALLGOALS/near/294075636" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Strange.20Behaviour.20of.20ALLGOALS.html#294075636">(Aug 18 2022 at 13:19)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+These tactic invocations should be functionally the same, but the exact <br>
+internal evaluation behaviour is different.  The version without ALLGOALS <br>
+can potentially run a bit further, and probably peeks at the implicit <br>
+context that is still active during compilation of the "tactic" <br>
+expression.  Later at actual runtime this is no longer available, and <br>
+produces the "Unknown context" error.</p>
+<p>Neither ALLGOALS nor COND' are at fault here.  You should look at <br>
+contains_eval thyp_ify instead at figure out where the context is <br>
+accessed, e.g. via the_context() or simpset() or similar.  All of this <br>
+belongs to old layers of the system and is more and more at retreat. <br>
+Usually it is best to refer to the context explicitly, passing through <br>
+ctxt: Proof.context where required and provide that value in the very end <br>
+via the @{context} antiquotation. E.g. like this:</p>
+<p>ML {*<br>
+   fun my_tac ctxt i = ...<br>
+*}</p>
+<p>...<br>
+   apply (tactic "ALLGOALS (my_tac @{context})")</p>
+<p>Makarius</p>
+
+
+
+<a name="294075688"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Strange%20Behaviour%20of%20ALLGOALS/near/294075688" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Strange.20Behaviour.20of.20ALLGOALS.html#294075688">(Aug 18 2022 at 13:19)</a>:</h4>
+<p>From: Jeremy Dawson &lt;<a href="mailto:jeremy@rsise.anu.edu.au">jeremy@rsise.anu.edu.au</a>&gt;<br>
+Burkhart Wolff wrote:<br>
+Burkhart,</p>
+<p>When I was using Isar I often found strange behaviour which was <br>
+something to do with theories, and I think the message *** Unknown <br>
+context suggests that this may be the case here also.</p>
+<p>What behaviour do you get not using Isar, ie using the straight ML <br>
+interface, and</p>
+<p>by (ALLGOALS(COND' contains_eval thyp_ify (K all_tac))) ;</p>
+<p>by ((COND' contains_eval thyp_ify (K all_tac)) 4) ;<br>
+by ((COND' contains_eval thyp_ify (K all_tac)) 3) ;<br>
+by ((COND' contains_eval thyp_ify (K all_tac)) 2) ;<br>
+by ((COND' contains_eval thyp_ify (K all_tac)) 1) ;</p>
+<p>?</p>
+<p>Jeremy</p>
+
+
+
+<a name="294075775"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Strange%20Behaviour%20of%20ALLGOALS/near/294075775" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Strange.20Behaviour.20of.20ALLGOALS.html#294075775">(Aug 18 2022 at 13:20)</a>:</h4>
+<p>From: Burkhart Wolff &lt;<a href="mailto:bwolff@inf.ethz.ch">bwolff@inf.ethz.ch</a>&gt;<br>
+Jeremy, thank you for your interest.</p>
+<p>The problem is solved (thanks Makarius) :  I used a construct<br>
+that makes reference to the proof-state<br>
+and binds the fixeds result somewhere inside a tactic.<br>
+(something equivalent to simpset(), but more<br>
+subtle: its 'thm "bla"', I guess 'theory "bla"' is the same ? ).</p>
+<p>This kind of context violation is now rejected<br>
+much more strictly by the kernel than it was in<br>
+previous Isabelle versions.</p>
+<p>The reason why the error pops up to surface at<br>
+the quite innocent ALLGOALS is somewhat<br>
+more obscure - but not really intereasting, I guess,<br>
+for this mailing list.</p>
+<p>bu</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

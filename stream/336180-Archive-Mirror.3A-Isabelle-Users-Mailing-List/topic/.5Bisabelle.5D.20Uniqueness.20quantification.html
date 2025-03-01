@@ -1,0 +1,244 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Uniqueness quantification · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Uniqueness.20quantification.html">[isabelle] Uniqueness quantification</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294217426"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Uniqueness%20quantification/near/294217426" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Uniqueness.20quantification.html#294217426">(Aug 19 2022 at 07:54)</a>:</h4>
+<p>From: John Munroe &lt;<a href="mailto:munddr@gmail.com">munddr@gmail.com</a>&gt;<br>
+Hi,</p>
+<p>I'm trying to prove a lemma containing a uniqueness quantification:</p>
+<p>axiomatization<br>
+p1 :: "nat =&gt; bool" and<br>
+p2 :: "nat =&gt; bool" and<br>
+p3 :: "nat =&gt; bool"<br>
+where<br>
+ax1: "p1 x == ~p2 x &amp; ~p3 x" and<br>
+ax2: "p2 x == ~p1 x &amp; ~p3 x" and<br>
+ax3: "p3 x == ~p1 x &amp; ~p2 x"</p>
+<p>lemma lem: "EX! p:{p1,p2,p3}. p q"<br>
+using ax1 ax2 ax3<br>
+apply auto</p>
+<p>but unfortunately no proof is found. Don't ax1, ax2 and ax3 together<br>
+imply that for all values, there's one and only one predicate that is<br>
+true?</p>
+<p>I must be missing something here...</p>
+<p>Thanks a lot for your time.</p>
+<p>John</p>
+
+
+
+<a name="294217503"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Uniqueness%20quantification/near/294217503" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Uniqueness.20quantification.html#294217503">(Aug 19 2022 at 07:54)</a>:</h4>
+<p>From: Thomas Sewell &lt;<a href="mailto:Thomas.Sewell@nicta.com.au">Thomas.Sewell@nicta.com.au</a>&gt;<br>
+I can prove your lemma a bit like this:</p>
+<p>axiomatization<br>
+p1 :: "nat =&gt; bool" and<br>
+p2 :: "nat =&gt; bool" and<br>
+p3 :: "nat =&gt; bool"<br>
+where<br>
+ax1: "p1 x == ~p2 x &amp; ~p3 x" and<br>
+ax2: "p2 x == ~p1 x &amp; ~p3 x" and<br>
+ax3: "p3 x == ~p1 x &amp; ~p2 x"</p>
+<p>lemma lem: "EX! p:{p1,p2,p3}. p q"<br>
+   apply simp<br>
+   apply (simp add: conj_disj_distribR cong: conj_cong)<br>
+   apply (metis ax1 ax2 ax3)<br>
+   done</p>
+<p>Let me say a little about how I knew to do that.</p>
+<p>Firstly, introducing ax1 ax2 or ax3 as assumptions will loop the <br>
+simplifier. It will take them as rewrite rules and apply them to each <br>
+other, and they're directed towards their complex ends. I could <br>
+introduce them safely the other way around, e.g.</p>
+<p>lemma lem: "EX! p:{p1,p2,p3}. p q"<br>
+   using ax1[symmetric] ax2[symmetric] ax3[symmetric]<br>
+   apply simp<br>
+   apply (simp add: conj_disj_distribR cong: conj_cong)<br>
+   apply metis<br>
+   done</p>
+<p>The syntax "EX! p: S. P p" is an abbreviation for "EX! p. p : S --&gt; P <br>
+p". The first simp statement reveals this by reducing "p : {p1, p2, p3}" <br>
+to "p = p1 | p = p2 | p = p3". If you are using an old enough version of <br>
+Isabelle, the syntax comes with a constant Bex1, which should be <br>
+unfolded in the first line with (simp add Bex1_def) to get to the same <br>
+state.</p>
+<p>Secondly, I wanted to avoid the (very general) application "p q" in your <br>
+term where "p" is a quantified variable (an intrinsically higher-order <br>
+expression). If we move this statement together with the three different <br>
+equalities, and supply the "conj_cong" congruence rule (which allows the <br>
+left-hand side of conjunctions to be used to rewrite their right hand <br>
+sides in the simplifier) then the applications are of the three specific <br>
+predicates p1 p2 and p3. The equalities are still higher-order, but for <br>
+some reason metis can solve the problem already (mirabile dictu).</p>
+<p>The quantifiers can be removed more completely with "apply (simp add: <br>
+conj_disj_distribR Ex1_def all_conj_distrib ex_disj_distrib)", from <br>
+which point it is even more clear that metis should be able to solve the <br>
+problem. Maybe.</p>
+<p>Yours,<br>
+     Thomas.</p>
+
+
+
+<a name="294217662"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Uniqueness%20quantification/near/294217662" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Uniqueness.20quantification.html#294217662">(Aug 19 2022 at 07:56)</a>:</h4>
+<p>From: John Munroe &lt;<a href="mailto:munddr@gmail.com">munddr@gmail.com</a>&gt;<br>
+Hi Thomas,</p>
+<p>Thanks so much for your detailed explanation.</p>
+<p>I've tried your suggestion and it works! However, I've tried extending<br>
+the model to 5 predicates:</p>
+<p>axiomatization<br>
+p1 :: "nat =&gt; bool" and<br>
+p2 :: "nat =&gt; bool" and<br>
+p3 :: "nat =&gt; bool" and<br>
+p4 :: "nat =&gt; bool" and<br>
+p5 :: "nat =&gt; bool"<br>
+where<br>
+ax1: "p1 x == ~p2 x &amp; ~p3 x &amp; ~p4 x &amp; ~p5 x" and<br>
+ax2: "p2 x == ~p1 x &amp; ~p3 x &amp; ~p4 x &amp; ~p5 x" and<br>
+ax3: "p3 x == ~p1 x &amp; ~p2 x &amp; ~p4 x &amp; ~p5 x" and<br>
+ax4: "p4 x == ~p1 x &amp; ~p2 x &amp; ~p3 x &amp; ~p5 x" and<br>
+ax5: "p5 x == ~p1 x &amp; ~p2 x &amp; ~p3 x &amp; ~p4 x"</p>
+<p>and</p>
+<p>metis loops at:</p>
+<p>lemma lem: "EX! p:{p1,p2,p3,p4,p5}. p q"<br>
+using ax1[symmetric] ax2[symmetric] ax3[symmetric] ax4[symmetric]<br>
+ax5[symmetric]<br>
+apply simp<br>
+apply (simp add: conj_disj_distribR Ex1_def all_conj_distrib ex_disj_distrib)<br>
+apply metis</p>
+<p>Do you know why it's fine for a smaller number of predicates, e.g., 3,<br>
+but not when there are 5? Do you happen to know how to simplify the<br>
+goal further?</p>
+<p>Thanks a lot for your time.</p>
+<p>John</p>
+
+
+
+<a name="294217803"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Uniqueness%20quantification/near/294217803" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Uniqueness.20quantification.html#294217803">(Aug 19 2022 at 07:57)</a>:</h4>
+<p>From: Thomas Sewell &lt;<a href="mailto:Thomas.Sewell@nicta.com.au">Thomas.Sewell@nicta.com.au</a>&gt;<br>
+I fiddled around with it a bit, and discovered that applying clarsimp <br>
+before metis may solve the problem.</p>
+<p>I have no idea why this might be. I tried case decomposition but all I <br>
+discovered was that some combination of disjCI and conjE, which <br>
+clarsimp/clarify apply, was helping metis. It makes no sense to me that <br>
+(elim conjE, metis) can solve some problems which metis can't, but it <br>
+seems to be the case.</p>
+<p>I suppose I should ask the obvious: these equalities on predicates seem <br>
+a bit strange. The "p1 = p2" possibilities all over the place are <br>
+complicating things. Do you want the property "p q" to hold for exactly <br>
+one of the 5 <em>expressions</em> p1, p2, ... or for exactly one of the <br>
+<em>values</em>, of which there might be less than 5? Note that "EX! p : {p1, <br>
+p2, p3, p4, p5}. p q" would be true if "p1 q" and "p2 q" but "p1 = p2" <br>
+(although that's impossible in this case).</p>
+<p>Here is a slightly stronger formulation which can be solved by auto:</p>
+<p>lemmas axs = ax1 ax2 ax3 ax4 ax5</p>
+<p>lemma lem: "length (filter (%p. p q) [p1, p2, p3, p4, p5]) = 1"<br>
+   using axs[symmetric]<br>
+   by auto</p>
+<p>This helper rule might also be helpful:</p>
+<p>lemma ex_unique_from_length:<br>
+   "length (filter P xs) = 1 ==&gt; (EX! x : set xs. P x)"<br>
+   apply (induct xs)<br>
+   apply (auto simp add: filter_empty_conv split: split_if_asm)<br>
+   done</p>
+<p>lemmas lem2 = ex_unique_from_length[OF lem, unfolded set.simps]</p>
+<p>Yours,<br>
+     Thomas.</p>
+
+
+
+<a name="294217927"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Uniqueness%20quantification/near/294217927" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Uniqueness.20quantification.html#294217927">(Aug 19 2022 at 07:58)</a>:</h4>
+<p>From: John Munroe &lt;<a href="mailto:munddr@gmail.com">munddr@gmail.com</a>&gt;<br>
+Thanks again for your help.</p>
+<blockquote>
+<p>I suppose I should ask the obvious: these equalities on predicates seem a<br>
+bit strange. The "p1 = p2" possibilities all over the place are complicating<br>
+things. Do you want the property "p q" to hold for exactly one of the 5<br>
+<em>expressions</em> p1, p2, ... or for exactly one of the <em>values</em>, of which there<br>
+might be less than 5? Note that "EX! p : {p1, p2, p3, p4, p5}. p q" would be<br>
+true if "p1 q" and "p2 q" but "p1 = p2" (although that's impossible in this<br>
+case).</p>
+</blockquote>
+<p>I indeed want "p q" to hold for exactly one of the 5 expressions, i.e.<br>
+only one of the 5 predicates returns true for all arguments.</p>
+<p>Applying clarify/clarsimp seems to work indeed. However, if I change<br>
+the type of the predicates from "nat =&gt; bool" to "(nat*nat) =&gt; bool",<br>
+the proof breaks. Do you know why the input type of the predicates<br>
+affects the proof?</p>
+<blockquote>
+<p>Here is a slightly stronger formulation which can be solved by auto:</p>
+<p>lemmas axs = ax1 ax2 ax3 ax4 ax5</p>
+<p>lemma lem: "length (filter (%p. p q) [p1, p2, p3, p4, p5]) = 1"<br>
+  using axs[symmetric]<br>
+  by auto</p>
+<p>This helper rule might also be helpful:</p>
+<p>lemma ex_unique_from_length:<br>
+  "length (filter P xs) = 1 ==&gt; (EX! x : set xs. P x)"</p>
+</blockquote>
+<p>Right, but how come the reverse doesn't hold? If there's exactly one<br>
+of the predicates returning true, then isn't the length of the<br>
+filtered list one?</p>
+<p>Thanks again.</p>
+<p>John</p>
+
+
+
+<a name="294217945"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Uniqueness%20quantification/near/294217945" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Uniqueness.20quantification.html#294217945">(Aug 19 2022 at 07:58)</a>:</h4>
+<p>From: Thomas Sewell &lt;<a href="mailto:Thomas.Sewell@nicta.com.au">Thomas.Sewell@nicta.com.au</a>&gt;</p>
+<blockquote>
+<p>I indeed want "p q" to hold for exactly one of the 5 expressions, i.e.<br>
+only one of the 5 predicates returns true for all arguments.</p>
+<p>Applying clarify/clarsimp seems to work indeed. However, if I change<br>
+the type of the predicates from "nat =&gt;  bool" to "(nat*nat) =&gt;  bool",<br>
+the proof breaks. Do you know why the input type of the predicates<br>
+affects the proof?</p>
+</blockquote>
+<p>No particularly good ideas here, except that things are becoming more <br>
+complicated.</p>
+<blockquote>
+<p>Right, but how come the reverse doesn't hold? If there's exactly one<br>
+of the predicates returning true, then isn't the length of the<br>
+filtered list one?</p>
+</blockquote>
+<p>No. To phrase what I said before in different language again, the <br>
+cardinality of the set you've been talking about "{p1, p2, p3, p4, p5}" <br>
+isn't necessarily 5. If "p1 = p2" then there are less than 5 unique <br>
+elements of the set "{p1, p2, p3, p4, p5}".</p>
+<p>To rephrase this once more: if you add a p6 to your axiomatization with <br>
+the axiom ax6: "p6 = p5", then the equivalent lemma is still provable:</p>
+<p>lemma lem: "EX! p:{p1,p2,p3,p4,p5, p6}. p q"<br>
+   apply (simp add: conj_disj_distribR Ex1_def all_conj_distrib <br>
+ex_disj_distrib)<br>
+   apply clarsimp<br>
+   apply (metis axs)<br>
+   done</p>
+<p>The reason this is provable is because "{p1, p2, p3, p4, p5, p6} = {p1, <br>
+p2, p3, p4, p5}", so it's really just the same as the 5 example.</p>
+<p>Yours,<br>
+     Thomas.</p>
+
+
+
+<a name="294217952"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Uniqueness%20quantification/near/294217952" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Uniqueness.20quantification.html#294217952">(Aug 19 2022 at 07:59)</a>:</h4>
+<p>From: Tjark Weber &lt;<a href="mailto:webertj@in.tum.de">webertj@in.tum.de</a>&gt;<br>
+No. Try</p>
+<p>lemma length_from_ex_unique:<br>
+    "(EX! x : set xs. P x) ==&gt; length (filter P xs) = 1"<br>
+  nitpick</p>
+<p>Best regards,<br>
+Tjark</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

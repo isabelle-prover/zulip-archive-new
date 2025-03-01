@@ -1,0 +1,239 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Code generation for reverse sorting · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20reverse.20sorting.html">[isabelle] Code generation for reverse sorting</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294656368"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20for%20reverse%20sorting/near/294656368" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20reverse.20sorting.html#294656368">(Aug 22 2022 at 11:36)</a>:</h4>
+<p>From: Christian Sternagel &lt;<a href="mailto:c.sternagel@gmail.com">c.sternagel@gmail.com</a>&gt;<br>
+Dear all,</p>
+<p>for those of you who do not regularly check stackoverflow but might have<br>
+an answer to my question there (yes I am looking at you Florian ;) ) I'm<br>
+brazenly posting the link to my question here</p>
+<p><a href="http://stackoverflow.com/q/32926842/476803">http://stackoverflow.com/q/32926842/476803</a></p>
+<p>In short, my question is: What is the easiest way to generate code for a<br>
+sorting algorithm that sorts its argument in reverse order, while<br>
+building on top of the existing List.sort?</p>
+<p>cheers</p>
+<p>chris</p>
+
+
+
+<a name="294656925"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20for%20reverse%20sorting/near/294656925" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20reverse.20sorting.html#294656925">(Aug 22 2022 at 11:40)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Christian,</p>
+<p>Here are my thoughts about List.sort &amp; friends:</p>
+<p>a) The first problem with List.sort and friends is that they are defined in the type class <br>
+linorder, although their definitions could be made as well in the type class ord. Three <br>
+years ago (2ada2be850cb), I have moved all the operations for red-black trees (RBT) into <br>
+the linorder type class, precisely because I wanted to use them with other ordering <br>
+relations. Ideally, the same should be done for List.sort and friends.</p>
+<p>For the time being, you can still avoid some of the overheads by using the foundational <br>
+constant linorder.sort_key, which takes the order as an additional argument. So, you can <br>
+pass in the dual order. With a single interpretation for the dual order, you should get <br>
+all the theorems you need. You can even define an abbreviation for it:</p>
+<p>interpretation dual!: linorder "op ≥" "op &gt; :: _ :: linorder ⇒ _" by(rule dual_linorder)<br>
+abbreviation "rsort == linorder.sort_key op ≥ (λx. x)"</p>
+<p>Unfortunately, code generation does not work out of the box, because the code setup has <br>
+only been done for the type-class based instance. If List.sort was defined in the type <br>
+class ord, one could simply re-declare the code equations (as I did for the RBT operations <br>
+in my AFP entry Containers). Alternatively, you can prove that sort &amp; friends are <br>
+parametric (as Peter did for RBT operations in his AFP entry Collections) and exploit <br>
+parametricity like he does, but my feeling is that this again requires unconditional <br>
+equations, i.e., a definition in ord.</p>
+<p>b) The second problem is that we want to implement List.sort with different algorithms <br>
+during code generation. For linear orders, this is no problem, because the result is <br>
+unique. However, if we pass in a non-linear order, the outcome might depend on the <br>
+algorithm. Thus, we can only do program refinement for linear orders. In that view, even <br>
+if we move List.sort to the type class ord, we still have problems, because we cannot <br>
+prove the code equations for arbitrary ordering relations any more.</p>
+<p>Ideally, we should separate the proving part from the code generation part. AFAICS, the <br>
+following should work.</p>
+<ol>
+<li>
+<p>Move List.sort and friends to type class ord. For ease of use and compatibility, we can <br>
+add sign constraints such that type inference infers the linorder sort constraints for <br>
+List.sort.</p>
+</li>
+<li>
+<p>Define a type 'a linorder of linear orders using typedef and an embedding</p>
+<p>linorder_of :: "'a :: linorder itself =&gt; 'a linorder"</p>
+</li>
+<li>
+<p>Define operations for sorting lists that are parametrised with the order from the type <br>
+'a linorder. Prove equations like "List.sort_key == sort_key_impl TYPE('a)".</p>
+</li>
+<li>
+<p>Adapt all the implementations for sorting such that they refine sort_key_impl rather <br>
+than List.sort_key.</p>
+</li>
+</ol>
+<p>Apart from sorting, such a setup could be used for further improvements to the generated <br>
+code. For example, one could refine the type 'a linorder to provide a comparator instead <br>
+of a comparison operation.</p>
+<p>I guess such a change requires quite a lot of work to be carried out on the whole <br>
+repository. At the moment, I do not have the time to carry all this out, but if the issue <br>
+is pressing for you, you might want to try it yourself. But before you start, we should <br>
+also ask Florian on his opinion.</p>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<a name="294657694"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20for%20reverse%20sorting/near/294657694" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20reverse.20sorting.html#294657694">(Aug 22 2022 at 11:45)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Christian, hi Andreas,</p>
+<p>I think there is one misperception concerning sort_key – it is not<br>
+parametrized by an order, but by a morphism:</p>
+<p>"sort_key" :: "('a ⇒ 'b) ⇒ 'a list ⇒ 'a list"</p>
+<p>Hence reverse sorting is difficult to accomplish unless you have a<br>
+structure where each element has a dual wrt. the underlying order.</p>
+<p>Hence the only way possible I see with the matter »as it is« is indeed a<br>
+separate interpretation of the linorder to its dual, together with<br>
+suitable mixins:</p>
+<p>theory Sort<br>
+imports Main "~~/src/Tools/Permanent_Interpretation"<br>
+begin</p>
+<p>context linorder<br>
+begin</p>
+<p>permanent_interpretation dual!: linorder greater_eq greater for dummy :: 'b<br>
+  defining<br>
+    insort_rev_key = "dual.insort_key :: ('b ⇒ 'a) ⇒ 'b ⇒ 'b list ⇒ 'b list"<br>
+    and sort_rev_key = "dual.sort_key :: ('b ⇒ 'a) ⇒ 'b list ⇒ 'b list"<br>
+  by default auto</p>
+<p>end</p>
+<p>export_code sort_rev_key in Haskell</p>
+<p>(Note that you need more mixins if you use the quicksort implementation<br>
+from Multiset.thy)</p>
+<p>Surely not very convincing due to all the mess generated by the dual order.</p>
+<p>IMHO the best way to continue from here is to develope a <em>algorithmic</em><br>
+theory on sorting, which is specifically designed for executability.  I<br>
+guess this should follow the spirit of the Isabelle collection<br>
+framework.  The sort in List.thy then could stand as it is.</p>
+<p>All the best,<br>
+    Florian<br>
+<a href="/user_uploads/14278/azNwTw5-__5ZFXFnlej_JLzI/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294657707"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20for%20reverse%20sorting/near/294657707" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20reverse.20sorting.html#294657707">(Aug 22 2022 at 11:45)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Florian,</p>
+<blockquote>
+<p>I think there is one misperception concerning sort_key – it is not<br>
+parametrized by an order, but by a morphism:</p>
+<p>"sort_key" :: "('a ⇒ 'b) ⇒ 'a list ⇒ 'a list"</p>
+<p>The morphism is not the parametrisation I was referring to. I meant the implicit <br>
+parametrisation with the order coming from the type class linorder. Obviously, this <br>
+parameter can only be seen by looking at the foundational constant for sort_key.</p>
+</blockquote>
+<blockquote>
+<p>IMHO the best way to continue from here is to develope a <em>algorithmic</em><br>
+theory on sorting, which is specifically designed for executability.  I<br>
+guess this should follow the spirit of the Isabelle collection<br>
+framework.  The sort in List.thy then could stand as it is.<br>
+I am also in favour of separating reasoning and code generation. But ultimately, you want <br>
+to connect the two kinds of sorting.</p>
+</blockquote>
+<p>Best,<br>
+Andreas</p>
+<blockquote>
+<p>Am 05.10.2015 um 09:17 schrieb Andreas Lochbihler:</p>
+<blockquote>
+<p>Hi Christian,</p>
+<p>Here are my thoughts about List.sort &amp; friends:</p>
+<p>a) The first problem with List.sort and friends is that they are defined<br>
+in the type class linorder, although their definitions could be made as<br>
+well in the type class ord. Three years ago (2ada2be850cb), I have moved<br>
+all the operations for red-black trees (RBT) into the linorder type<br>
+class, precisely because I wanted to use them with other ordering<br>
+relations. Ideally, the same should be done for List.sort and friends.</p>
+<p>For the time being, you can still avoid some of the overheads by using<br>
+the foundational constant linorder.sort_key, which takes the order as an<br>
+additional argument. So, you can pass in the dual order. With a single<br>
+interpretation for the dual order, you should get all the theorems you<br>
+need. You can even define an abbreviation for it:</p>
+<p>interpretation dual!: linorder "op ≥" "op &gt; :: _ :: linorder ⇒ _"<br>
+by(rule dual_linorder)<br>
+abbreviation "rsort == linorder.sort_key op ≥ (λx. x)"</p>
+<p>Unfortunately, code generation does not work out of the box, because the<br>
+code setup has only been done for the type-class based instance. If<br>
+List.sort was defined in the type class ord, one could simply re-declare<br>
+the code equations (as I did for the RBT operations in my AFP entry<br>
+Containers). Alternatively, you can prove that sort &amp; friends are<br>
+parametric (as Peter did for RBT operations in his AFP entry<br>
+Collections) and exploit parametricity like he does, but my feeling is<br>
+that this again requires unconditional equations, i.e., a definition in<br>
+ord.</p>
+<p>b) The second problem is that we want to implement List.sort with<br>
+different algorithms during code generation. For linear orders, this is<br>
+no problem, because the result is unique. However, if we pass in a<br>
+non-linear order, the outcome might depend on the algorithm. Thus, we<br>
+can only do program refinement for linear orders. In that view, even if<br>
+we move List.sort to the type class ord, we still have problems, because<br>
+we cannot prove the code equations for arbitrary ordering relations any<br>
+more.</p>
+<p>Ideally, we should separate the proving part from the code generation<br>
+part. AFAICS, the following should work.</p>
+<ol>
+<li>
+<p>Move List.sort and friends to type class ord. For ease of use and<br>
+compatibility, we can add sign constraints such that type inference<br>
+infers the linorder sort constraints for List.sort.</p>
+</li>
+<li>
+<p>Define a type 'a linorder of linear orders using typedef and an<br>
+embedding</p>
+<p>linorder_of :: "'a :: linorder itself =&gt; 'a linorder"</p>
+</li>
+<li>
+<p>Define operations for sorting lists that are parametrised with the<br>
+order from the type 'a linorder. Prove equations like "List.sort_key ==<br>
+sort_key_impl TYPE('a)".</p>
+</li>
+<li>
+<p>Adapt all the implementations for sorting such that they refine<br>
+sort_key_impl rather than List.sort_key.</p>
+</li>
+</ol>
+<p>Apart from sorting, such a setup could be used for further improvements<br>
+to the generated code. For example, one could refine the type 'a<br>
+linorder to provide a comparator instead of a comparison operation.</p>
+<p>I guess such a change requires quite a lot of work to be carried out on<br>
+the whole repository. At the moment, I do not have the time to carry all<br>
+this out, but if the issue is pressing for you, you might want to try it<br>
+yourself. But before you start, we should also ask Florian on his opinion.</p>
+<p>Best,<br>
+Andreas</p>
+</blockquote>
+<p>On 03/10/15 21:59, Christian Sternagel wrote:</p>
+<blockquote>
+<blockquote>
+<p>Dear all,</p>
+<p>for those of you who do not regularly check stackoverflow but might have<br>
+an answer to my question there (yes I am looking at you Florian ;) ) I'm<br>
+brazenly posting the link to my question here</p>
+<p><a href="http://stackoverflow.com/q/32926842/476803">http://stackoverflow.com/q/32926842/476803</a></p>
+<p>In short, my question is: What is the easiest way to generate code for a<br>
+sorting algorithm that sorts its argument in reverse order, while<br>
+building on top of the existing List.sort?</p>
+<p>cheers</p>
+<p>chris<br>
+</p>
+</blockquote>
+</blockquote>
+</blockquote>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

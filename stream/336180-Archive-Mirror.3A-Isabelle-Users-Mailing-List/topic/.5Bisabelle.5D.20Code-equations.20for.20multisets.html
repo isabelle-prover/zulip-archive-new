@@ -1,0 +1,145 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Code-equations for multisets · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code-equations.20for.20multisets.html">[isabelle] Code-equations for multisets</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294268542"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code-equations%20for%20multisets/near/294268542" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code-equations.20for.20multisets.html#294268542">(Aug 19 2022 at 13:40)</a>:</h4>
+<p>From: René Thiemann &lt;<a href="mailto:rene.thiemann@uibk.ac.at">rene.thiemann@uibk.ac.at</a>&gt;<br>
+Dear all,</p>
+<p>I recently played around with the available code-equations for multisets.<br>
+(I wanted to get rid of manual data refinement in our formalization)</p>
+<p>Here, the current problem is that the code for comparing multisets is non-terminating:</p>
+<p>E.g., equality is implemented via two calls to &lt;=,<br>
+and &lt;= is implemented via intersection and equality.<br>
+Hence, even </p>
+<p>value[code] "{#} = {#}" </p>
+<p>does not terminate.</p>
+<p>To solve this problem, I wrote a tiny implementation for comparisons.<br>
+Everybody can use it, and it would be nice, if <br>
+this algorithm or another proper implementation would find its<br>
+way into the distribution in src/HOL/Library/Multiset.thy.</p>
+<p>Kind regards,<br>
+René<br>
+<a href="/user_uploads/14278/J4nnGTiD95QOON7XD1tdhqbJ/Multiset_Code.thy">Multiset_Code.thy</a></p>
+
+
+
+<a name="294268554"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code-equations%20for%20multisets/near/294268554" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code-equations.20for.20multisets.html#294268554">(Aug 19 2022 at 13:40)</a>:</h4>
+<p>From: "Jens-D. Doll" &lt;<a href="mailto:jd@cococo.de">jd@cococo.de</a>&gt;<br>
+Hello René,</p>
+<p>could you explain the results for code comparison from conventional theory  <br>
+a little? Aren't there some undecidable areas? And which results do we  <br>
+have on normal forms and reducability?</p>
+<p>Jens</p>
+<p>------------------- René Thiemann wrote: -----------------</p>
+<p>... the current problem is that the code for comparing multisets is  <br>
+non-terminating: ...</p>
+
+
+
+<a name="294268569"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code-equations%20for%20multisets/near/294268569" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code-equations.20for.20multisets.html#294268569">(Aug 19 2022 at 13:40)</a>:</h4>
+<p>From: René Thiemann &lt;<a href="mailto:rene.thiemann@uibk.ac.at">rene.thiemann@uibk.ac.at</a>&gt;<br>
+Hi Jens,</p>
+<blockquote>
+<p>could you explain the results for code comparison from conventional theory a little?</p>
+</blockquote>
+<p>The problem is easily explained. At the end of Multiset.thy, multisets are implemented via (not necessarily sorted) lists.<br>
+I.e., now all multiset-operations must be implemented on lists, where multiset_of is seen as a constructor.</p>
+<p>E.g., it would be possible to implement membership via the lemma</p>
+<p>lemma [code]: "(x :# multiset_of xs) = (x : set xs)"</p>
+<p>Pattern matching on multiset_of is however not required. It is perfectly fine to implement multiset-equality via <br>
+the multiset subset-relation in general, i.e., without any specialization on the implementation type:</p>
+<p>lemma[code]: "(A = (B :: 'a multiset)) = (A &lt;= B &amp; B &lt;= A)"</p>
+<p>However, the problem in Multiset.thy is, that the subset-relation is again implemented via equality:</p>
+<p>lemma[code]: "(A &lt;= B) = (inf_multiset A B = A)</p>
+<p>Then, when trying to evaluate "A = B" we immediately invoke "A &lt;= B" which in turn<br>
+invokes "inf_multiset A B = A" which invokes "&lt;=", etc.</p>
+<p>So, at least "=" or "&lt;=" must be implemented directly, which is what I did in the previously attached theory.</p>
+<p>Of course, one can think of smarter representations for multisets, like sorted lists,<br>
+or maps "'a =&gt; nat" which store the multiplicity of each element, but this is a bit more effort<br>
+than just fixing the current implementation of multisets by lists which is provided in Multiset.thy.</p>
+<blockquote>
+<p>Aren't there some undecidable areas? And which results do we have on normal forms and reducability?</p>
+</blockquote>
+<p>Can you be more precise? The above problems at least have nothing to do with undecidability!</p>
+<p>Cheers,<br>
+René</p>
+
+
+
+<a name="294268705"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code-equations%20for%20multisets/near/294268705" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code-equations.20for.20multisets.html#294268705">(Aug 19 2022 at 13:41)</a>:</h4>
+<p>From: "Jens-D. Doll" &lt;<a href="mailto:jd@cococo.de">jd@cococo.de</a>&gt;<br>
+If you consider code comparison of a phrase structure language or subsets  <br>
+of it you will find intractables and undicidables; at least the current  <br>
+theory says so.</p>
+<p>D'accord?<br>
+Jens</p>
+
+
+
+<a name="294268721"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code-equations%20for%20multisets/near/294268721" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code-equations.20for.20multisets.html#294268721">(Aug 19 2022 at 13:41)</a>:</h4>
+<p>From: René Thiemann &lt;<a href="mailto:rene.thiemann@uibk.ac.at">rene.thiemann@uibk.ac.at</a>&gt;<br>
+Maybe, but I do not see the connection between the "code comparison of a phrase structure language" and my topic, the implementation of finite multisets.</p>
+<p>René</p>
+
+
+
+<a name="294268917"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code-equations%20for%20multisets/near/294268917" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code-equations.20for.20multisets.html#294268917">(Aug 19 2022 at 13:42)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+René, thanks for your implementation, it is "in" now. I have defined your<br>
+auxiliary function List.extract (which may be of general interest for list<br>
+manipulators) via takeWhile and dropWhile, but the implementation is still via<br>
+your code equations.</p>
+<p>Note that there is actually a faster implementation of multisets in<br>
+Library/DAList_Multiset.thy. Nevertheless it is nice that the default one<br>
+terminates more often now ;-)</p>
+<p>Tobias</p>
+
+
+
+<a name="294271922"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code-equations%20for%20multisets/near/294271922" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code-equations.20for.20multisets.html#294271922">(Aug 19 2022 at 13:58)</a>:</h4>
+<p>From: René Thiemann &lt;<a href="mailto:rene.thiemann@uibk.ac.at">rene.thiemann@uibk.ac.at</a>&gt;<br>
+Dear Tobias,</p>
+<blockquote>
+<p>your implementation is "in" now. </p>
+</blockquote>
+<p>Thanks for taking care of it.</p>
+<blockquote>
+<p>Note that there is actually a faster implementation of multisets in<br>
+Library/DAList_Multiset.thy. </p>
+</blockquote>
+<p>This is true, but actually also this implementation lacks some implementations, namely<br>
+none of the following constants are executable after loading DAList_Multiset:</p>
+<p>set_of, msetsum, msetprod, mcard, image_mset</p>
+<p>To this end, it might be nice to merge the attached theory into DAList_Multiset: it implements<br>
+all of the above constants via a generic DA_List_Multiset_fold constant.</p>
+<p>Maybe someone else also requires a more complete implementation.</p>
+<p>Cheers,<br>
+René<br>
+<a href="/user_uploads/14278/qFpdMbzOTUYp_BAwwiKLWNxn/Multiset_Code.thy">Multiset_Code.thy</a></p>
+
+
+
+<a name="294271960"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code-equations%20for%20multisets/near/294271960" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code-equations.20for.20multisets.html#294271960">(Aug 19 2022 at 13:58)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+I have added your contributions, thank you!</p>
+<p>Tobias</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

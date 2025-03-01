@@ -1,0 +1,213 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Creating cterms with automatic type inference ... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Creating.20cterms.20with.20automatic.20type.20inference.20.2E.2E.2E.html">[isabelle] Creating cterms with automatic type inference ...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294755439"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Creating%20cterms%20with%20automatic%20type%20inference%20.../near/294755439" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Creating.20cterms.20with.20automatic.20type.20inference.20.2E.2E.2E.html#294755439">(Aug 22 2022 at 19:41)</a>:</h4>
+<p>From: mailing-list anonymous &lt;<a href="mailto:mailing.list.anonymous@gmail.com">mailing.list.anonymous@gmail.com</a>&gt;<br>
+Dear All,</p>
+<p>I would like to understand if there exists a canonical method for creating<br>
+cterms with automatic type inference from several distinct terms in<br>
+Isabelle/ML, given that some of these distinct terms are supplied by the<br>
+user.  Unfortunately, given that some of the consts that are used in the<br>
+terms provided by the user are not known in advance, the methods that I am<br>
+aware of do not seem to be directly applicable or may, potentially, result<br>
+in certain malpractices.</p>
+<p>For example, I would like to perform an automatic type inference and create<br>
+a certified term in the context of the following (significantly) simplified<br>
+use case:</p>
+<p>ML ‹</p>
+<p>val A = @{term "A::'al⇒'ar⇒bool"};<br>
+val B = @{term "B::'bl⇒'br⇒bool"};<br>
+val RF = @{term rel_fun} (*in the use case, RF can represent an arbitrary<br>
+const accepting an arbitrary number of arguments, as supplied by the user*)</p>
+<p>val uterm = RF $ A $ B;<br>
+(* fails because type inference is not applicable: *)<br>
+val cterm = Thm.cterm_of @{context} uterm;</p>
+<p>›</p>
+<p>Of course, the default names of the 'TFree' types that are generated for<br>
+rel_fun in the example above are not suitable when $ is used for combining<br>
+terms. *It is very important to note that <strong>in my use case </strong>RF is provided<br>
+by the user and, therefore, it may be different from rel_fun.*</p>
+<p>I am aware of two methods that can be used for the solution of the problem.<br>
+However, these methods do not seem to be ideal for my application, given<br>
+that the consts are provided by the user:</p>
+<ol>
+<li>
+<p>Provide "tailor-made" type inference for each const, similar to the<br>
+methodology used in <a href="http://hologic.ml">hologic.ml</a>, e.g. HOLogic.mk_eq. Unfortunately, in my<br>
+use case, functions like HOLogic.mk_eq need to be generated 'on the fly'<br>
+based on the user input. This solution seems to require an investment of a<br>
+certain amount of effort.</p>
+</li>
+<li>
+<p>Define terms as strings and use Syntax.read_term to generate terms from<br>
+the strings. This solution does not seem to be safe, although, its<br>
+implementation is almost trivial.</p>
+</li>
+</ol>
+<p>I provide a code that demonstrates the methods that I am referring to in<br>
+the clauses above after my signature. However, please note that the code is<br>
+merely an example that is meant for the demonstration of the problem and it<br>
+does not contain (almost) any parts of the intended solution. Therefore,<br>
+please ignore various malpractices that are not related to the problem (in<br>
+particular, the code does not provide guarantees that unique names are used<br>
+and omits all error checks).</p>
+<p>*Lastly, I would like to provide a summary of the question : *</p>
+<p>- If there is a canonical method for combining arbitrary terms with type<br>
+   inference that is different from the methods suggested in clauses 1 and 2<br>
+   above, then I would highly appreciate if you could let me know about it. If<br>
+   such a method does not exist, then I would like to know whether the<br>
+   solution in clause 2 above is considered to be a standard practice or not.</p>
+<p>Thank you</p>
+<p>ML ‹</p>
+<p>(* -------------------------------------------- *)<br>
+(* auxiliary functions - provided for completeness *)</p>
+<p>fun delete_elem _ [] = []<br>
+  | delete_elem a (x::xs) =<br>
+    if (a = x) then (delete_elem a xs) else x::(delete_elem a xs);</p>
+<p>(* remove duplicates from a list *)<br>
+fun remdups [] = []<br>
+  | remdups (x::xs) = x::(remdups (delete_elem x xs));</p>
+<p>(* get unique free type variables *)<br>
+fun get_unique_tfree t =<br>
+  remdups(<br>
+    rev(<br>
+      fold_atyps<br>
+        (fn t =&gt; fn ts =&gt; case t of TFree td =&gt; (TFree td)::ts | _ =&gt; ts) t<br>
+[]<br>
+      )<br>
+    );</p>
+<p>val A = @{term "A::'al⇒'ar⇒bool"};<br>
+val B = @{term "B::'bl⇒'br⇒bool"};</p>
+<p>(* -------------------------------------------- *)</p>
+<p>(*</p>
+<p>Solution 1: the solution was inferred from the method suggested in section<br>
+3.2<br>
+(and other sections) in the document "The Isabelle Cookbook"<br>
+(May 28, 2015 draft) by Christian Urban. According to this solution,<br>
+a tailor-made type inference procedure needs to be provided for each const.<br>
+Of course, for many existing standard consts this functionality has<br>
+already been provided in hologic.ML (e.g. HOLogic.mk_eq).</p>
+<p>The solution is difficult to implement because the consts are<br>
+supplied by the user. Therefore, functions similar to HOLogic.mk_eq need to<br>
+be<br>
+generated 'on the fly'. Effectively, this would require the development of<br>
+the functionality<br>
+that would enable automatic generation of a significant part of the content<br>
+of <a href="http://hologic.ml">hologic.ml</a>.</p>
+<p>*)</p>
+<p>val boolT = Type ("HOL.bool", []);<br>
+fun rel_fun_const (A, B, C, D) =<br>
+  Const<br>
+    (\&lt;^const_name&gt;‹BNF_Def.rel_fun›,<br>
+    (A --&gt; B --&gt; boolT) --&gt;<br>
+    (C --&gt; D --&gt; boolT) --&gt;<br>
+    (A --&gt; C) --&gt;<br>
+    (B --&gt; D) --&gt;<br>
+    boolT);</p>
+<p>fun get_types_rel_fun fts gts = (nth fts 0, nth fts 1, nth gts 0, nth gts<br>
+1);</p>
+<p>fun mk_rel_fun (R1, R2) =<br>
+  (<br>
+  (get_types_rel_fun<br>
+  (R1 |&gt; type_of |&gt; get_unique_tfree)<br>
+  (R2 |&gt; type_of |&gt; get_unique_tfree)) |&gt; rel_fun_const<br>
+  )<br>
+  $ R1 $ R2;</p>
+<p>val cterm = Thm.cterm_of @{context} (mk_rel_fun (A, B));</p>
+<p>(*<br>
+Solution 2: inferred from the code on page 118 in<br>
+the document "The Isabelle/Isar Implementation" by Makarius Wenzel.</p>
+<p>Can be implemented with ease, but requires the construction of terms<br>
+from strings. I am not certain if this is considered to be a standard<br>
+practice.<br>
+*)<br>
+val ctxt' = @{context} |&gt; Variable.declare_term A |&gt; Variable.declare_term<br>
+B;<br>
+val uterm' = Syntax.read_term ctxt' "BNF_Def.rel_fun A B";<br>
+val cterm' = Thm.cterm_of @{context} uterm';</p>
+<p>›</p>
+
+
+
+<a name="294756491"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Creating%20cterms%20with%20automatic%20type%20inference%20.../near/294756491" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Creating.20cterms.20with.20automatic.20type.20inference.20.2E.2E.2E.html#294756491">(Aug 22 2022 at 19:48)</a>:</h4>
+<p>From: Alexander Krauss &lt;<a href="mailto:krauss@in.tum.de">krauss@in.tum.de</a>&gt;<br>
+Dear MLA,</p>
+<p>(re-sending as I forgot to Cc the list)</p>
+<p>I there is not really a well-established canonical method, since the<br>
+needs of tools are quite different in the details.</p>
+<p>What tools usually do is try to get to a "fully typed" stage as soon as<br>
+possible in the outermost layers, and then work with full type<br>
+information internally, which means that you must usually carry types<br>
+around everywhere.</p>
+<p>What I would try is this:</p>
+<ul>
+<li>
+<p>Make sure you get the user-provided constants / terms in a polymorphic<br>
+version, i.e., with schematic type variables. Here, the function<br>
+"Variable.polymorphic" should help.</p>
+</li>
+<li>
+<p>Then, construct the combined terms as you need them, and run type<br>
+checking on this. (-&gt; Syntax.check_terms). I think this should<br>
+instantiate the type variables properly.</p>
+</li>
+<li>
+<p>Then you should get terms on which Thm.cterm_of should work.</p>
+</li>
+</ul>
+<p>Note that Syntax.check_terms includes several specific things like<br>
+insertion of coercions etc. But it is the most general answer to "how do<br>
+I check / infer types".</p>
+<p>Hope this helps.</p>
+<p>Alex</p>
+
+
+
+<a name="294756634"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Creating%20cterms%20with%20automatic%20type%20inference%20.../near/294756634" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Creating.20cterms.20with.20automatic.20type.20inference.20.2E.2E.2E.html#294756634">(Aug 22 2022 at 19:49)</a>:</h4>
+<p>From: mailing-list anonymous &lt;<a href="mailto:mailing.list.anonymous@gmail.com">mailing.list.anonymous@gmail.com</a>&gt;<br>
+Dear Alexander Krauss,</p>
+<p>Thank you for your email. Indeed, your reply pointed me in the right<br>
+direction.</p>
+<p>It seems that there is a nearly canonical solution for my problem (without<br>
+the explicit use of the schematic type variables). The solution involves<br>
+the use of the “place-holder” type dummyT, which is defined in term.ML (I<br>
+can only assume it was defined specifically for this use case), e.g.</p>
+<p>ML ‹<br>
+val f = Const ("HOL.eq", dummyT);<br>
+val A = @{term "A::'b"};<br>
+val q = (f $ A $ A)<br>
+  |&gt; Syntax.check_term @{context}<br>
+  |&gt; Thm.cterm_of @{context};<br>
+›</p>
+<p>This method is presented in Section 3.5 in "The Isabelle Cookbook" (May 28,<br>
+2015 draft) by Christian Urban. I can hardly believe that I missed the<br>
+relevant example upon the first reading. Regretfully, I only have several<br>
+days of experience in Isabelle/ML coding, therefore, please accept my<br>
+apologies for the naive question.</p>
+<p>Thank you</p>
+
+
+
+<a name="294756815"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Creating%20cterms%20with%20automatic%20type%20inference%20.../near/294756815" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Creating.20cterms.20with.20automatic.20type.20inference.20.2E.2E.2E.html#294756815">(Aug 22 2022 at 19:51)</a>:</h4>
+<p>From: Alexander Krauss &lt;<a href="mailto:krauss@in.tum.de">krauss@in.tum.de</a>&gt;<br>
+Glad you got it to work. Yes, dummyT is treated like a type variable by<br>
+type inference, so this is the simplest solution if you just have a<br>
+single constant and must figure out the correct type.</p>
+<p>Alex</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

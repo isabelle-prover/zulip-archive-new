@@ -1,0 +1,93 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] ML - How to handle ERROR exception · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20ML.20-.20How.20to.20handle.20ERROR.20exception.html">[isabelle] ML - How to handle ERROR exception</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294746829"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20ML%20-%20How%20to%20handle%20ERROR%20exception/near/294746829" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20ML.20-.20How.20to.20handle.20ERROR.20exception.html#294746829">(Aug 22 2022 at 18:43)</a>:</h4>
+<p>From: Janik Benzin &lt;<a href="mailto:janik.benzin@rwth-aachen.de">janik.benzin@rwth-aachen.de</a>&gt;<br>
+Hi all,</p>
+<p>I would like to learn a bit more about the ML basis of Isabelle.<br>
+Recently, I have tried to catch and handle the user exception "ERROR of<br>
+string" defined in exn.ML in the following example:</p>
+<p>ML {*<br>
+       type isar_record =  {context: Proof.context, facts: thm list, goal:<br>
+thm}</p>
+<p>fun goal_display ctxt (isar_goal:isar_record) =<br>
+            Pretty.writeln(Goal_Display.pretty_goal ctxt (#goal(isar_goal)))<br>
+       handle Exn.ERROR _    =&gt;   ();<br>
+*}</p>
+<p>Now I would like to insert the function using ML_val and antiquotations<br>
+anywhere in a theory file, i.e. inside and outside of proofs:</p>
+<p>ML_val {*<br>
+               goal_display @{context} @{Isar.goal}<br>
+             *}</p>
+<p>However, the exception ERROR "No proof state" is printed as an error<br>
+message in Isabelle, although I’ve installed the corresponding error<br>
+handler. Am I doing something wrong here?</p>
+<p>Thank you for your time and help!</p>
+<p>Best regards,<br>
+Janik Benzin</p>
+
+
+
+<a name="294746909"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20ML%20-%20How%20to%20handle%20ERROR%20exception/near/294746909" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20ML.20-.20How.20to.20handle.20ERROR.20exception.html#294746909">(Aug 22 2022 at 18:44)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On 08/11/2018 20:25, Janik Benzin wrote:</p>
+<blockquote>
+<p>I would like to learn a bit more about the ML basis of Isabelle.<br>
+Recently, I have tried to catch and handle the user exception "ERROR of<br>
+string" defined in exn.ML in the following example:</p>
+</blockquote>
+<p>The "implementation" manual contains a lot of explanations about<br>
+Isabelle/ML in chapter 0. Section 0.5 is about exceptions in particular:<br>
+these clear guidelines help to work with various kinds of errors robustly.</p>
+<blockquote>
+<p>ML {*<br>
+       type isar_record =  {context: Proof.context, facts: thm list, goal:<br>
+thm}</p>
+<p>fun goal_display ctxt (isar_goal:isar_record) =<br>
+            Pretty.writeln(Goal_Display.pretty_goal ctxt (#goal(isar_goal)))<br>
+       handle Exn.ERROR _    =&gt;   ();<br>
+*}</p>
+</blockquote>
+<p>BTW, when you find yourself defining record-type aliases such as<br>
+isar_record above there is something wrong with your function<br>
+signatures. In the Isabelle/Pure implementation, types are defined in a<br>
+manner to minimize redundant type constraints: ML is essentially<br>
+implicitly typed LISP, and the Isabelle/ML IDE tells you what the<br>
+inferred types are -- you rarely write anything in the source.</p>
+<p>So here is the example written in a more standard way:</p>
+<p>ML ‹<br>
+  fun goal_display ctxt goal =<br>
+    Pretty.writeln (Goal_Display.pretty_goal ctxt goal)<br>
+    handle ERROR _ =&gt; ();<br>
+›</p>
+<p>ML_val ‹goal_display (#goal @{Isar.goal})›</p>
+<blockquote>
+<p>ML_val {*<br>
+               goal_display @{context} @{Isar.goal}<br>
+             *}</p>
+<p>However, the exception ERROR "No proof state" is printed as an error<br>
+message in Isabelle, although I’ve installed the corresponding error<br>
+handler. Am I doing something wrong here?</p>
+</blockquote>
+<p>The error is produced statically by the @{Isar.goal} antiquotation,<br>
+because the context of the ML_val command lacks a goal state.</p>
+<p>Such confusions about the origin of exceptions belong to the nature of<br>
+exceptions: it requires care to write programs correctly in that respect<br>
+(section 0.5 of the "implementation" manual and the body of<br>
+Isabelle/Pure ML sources should provide some idea how to do it).</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

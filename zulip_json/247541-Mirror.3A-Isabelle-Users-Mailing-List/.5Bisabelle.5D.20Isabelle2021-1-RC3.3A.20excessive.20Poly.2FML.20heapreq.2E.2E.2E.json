@@ -1,0 +1,38 @@
+[
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nWhat is your OS version?</p>\n<p>Can you can try this with other versions of Poly/ML? Here are some formal<br>\ncomponent names:</p>\n<p>#bundled with Isabelle2021<br>\npolyml-test-f86ae3dc1686</p>\n<p>#official release after Isabelle2021<br>\npolyml-5.8.2</p>\n<p>#approximations of polyml-5.9 for Isabelle2021-1<br>\npolyml-5.9-960de0cd0795<br>\npolyml-5.9-5d4caa8f7148<br>\npolyml-5.9-cc80e2b43c38<br>\npolyml-5.9-610a153b941d</p>\n<p>Makarius</p>",
+        "id": 262595396,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1637764003
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nI think that only these 2 alternatives are relevant for a comparison.</p>\n<p>Generally, I do see lots of heap usage on \"small\" machines with only 8-24 GB,<br>\nespecially on weak VM nodes. Sometimes this causes problems to built<br>\nHOL-Analysis or HOL-Data_Structures.</p>\n<p>The question: Is this really a new problem for Isabelle2021-1 that was absent<br>\nin Isabelle2021?</p>\n<p>Attached are some measurements for HOL-Analysis in the past 400 days: nothing<br>\nspecial to be seen. Here is further context<br>\n<a href=\"https://isabelle.sketis.net/devel/build_status/macOS_10.15_Catalina_4_threads/index.html#session_HOL-Analysis\">https://isabelle.sketis.net/devel/build_status/macOS_10.15_Catalina_4_threads/index.html#session_HOL-Analysis</a></p>\n<p>Note that this test line uses 4 threads with a \"cold start\", i.e. no  previous<br>\ninformation about the timing of proofs.</p>\n<p>Makarius<br>\n<a href=\"/user_uploads/14278/oyRIBs0jDAcZclRsGwQ1LQLs/HOL-Analysis_heap.png\">HOL-Analysis_heap.png</a></p>\n<div class=\"message_inline_image\"><a href=\"/user_uploads/14278/oyRIBs0jDAcZclRsGwQ1LQLs/HOL-Analysis_heap.png\" title=\"HOL-Analysis_heap.png\"><img src=\"/user_uploads/14278/oyRIBs0jDAcZclRsGwQ1LQLs/HOL-Analysis_heap.png\"></a></div>",
+        "id": 262893925,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1638048608
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nSo how is the situation with these Poly/ML versions?</p>\n<p>#bundled with Isabelle2021<br>\npolyml-test-f86ae3dc1686</p>\n<p>#official release after Isabelle2021<br>\npolyml-5.8.2</p>\n<p>We need some tangible empirical results to proceed.</p>\n<p>Makarius</p>",
+        "id": 262929571,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1638106965
+    },
+    {
+        "content": "<p>From: Matthew Torrence &lt;<a href=\"mailto:matthew.torrence@twosixtech.com\">matthew.torrence@twosixtech.com</a>&gt;<br>\nSome further details that were discovered from the Zulip:</p>\n<p>The problem is that Auto quickcheck is evaluating 2^129 in nats, with<br>\nsuccessor arithmetic, and is running out of memory. Importing<br>\n\"HOL-Library.Code_Target_Numeral\", or disabling auto quickcheck solves the<br>\nproblem.</p>\n<p>It does seem a bit odd though that this is the way auto quickcheck acts<br>\nwhen it encounters such arithmetic, instead of catching itself and giving<br>\nup...</p>",
+        "id": 263118971,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1638264507
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nGreat, that is a tangible empirical situation.</p>\n<p>I have turned it into the following example:</p>\n<p>theory Scratch<br>\n  imports Main<br>\nbegin</p>\n<p>definition test :: \"nat\"<br>\n  where \"test = 1000\"</p>\n<p>lemma \"test = test + 1\"<br>\n  quickcheck a</p>\n<p>end</p>\n<p>Thus it is possible to add digits to the numeral and see how auto quickcheck<br>\nreacts -- while watching the ML heap in the Monitor panel. Afterwards the<br>\nexplicit quickcheck command can be activated by removing the bad argument \"a\"<br>\nand not touching anything else.</p>\n<p>The reason for the appearance of non-timeout is this change from Isabelle2019<br>\n(June 2019):<br>\n<a href=\"https://isabelle-dev.sketis.net/rISABELLE1bea05713dde\">https://isabelle-dev.sketis.net/rISABELLE1bea05713dde</a></p>\n<p>\"\"\"<br>\nphysical vs. logical events, the latter takes GC time into account;<br>\nTimeout.apply is based on logical ML time;<br>\n\"\"\"</p>\n<p>Attached is a change for Isabelle2021-1-RC4 that returns to physical timeout<br>\nspecifically for quickcheck / try / auto_try.</p>\n<p>I do hope that we can afford this isolated last-minute change on<br>\nIsabelle2021-1, for something that has been present in the past 3 releases.</p>\n<p>Makarius<br>\n<a href=\"/user_uploads/14278/Tep_fOVziOpWlBTuNlpntN03/ch-physical_timeout\">ch-physical_timeout</a></p>",
+        "id": 263127927,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1638269807
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nSide-remark: the Monitor panel already provides the buttons \"GC\" and \"Sharing\"<br>\nfor the ML heap (since Isabelle2021).</p>\n<p>Since the monitoring now works via an external process, it remains active<br>\nduring GC (\"ML cleanup\").</p>\n<p>Makarius</p>",
+        "id": 263128638,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1638270215
+    }
+]

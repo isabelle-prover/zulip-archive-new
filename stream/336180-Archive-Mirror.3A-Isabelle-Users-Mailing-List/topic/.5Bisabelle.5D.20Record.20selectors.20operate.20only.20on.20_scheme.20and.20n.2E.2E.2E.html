@@ -1,0 +1,142 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Record selectors operate only on _scheme and n... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Record.20selectors.20operate.20only.20on.20_scheme.20and.20n.2E.2E.2E.html">[isabelle] Record selectors operate only on _scheme and n...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294647432"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Record%20selectors%20operate%20only%20on%20_scheme%20and%20n.../near/294647432" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Record.20selectors.20operate.20only.20on.20_scheme.20and.20n.2E.2E.2E.html#294647432">(Aug 22 2022 at 10:37)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear experts of the record package,</p>
+<p>Last week, Jasmin and I had a long discussion about integrating the record package further <br>
+with the free_constructors package. In the end, we found out that things are not so <br>
+simple. The main obstacle was the somewhat non-uniform treatment of record extensions when <br>
+it comes to the different generated constants. Let me illustrate the problem with an example.</p>
+<p>record foo = foo :: nat<br>
+   record bar = foo + bar :: int</p>
+<p>The first command creates a type "'m1 foo_ext"<br>
+and synonyms "'m1 foo_scheme = 'm1 foo_ext" and "foo = unit foo_scheme".<br>
+The second a type "'m2 bar_ext"<br>
+and synonyms "'m2 bar_scheme == 'm2 bar_ext foo_ext" and "bar = unit bar_scheme".</p>
+<p>The record notation (| ... |) gets translated to constants foo_ext and bar_ext, which <br>
+serve as free constructors for the types foo_ext and bar_ext. Thus, a value of type 'm2 <br>
+bar_scheme is composed of two nested constructors, namely bar_ext in the extension <br>
+parameter for foo_ext. If it were only for this, it would be easy to register the <br>
+constants foo_ext and bar_ext as free constructors of the respective types.</p>
+<p>However, the free_constructor command also supports selectors and therefore, it would be <br>
+good to register them too. Unfortunately, I have not been able to find a proper selector <br>
+for the bar_ext type. The selector bar is generated as a constant of its own rather than <br>
+an abbreviation like</p>
+<p>bar x == <a href="http://bar_ext.bar">bar_ext.bar</a> (foo.more x) (* <a href="http://bar_ext.bar">bar_ext.bar</a> does not exist at the moment *)</p>
+<p>Can anyone remember why the selectors for _scheme are constants rather than abbreviations <br>
+of selectors for the _ext types?</p>
+<p>In the present form, free_constructors cannot handle compound types such as bar_scheme. So <br>
+we cannot register bar reasonably with free_constructors.</p>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<a name="294647484"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Record%20selectors%20operate%20only%20on%20_scheme%20and%20n.../near/294647484" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Record.20selectors.20operate.20only.20on.20_scheme.20and.20n.2E.2E.2E.html#294647484">(Aug 22 2022 at 10:38)</a>:</h4>
+<p>From: Thomas Sewell &lt;<a href="mailto:thomas.sewell@nicta.com.au">thomas.sewell@nicta.com.au</a>&gt;<br>
+Hey Andreas.</p>
+<p>The record package builds records out of layers of "ext" record<br>
+extensions, as you've understood.</p>
+<p>In the distant past, the record package defined two layers of selectors<br>
+and updators, one (mostly hidden) for each "ext" layer, and surface<br>
+selectors/updators which operate on the "completed" type. These were all<br>
+new constant definitions - it may be relevant that this design predates<br>
+abbreviations.</p>
+<p>When I last attacked the record package, I got rid of the duplication in<br>
+order to reduce the proof times, and just kept the surface<br>
+selectors/updators.</p>
+<p>In hindsight, we could have instead kept the layer-by-layer<br>
+selectors/updators, and turned them into the final selectors/updators<br>
+with abbreviations or other syntax tricks. I didn't think of this at the<br>
+time. Also, I wanted to change as little of the old design as possible,<br>
+in particular I didn't want to try to understand the syntax aspects.</p>
+<p>I suspect that making this change would require a modest amount of work,<br>
+probably a few weeks for someone who knows what they're doing. It would<br>
+also simplify the simprocs a little - they have to think a lot about the<br>
+special cases for the more/"..." selector/updator.</p>
+<p>A final complexity you might want to think about: the reason I got<br>
+involved in this in the first place is that the record package <em>can</em> be<br>
+used to define some really big records (&gt; 500 fields). I don't think<br>
+that the corresponding datatype proofs can be done in a reasonable<br>
+amount of time. This is one reason why records aren't given the datatype<br>
+treatment by default. There might be an argument for switching the<br>
+default here, and providing a richer theorem set by default with a<br>
+"simple mode" switch available for bigger records.</p>
+<p>Cheers,<br>
+     Thomas.</p>
+<hr>
+<p>The information in this e-mail may be confidential and subject to legal professional privilege and/or copyright. National ICT Australia Limited accepts no liability for any damage caused by this email or its attachments.</p>
+
+
+
+<a name="294647591"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Record%20selectors%20operate%20only%20on%20_scheme%20and%20n.../near/294647591" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Record.20selectors.20operate.20only.20on.20_scheme.20and.20n.2E.2E.2E.html#294647591">(Aug 22 2022 at 10:38)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hey Thomas,</p>
+<p>Thanks for the quick reply. I still wonder how a change from selectors on _scheme to <br>
+layer-by-layer would affect efficiency. With layer-by-layer, we'd get less <br>
+selector/updator pairs, because we only need them for the fields of one record <br>
+specification, not for the fields inherited from existing records. On the other hand, <br>
+selectors then consist of several constants and pretty-printing has to collapse the <br>
+abbreviations. In the end, it certainly depends on the depth of the record extensions. I <br>
+myself have never exceeded depth 5, but how about at NICTA?</p>
+<p>Despite the explanation at the beginning of Record.thy, I have not yet understood how you <br>
+manage to state and prove O(n ^ 2) theorems (for the selector-updator rules) in <br>
+O(log(n)^2) step. In the end, there are O(n ^ 2) theorems, aren't there?</p>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<a name="294647692"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Record%20selectors%20operate%20only%20on%20_scheme%20and%20n.../near/294647692" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Record.20selectors.20operate.20only.20on.20_scheme.20and.20n.2E.2E.2E.html#294647692">(Aug 22 2022 at 10:39)</a>:</h4>
+<p>From: Thomas Sewell &lt;<a href="mailto:thomas.sewell@nicta.com.au">thomas.sewell@nicta.com.au</a>&gt;<br>
+The "NICTA record problem" is with a single flat record that has a lot<br>
+of fields (~ 500 I think). I don't think we use record extensions much<br>
+at all. I've never seen a record extension more than 2 deep.</p>
+<p>The change would impact syntax performance somehow, more work, or<br>
+different work. I don't understand the syntax layer at all though, so I<br>
+can't really comment on that.</p>
+<p>There are less selector/updator pairs, but this essentially doesn't<br>
+matter. There are in any case far too many pairs (for a record with &gt;<br>
+100 fields) to generate all the simp rules ahead of time. Anyway, only a<br>
+tiny proportion of them would be syntactically encountered. The record<br>
+simproc proves the relevant rules each time they are needed. The proof<br>
+of each one is O (log(n)), so we don't even bother to cache them.</p>
+<p>Your suggested change would make this simproc proof process fire<br>
+multiple times for some cases where it currently fires once, but I think<br>
+the total amount of work would stay about the same, so I suspect the<br>
+performance impact would be minor.</p>
+<p>Cheers,<br>
+     Thomas.</p>
+<hr>
+<p>The information in this e-mail may be confidential and subject to legal professional privilege and/or copyright. National ICT Australia Limited accepts no liability for any damage caused by this email or its attachments.</p>
+
+
+
+<a name="294647716"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Record%20selectors%20operate%20only%20on%20_scheme%20and%20n.../near/294647716" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Record.20selectors.20operate.20only.20on.20_scheme.20and.20n.2E.2E.2E.html#294647716">(Aug 22 2022 at 10:39)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Thomas,</p>
+<p>Thanks for the clarification, I did not know that the theorems are only generated inside <br>
+the simproc on demand. This indeed adds some complication.</p>
+<p>For the moment, I'll wait and see what Dmitriy's new tool for lifting BNFs over typedefs <br>
+brings and how he integrates the record selectors.</p>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

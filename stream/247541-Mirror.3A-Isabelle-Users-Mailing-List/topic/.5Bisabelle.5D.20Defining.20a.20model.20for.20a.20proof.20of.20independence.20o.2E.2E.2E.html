@@ -1,0 +1,295 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Defining a model for a proof of independence o... · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Defining.20a.20model.20for.20a.20proof.20of.20independence.20o.2E.2E.2E.html">[isabelle] Defining a model for a proof of independence o...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="497147347"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Defining%20a%20model%20for%20a%20proof%20of%20independence%20o.../near/497147347" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Defining.20a.20model.20for.20a.20proof.20of.20independence.20o.2E.2E.2E.html#497147347">(Feb 01 2025 at 09:15)</a>:</h4>
+<p>From: Oleksandr Gavenko &lt;<a href="mailto:gavenkoa@gmail.com">gavenkoa@gmail.com</a>&gt;<br>
+I'm an enthusiast of math logic so what I'm doing with Isabelle is not for<br>
+something beneficial IRL, skip the mail if you value your time ))</p>
+<p>In David Hilbert's book<br>
+<a href="https://en.wikipedia.org/wiki/Grundlagen_der_Mathematik">https://en.wikipedia.org/wiki/Grundlagen_der_Mathematik</a> there is a<br>
+methodology to prove axiom independence via a model.</p>
+<p>A trivial informal example of independence proof: if we assign usual truth<br>
+table for T / F for implication and define _ &amp; _ = F (for conjunction) we<br>
+get following as tautologies:</p>
+<p>(A &amp; B)⟶A   -- (F⟶_) ≡ T<br>
+(A &amp; B)⟶B</p>
+<p>Also MP rule keeps tautology status.</p>
+<p>But following statement (&amp;-introduction) is not a tautology:</p>
+<p>A⟶B⟶(A &amp; B)   -- (T⟶F) ≡ F, so (T⟶(T⟶F)) ≡ F</p>
+<p>So this axiom is independent from any implication axioms and &amp;-elimination<br>
+axioms.</p>
+<p>I asked the question earlier here:</p>
+<p><a href="https://proofassistants.stackexchange.com/questions/4585/defining-a-finite-model-for-proving-propositional-logic-axiom-indepencense-in-is">https://proofassistants.stackexchange.com/questions/4585/defining-a-finite-model-for-proving-propositional-logic-axiom-indepencense-in-is</a></p>
+<p>I don't understand how to define truth tables and prove statements about<br>
+operations, defined by truth tables.</p>
+<p>My naive HOL code is:</p>
+<p>theory ax_ind<br>
+  imports Main<br>
+begin</p>
+<p>datatype truth = T | F</p>
+<p>lemma truth_dom: "a = T ∨ a = F"<br>
+  by (cases a, clarify+)</p>
+<p>fun impl :: "truth⇒truth⇒truth" where<br>
+  "impl F F = T" |<br>
+  "impl F T = T" |<br>
+  "impl T F = F" |<br>
+  "impl T T = T"</p>
+<p>notation impl (infixr ‹→› 65)</p>
+<p>value "(T→F)"</p>
+<p>fun conja :: "truth⇒truth⇒truth" where<br>
+  "conja F F = F" |<br>
+  "conja F T = F" |<br>
+  "conja T F = F" |<br>
+  "conja T T = F"</p>
+<p>notation conja (infixr ‹&amp;› 60)</p>
+<p>value "(T → F) → (F &amp; T)"</p>
+<p>(* example of tautology proof *)<br>
+lemma "((P::truth) → P) = T"<br>
+  by(cases P, auto)</p>
+<p>(* example of inference rule keeping tautology *)<br>
+lemma<br>
+  fixes P::truth and Q::truth<br>
+  assumes "P = T" and "(P→Q) = T"<br>
+  shows "Q = T"<br>
+proof (rule ccontr)<br>
+  assume "Q ≠ T"<br>
+  then have "Q = F" using truth_dom by (auto)<br>
+  then have "P→Q = F" using assms(1) by (auto)<br>
+  then show False using assms(2) by auto<br>
+qed</p>
+<p>(* example of non-tautology *)<br>
+lemma "∃ P Q. P → Q → (P &amp; Q) = F"<br>
+proof -<br>
+  have "(T → T → (T &amp; T)) = F" by auto<br>
+  then show ?thesis by auto+<br>
+qed</p>
+<p>Above code is a rudimental attempt, things I don't like and hope veterans<br>
+could reference to examples or suggest improvement:</p>
+<ul>
+<li>
+<p>I made "fun" working only by providing all combinations of truth values.<br>
+In Hilbert's original work he used schematic rules, which shortens truth<br>
+tables and even denote "ideas". If I start encoding 3 or 4 values truth<br>
+tables patterns becomes handy:</p>
+</li>
+<li>
+<p>shorter definitions</p>
+</li>
+<li>shorter proof cases</li>
+</ul>
+<p>My attempts to define "a -&gt; a = T" resulted in an error "Nonlinear patterns<br>
+not allowed in sequential mode", probably I need to read functions.pdf.</p>
+<p>??? What is the way to define a truth table for operators via helpful<br>
+patterns?</p>
+<ul>
+<li>I've heard about "embedding logic" into object logic. I assume it is<br>
+important because you could reason about embedded logic  - basically prove<br>
+<em>meta</em>-theorems (like deduction thm or in this letter case about tautology<br>
+of expression).</li>
+</ul>
+<p>I have a wild guess that the above code is already like "embedded logic".</p>
+<p>It might lack some syntax sugar, like operator ⊨, how can I define it?<br>
+Naive pseudocode is:</p>
+<p>definition ⊨::"truth =&gt; bool"<br>
+where "⊨ expr ⟷ (expr = T) ∨ (expr = α) ∨ (expr = β)</p>
+<p>IDK how to capture variable number of free variables in "expr". Because an<br>
+expression is a tautology when every truth table substitution leads to a<br>
+selected truth value set. Like:</p>
+<p>⊨A→B→A</p>
+<p>actually means:</p>
+<p>∀ A B. A→B→A ∈{T, α, β}</p>
+<p>And independence of an axiom is a statement that exist values for variables<br>
+of "expr" that results to non-true truth value:</p>
+<p>∃ A B. A→B→(A&amp;B) ∉{T, α, β}</p>
+<p>??? With my knowledge of Isabelle I cannot express a statement about *all<br>
+variables, participating in formula* and quantify them as All or Ex.</p>
+<p>Seems latter ⊭ (non-tautology) could be defined as negation of ⊨.</p>
+<ul>
+<li>Is it possible to externalize or generalize a "model"? Like to be able to<br>
+attach a model to formulas and state that this formula is tautology in a<br>
+given model (or not)?</li>
+</ul>
+<p>It looks like some evaluator (or "image" creator) should be defined over<br>
+expressions. Some values will denote "true", and theorems might look like<br>
+in pseudocode:</p>
+<p>fact: true_val(model) ∈{T, α, β}<br>
+fact: img_of (expr in model) ⊆  true_val(model)  (* image of expr over all<br>
+possible substitution of  variables in expr *)</p>
+<p>lemma "model ⊨(A → A)"</p>
+<p>??? What way could the model be externalized or abstracted and different<br>
+instances could be referenced for a given expression?</p>
+<ul>
+<li>??? Could someone provide an example of nitpick (or another<br>
+counterexample engine) finding values of expression variables leading to<br>
+non-true value of expression?</li>
+</ul>
+<p>Hilbert used 3-4 valued truth tables in his work. I believe it is<br>
+manageable for Isablelle.</p>
+
+
+
+<a name="497147410"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Defining%20a%20model%20for%20a%20proof%20of%20independence%20o.../near/497147410" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Defining.20a.20model.20for.20a.20proof.20of.20independence.20o.2E.2E.2E.html#497147410">(Feb 01 2025 at 09:16)</a>:</h4>
+<p>From: Oleksandr Gavenko &lt;<a href="mailto:gavenkoa@gmail.com">gavenkoa@gmail.com</a>&gt;<br>
+I'm an enthusiast of math logic so what I'm doing with Isabelle is not<br>
+for something beneficial IRL, value your time ))</p>
+<p>In David Hilbert's book<br>
+<a href="https://en.wikipedia.org/wiki/Grundlagen_der_Mathematik">https://en.wikipedia.org/wiki/Grundlagen_der_Mathematik</a> there is a<br>
+methodology to prove axiom independence via a model.</p>
+<p>A trivial informal example of independence proof: if we assign usual<br>
+truth table for T / F for implication and define _ &amp; _ = F (for<br>
+conjunction) we get following as tautologies:</p>
+<p>(A &amp; B)⟶A   -- (F⟶_) ≡ T<br>
+(A &amp; B)⟶B</p>
+<p>Also MP rule keeps tautology status.</p>
+<p>But following statement (&amp;-introduction) is not a tautology:</p>
+<p>A⟶B⟶(A &amp; B)   -- (T⟶F) ≡ F, so (T⟶(T⟶F)) ≡ F</p>
+<p>So this axiom is independent from any implication axioms and<br>
+&amp;-elimination axioms.</p>
+<p>I asked the question earlier here:</p>
+<p><a href="https://proofassistants.stackexchange.com/questions/4585/defining-a-finite-model-for-proving-propositional-logic-axiom-indepencense-in-is">https://proofassistants.stackexchange.com/questions/4585/defining-a-finite-model-for-proving-propositional-logic-axiom-indepencense-in-is</a></p>
+<p>I don't understand how to define truth tables and prove statements<br>
+about operations, defined by truth tables.</p>
+<p>My naive HOL code is:</p>
+<p>theory ax_ind<br>
+  imports Main<br>
+begin</p>
+<p>datatype truth = T | F</p>
+<p>lemma truth_dom: "a = T ∨ a = F"<br>
+  by (cases a, clarify+)</p>
+<p>fun impl :: "truth⇒truth⇒truth" where<br>
+  "impl F F = T" |<br>
+  "impl F T = T" |<br>
+  "impl T F = F" |<br>
+  "impl T T = T"</p>
+<p>notation impl (infixr ‹→› 65)</p>
+<p>value "(T→F)"</p>
+<p>fun conja :: "truth⇒truth⇒truth" where<br>
+  "conja F F = F" |<br>
+  "conja F T = F" |<br>
+  "conja T F = F" |<br>
+  "conja T T = F"</p>
+<p>notation conja (infixr ‹&amp;› 60)</p>
+<p>value "(T → F) → (F &amp; T)"</p>
+<p>(* example of tautology proof *)<br>
+lemma "((P::truth) → P) = T"<br>
+  by(cases P, auto)</p>
+<p>(* example of inference rule keeping tautology *)<br>
+lemma<br>
+  fixes P::truth and Q::truth<br>
+  assumes "P = T" and "(P→Q) = T"<br>
+  shows "Q = T"<br>
+proof (rule ccontr)<br>
+  assume "Q ≠ T"<br>
+  then have "Q = F" using truth_dom by (auto)<br>
+  then have "P→Q = F" using assms(1) by (auto)<br>
+  then show False using assms(2) by auto<br>
+qed</p>
+<p>(* example of non-tautology *)<br>
+lemma "∃ P Q. P → Q → (P &amp; Q) = F"<br>
+proof -<br>
+  have "(T → T → (T &amp; T)) = F" by auto<br>
+  then show ?thesis by auto+<br>
+qed</p>
+<p>Above code is a rudimental attempt, things I don't like and hope<br>
+veterans could reference to examples or suggest improvement:</p>
+<ul>
+<li>
+<p>I made "fun" working only by providing all combinations of truth<br>
+values. In Hilbert's original work he used schematic rules, which<br>
+shortens truth tables and even denote "ideas". If I start encoding 3<br>
+or 4 values truth tables patterns becomes handy:</p>
+</li>
+<li>
+<p>shorter definitions</p>
+</li>
+<li>shorter proof cases</li>
+</ul>
+<p>My attempts to define "a -&gt; a = T" resulted in an error "Nonlinear<br>
+patterns not allowed in sequential mode", probably I need to read<br>
+functions.pdf.</p>
+<p>??? What is the way to define a truth table for operators via helpful patterns?</p>
+<ul>
+<li>I've heard about "embedding logic" into object logic. I assume it is<br>
+important because you could reason about embedded logic  - basically<br>
+prove <em>meta</em>-theorems (like deduction thm or in this letter case about<br>
+tautology of an expression).</li>
+</ul>
+<p>I have a wild guess that the above code is already like "embedded logic".</p>
+<p>It might lack some syntax sugar, like operator ⊨, how can I define it?<br>
+Naive pseudocode is:</p>
+<p>definition ⊨::"truth =&gt; bool"<br>
+where "⊨ expr ⟷ (expr = T) ∨ (expr = α) ∨ (expr = β)  (* values, that<br>
+are considered "true" *)</p>
+<p>IDK how to capture <strong>variable</strong> number of free variables in "expr".<br>
+Because an expression is a tautology when every truth table<br>
+substitution leads to a selected truth value set. Like:</p>
+<p>⊨A→B→A</p>
+<p>actually means:</p>
+<p>∀ A B. A→B→A ∈{T, α, β}</p>
+<p>And independence of an axiom is a statement that exist values for<br>
+variables of "expr" that results to non-true truth value:</p>
+<p>∃ A B. A→B→(A&amp;B) ∉{T, α, β}</p>
+<p>??? With my knowledge of Isabelle I cannot express a statement about<br>
+<em>all variables, participating in formula</em> and quantify them as All or<br>
+Ex.</p>
+<p>Seems latter ⊭ (non-tautology) could be defined as negation of ⊨.</p>
+<ul>
+<li>Is it possible to externalize or generalize a "model"? Like to be<br>
+able to attach a model to formulas and state that this formula is<br>
+tautology in a given model (or not)?</li>
+</ul>
+<p>It looks like some evaluator (or "image" creator) should be defined<br>
+over expressions. Some values will denote "true", and theorems might<br>
+look like in pseudocode:</p>
+<p>fact: true_val(model) = {T, α, β}<br>
+fact: img_of (expr in model) ⊆  true_val(model)  (* image of expr over<br>
+all possible substitution of  variables in expr *)</p>
+<p>lemma "model ⊨(A → A)"</p>
+<p>??? What way could the model be externalized or abstracted and<br>
+different instances of model could be referenced for a given<br>
+expression?</p>
+<ul>
+<li>??? Could someone provide an example of nitpick (or another<br>
+counterexample engine) finding values of expression variables leading<br>
+to non-true value of expression?</li>
+</ul>
+<p>Hilbert used 3-4 valued truth tables in his work. I believe it is<br>
+manageable for Isablelle.</p>
+<p>PS I've sent an email to the list <a href="mailto:isabelle-users@cl.cam.ac.uk">isabelle-users@cl.cam.ac.uk</a><br>
+initially, probably that is a legacy one.</p>
+<p>PPS I searched for "⊨", "sound", "complete" in Isablelle's src/ &amp;<br>
+AFP's thys/, the latter has many examples that might be relevant for<br>
+the goal. Variables are defined as "nat" and so on (from Cook_Levin<br>
+folder of AFP):</p>
+<p>datatype literal = Neg nat | Pos nat<br>
+type_synonym clause = "literal list"<br>
+type_synonym formula = "clause list"<br>
+type_synonym assignment = "nat ⇒ bool"</p>
+<p>abbreviation satisfies_literal :: "assignment ⇒ literal ⇒ bool" where<br>
+  "satisfies_literal α x ≡ case x of Neg n ⇒ ¬ α n | Pos n ⇒ α n"</p>
+<p>definition satisfies_clause :: "assignment ⇒ clause ⇒ bool" where<br>
+  "satisfies_clause α c ≡ ∃x∈set c. satisfies_literal α x"</p>
+<p>definition satisfies :: "assignment ⇒ formula ⇒ bool" (infix ‹⊨› 60) where<br>
+  "α ⊨ φ ≡ ∀c∈set φ. satisfies_clause α c"</p>
+<p>Above is specialized logic, other theories define formulas as<br>
+recursive data structures. I think I lose human readable axiom<br>
+representation because of "constructor" syntax of types. Dealing with<br>
+"nat" or formula "trees" is not fun ((</p>
+<p>That gives me ideas but I'm inexperienced with Isabelle enough to come<br>
+up with some clever abstraction so I can reason about validity of<br>
+expression under a given model.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

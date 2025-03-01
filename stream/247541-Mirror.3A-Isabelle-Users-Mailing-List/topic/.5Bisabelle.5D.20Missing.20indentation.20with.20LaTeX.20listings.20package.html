@@ -1,0 +1,114 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Missing indentation with LaTeX listings package · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Missing.20indentation.20with.20LaTeX.20listings.20package.html">[isabelle] Missing indentation with LaTeX listings package</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="399192524"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Missing%20indentation%20with%20LaTeX%20listings%20package/near/399192524" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Missing.20indentation.20with.20LaTeX.20listings.20package.html#399192524">(Oct 29 2023 at 23:10)</a>:</h4>
+<p>From: Pasquale Noce &lt;<a href="mailto:pasquale.noce.lavoro@gmail.com">pasquale.noce.lavoro@gmail.com</a>&gt;<br>
+Dear Isabelle users,</p>
+<p>In the new AFP submission on which I am currently working, I am using the<br>
+LaTeX listings package for some sample C code snippets, enclosed between<br>
+\begin{lstlisting} and \end{lstlisting} commands, and everything worked fine<br>
+up to the previous document generation, performed a couple of weeks ago.<br>
+Particularly, my manual indentation of those code snippets using simple<br>
+spaces, according to some examples found on the internet, was faithfully<br>
+rendered in my document.<br>
+Yesterday, as I generated my document again, I found out to my surprise that<br>
+those code snippets are no longer indented in the document, although I had not<br>
+changed anything either in the snippets themselves or in the \lstset command<br>
+used to configure the package, which is reported here below.</p>
+<p>\lstset{<br>
+  basicstyle = \small\ttfamily,<br>
+  frame = tb,<br>
+  keywordstyle = \bfseries,<br>
+  language = C,<br>
+  numbers = left,<br>
+  numberstyle = \tiny<br>
+}</p>
+<p>I am using MikTeX on Windows 10, so after detecting this unexpected behavior,<br>
+I launched the MikTeX console to update the LaTeX packages. However, this did<br>
+not have any effect: when I generate my document, those code snippets keep not<br>
+being indented.<br>
+Does any one of you have any hint about the possible reasons for this sudden<br>
+change in the behavior of the package, as well as about some possible solution<br>
+to this issue?</p>
+<p>Thank you very much, best regards,<br>
+Pasquale Noce</p>
+
+
+
+<a name="399746401"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Missing%20indentation%20with%20LaTeX%20listings%20package/near/399746401" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Missing.20indentation.20with.20LaTeX.20listings.20package.html#399746401">(Nov 01 2023 at 15:18)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On 30/10/2023 00:10, Pasquale Noce wrote:</p>
+<blockquote>
+<p>In the new AFP submission on which I am currently working, I am using the<br>
+LaTeX listings package for some sample C code snippets, enclosed between<br>
+\begin{lstlisting} and \end{lstlisting} commands<br>
+[...]<br>
+Yesterday, as I generated my document again, I found out to my surprise that<br>
+those code snippets are no longer indented in the document</p>
+</blockquote>
+<p>On 31/10/2023 12:31, Pasquale Noce wrote:</p>
+<blockquote>
+<p>I have further investigated this unexpected behavior, and it turns out to take<br>
+place if the text command containing the code listings also contains a list<br>
+created using the markdown control symbols described in the Isabelle/jEdit<br>
+reference manual (<a href="https://isabelle.in.tum.de/dist/Isabelle2023/doc/jedit.pdf">https://isabelle.in.tum.de/dist/Isabelle2023/doc/jedit.pdf</a>,<br>
+section 4.2).</p>
+</blockquote>
+<p>(The latter snippet is from a private mail thread. I will answer that here to <br>
+close the isabelle-users thread properly.)</p>
+<p>The observation about markdown already explains the situation: a paragraph is <br>
+a list of lines where initial spaces are not taken into account for document <br>
+output. Only the indentation of the first line is significant --- to determine <br>
+overall markdown structure.</p>
+<p>The listing environment is in conflict with that. It deviates from the normal <br>
+(non-)treatment of blanks within paragraphs. Thus it may be seen as a <br>
+variation on the "verbatim" environment, and needs to be treated similarly to <br>
+the "verbatim" document antiquotation.</p>
+<p>Here is a suitable definition in Isabelle/ML:</p>
+<p>setup ‹<br>
+   Document_Output.antiquotation_raw_embedded \&lt;^binding&gt;‹lstlisting›<br>
+     (Scan.lift Parse.embedded)<br>
+     (fn _ =&gt; fn s =&gt;<br>
+       Latex.string "\\begin{lstlisting}\n" @<br>
+       Latex.string (cat_lines (trim (forall_string Symbol.is_space) <br>
+(trim_split_lines s))) @<br>
+       Latex.string "\n\\end{lstlisting}")<br>
+›</p>
+<p>And here is an example document snippet:</p>
+<p>text ‹<br>
+   List:<br>
+     ▪ Lorem ipsum dolor sit amet, consectetur adipiscing elit.<br>
+     ▪ Sed sit amet porta orci, vitae ultricies ipsum. Phasellus volutpat arcu<br>
+       quam, non blandit purus cursus vitae.</p>
+<p>Nam vehicula magna ut purus sagittis, ac vehicula nisl iaculis. Nam nec<br>
+   ullamcorper mi, non tincidunt ipsum.</p>
+<p>\&lt;^lstlisting&gt;‹<br>
+do<br>
+{<br>
+     r = a % b;<br>
+     a = b;<br>
+     b = r;<br>
+} while (b);<br>
+   ›</p>
+<p>Cras sit amet est rhoncus massa semper venenatis. Sed elementum diam sed mi<br>
+   tempor pellentesque sit amet at justo. Aliquam vitae nunc nec massa<br>
+   ultricies ullamcorper.<br>
+›</p>
+<p>The full example is attached (and hopefully not lost).</p>
+<p>Makarius</p>
+<p><a href="/user_uploads/14278/EaQ5XsjwkxjIq6yaSu0kciUW/Test_C.tar.gz">Test_C.tar.gz</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

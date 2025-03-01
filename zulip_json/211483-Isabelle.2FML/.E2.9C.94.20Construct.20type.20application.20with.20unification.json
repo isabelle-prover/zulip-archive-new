@@ -1,0 +1,56 @@
+[
+    {
+        "content": "<p>What is the proper way to construct a type application with ML that requires unification? If I just use the <code>$</code> constructor I get an expected unification error:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"n\">Operator</span><span class=\"o\">:</span>  <span class=\"n\">card_suc</span> <span class=\"o\">::</span> <span class=\"o\">(?</span><span class=\"n n-Type\">'a</span> <span class=\"err\">×</span> <span class=\"o\">?</span><span class=\"n n-Type\">'a</span><span class=\"o\">)</span> <span class=\"n\">set</span> <span class=\"err\">⇒</span> <span class=\"o\">(?</span><span class=\"n n-Type\">'a</span> <span class=\"n\">suc</span> <span class=\"err\">×</span> <span class=\"o\">?</span><span class=\"n n-Type\">'a</span> <span class=\"n\">suc</span><span class=\"o\">)</span> <span class=\"n\">set</span>\n<span class=\"n\">Operand</span><span class=\"o\">:</span>   <span class=\"n\">natLeq</span> <span class=\"o\">::</span> <span class=\"o\">(</span><span class=\"n\">nat</span> <span class=\"err\">×</span> <span class=\"n\">nat</span><span class=\"o\">)</span> <span class=\"n\">set</span>\n</code></pre></div>",
+        "id": 253405751,
+        "sender_full_name": "Jan van Brügge",
+        "timestamp": 1631709396
+    },
+    {
+        "content": "<p><a href=\"#narrow/stream/202961-General/topic/Construct.20term.20while.20instantiating.20schematic.20type.20variables\">https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/Construct.20term.20while.20instantiating.20schematic.20type.20variables</a></p>",
+        "id": 253408723,
+        "sender_full_name": "Lukas Stevens",
+        "timestamp": 1631710868
+    },
+    {
+        "content": "<p>Thanks,</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"n\">Syntax.check_term</span> <span class=\"n\">ctxt</span> <span class=\"o\">(</span><span class=\"n\">Const</span> <span class=\"o\">(</span><span class=\"s\">\"Prelim.card_suc\"</span><span class=\"o\">,</span> <span class=\"n\">dummyT</span><span class=\"o\">)</span> <span class=\"err\">$</span> <span class=\"n\">BNF_Def.bd_of_bnf</span> <span class=\"kn\">bnf</span><span class=\"o\">))</span>\n</code></pre></div>\n<p>does indeed correctly unify the free variables</p>",
+        "id": 253410641,
+        "sender_full_name": "Jan van Brügge",
+        "timestamp": 1631711630
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"392255\">Jan van Brügge</span> has marked this topic as resolved.</p>",
+        "id": 253410647,
+        "sender_full_name": "Notification Bot",
+        "timestamp": 1631711632
+    },
+    {
+        "content": "<p>You picked the last answer from the thread that Lukas linked. However, there was an earlier answer (starting with 'if \"term\" is something whose type you know ...') that suits your situation better. In fact, <code>Syntax.check_term</code> does a <em>lot</em> of things and moreover is extensible (so it could do even more things when your code is run in a different context), which makes it something one should avoid using in a definitional package whenever possible.</p>",
+        "id": 253411720,
+        "sender_full_name": "Dmitriy Traytel",
+        "timestamp": 1631712050
+    },
+    {
+        "content": "<p>The problem is the result type, it is not obvious to me how I would construct that from the type of natLeq as input, or better said: Depending on what relation type I get as input</p>",
+        "id": 253412093,
+        "sender_full_name": "Jan van Brügge",
+        "timestamp": 1631712202
+    },
+    {
+        "content": "<p>Have a look at the various <code>mk_...</code> functions in <code>~~/src/HOL/Tools/BNF/bnf_util.ML</code> for terms and types.</p>",
+        "id": 253412684,
+        "sender_full_name": "Dmitriy Traytel",
+        "timestamp": 1631712457
+    },
+    {
+        "content": "<p>Actually, there is even a <code>mk_cardSuc</code> in <code>~~/src/HOL/Tools/BNF/bnf_lfp_util.ML</code>, which should be very similar to what you need.</p>",
+        "id": 253412938,
+        "sender_full_name": "Dmitriy Traytel",
+        "timestamp": 1631712545
+    },
+    {
+        "content": "<p>got that to work too:</p>\n<div class=\"codehilite\" data-code-language=\"Standard ML\"><pre><span></span><code><span class=\"kr\">fun</span> <span class=\"nf\">mk_sucT</span> <span class=\"n\">T</span> <span class=\"p\">=</span> <span class=\"n\">Type</span> <span class=\"p\">(</span><span class=\"n\">\\&lt;^type_name&gt;</span><span class=\"err\">‹suc›,</span> <span class=\"p\">[</span><span class=\"n\">T</span><span class=\"p\">])</span>\n<span class=\"kr\">fun</span> <span class=\"nf\">mk_card_suc</span> <span class=\"n\">r</span> <span class=\"p\">=</span>\n  <span class=\"kr\">let</span> <span class=\"kr\">val</span> <span class=\"nv\">T</span> <span class=\"p\">=</span> <span class=\"n\">fst</span> <span class=\"p\">(</span><span class=\"nn\">BNF_Util</span><span class=\"p\">.</span><span class=\"n\">dest_relT</span> <span class=\"p\">(</span><span class=\"n\">fastype_of</span> <span class=\"n\">r</span><span class=\"p\">));</span>\n  <span class=\"kr\">in</span> <span class=\"n\">Const</span> <span class=\"p\">(</span><span class=\"n\">\\&lt;^const_name&gt;</span><span class=\"err\">‹card_suc›,</span> <span class=\"nn\">BNF_Util</span><span class=\"p\">.</span><span class=\"n\">mk_relT</span> <span class=\"p\">(</span><span class=\"n\">T</span><span class=\"p\">,</span> <span class=\"n\">T</span><span class=\"p\">)</span> <span class=\"n\">--&gt;</span> <span class=\"nn\">BNF_Util</span><span class=\"p\">.</span><span class=\"n\">mk_relT</span> <span class=\"p\">(</span><span class=\"n\">mk_sucT</span> <span class=\"n\">T</span><span class=\"p\">,</span> <span class=\"n\">mk_sucT</span> <span class=\"n\">T</span><span class=\"p\">))</span> <span class=\"n\">$</span> <span class=\"n\">r</span> <span class=\"kr\">end</span><span class=\"p\">;</span>\n</code></pre></div>",
+        "id": 253414877,
+        "sender_full_name": "Jan van Brügge",
+        "timestamp": 1631713204
+    }
+]

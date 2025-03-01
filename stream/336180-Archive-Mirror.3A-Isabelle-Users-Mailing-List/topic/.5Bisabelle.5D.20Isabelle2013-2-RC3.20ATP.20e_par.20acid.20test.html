@@ -1,0 +1,277 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Isabelle2013-2-RC3 ATP e_par acid test · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2013-2-RC3.20ATP.20e_par.20acid.20test.html">[isabelle] Isabelle2013-2-RC3 ATP e_par acid test</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294262390"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2013-2-RC3%20ATP%20e_par%20acid%20test/near/294262390" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2013-2-RC3.20ATP.20e_par.20acid.20test.html#294262390">(Aug 19 2022 at 13:14)</a>:</h4>
+<p>From: Gottfried Barrow &lt;<a href="mailto:gottfried.barrow@gmx.com">gottfried.barrow@gmx.com</a>&gt;<br>
+Makarius,</p>
+<p>The short story is that I can reliably get non-terminating processes (or <br>
+processes that can't be shut down, and that will run for a long time), <br>
+but so far, I can only do that with the ATP e_par, and when it's started <br>
+with a bunch of other ATPs.</p>
+<p>The theorem I use for the test has to be put it at the bottom of a <br>
+theory, so that Sledgehammer can find some relevant facts.</p>
+<p>The test is to start Sledgehammer, and then terminate it prematurely by <br>
+deleting the "r" in "Sledgehammer", sometimes soon, and sometimes later. <br>
+I actually have to let e_par run for a while to get the right conditions <br>
+for it to not terminate.</p>
+<p>I didn't spend a lot of time experimenting with the command I show next, <br>
+which doesn't use e_par, but it uses most every ATP that's available to <br>
+me, and I haven't seen any problems from prematurely terminating the <br>
+Sledgehammer command. This is the command:</p>
+<p>ML {* Multithreading.max_threads_value () *}<br>
+    ML {* Multithreading.max_threads := 300 *}<br>
+    ML {* Multithreading.max_threads_value () *}</p>
+<p>theorem "False = True"<br>
+    sledgehammer [minimize=smart,preplay_timeout=10,timeout=60,verbose=true,<br>
+                  isar_try0=true,isar_proofs=smart,provers="<br>
+       remote_vampire  metis  remote_satallax  z3_tptp  remote_e  smt<br>
+       remote_e_tofof  spass  remote_e_sine    e        z3        yices</p>
+<p>remote_snark  remote_iprover  remote_z3    remote_waldmeister  <br>
+    spass_poly<br>
+       remote_cvc3   remote_agsyhol  remote_leo2  remote_iprover_eq   <br>
+    leo2        cvc3<br>
+    "]<br>
+    oops</p>
+<p>From here, two key points are that e_par starts up 12 eprover.exe <br>
+processes regardless of what max_threads is set to, that the number and <br>
+order of ATPs run with it affect things, and "max_thread := 4" is what <br>
+sets up the particular sequence I list below.</p>
+<p>I give the Isar command below, but I work it like this:</p>
+<p>1) I start the command.<br>
+2) Lots of eprover processes will be started and terminated, several times.<br>
+3) At about 40 seconds using my CPU, the ATP "leo" will be running with <br>
+12 eprover.exe processes, during a time when processes aren't being shut <br>
+down and started (shown by green and red lines using <br>
+<a href="http://systemexplorer.net/">http://systemexplorer.net/</a> )<br>
+4) I delete the "r" in "Sledgehammer".<br>
+5) The processes keep running much long than what I'm willing to wait. <br>
+(I have waited up to 15 minutes to see if they would terminate, and they <br>
+didn't.)<br>
+6) I exit the PIDE. Processes are terminated except for the ATP related <br>
+processes. I attach a screen shot showing the many non-terminating <br>
+processes.</p>
+<p>The command is this:</p>
+<p>ML {* Multithreading.max_threads_value () *}<br>
+    ML {* Multithreading.max_threads := 4 *}<br>
+    ML {* Multithreading.max_threads_value () *}</p>
+<p>theorem "False = True"</p>
+<p>sledgehammer [minimize=smart,preplay_timeout=10,timeout=60,verbose=true,<br>
+                  isar_try0=true,isar_proofs=smart,provers="<br>
+       e_par e leo2 z3 metis z3_tptp spass yices cvc3 smt spass_poly<br>
+    "]</p>
+<p>oops</p>
+<p>The steps listed above don't always work, but they probably work more <br>
+than 50% of the time.</p>
+<p>In the PIDE options, the default for "Threads" is "0", which is what <br>
+controlled my "max_thread" until I started changing "max_threads" with <br>
+the ML command, which affected me being able to get the sequence of <br>
+events to happen as I described above. The value "max_threads := 4" gets <br>
+the same results as the "Threads" set to "0". I have a 4 core CPU with <br>
+no hyperthreading.</p>
+<p>This is no problem for me. The ATP e_par actually terminates much of the <br>
+time, and I haven't been using it because of the large number of <br>
+processes that it starts.</p>
+<p>Regards,<br>
+GB<br>
+<a href="/user_uploads/14278/upxVfMJI74aTvLxLV3DwHj8X/131204_non-term-processes.png">131204_non-term-processes.png</a></p>
+<div class="message_inline_image"><a href="/user_uploads/14278/upxVfMJI74aTvLxLV3DwHj8X/131204_non-term-processes.png" title="131204_non-term-processes.png"><img src="/user_uploads/14278/upxVfMJI74aTvLxLV3DwHj8X/131204_non-term-processes.png"></a></div>
+
+
+
+<a name="294262396"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2013-2-RC3%20ATP%20e_par%20acid%20test/near/294262396" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2013-2-RC3.20ATP.20e_par.20acid.20test.html#294262396">(Aug 19 2022 at 13:14)</a>:</h4>
+<p>From: Gottfried Barrow &lt;<a href="mailto:gottfried.barrow@gmx.com">gottfried.barrow@gmx.com</a>&gt;<br>
+I don't actually have to terminate the Sledgehammer command. This worked <br>
+three times in a row:</p>
+<p>1) Log out and back into my Windows account.<br>
+2) Run the command I showed with max_threads set to 4.<br>
+3) It gets to where "leo" and 12 "eprover.exe" processes are running, <br>
+and they don't timeout like they should.</p>
+<p>I think it's related to the number of threads, but not completely. I can <br>
+change max_threads to 3, and e_par times out like it should. I change it <br>
+back to 4, and it can time out like it should.</p>
+<p>I did the log out/log in sequence with max_threads set to 3, and it did <br>
+like with 4, except "leo" wasn't running, but it didn't do it twice in a <br>
+row. The number 4 seems worse, but 3 fails, and every computer might be <br>
+different.</p>
+<p>Regards,<br>
+GB</p>
+
+
+
+<a name="294262484"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2013-2-RC3%20ATP%20e_par%20acid%20test/near/294262484" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2013-2-RC3.20ATP.20e_par.20acid.20test.html#294262484">(Aug 19 2022 at 13:14)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On Wed, 4 Dec 2013, Gottfried Barrow wrote:</p>
+<blockquote>
+<p>The short story is that I can reliably get non-terminating processes (or <br>
+processes that can't be shut down, and that will run for a long time), <br>
+but so far, I can only do that with the ATP e_par, and when it's started <br>
+with a bunch of other ATPs.</p>
+</blockquote>
+<p>This is the first time I learn about the existence of e_par.  It seems to <br>
+be an add-on script to E prover by Josef Urban.  Maybe Jasmin can say <br>
+something about the degree of supportedness within the Sledgehammer suite.</p>
+<p>My general impression is that there are many experimental add-ons that are <br>
+not widely used nor tested on the usual platforms.</p>
+<blockquote>
+<p>I didn't spend a lot of time experimenting with the command I show next, <br>
+which doesn't use e_par, but it uses most every ATP that's available to <br>
+me, and I haven't seen any problems from prematurely terminating the <br>
+Sledgehammer command. This is the command:</p>
+<p>ML {* Multithreading.max_threads_value () *}<br>
+  ML {* Multithreading.max_threads := 300 *}<br>
+  ML {* Multithreading.max_threads_value () *}</p>
+<p>theorem "False = True"<br>
+  sledgehammer [minimize=smart,preplay_timeout=10,timeout=60,verbose=true,<br>
+                isar_try0=true,isar_proofs=smart,provers="<br>
+     remote_vampire  metis  remote_satallax  z3_tptp  remote_e  smt<br>
+     remote_e_tofof  spass  remote_e_sine    e        z3        yices</p>
+<p>remote_snark  remote_iprover  remote_z3    remote_waldmeister <br>
+spass_poly<br>
+     remote_cvc3   remote_agsyhol  remote_leo2  remote_iprover_eq      leo2 <br>
+cvc3<br>
+  "]<br>
+  oops</p>
+<p>From here, two key points are that e_par starts up 12 eprover.exe processes <br>
+regardless of what max_threads is set to, that the number and order of ATPs <br>
+run with it affect things, and "max_thread := 4" is what sets up the <br>
+particular sequence I list below.</p>
+</blockquote>
+<p>300 threads are quite a lot, but I suggested to go towards and beyond the <br>
+limits of what is feasible :-)</p>
+<p>The e_par implementation ($E_HOME/runepar.pl) has its own process <br>
+management and allocation of CPU resources.  It does not take the number <br>
+of ML threads into account.  Looking a bit through the script, I see <br>
+various potential weaknesses and non-portabilities.  E.g. there is ulimit, <br>
+which only works reliably on various brands of Unix, not the generic <br>
+quasi-POSIX of Isabelle that includes Cygwin.  It is also unclear if its <br>
+internal signal handling is really robust (e.g. the Cleanup does not wait<br>
+for the process farm.)</p>
+<p>A general note on Multithreading.max_threads: changing that in Isabelle/ML <br>
+might lead to some surprises, because the PIDE protocol will update its <br>
+value after some change of properties, using the value that is given in <br>
+Isabelle/Scala, which is the same that you see in Isabelle/jEdit in the <br>
+dialog "Plugin Options / Isabelle / General / Threads".</p>
+<p>ML {* Multithreading.max_threads_value () *} is fine to check what <br>
+Isabelle/ML is presently using.</p>
+<blockquote>
+<p>I give the Isar command below, but I work it like this:</p>
+<p>1) I start the command.<br>
+2) Lots of eprover processes will be started and terminated, several times.<br>
+3) At about 40 seconds using my CPU, the ATP "leo" will be running with 12 <br>
+eprover.exe processes, during a time when processes aren't being shut down <br>
+and started (shown by green and red lines using <a href="http://systemexplorer.net/">http://systemexplorer.net/</a> )</p>
+</blockquote>
+<p>Does that mean you have a local installation of leo?  I've never looked <br>
+at it myself, and don't know where to get it.  It might have once again <br>
+its very own process management done in OCaml.</p>
+<blockquote>
+<p>4) I delete the "r" in "Sledgehammer".<br>
+5) The processes keep running much long than what I'm willing to wait. (I <br>
+have waited up to 15 minutes to see if they would terminate, and they <br>
+didn't.)<br>
+6) I exit the PIDE. Processes are terminated except for the ATP related <br>
+processes. I attach a screen shot showing the many non-terminating <br>
+processes.</p>
+</blockquote>
+<p>We've had that already: switching off the light with the hammer --- by <br>
+shutting down the outermost PIDE application --- does not really help. <br>
+It can leave processes behind at the bottom of the implicit hierarchy.</p>
+<p>POSIX processes are relatively difficult to control systematically.  One <br>
+needs to look at particular implementations, to see that they are within <br>
+reason of fork, wait, signal handling etc.</p>
+<blockquote>
+<p>This is no problem for me. The ATP e_par actually terminates much of the <br>
+time, and I haven't been using it because of the large number of <br>
+processes that it starts.</p>
+</blockquote>
+<p>Indeed.  It seems to be an experiment to allocate as many CPU cores as <br>
+feasible, with different strategies for E tried in parallel.</p>
+<p>Makarius</p>
+
+
+
+<a name="294262504"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2013-2-RC3%20ATP%20e_par%20acid%20test/near/294262504" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2013-2-RC3.20ATP.20e_par.20acid.20test.html#294262504">(Aug 19 2022 at 13:14)</a>:</h4>
+<p>From: Jasmin Christian Blanchette &lt;<a href="mailto:jasmin.blanchette@gmail.com">jasmin.blanchette@gmail.com</a>&gt;<br>
+Yes, "e_par" should be considered experimental. Beyond the technical issues, it didn't perform well on our benchmarks.</p>
+<p>Jasmin</p>
+
+
+
+<a name="294262526"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2013-2-RC3%20ATP%20e_par%20acid%20test/near/294262526" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2013-2-RC3.20ATP.20e_par.20acid.20test.html#294262526">(Aug 19 2022 at 13:15)</a>:</h4>
+<p>From: Gottfried Barrow &lt;<a href="mailto:gottfried.barrow@gmx.com">gottfried.barrow@gmx.com</a>&gt;<br>
+On 12/5/2013 7:59 AM, Makarius wrote:</p>
+<blockquote>
+<p>300 threads are quite a lot, but I suggested to go towards and beyond <br>
+the limits of what is feasible :-)</p>
+</blockquote>
+<p>I have about 70 processes running normally, and with threads set to 300, <br>
+only a maximum of about 140 processes are ever running for the "False = <br>
+True" test. An ATP running as a thread sometimes starts up lots of <br>
+processes of its own. With threads set to 4, a max of about 90 processes <br>
+will be running on my computer.</p>
+<p>I think I'll try threads set to 12 for a while, even though you've said <br>
+it should be set to the number of physical cores. One of the new remote <br>
+ATPs that came with Isablle2013-1 is "remote_agsyhol", which is finding <br>
+proofs.</p>
+<p>I've added that to my "first pass ATPs", so here are the 12 I use for a <br>
+first pass. Setting threads to 12 lets all of the them start (or maybe <br>
+it needs to be more than 12), and many of them will sometimes timeout fast:</p>
+<p>remote_vampire  metis  remote_satallax  z3_tptp  remote_e remote_agsyhol<br>
+   remote_e_tofof  spass  remote_e_sine    e        z3       yices</p>
+<blockquote>
+<p>A general note on Multithreading.max_threads: changing that in <br>
+Isabelle/ML might lead to some surprises, because the PIDE protocol <br>
+will update its value after some change of properties, using the value <br>
+that is given in Isabelle/Scala, which is the same that you see in <br>
+Isabelle/jEdit in the dialog "Plugin Options / Isabelle / General / <br>
+Threads".</p>
+<p>ML {* Multithreading.max_threads_value () *} is fine to check what <br>
+Isabelle/ML is presently using.</p>
+</blockquote>
+<p>Before, I didn't see max_threads_value change after changing "Threads", <br>
+but now I see that if I save the file, max_threads_value will display <br>
+what I set "Threads" to in the options.</p>
+<blockquote>
+<p>Does that mean you have a local installation of leo?  I've never <br>
+looked at it myself, and don't know where to get it.  It might have <br>
+once again its very own process management done in OCaml.</p>
+</blockquote>
+<p>Yes. I have a local install. Your colleague must have forgot to mention <br>
+it to you:</p>
+<p><a href="http://www.cl.cam.ac.uk/~lp15/Grants/leo2.html">http://www.cl.cam.ac.uk/~lp15/Grants/leo2.html</a></p>
+<p>You may be able to ask him about it in Houston. Texas is big, so they <br>
+say. You wouldn't want to get lost. With your good English grammar, <br>
+Texans might not be able to understand you.</p>
+<p><a href="http://www.nasaformalmethods.org/?page_id=104">http://www.nasaformalmethods.org/?page_id=104</a></p>
+<p>I haven't had to do anything special to keep leo2 running since <br>
+Isabelle2012, unlike satallax, which doesn't run anymore because I <br>
+haven't downloaded what's needed for Cygwin.</p>
+<p>For anyone interested, there are a number of ATPs which can be run <br>
+locally, that aren't part of the distribution.</p>
+<p>Vampire, <a href="http://www.vprover.org/">http://www.vprover.org/</a> (The version is up to 3.0, but the <br>
+downloads haven't been available for a long time, and local vampire <br>
+won't run on Windows)</p>
+<p>Leo2, <a href="http://www.ags.uni-sb.de/~leo/">http://www.ags.uni-sb.de/~leo/</a> (the link is not responding for me <br>
+right now)</p>
+<p>Satallax, <a href="http://www.ps.uni-saarland.de/~cebrown/satallax/">http://www.ps.uni-saarland.de/~cebrown/satallax/</a></p>
+<p>Yices, <a href="http://yices.csl.sri.com/download.shtml">http://yices.csl.sri.com/download.shtml</a></p>
+<p>Regards,<br>
+GB</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,169 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Proofs using inductively defined sets. · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proofs.20using.20inductively.20defined.20sets.2E.html">[isabelle] Proofs using inductively defined sets.</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294042625"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proofs%20using%20inductively%20defined%20sets./near/294042625" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proofs.20using.20inductively.20defined.20sets.2E.html#294042625">(Aug 18 2022 at 09:46)</a>:</h4>
+<p>From: D Mulligan &lt;<a href="mailto:s0346804@sms.ed.ac.uk">s0346804@sms.ed.ac.uk</a>&gt;<br>
+Hi,<br>
+   I've been formulating some Prolog relations in Isabelle using <br>
+inductively defined sets.  I've managed to prove some theorems about <br>
+relations that are defined entirely within themselves (i.e. plus), but <br>
+when I try to prove theorems about relations defined in terms of other <br>
+relations, for example the reverse of a list, defined in terms of <br>
+itself and append, I hit a wall.  My reverse definition is below:</p>
+<p>consts<br>
+     reverse_inductive :: "('a list * 'a list) set"<br>
+   syntax<br>
+     reverse :: "'a list =&gt; 'a list =&gt; bool"<br>
+   translations<br>
+     "reverse l r" == "(l, r) \&lt;in&gt; reverse_inductive"<br>
+   inductive reverse_inductive<br>
+     intros<br>
+       nil [intro!]: "reverse [] []"<br>
+       notnil [intro!]: "(append r [h] a) /\ (reverse t r) ==&gt; (reverse <br>
+(h#t) a)"</p>
+<p>I'm attempting to prove that the reverse of a reverse of a list is the <br>
+same list.  I have a lemma that states that states \&lt;exists&gt;c. append a <br>
+b c.  It's been suggested to me that I use this lemma with rule exE[OF <br>
+..] in the proof, but no matter how I attempt to use it I cannot get <br>
+the proof to go through.</p>
+<p>An attempt at the proof is included below:</p>
+<p>theorem reverse_reverse_l:<br>
+     "\&lt;exists&gt;l'.(reverse l l') /\ (reverse l' l)"<br>
+     apply(induct_tac l)<br>
+     apply(rule exI)<br>
+     apply(rule conjI)<br>
+     apply(rule reverse_inductive.nil)+<br>
+     apply(rule exE[OF ex_append])<br>
+     apply(rule exI)<br>
+     apply(erule exE)<br>
+     apply(erule conjE)<br>
+     apply(rule conjI)<br>
+     apply(rule reverse_inductive.notnil)<br>
+     apply(rule conjI)<br>
+     apply(assumption)<br>
+       sorry (* Stuck! *)</p>
+<p>The problem (as I see it) is in the step case when I apply <br>
+reverse_inductive.notnil.  Is anybody able to offer any advice as to <br>
+how I would go about proving this theorem?</p>
+<p>Please note, I'm not using the Isar proof style for a reason.  For your <br>
+convenience I've attached a theory file with my relations and proofs in <br>
+(scroll to the bottom for the relevant proof attempt).</p>
+<p>Many thanks for any help offered,<br>
+Dominic Mulligan<br>
+<a href="/user_uploads/14278/VRB-gF3mUbCpIP1WsEnuB4ui/PrologInductiveSets.thy">PrologInductiveSets.thy</a></p>
+
+
+
+<a name="294042646"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proofs%20using%20inductively%20defined%20sets./near/294042646" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proofs.20using.20inductively.20defined.20sets.2E.html#294042646">(Aug 18 2022 at 09:46)</a>:</h4>
+<p>From: Brian Huffman &lt;<a href="mailto:brianh@csee.ogi.edu">brianh@csee.ogi.edu</a>&gt;<br>
+Hi Dominic,</p>
+<p>Since you do not instantiate variables in your rule applications, your proof <br>
+state often contains schematic variables that are instantiated later as <br>
+needed. (These are the ones written with a leading question mark.)</p>
+<p>You need to pay attention to the parameters that these schematic variables <br>
+have. In particular, a schematic variable can not be instantiated to a term <br>
+that contains variables that were created after the schematic variable was. </p>
+<p>In your proof below, "rule exE[OF ex_append]" introduces two schematic <br>
+variables, and afterward "erule exE" obtains a new variable l'. Later, you <br>
+would like to instantiate the schematic variable to l' but you can't, because <br>
+l' did not exist when the schematic variable was created. You might want to <br>
+try putting "erule exE" a few steps earlier.</p>
+<p>Having unbound schematic variables in your proof state is often very <br>
+confusing. I would recommend instantiating your rules as you apply them <br>
+instead, i.e. use something like (rule_tac x="list" in exI) instead of just <br>
+(rule exI).</p>
+<p>Hope this helps.</p>
+<ul>
+<li>Brian</li>
+</ul>
+<p>On Wednesday 04 October 2006 04:57, D Mulligan wrote:<br>
+...</p>
+<blockquote>
+<p>I'm attempting to prove that the reverse of a reverse of a list is the<br>
+same list.  I have a lemma that states that states \&lt;exists&gt;c. append a<br>
+b c.  It's been suggested to me that I use this lemma with rule exE[OF<br>
+..] in the proof, but no matter how I attempt to use it I cannot get<br>
+the proof to go through.</p>
+<p>An attempt at the proof is included below:</p>
+<p>theorem reverse_reverse_l:<br>
+     "\&lt;exists&gt;l'.(reverse l l') /\ (reverse l' l)"<br>
+     apply(induct_tac l)<br>
+     apply(rule exI)<br>
+     apply(rule conjI)<br>
+     apply(rule reverse_inductive.nil)+<br>
+          -- variables from induction rule: a, list<br>
+     apply(rule exE[OF ex_append])<br>
+          -- introduces schematic variables parameterized on a, list<br>
+          -- obtains variable x<br>
+     apply(rule exI)<br>
+          -- introduces schematic variable parameterized on a, list, x<br>
+     apply(erule exE)<br>
+          -- obtains variable l'<br>
+     apply(erule conjE)<br>
+     apply(rule conjI)<br>
+     apply(rule reverse_inductive.notnil)<br>
+     apply(rule conjI)<br>
+     apply(assumption)<br>
+          -- can't apply assumption again because schematic variable<br>
+          -- must not depend on l'<br>
+       sorry (* Stuck! *)</p>
+</blockquote>
+
+
+
+<a name="294042657"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proofs%20using%20inductively%20defined%20sets./near/294042657" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proofs.20using.20inductively.20defined.20sets.2E.html#294042657">(Aug 18 2022 at 09:46)</a>:</h4>
+<p>From: Lucas Dixon &lt;<a href="mailto:ldixon@inf.ed.ac.uk">ldixon@inf.ed.ac.uk</a>&gt;<br>
+I think you will also need a lemma:</p>
+<p>theorem reverse_append2:<br>
+     "\&lt;lbrakk&gt; append r [h] l; reverse r t \&lt;rbrakk&gt; \&lt;Longrightarrow&gt; <br>
+reverse l (h#t)"<br>
+     sorry</p>
+<p>This is the opposite case of your reverse definition. With this you <br>
+should be able to prove:</p>
+<p>theorem reverse_reverse_l:<br>
+     "\&lt;exists&gt;l'.(reverse l l') \&lt;and&gt; (reverse l' l)"<br>
+     apply(induct_tac l)<br>
+     apply(rule exI)<br>
+     apply(rule conjI)<br>
+     apply(rule reverse_inductive.nil)+<br>
+     apply(erule exE)<br>
+     apply(erule conjE)<br>
+     apply(rule exE) (* the exE step you mentioned: for the result of <br>
+append in the definition of reverse *)<br>
+defer<br>
+     apply(rule exI)<br>
+     apply(rule conjI)<br>
+     apply(rule reverse_inductive.notnil)<br>
+     apply(rule conjI)<br>
+defer<br>
+     apply assumption<br>
+     apply(rule reverse_append2)<br>
+defer<br>
+     apply assumption<br>
+defer<br>
+     apply assumption<br>
+     apply assumption<br>
+     apply (rule ex_append)<br>
+done</p>
+<p>I'm not sure if this is the most efficient proof... the structure of the <br>
+proof is hard to see in apply style. But with this you can at least see <br>
+the incremental instantiation of the introduced meta-variables.</p>
+<p>best,<br>
+lucas</p>
+<p>D Mulligan wrote:</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

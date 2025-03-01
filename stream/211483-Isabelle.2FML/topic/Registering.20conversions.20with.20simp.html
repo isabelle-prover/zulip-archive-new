@@ -1,0 +1,90 @@
+<html>
+<head><meta charset="utf-8"><title>Registering conversions with simp · Isabelle/ML · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/index.html">Isabelle/ML</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Registering.20conversions.20with.20simp.html">Registering conversions with simp</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="340033701"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Registering%20conversions%20with%20simp/near/340033701" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Hanno Becker <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Registering.20conversions.20with.20simp.html#340033701">(Mar 07 2023 at 07:16)</a>:</h4>
+<p>Hi! (How) Is it possible to register a conversion with the simplifier (similar to a simproc), so that it is automatically tried as part of <code>simp</code>?</p>
+
+
+
+<a name="340049891"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Registering%20conversions%20with%20simp/near/340049891" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Registering.20conversions.20with.20simp.html#340049891">(Mar 07 2023 at 08:52)</a>:</h4>
+<p>No, you're going to have to wrap it in a simproc. That's not very hard to do; simprocs are more general than conversions.</p>
+
+
+
+<a name="340053270"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Registering%20conversions%20with%20simp/near/340053270" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Hanno Becker <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Registering.20conversions.20with.20simp.html#340053270">(Mar 07 2023 at 09:09)</a>:</h4>
+<p>So I'd just give a trivial pattern to the simproc so the conversion starts out with the full goal?</p>
+
+
+
+<a name="340055323"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Registering%20conversions%20with%20simp/near/340055323" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Registering.20conversions.20with.20simp.html#340055323">(Mar 07 2023 at 09:19)</a>:</h4>
+<p>Ah, I see, I hadn't thought of that. Usually you do target a rather specific term structure when you do this sort of thing.</p>
+<p>You can of course just register your simproc with a pattern like <code>x</code>, but it will be called on every single subterm of your term, i.e. quadratically often (in terms of your proof state size). If you do this, you ought to make sure your simproc fails fast when it fails. And even then there might be some performance impact. For a small closed-off development this may be fine, but if your development is something that may be imported by others it would be prudent not to enable this simproc by default.</p>
+<p>There is another possibility that is not quite as nice but might have less overhead, namely to register a <em>looper</em> instead of a simproc. Off the top of my head, a looper is called when the simplifier has tried everything else, the goal is not solved and it does not change anymore either. The looper gets to see the <em>entire</em> goal (not just a subterm) and can do to it whatever it wants. In particular, it could apply a conversion to the entire goal (or parts of it).</p>
+<p>Not sure which is better for your use case.</p>
+
+
+
+<a name="340055822"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Registering%20conversions%20with%20simp/near/340055822" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Hanno Becker <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Registering.20conversions.20with.20simp.html#340055822">(Mar 07 2023 at 09:21)</a>:</h4>
+<p>Wow, thanks. I had never heard of loopers, but that seems like the right thing here -- I want the conversion to be called on the _entire_ subgoal only, as it needs to selectively apply different simplifications for assumptions and conclusions, and in the conclusion there are further refinements</p>
+
+
+
+<a name="340055913"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Registering%20conversions%20with%20simp/near/340055913" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Hanno Becker <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Registering.20conversions.20with.20simp.html#340055913">(Mar 07 2023 at 09:22)</a>:</h4>
+<p>Can you point me to a minimal example of how to use loopers?</p>
+
+
+
+<a name="340056578"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Registering%20conversions%20with%20simp/near/340056578" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Registering.20conversions.20with.20simp.html#340056578">(Mar 07 2023 at 09:25)</a>:</h4>
+<p>Yeah this is pretty arcane Isabelle lore. Not many people know about it these days, I think. The only looper that I am aware of is the one that does case splitting.</p>
+
+
+
+<a name="340057459"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Registering%20conversions%20with%20simp/near/340057459" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Registering.20conversions.20with.20simp.html#340057459">(Mar 07 2023 at 09:29)</a>:</h4>
+<p>You can just grep the AFP or the distribution for <code>addloop</code>, but I don't think there are very many helpful examples. The splitter is in <code>~~/src/Provers/splitter.ML</code>.</p>
+
+
+
+<a name="340058210"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Registering%20conversions%20with%20simp/near/340058210" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Registering.20conversions.20with.20simp.html#340058210">(Mar 07 2023 at 09:33)</a>:</h4>
+<p>I looked through my extensive collection of half-finished gadgets and found the following experimental code for normalisation of commutative monoid expressions. It registers a looper in order to get to see the entire proof state and then applies a targeted rewrite step. Definitely not a minimal example, but probably one of the few actual uses of a custom looper.</p>
+<p><a href="/user_uploads/14278/hgis35TTVgYnPoMElVNPNSc2/Monad_Normalisation.thy">Monad_Normalisation.thy</a></p>
+
+
+
+<a name="340060217"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Registering%20conversions%20with%20simp/near/340060217" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Registering.20conversions.20with.20simp.html#340060217">(Mar 07 2023 at 09:43)</a>:</h4>
+<p>Just another thought, do remember that the goal will always be of type <code>prop</code>, so if you want to match only the goal, you could also do a simproc that matches on the pattern <code>p :: prop</code> or, in HOL, <code>Trueprop p</code>.</p>
+<p>The main problem there is that you basically have no way to distinguish whether the thing you get to see is the goal or a premise. If you just do <code>Trueprop p</code> you only get the assumptions and premises; if you match on <code>p :: prop</code> you will also get terms of the form <code>asm1 ⟹ asm2 ⟹ goal</code>.</p>
+
+
+
+<a name="340062920"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Registering%20conversions%20with%20simp/near/340062920" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Hanno Becker <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Registering.20conversions.20with.20simp.html#340062920">(Mar 07 2023 at 09:56)</a>:</h4>
+<p>I see... perhaps I should abandon the idea of integrating said simplification into <code>simp</code>, and just wrap it in a separate tactic. At the least, one can give a name to <code>(simp | conv_based_tactic)+</code> if that happens to be invoked many times.</p>
+
+
+
+<a name="340063076"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Registering%20conversions%20with%20simp/near/340063076" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Hanno Becker <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Registering.20conversions.20with.20simp.html#340063076">(Mar 07 2023 at 09:57)</a>:</h4>
+<p>Thank you <span class="user-mention" data-user-id="232736">@Manuel Eberl</span> !</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,95 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Automating a Repetitive Structured Proof · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Automating.20a.20Repetitive.20Structured.20Proof.html">[isabelle] Automating a Repetitive Structured Proof</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294721591"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Automating%20a%20Repetitive%20Structured%20Proof/near/294721591" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Automating.20a.20Repetitive.20Structured.20Proof.html#294721591">(Aug 22 2022 at 16:16)</a>:</h4>
+<p>From: "David E. Narvaez" &lt;<a href="mailto:den9562@rit.edu">den9562@rit.edu</a>&gt;<br>
+Hi,</p>
+<p>I have a structured proof that right now looks roughly like this:</p>
+<p>[...]<br>
+    case And_bool_expr<br>
+    then show ?thesis<br>
+      using assms<br>
+    proof (cases "partial_val_bool_expr e2 a", simp_all add: models_def)<br>
+      case (Const_bool_expr b)<br>
+      then show ?thesis using assms And_bool_expr  by (cases b, simp_all add: <br>
+models_def)<br>
+    qed<br>
+  next<br>
+    case Or_bool_expr<br>
+    then show ?thesis<br>
+      using assms<br>
+    proof (cases "partial_val_bool_expr e2 a", simp_all add: models_def)<br>
+      case (Const_bool_expr b)<br>
+      then show ?thesis using assms Or_bool_expr  by (cases b, simp_all add: <br>
+models_def)<br>
+    qed<br>
+  next<br>
+[...]</p>
+<p>and it goes on for about 6 cases. Instead of repeating these instructions, I <br>
+want Isabelle to try the following for every case:</p>
+<p>case $casename<br>
+    then show ?thesis<br>
+      using assms<br>
+    proof (cases "partial_val_bool_expr e2 a", simp_all add: models_def)<br>
+      case (Const_bool_expr b)<br>
+      then show ?thesis using assms $casename  by (cases b, simp_all add: <br>
+models_def)<br>
+    qed</p>
+<p>and discharge those that work using this strategy so that I'm left with those <br>
+that really need work.</p>
+<blockquote>
+<p>From what I understand, this is the kind of things Eisbach is supposed to be <br>
+for, but Eisbach does not seem to be meant for structured proofs, am I <br>
+correct? If that is the case, then what tool could help me here? I have read <br>
+about automation using ML but I cannot find much documentation about that, with <br>
+examples of things that can automated using ML.</p>
+</blockquote>
+<p>Thanks!</p>
+
+
+
+<a name="294721646"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Automating%20a%20Repetitive%20Structured%20Proof/near/294721646" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Automating.20a.20Repetitive.20Structured.20Proof.html#294721646">(Aug 22 2022 at 16:17)</a>:</h4>
+<p>From: <a href="mailto:Matthew.Brecknell@data61.csiro.au">Matthew.Brecknell@data61.csiro.au</a><br>
+Hi David,</p>
+<p>It ought to be possible to make an Eisbach method to solve the boring cases,<br>
+while keeping the structure of the overall proof. In that case, the overall<br>
+proof might look something like this:</p>
+<p>proof (induct ...)<br>
+  case (Interesting_bool_expr arg1 arg2)<br>
+  show ?case proof ... qed<br>
+next<br>
+  case (AnotherInteresting_bool_expr arg1 arg2 arg3)<br>
+  show ?case proof ... qed<br>
+qed solve_boring_case+</p>
+<p>Note the "solve_boring_case+" <em>after</em> the "qed" to handle any cases not yet<br>
+proved in the "proof" block.</p>
+<p>The tricky part of making the Eisbach method will be obtaining bindings for<br>
+the variables "e2", "a" and "b". For that, you might be able to use the<br>
+"match" method, also part of Eisbach. Perhaps something like this:</p>
+<p>method solve_boring_case =<br>
+  (match goal in ‹... e2 ... a ...› for e2 a<br>
+     ⇒ ‹cases "partial_val_bool_expr e2 a"; simp add: models_def;<br>
+          match goal in ‹... b ...› for b<br>
+            ⇒ ‹cases b; simp add: models_def››)</p>
+<p>You'll need to figure out what term patterns will allow you to correctly<br>
+identify the right "e2", "a" and "b". You might need "match premises"<br>
+instead of "match goal", and you might need to bind fact names to matched<br>
+premises to wire them into proof fragments ("inner methods" in Eisbach-match <br>
+terminology).</p>
+<p>Regards,<br>
+Matthew</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

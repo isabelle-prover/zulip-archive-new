@@ -1,0 +1,102 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Issue with multiple superclasses · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Issue.20with.20multiple.20superclasses.html">[isabelle] Issue with multiple superclasses</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294217214"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Issue%20with%20multiple%20superclasses/near/294217214" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Issue.20with.20multiple.20superclasses.html#294217214">(Aug 19 2022 at 07:52)</a>:</h4>
+<p>From: Joachim Breitner &lt;<a href="mailto:breitner@kit.edu">breitner@kit.edu</a>&gt;<br>
+Hello,</p>
+<p>I have a problem with type classes and multiple subclasses, and here is<br>
+a stripped-town testcase:</p>
+<p>theory "Test"<br>
+        imports <br>
+          "~~/src/HOL/HOLCF/HOLCF"<br>
+        begin</p>
+<p>default_sort cpo</p>
+<p>class Top_cpo = cpo +<br>
+          assumes most: "∃x. ∀y. y ⊑ x"<br>
+        begin</p>
+<p>definition top :: "'a"<br>
+            where "top = (THE x. ∀y. y ⊑ x)"</p>
+<p>notation (xsymbols)<br>
+            top ("⊤")<br>
+        end</p>
+<p>definition is_lb :: "'a set =&gt; 'a =&gt; bool" (infix "&gt;|" 55) where<br>
+          "S &gt;| x &lt;-&gt; (∀y∈S. x ⊑ y)"</p>
+<p>definition is_glb :: "'a set =&gt; 'a =&gt; bool" (infix "&gt;&gt;|" 55)<br>
+        where<br>
+          "S &gt;&gt;| x &lt;-&gt; S &gt;| x ∧ (∀u. S &gt;| u --&gt; u ⊑ x)"</p>
+<p>definition glb :: "'a set =&gt; 'a" ("⨅_" [60]60) where<br>
+          "glb S = (THE x. S &gt;&gt;| x)" </p>
+<p>class Nonempty_Meet_cpo = cpo +<br>
+          assumes nonempty_meet_exists: "S ≠ {} ⟹ ∃x. S &gt;&gt;| x"</p>
+<p>class Meet_cpo = Top_cpo + Nonempty_Meet_cpo<br>
+        begin<br>
+          lemma "∃ x. {} &gt;&gt;| (x::'a)"<br>
+             apply (rule_tac x = "⊤" in exI)<br>
+        (*<br>
+         Type unification failed: Variable 'a::cpo not of sort Top_cpo</p>
+<p>Failed to meet type constraint:</p>
+<p>Term:  ⊤ :: ??'a<br>
+        Type:  'a<br>
+        *)<br>
+          oops</p>
+<p>end</p>
+<p>I would assume that the 'a inside the context of class will have that<br>
+sort (Meet_cpo) and hence by implication Top_cpo, but it seems it does<br>
+not. Would someone be so kind and help me out here?</p>
+<p>(This is on Isabelle2012.)</p>
+<p>Thanks,<br>
+Joachim<br>
+<a href="/user_uploads/14278/6GviN_tAZmiNunTEMQBe72mz/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294217222"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Issue%20with%20multiple%20superclasses/near/294217222" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Issue.20with.20multiple.20superclasses.html#294217222">(Aug 19 2022 at 07:52)</a>:</h4>
+<p>From: Brian Huffman &lt;<a href="mailto:huffman@in.tum.de">huffman@in.tum.de</a>&gt;<br>
+Hi Joachim,</p>
+<p>A general principle for reasoning with classes is that if you want to<br>
+prove lemmas within the class context, you need to define <em>all</em> the<br>
+related constants inside the appropriate class contexts as well.<br>
+Otherwise you may run into problems with the so-called "base sort"<br>
+inferred for the classes. (To get a better idea of what is going on,<br>
+try turning on [[show_sorts]], and print the type of a class locale<br>
+predicate, e.g. "term class.Nonempty_Meet_cpo".)</p>
+<p>Most classes in the Isabelle libraries have "type" as the base sort<br>
+(this is the sort that type 'a will have within the class context) but<br>
+some classes in HOLCF have "cpo" as the base sort, due to the fact<br>
+that they refer to constants with continuous function types that are<br>
+only defined on class cpo.</p>
+<p>I haven't tried this code yet, but I would suggest changing<br>
+"definition is_lb" to "definition (in po) is_lb", and similarly for<br>
+is_glb; alternatively, wrap both definitions in a "context po begin<br>
+... end" block.</p>
+<p>Hope this helps,</p>
+<ul>
+<li>Brian</li>
+</ul>
+
+
+
+<a name="294217253"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Issue%20with%20multiple%20superclasses/near/294217253" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Issue.20with.20multiple.20superclasses.html#294217253">(Aug 19 2022 at 07:52)</a>:</h4>
+<p>From: Joachim Breitner &lt;<a href="mailto:breitner@kit.edu">breitner@kit.edu</a>&gt;<br>
+Dear Brian,</p>
+<p>thanks, that did the trick. I failed to notice the "begin po"-blocks<br>
+that you wrapped your definitions in HOLCF in.</p>
+<p>Greetings,<br>
+Joachim<br>
+<a href="/user_uploads/14278/xNJv2xzsQKjb_puyG_m0QuJF/signature.asc">signature.asc</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

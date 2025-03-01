@@ -1,0 +1,235 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Composing BNFs · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Composing.20BNFs.html">[isabelle] Composing BNFs</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294709697"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Composing%20BNFs/near/294709697" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Composing.20BNFs.html#294709697">(Aug 22 2022 at 15:22)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+Dear BNF experts,</p>
+<p>I'm looking for a simple way to obtain a composed map function given a type.</p>
+<p>For example, given</p>
+<p>('a + 'b) option list</p>
+<p>the result should be a term of type</p>
+<p>('a ⇒ 'c) ⇒ ('b ⇒ 'd) ⇒ ('a + 'b) option list ⇒ ('c + 'd) option list</p>
+<p>It doesn't necessarily need to be a constant; instead, it could be a<br>
+simple term composition of map functions.</p>
+<p>I found "BNF_Comp.bnf_of_typ" but I'm a little confused about all the<br>
+parameters it takes. Is there a small, canonical example somewhere?<br>
+Also, can I get "bnf_of_typ" (or something else in BNF) to produce a<br>
+bunch of terms instead of constants, typedefs and everything?</p>
+<p>Cheers<br>
+Lars</p>
+
+
+
+<a name="294709707"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Composing%20BNFs/near/294709707" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Composing.20BNFs.html#294709707">(Aug 22 2022 at 15:22)</a>:</h4>
+<p>From: Dmitriy Traytel &lt;<a href="mailto:traytel@inf.ethz.ch">traytel@inf.ethz.ch</a>&gt;<br>
+Hi Lars,</p>
+<p>bnf_of_typ is the right function for that. Here is an example usage:</p>
+<p>local_setup ‹ fn lthy =&gt;<br>
+  let<br>
+    val live_As = [@{typ 'a}, @{typ 'b}]<br>
+    val dead_As = []</p>
+<p>fun flatten_tyargs Ass =<br>
+      map dest_TFree live_As<br>
+      |&gt; filter (fn T =&gt; exists (fn Ts =&gt; member (op =) Ts T) Ass);</p>
+<p>val ((bnf, _), (_, lthy)) =<br>
+      BNF_Comp.bnf_of_typ false BNF_Def.Do_Inline I<br>
+        flatten_tyargs (map dest_TFree live_As) (map dest_TFree dead_As)<br>
+        @{typ "('a + 'b) option list"}<br>
+        ((BNF_Comp.empty_comp_cache, BNF_Comp.empty_unfolds), lthy)<br>
+    val _ = BNF_Def.map_of_bnf bnf |&gt; Syntax.string_of_term lthy |&gt; warning<br>
+    val _ = BNF_Def.map_of_bnf bnf |&gt; fastype_of |&gt; Syntax.string_of_typ lthy |&gt; warning<br>
+  in<br>
+    lthy<br>
+  end<br>
+›</p>
+<p>Try to play with Do_Inline vs. Dont_Inline and observe the output (whether new map constants are defined or inlined, i.e. composed terms are used).</p>
+<p>Hope that helps,<br>
+Dmitriy</p>
+
+
+
+<a name="294709728"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Composing%20BNFs/near/294709728" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Composing.20BNFs.html#294709728">(Aug 22 2022 at 15:22)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+Hi Dmitriy,</p>
+<p>thanks for that.</p>
+<blockquote>
+<p>val live_As = [@{typ 'a}, @{typ 'b}]<br>
+    val dead_As = []</p>
+</blockquote>
+<p>Is there a reason why I need to specify the live variables? Surely the<br>
+internal bookkeeping of BNF already knows which variables are live and<br>
+which are dead.</p>
+<p>Cheers<br>
+Lars</p>
+
+
+
+<a name="294709743"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Composing%20BNFs/near/294709743" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Composing.20BNFs.html#294709743">(Aug 22 2022 at 15:22)</a>:</h4>
+<p>From: Dmitriy Traytel &lt;<a href="mailto:traytel@inf.ethz.ch">traytel@inf.ethz.ch</a>&gt;<br>
+Hi Lars,</p>
+<p>sure, BNFs can figure this out by themselves indeed. But then very often the variables will not be in the order in which you expect them. (Same for the dead ones.) Therefore it is better to fix the order on the caller’s side.</p>
+<p>Cheers,<br>
+Dmitriy</p>
+
+
+
+<a name="294709757"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Composing%20BNFs/near/294709757" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Composing.20BNFs.html#294709757">(Aug 22 2022 at 15:22)</a>:</h4>
+<p>From: Sebastiaan Joosten &lt;<a href="mailto:sjcjoosten@gmail.com">sjcjoosten@gmail.com</a>&gt;<br>
+Hi Dimitriy,</p>
+<p>this is really cool! I haven't looked into the BNF_.. code yet, so I have two questions out of ignorance, that I hope are quick to answer for you:</p>
+<ul>
+<li>
+<p>is there something similar for fold / traverse?</p>
+</li>
+<li>
+<p>in the below example, for the type "('a option + 'b ) list + 'c", a function "sum1.sum1.sum1.list.map_list_lift1_permute_201_01" is created. Can this be avoided / why is this needed, and why is a function created that ignores its last argument?</p>
+</li>
+</ul>
+<p>local_setup ‹ fn lthy =&gt;<br>
+ let<br>
+   val live_As = [@{typ 'a}, @{typ 'b}, @{typ 'c}]<br>
+   val dead_As = []</p>
+<p>fun flatten_tyargs Ass =<br>
+     map dest_TFree live_As<br>
+     |&gt; filter (fn T =&gt; exists (fn Ts =&gt; member (op =) Ts T) Ass);</p>
+<p>val ((bnf, _), (_, lthy)) =<br>
+     BNF_Comp.bnf_of_typ false BNF_Def.Do_Inline I<br>
+       flatten_tyargs (map dest_TFree live_As) (map dest_TFree dead_As)<br>
+       @{typ "('a option + 'b ) list + 'c"}<br>
+       ((BNF_Comp.empty_comp_cache, BNF_Comp.empty_unfolds), lthy)<br>
+   val _ = BNF_Def.map_of_bnf bnf |&gt; Syntax.string_of_term lthy |&gt; warning<br>
+   val _ = BNF_Def.map_of_bnf bnf |&gt; fastype_of |&gt; Syntax.string_of_typ lthy |&gt; warning<br>
+ in<br>
+   lthy<br>
+ end<br>
+›</p>
+<p>(* Note that I could simply use the following term, indicating that no extra functions are required: *)<br>
+term "op o (map_sum o map_option) o op o map o map_sum"</p>
+
+
+
+<a name="294709782"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Composing%20BNFs/near/294709782" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Composing.20BNFs.html#294709782">(Aug 22 2022 at 15:23)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;</p>
+<blockquote>
+<ul>
+<li>in the below example, for the type "('a option + 'b ) list + 'c", a function "sum1.sum1.sum1.list.map_list_lift1_permute_201_01" is created. Can this be avoided / why is this needed, and why is a function created that ignores its last argument?</li>
+</ul>
+</blockquote>
+<p>For my particular use case, that's not a problem. But I can't find the<br>
+definition of that constant, which means I can't unfold it. Is the<br>
+definition recorded somewhere?</p>
+<p>Cheers<br>
+Lars</p>
+
+
+
+<a name="294709811"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Composing%20BNFs/near/294709811" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Composing.20BNFs.html#294709811">(Aug 22 2022 at 15:23)</a>:</h4>
+<p>From: Jasmin Blanchette &lt;<a href="mailto:jasmin.blanchette@inria.fr">jasmin.blanchette@inria.fr</a>&gt;<br>
+Hi Lars,</p>
+<p>Look for "xxx_def_of_bnf" in "bnf_def.ML", for suitable values of "xxx". But you should ask yourself whether you really need to unfold it or if you shouldn't instead rely on the abstract properties given by the BNF (the xxx_of_bnf functions returning "thm").</p>
+<p>Jasmin</p>
+
+
+
+<a name="294709822"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Composing%20BNFs/near/294709822" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Composing.20BNFs.html#294709822">(Aug 22 2022 at 15:23)</a>:</h4>
+<p>From: Dmitriy Traytel &lt;<a href="mailto:traytel@inf.ethz.ch">traytel@inf.ethz.ch</a>&gt;<br>
+Hi Sebastiaan,</p>
+<blockquote>
+<p>On 10 Apr 2017, at 17:15, Sebastiaan Joosten &lt;<a href="mailto:sjcjoosten@gmail.com">sjcjoosten@gmail.com</a>&gt; wrote:</p>
+<p>Hi Dimitriy,</p>
+<p>this is really cool! I haven't looked into the BNF_.. code yet, so I have two questions out of ignorance, that I hope are quick to answer for you:</p>
+<ul>
+<li>is there something similar for fold / traverse?</li>
+</ul>
+</blockquote>
+<p>Can you give a more precise type of the function you want? Folds (or more precisely recursors) are available for datatypes, but not for compositions of datatypes.</p>
+<blockquote>
+<ul>
+<li>in the below example, for the type "('a option + 'b ) list + 'c", a function "sum1.sum1.sum1.list.map_list_lift1_permute_201_01" is created. Can this be avoided / why is this needed, and why is a function created that ignores its last argument?</li>
+</ul>
+</blockquote>
+<p>Those intermediate definitions are introduced to avoid large terms. The bnf_of_typ function actually returns something of type unfold_set. However the implementation of this type is not exposed, and it seems that we never needed to actually get the contents outside of the BNF_Comp structure.</p>
+<p>Attached is a small patch that exports the internal representation of unfold_set. For some reason, I can’t push to Isabelle right now (@Lars: is there some known maintenance in Munich, or shall I contact the MTAs? Also feel free to push this.)</p>
+<p>The theorems from the unfold_set returned by bnf_of_typ can be then used to unfold all those intermediate constants in the resulting BNF. This is best done by creating morphism and applying it using BNF_Def.morph_bnf (see some example usages in bnf_comp.ML). </p>
+<p>Dmitriy<br>
+<a href="/user_uploads/14278/Z4xRpC-mr36CZwRXP-sXb8t8/unfold_set.patch">unfold_set.patch</a></p>
+
+
+
+<a name="294709837"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Composing%20BNFs/near/294709837" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Composing.20BNFs.html#294709837">(Aug 22 2022 at 15:23)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+Hi Jasmin,</p>
+<p>I checked, but unless I'm missing something, "map_def_of" is just the theorem "x = x".</p>
+<p>The reason I'm asking about unfolding is because in my case, it's a composition of datatypes and I need to use map/constructor commutativity.</p>
+<p>Cheers<br>
+Lars</p>
+
+
+
+<a name="294709866"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Composing%20BNFs/near/294709866" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Composing.20BNFs.html#294709866">(Aug 22 2022 at 15:23)</a>:</h4>
+<p>From: Jasmin Blanchette &lt;<a href="mailto:jasmin.blanchette@inria.fr">jasmin.blanchette@inria.fr</a>&gt;<br>
+Hi Lars,</p>
+<blockquote>
+<p>I checked, but unless I'm missing something, "map_def_of" is just the theorem "x = x".</p>
+</blockquote>
+<p>Of course. The constant stands for an intermediate term.</p>
+<p>If you look at the type of "bnf_of_typ", you'll see "unfold_set" as one of the components of the result. This should contain the theorem you are looking for.</p>
+<p>Cheers,</p>
+<p>Jasmin</p>
+
+
+
+<a name="294709884"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Composing%20BNFs/near/294709884" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Composing.20BNFs.html#294709884">(Aug 22 2022 at 15:23)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+Hi,</p>
+<blockquote>
+<p>Attached is a small patch that exports the internal representation of unfold_set. For some reason, I can’t push to Isabelle right now (@Lars: is there some known maintenance in Munich, or shall I contact the MTAs? Also feel free to push this.)</p>
+</blockquote>
+<p>I myself also can't log in to our usual nodes. I'll contact our admins.</p>
+<p>Cheers<br>
+Lars</p>
+
+
+
+<a name="294709903"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Composing%20BNFs/near/294709903" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Composing.20BNFs.html#294709903">(Aug 22 2022 at 15:23)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+Hi Dmitriy,</p>
+<blockquote>
+<p>Attached is a small patch that exports the internal representation of unfold_set. For some reason, I can’t push to Isabelle right now (@Lars: is there some known maintenance in Munich, or shall I contact the MTAs? Also feel free to push this.)</p>
+</blockquote>
+<p>thanks for the explanation and the patch. I have pushed it to the<br>
+temporary repository.</p>
+<blockquote>
+<p>The theorems from the unfold_set returned by bnf_of_typ can be then used to unfold all those intermediate constants in the resulting BNF. This is best done by creating morphism and applying it using BNF_Def.morph_bnf (see some example usages in bnf_comp.ML). </p>
+</blockquote>
+<p>That seems to work. I'm kind of surprised that there seems to be no<br>
+canonical way to construct a morphism based on unfolding a bunch of<br>
+theorems. For the time being, I have copied "expand_term_const" which<br>
+you in turn have copied from "expand_term_free" :-)</p>
+<p>Cheers<br>
+Lars</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

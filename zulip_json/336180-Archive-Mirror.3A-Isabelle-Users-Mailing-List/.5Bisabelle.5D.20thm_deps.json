@@ -1,0 +1,38 @@
+[
+    {
+        "content": "<p>From: John Matthews &lt;<a href=\"mailto:matthews@galois.com\">matthews@galois.com</a>&gt;<br>\nHi, I'm trying to see what lemmas end up being used by auto in an  <br>\nIsabelle proof. Here's what I did:</p>\n<p>ML {* ThmDeps.enable () *}<br>\n   lemma test: \"(x::int) * 0 + y = y\"<br>\n   by auto</p>\n<p>thm_deps test</p>\n<p>However, as far as I can see the lemmas auto used to simplify away  <br>\nthe occurrences of addition and multiplication don't show up in the  <br>\ngraph browser.</p>\n<p>Also, is there an existing ML function that, given a theorem proved  <br>\nwhile theorem dependencies was turned on (i.e. ML {* proofs := 1 *}),  <br>\nwould return the list of lemmas used in the proof, or will I have to  <br>\nwrite something that traverses the theorem's proof object?</p>\n<p>Thanks,<br>\n-john</p>",
+        "id": 293904910,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660745671
+    },
+    {
+        "content": "<p>From: Stefan Berghofer &lt;<a href=\"mailto:berghofe@in.tum.de\">berghofe@in.tum.de</a>&gt;<br>\nJohn Matthews wrote:</p>\n<blockquote>\n<p>Hi, I'm trying to see what lemmas end up being used by auto in an  <br>\nIsabelle proof. Here's what I did:</p>\n<p>ML {* ThmDeps.enable () *}<br>\n  lemma test: \"(x::int) * 0 + y = y\"<br>\n  by auto</p>\n<p>thm_deps test</p>\n<p>However, as far as I can see the lemmas auto used to simplify away  the <br>\noccurrences of addition and multiplication don't show up in the  graph <br>\nbrowser.</p>\n</blockquote>\n<p>Hello John,</p>\n<p>I tried out the above example with the repository version of Isabelle, and<br>\nthm_deps displayed a dependency on the theorems mult_zero_right, add_0_right,<br>\nand add_left_cancel (among others). Note that in order for this to work<br>\nproperly, you already have to compile HOL with theorem dependencies switched<br>\non. To achieve this, add</p>\n<p>ISABELLE_USEDIR_OPTIONS=\"-p 1\"</p>\n<p>or</p>\n<p>HOL_USEDIR_OPTIONS=\"-p 1\"</p>\n<p>to your isabelle/etc/settings file (the latter enables theorem dependencies<br>\njust for the HOL images, but not for other images such as HOL-Complex etc.).<br>\nOf course, \"-p 2\" works as well, although it is a lot slower.<br>\nAlso note that in the graph browser, you may have to \"unfold\" some of the<br>\nred nodes such as \"[HOL]\" or \"[OrderedGroup]\" by clicking on them (alternatively,<br>\nyou can also click on the \"directories\" in the left part of the window).</p>\n<blockquote>\n<p>Also, is there an existing ML function that, given a theorem proved  <br>\nwhile theorem dependencies was turned on (i.e. ML {* proofs := 1 *}),  <br>\nwould return the list of lemmas used in the proof, or will I have to  <br>\nwrite something that traverses the theorem's proof object?</p>\n</blockquote>\n<p>There is a function</p>\n<p>Proofterm.thms_of_proof: Proofterm.proof -&gt;<br>\n      (Term.term * Proofterm.proof) list Symtab.table -&gt;<br>\n      (Term.term * Proofterm.proof) list Symtab.table</p>\n<p>that recursively adds all lemmas (i.e. proofs of the form \"PThm ...\")<br>\noccurring in a proof to a table. Since there can be several theorems<br>\nwith same name but different propositions, we also have to record the<br>\nterm representing the proposition (hence the \"term\" in the above type).<br>\nThe function call</p>\n<p>Proofterm.thms_of_proof (proof_of (thm \"test\")) Symtab.empty</p>\n<p>produces a table of all lemmas used in the proof of \"test\".</p>\n<p>Greetings,<br>\nStefan</p>",
+        "id": 293905022,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660745697
+    },
+    {
+        "content": "<p>From: John Matthews &lt;<a href=\"mailto:matthews@galois.com\">matthews@galois.com</a>&gt;<br>\nThanks Stefan, that was helpful. I rebuilt the latest repository  <br>\nIsabelle with \"-p 2\", and then tried the following:</p>\n<p>lemma test: \"(x::int) * 0 + y = y\"<br>\n   by auto</p>\n<p>ML {* val _ = map (fn str =&gt; print str)<br>\n           (Symtab.keys (Proofterm.thms_of_proof (proof_of (thm \"test\"))<br>\n                                                 Symtab.empty)) *}</p>\n<p>However, this gave me not only the lemmas used in the proof of test, but<br>\nthe transitive closure of all the lemmas used in the proof of any  <br>\nlemma used<br>\nby test as well. What I would like is to just get the names of the  <br>\nlemmas directly used<br>\nin the proof of test itself. That way I can prune the list of lemmas  <br>\ngiven to<br>\ntactics I call when trying to prove theorems.</p>\n<p>Thanks,<br>\n-john</p>",
+        "id": 293905054,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660745704
+    },
+    {
+        "content": "<p>From: Stefan Berghofer &lt;<a href=\"mailto:berghofe@in.tum.de\">berghofe@in.tum.de</a>&gt;<br>\nJohn Matthews wrote:<br>\nDear John,</p>\n<p>the following variant of thms_of_proof, which is currently not part of<br>\nproofterm.ML, should do what you want:</p>\n<p>fun thms_of_proof' (Abst (_, _, prf)) = thms_of_proof' prf<br>\n   | thms_of_proof' (AbsP (_, _, prf)) = thms_of_proof' prf<br>\n   | thms_of_proof' (prf1 %% prf2) = thms_of_proof' prf1 #&gt; thms_of_proof' prf2<br>\n   | thms_of_proof' (prf % _) = thms_of_proof' prf<br>\n   | thms_of_proof' (PThm ((\"\", _), prf, prop, _)) = thms_of_proof' prf<br>\n   | thms_of_proof' (prf' as PThm ((s, _), _, prop, _)) = (fn tab =&gt;<br>\n       case Symtab.lookup tab s of<br>\n         NONE =&gt; Symtab.update (s, [(prop, prf')]) tab<br>\n       | SOME ps =&gt; if exists (fn (p, _) =&gt; p = prop) ps then tab else<br>\n           Symtab.update (s, (prop, prf')::ps) tab)<br>\n   | thms_of_proof' (MinProof (prfs, _, _)) = fold (thms_of_proof' o Proofterm.proof_of_min_thm) prfs<br>\n   | thms_of_proof' _ = I;</p>\n<p>With the above function, you can compute the table of lemmas directly used in<br>\nthe proof of \"test\" as follows:</p>\n<p>thms_of_proof' (Proofterm.strip_thm (proof_of (thm \"test\"))) Symtab.empty</p>\n<p>Note that you have to strip off the outermost PThm constructor first,<br>\notherwise the table of lemmas used in the proof would only consist<br>\nof \"test\" itself.</p>\n<p>Greetings,<br>\nStefan</p>",
+        "id": 293905157,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660745734
+    },
+    {
+        "content": "<p>From: John Matthews &lt;<a href=\"mailto:matthews@galois.com\">matthews@galois.com</a>&gt;<br>\nThanks Stefan, your function works exactly as advertised. Please let  <br>\nme know if you decide to add this to the Isabelle repository, so that  <br>\nI use the official version.</p>\n<p>Best,<br>\n-john</p>",
+        "id": 293905169,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660745739
+    },
+    {
+        "content": "<p>From: Stefan Berghofer &lt;<a href=\"mailto:berghofe@in.tum.de\">berghofe@in.tum.de</a>&gt;<br>\nJohn Matthews wrote:<br>\nDear John,</p>\n<p>I have just added the function to the repository. If nothing goes wrong,<br>\nit should appear in the development snapshot tomorrow.</p>\n<p>Greetings,<br>\nStefan</p>",
+        "id": 293905203,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660745750
+    }
+]

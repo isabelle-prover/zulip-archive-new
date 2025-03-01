@@ -1,0 +1,82 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Behavior of configuration options in local the... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Behavior.20of.20configuration.20options.20in.20local.20the.2E.2E.2E.html">[isabelle] Behavior of configuration options in local the...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294682054"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Behavior%20of%20configuration%20options%20in%20local%20the.../near/294682054" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Behavior.20of.20configuration.20options.20in.20local.20the.2E.2E.2E.html#294682054">(Aug 22 2022 at 14:04)</a>:</h4>
+<p>From: Dmitriy Traytel &lt;<a href="mailto:traytel@inf.ethz.ch">traytel@inf.ethz.ch</a>&gt;<br>
+Dear all,</p>
+<p>I was surprised by the fact that configuration options seem to be reset when closing a local target:</p>
+<p>ML ‹<br>
+val foo = Attrib.setup_config_int @{binding foo} (K 6);<br>
+›</p>
+<p>local_setup ‹fn lthy =&gt;<br>
+  let<br>
+    val _ = Config.get lthy foo |&gt; @{print}<br>
+    val _ = Config.get (Config.put foo 7 lthy) foo |&gt; @{print}<br>
+    val _ = Config.get (Config.put foo 7 lthy |&gt; Local_Theory.open_target |&gt; snd) foo |&gt; @{print}<br>
+    val _ = Config.get (Config.put foo 7 lthy |&gt; Local_Theory.open_target |&gt; snd |&gt; Local_Theory.close_target) foo |&gt; @{print}<br>
+  in<br>
+    lthy<br>
+  end<br>
+›</p>
+<p>This prints<br>
+6<br>
+7<br>
+7<br>
+6.</p>
+<p>I had expected the last one to be 7 as well. Is there a way to make the changes to configuration options persistent in this respect?</p>
+<p>Thanks for any hints,<br>
+Dmitriy</p>
+
+
+
+<a name="294682305"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Behavior%20of%20configuration%20options%20in%20local%20the.../near/294682305" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Behavior.20of.20configuration.20options.20in.20local.20the.2E.2E.2E.html#294682305">(Aug 22 2022 at 14:05)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+If you really mean persistent in the sense of local theory targets, the<br>
+declaration needs to be applied via Local_Theory.declaration -- this<br>
+corresponds to Isar commands like 'declare' or 'declaration'.</p>
+<p>Nonetheless, there is a slightly odd detail above for updates of the<br>
+hypothetical context on the surface: Local_Theory.open_target ..<br>
+Local_Theory.close_target is more disruptive than it needs to be. This<br>
+can be explained from the historical situation of still not fully<br>
+consolidated Local_Theory.restore / Local_Theory.reset.</p>
+<p>See also this NEWS entry for the coming release<br>
+(<a href="http://isabelle.in.tum.de/repos/isabelle/rev/aae510e9a698">http://isabelle.in.tum.de/repos/isabelle/rev/aae510e9a698</a>):</p>
+<ul>
+<li>Local_Theory.restore has been renamed to Local_Theory.reset to<br>
+emphasize its disruptive impact on the cumulative context, notably the<br>
+scope of 'private' or 'qualified' names. Note that Local_Theory.reset is<br>
+only appropriate when targets are managed, e.g. starting from a global<br>
+theory and returning to it. Regular definitional packages should use<br>
+balanced blocks of Local_Theory.open_target versus<br>
+Local_Theory.close_target instead. Rare INCOMPATIBILITY.</li>
+</ul>
+<p>I will try to get rid of this extra Local_Theory.reset in<br>
+Local_Theory.close_target.</p>
+<p>I will also try harder to motivate other people to eliminate remaining<br>
+uses of Local_Theory.restore / Local_Theory.reset from their own tools.</p>
+<p>Lets see if we can finally sort this out for the coming release.</p>
+<p>Makarius</p>
+
+
+
+<a name="294700559"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Behavior%20of%20configuration%20options%20in%20local%20the.../near/294700559" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Behavior.20of.20configuration.20options.20in.20local.20the.2E.2E.2E.html#294700559">(Aug 22 2022 at 14:37)</a>:</h4>
+<p>From: Dmitriy Traytel &lt;<a href="mailto:traytel@inf.ethz.ch">traytel@inf.ethz.ch</a>&gt;<br>
+Hi Makarius,</p>
+<p>sure, this is fine. We have a workaround not to rely on configuration options (but instead pass a Boolean flag around) for the problem I reported originally anyway.</p>
+<p>Dmitriy</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

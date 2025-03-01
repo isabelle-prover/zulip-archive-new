@@ -1,0 +1,66 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Derive bounded sets from extended nat · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Derive.20bounded.20sets.20from.20extended.20nat.html">[isabelle] Derive bounded sets from extended nat</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="223100605"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Derive%20bounded%20sets%20from%20extended%20nat/near/223100605" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Derive.20bounded.20sets.20from.20extended.20nat.html#223100605">(Jan 18 2021 at 10:03)</a>:</h4>
+<p>From: "Kruse, Kevin" &lt;<a href="mailto:kevin.kruse@rwth-aachen.de">kevin.kruse@rwth-aachen.de</a>&gt;<br>
+Hi,</p>
+<p>I’m trying to execute the following code snippet:</p>
+<p>value "(∀n::nat. (enat n) ≤ (4::enat) ⟶ (n≤6))"</p>
+<p>To do this, I use the following code abbreviation, which transforms the universal quantifier into an bounded set (for the non-infinite case):</p>
+<p>lemma bounded_enat_exec [code_abbrev]:"(if ((x::enat)=∞) then (∀n. P n)<br>
+                    else ((∀n∈{0..(the_enat(x))}. P n))) = (∀n::nat. enat n ≤ (x::enat) ⟶ P n)"<br>
+  sorry</p>
+<p>However, I can’t explain the behavior of Isabelle: If I’m writing e.g. “False” in the first if branch (which should never be entered), the code will execute (but the lemma is not provable). If I’m writing what I stated above, the code won’t execute (Error, that nat is not enumerable).</p>
+<p>Is there an explanation, why this happens? (… and hopefully a solution?)</p>
+<p>All the best,<br>
+Kevin</p>
+
+
+
+<a name="223102582"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Derive%20bounded%20sets%20from%20extended%20nat/near/223102582" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Derive.20bounded.20sets.20from.20extended.20nat.html#223102582">(Jan 18 2021 at 10:25)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:eberlm@in.tum.de">eberlm@in.tum.de</a>&gt;<br>
+Code generation happens statically, so if you cannot generate code for<br>
+the "False" branch, you cannot generate code for the whole thing. Even<br>
+if the branch can never be entered in practice.</p>
+<p>What you can do is to use <code>Code.abort</code> in the False branch. Basically,<br>
+<code>Code.abort s f</code> is defined to be equal to <code>f ()</code> but does not generate<br>
+code for f. Instead, whenever Code.abort is encountered at run time, you<br>
+get an exception with the message s.</p>
+<p>For your case, this works:</p>
+<p>lemma bounded_enat_exec [code_unfold]:<br>
+  "(∀n::nat. enat n ≤ x ⟶ P n) =<br>
+      (if (x::enat) = ∞ then Code.abort STR ''infinite'' (λ_. ∀n∈UNIV. P n)<br>
+       else (∀n∈{0..the_enat x}. P n))"<br>
+  by auto</p>
+<p>definition P :: "enat ⇒ bool" where "P x = (∀n::nat. enat n ≤ x ⟶ x ^ 2<br>
+= x)"</p>
+<p>value "P 1"</p>
+<p>I'm a bit puzzled why it doesn't work with just "∀n. P n" instead of<br>
+"∀n∈UNIV. P n". Perhaps one of our code generation experts can comment<br>
+on this (I CC'ed Florian).</p>
+<p>Manuel<br>
+<a href="/user_uploads/14278/w6Duu6BFAm0FAAaWcqJvxjvw/smime.p7s">smime.p7s</a></p>
+
+
+
+<a name="223167924"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Derive%20bounded%20sets%20from%20extended%20nat/near/223167924" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Derive.20bounded.20sets.20from.20extended.20nat.html#223167924">(Jan 18 2021 at 22:06)</a>:</h4>
+<p>From: Kevin Kruse &lt;<a href="mailto:kevin.kruse@rwth-aachen.de">kevin.kruse@rwth-aachen.de</a>&gt;<br>
+Hi Manuel, thanks for the explanation/hint!  </p>
+<p>All the best<br>
+Kevin</p>
+
+
+
+<hr><p>Last updated: Jul 15 2022 at 23:21 UTC</p>
+</html>

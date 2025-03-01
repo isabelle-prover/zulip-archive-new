@@ -1,0 +1,116 @@
+[
+    {
+        "content": "<p>Dear community,</p>\n<p>I'm looking for ways to generate code from Isabelle in a \"real\" imperative programming language. As far as I understand, the closest to this would be Imperative HOL, which generates code in an imperative fashion embedded in otherwise functional languages like Haskell or SML. In a slightly different fashion, Isabelle LLVM targets LLVM intermediate representation which is more imperative but not a high level programming language. To be more precise, I would like to have a code generation backend for Isabelle that generates something like C or Rust. Has there been any kind of work in this direction yet?</p>\n<p>To give some background, the talk by <span class=\"user-mention\" data-user-id=\"344245\">@pandaman</span> at the first <a href=\"https://sites.google.com/view/rustverify2021\">Rust Verification Workshop</a> gave me the idea to combine their <a href=\"https://github.com/pandaman64/sabi\">Rust verification tool</a> with the Imperative Refinement framework. It would be quite helpful to be able to refine some algorithm from a high level functional specification to a lower level imperative definition based on Imperative HOL (or something similar) and use this to generate Rust code that can then also be checked by something like pandaman's tool for Rust specific properties. This approach would leverage the Refinement Framework's abilities to verify rather general algorithms whereas more specialised verified compilers that can generate Rust code (e.g. <a href=\"https://github.com/AU-COBRA/ConCert\">ConCert</a> or <a href=\"https://github.com/mit-plv/fiat-crypto\">fiat</a>, both implemented in Coq) work only for some domain specific programs. A more general tool would be especially helpful for the Rust community as there exists no complete formal standard/semantics for the Rust programming language yet.</p>",
+        "id": 234045438,
+        "sender_full_name": "Florian Sextl",
+        "timestamp": 1618148186
+    },
+    {
+        "content": "<p>There is <a href=\"https://www.isa-afp.org/entries/Isabelle_C.html\">Isabelle/C</a></p>",
+        "id": 234045556,
+        "sender_full_name": "Lukas Stevens",
+        "timestamp": 1618148340
+    },
+    {
+        "content": "<p>I don't see how a new backend that generates helps for the semantics for Rust <span aria-label=\"thinking\" class=\"emoji emoji-1f914\" role=\"img\" title=\"thinking\">:thinking:</span> By definition, you will target a subset of the language and have a semantic of only that (like Isabelle_LLVM does not have a semantic for the complete LLVM language, but only the useful parts)</p>",
+        "id": 234047226,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1618149821
+    },
+    {
+        "content": "<p>Remark that due to how the RF work you cannot share ownership of impure values anyway. So you will never be able to express an algorithm that shares values</p>",
+        "id": 234047382,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1618149962
+    },
+    {
+        "content": "<blockquote>\n<p>I don't see how a new backend that generates helps for the semantics for Rust.</p>\n</blockquote>\n<p>So my intuition to this is that without a complete standard/specification there probably won't be tools that can verify programs written in an arbitrary subset of the language. Thus generating verified program parts in a fixed subset seems like the more reasonable solution to obtain verified Rust code for now.</p>",
+        "id": 234047780,
+        "sender_full_name": "Florian Sextl",
+        "timestamp": 1618150270
+    },
+    {
+        "content": "<p>Just to be sure we are talking about the same thing. The standard RF works the following way:</p>\n<div class=\"codehilite\"><pre><span></span><code>   1. Generic Isabelle code\n       /\\\n        |\n        |    Refinement Framework (automatic)\n       \\/\n   2. Isabelle in Imperative/HOL\n      /\\\n       | Code Generator  (trusted)\n      \\/\n    3. OCaml/Scala/Haskell Code\n</code></pre></div>\n<p>And Isabelle_LLVM:</p>\n<div class=\"codehilite\"><pre><span></span><code>   1. Generic Isabelle code\n       /\\\n        |\n        |    Refinement Framework (automatic)\n       \\/\n   2. Isabelle in LLVM semantics\n      /\\\n       | Pretty-printing\n      \\/\n    3. LLVM Code\n</code></pre></div>",
+        "id": 234048182,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1618150607
+    },
+    {
+        "content": "<p>You want to change Isabelle_LLVM to have a Rust-like in step 2, right?</p>",
+        "id": 234048295,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1618150694
+    },
+    {
+        "content": "<p>Not necessarily, I thought of something in between:</p>\n<div class=\"codehilite\"><pre><span></span><code>1. Generic Isabelle code\n  /\\\n   |\n   |    Refinement Framework (automatic)\n  \\/\n2. Isabelle in Imperative/HOL\n  /\\\n   |\n   | More or less direct translation (hopefully automatic)\n  \\/\n3. Rust-like intermediate representation (e.g. a formalisation of a subset), Rust specific analyses can be performed on this level\n  /\\\n   |\n   | Code Generator (should be trusted)\n  \\/\n4. Rust Code\n</code></pre></div>\n<p>I'm not entirely sure whether the intermediate step to Imperative/HOL would actually help in this setup.</p>",
+        "id": 234049795,
+        "sender_full_name": "Florian Sextl",
+        "timestamp": 1618151866
+    },
+    {
+        "content": "<p>3 is still in Isabelle, right?</p>",
+        "id": 234050215,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1618152169
+    },
+    {
+        "content": "<p>Yes, that stage would be similar to the aforementioned work by pandaman (which is implemented in Isabelle).</p>",
+        "id": 234050274,
+        "sender_full_name": "Florian Sextl",
+        "timestamp": 1618152229
+    },
+    {
+        "content": "<p>and the step from 3 to 4 is simply pretty-printing?</p>",
+        "id": 234050307,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1618152244
+    },
+    {
+        "content": "<p>In 3 you already have rust code, what is the difference to 4?</p>",
+        "id": 234050368,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1618152289
+    },
+    {
+        "content": "<p>3 does not really have to be valid Rust code but I would rather expect some simple formalisation of it. Maybe some kind of AST like in Isabelle/C.</p>",
+        "id": 234050489,
+        "sender_full_name": "Florian Sextl",
+        "timestamp": 1618152374
+    },
+    {
+        "content": "<p>Imperative HOL is more general than the output of the RF. Somehow I expect that you can express code in Imperative HOL that violates the ownership property (which cannot happen with the RF). Not sure though.</p>",
+        "id": 234051234,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1618153004
+    },
+    {
+        "content": "<p>So the translation would have to fail</p>",
+        "id": 234051364,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1618153095
+    },
+    {
+        "content": "<p><span class=\"user-mention\" data-user-id=\"368701\">@Florian Sextl</span> Thank you for your question. It is certainly an interesting idea. Could you summarize what the Rustv project has already formalized in Isabelle? From what you wrote and I saw in their github repo, I have the impression that they use <a href=\"https://www.isa-afp.org/entries/Simpl.html\">Simpl</a> -- a generic verification environment for imperative code -- to build up an verification environment for Rust. Is that already done? Do they provide a case study example?</p>",
+        "id": 234149316,
+        "sender_full_name": "maximilian p.l. haslbeck",
+        "timestamp": 1618230956
+    },
+    {
+        "content": "<p>If they already provide a formalization of states and (operational) semantics of Rust this could indeed be integrated with the Isabelle Refinement Framework.</p>",
+        "id": 234149492,
+        "sender_full_name": "maximilian p.l. haslbeck",
+        "timestamp": 1618231031
+    },
+    {
+        "content": "<p><span class=\"user-mention\" data-user-id=\"324415\">@Peter Lammich</span> provides a quite <a href=\"https://github.com/lammich/isabelle_llvm/blob/master/thys/vcg/Sep_Generic_Wp.thy\">generic setup</a> for a verification environment that requires a weakest precondition predicate capturing the semantics of a programming language and a separation algebra modelling its state. It is quite straightforward to hook that up with the IRF. In fact, that generic wp framework is instantiated for LLVM and then hooked up with IRF (described in his <a href=\"https://drops.dagstuhl.de/opus/volltexte/2019/11077/\">ITP19 Paper</a>).</p>",
+        "id": 234150084,
+        "sender_full_name": "maximilian p.l. haslbeck",
+        "timestamp": 1618231298
+    },
+    {
+        "content": "<p>I have also not looked that deeply into Rustv but as far as I understand (and recall from the talk) it has currently only support for very simple datatypes and automation of stacked borrows, a static analysis for ownership and borrow checking. Also, thanks <span class=\"user-mention\" data-user-id=\"233151\">@maximilian p.l. haslbeck</span> for the references to Peter's work. I will look into and try to figure out if my idea would be feasible (e.g. as a master thesis topic or something similar).</p>",
+        "id": 234156666,
+        "sender_full_name": "Florian Sextl",
+        "timestamp": 1618233896
+    }
+]

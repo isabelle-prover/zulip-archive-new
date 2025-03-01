@@ -1,0 +1,886 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] BUG in conv.ML: rewr_conv and then_conv fail d... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20BUG.20in.20conv.2EML.3A.20rewr_conv.20and.20then_conv.20fail.20d.2E.2E.2E.html">[isabelle] BUG in conv.ML: rewr_conv and then_conv fail d...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294224297"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20BUG%20in%20conv.ML%3A%20rewr_conv%20and%20then_conv%20fail%20d.../near/294224297" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20BUG.20in.20conv.2EML.3A.20rewr_conv.20and.20then_conv.20fail.20d.2E.2E.2E.html#294224297">(Aug 19 2022 at 08:52)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+De-facto it was an Isabelle/ML users workshop, with a little bit of <br>
+outlook towards Isabelle/Scala (but in 2009 the latter was still very <br>
+thin). Maybe we should make some "Isabelle proof development workshop" <br>
+next time.</p>
+<p>Anyway, I've just returned from one that was very interesting: mostly <br>
+French Coq users learning about HOL specifications and Isar proofs.  See <br>
+also <a href="http://www.lri.fr/~wenzel/Isabelle_Orleans_2012/">http://www.lri.fr/~wenzel/Isabelle_Orleans_2012/</a> and feel free to <br>
+re-use material you might want for your own courses next time.</p>
+<p>Makarius</p>
+
+
+
+<a name="294225345"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20BUG%20in%20conv.ML%3A%20rewr_conv%20and%20then_conv%20fail%20d.../near/294225345" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20BUG.20in.20conv.2EML.3A.20rewr_conv.20and.20then_conv.20fail.20d.2E.2E.2E.html#294225345">(Aug 19 2022 at 09:01)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:lammich@in.tum.de">lammich@in.tum.de</a>&gt;<br>
+Hi, </p>
+<p>my understanding of conversions is, that "conv ct" either throws an<br>
+exception or returns a theorem of the form "ct == ...". Here is a<br>
+minimal example where rewr_conv actually returns a theorem that does not<br>
+satisfy this condition, and thus, a subsequent then_conv fails<br>
+unexpectedly.</p>
+<p>definition "I x \&lt;equiv&gt; x"<br>
+definition "A f x \&lt;equiv&gt; f x"</p>
+<p>ML_val {*<br>
+  let<br>
+    open Conv</p>
+<p>val cv1 = fun_conv (rewr_conv @{thm I_def}) <br>
+    val cv2 = rewr_conv (@{thm A_def[symmetric]})<br>
+  in<br>
+    (cv1 then_conv cv2) @{cterm "I (\&lt;lambda&gt;s::bool. s) True"}<br>
+  end</p>
+<p>(*<br>
+*** exception THM 0 raised (line 835 of "thm.ML"):<br>
+*** transitive: middle term<br>
+*** I (\&lt;lambda&gt;s\&lt;Colon&gt;bool. s) True \&lt;equiv&gt; True<br>
+*** True \&lt;equiv&gt; A (\&lt;lambda&gt;s\&lt;Colon&gt;bool. s) True<br>
+  *)</p>
+<p>*}</p>
+<p>The reason is, that the term after applying cv1 is not beta-reduced, and<br>
+cv2 returns a theorem with a beta-reduced left-hand side. The exception<br>
+is thrown when then_conv tries to put the two theorems together.</p>
+<p>The issue can be observed when instrumenting then_conv, e.g. as attached<br>
+to the end of this mail.</p>
+<p>I consider this a bug, because it is nowhere documented that the user of<br>
+conversions has to take care of beta-normalization manually. My proposal<br>
+for solution is as follows:<br>
+  What is the status of beta-equality within Isabelle?<br>
+    Alternative 1) beta-equivalent terms are considered equal: then_conv<br>
+should just work modulo beta-equivalence<br>
+    Alternative 2) They are not considered equal on this low-level:<br>
+rewr_conv should be forced to return an equal term.</p>
+<p>Anyway, if none of the two alternatives is appropriate, the rules for<br>
+composing conversions should be CLEANLY documented.</p>
+<p>Regards,<br>
+  Peter</p>
+<hr>
+<p>ML_val {*<br>
+let<br>
+  open Conv</p>
+<p>(* Instrumenting then_conv to make the reason for the error visible:<br>
+*)<br>
+  fun (cv1 then_conv cv2) ct =<br>
+    let<br>
+      val eq1 = cv1 ct;<br>
+      val eq2 = cv2 (Thm.rhs_of eq1);<br>
+    in<br>
+      if Thm.is_reflexive eq1 then eq2<br>
+      else if Thm.is_reflexive eq2 then eq1<br>
+      else (<br>
+        tracing ("RHS1: "^PolyML.makestring (Thm.rhs_of eq1 |&gt;<br>
+term_of));<br>
+        tracing ("LHS2: "^PolyML.makestring (Thm.lhs_of eq2 |&gt;<br>
+term_of));<br>
+        Thm.transitive eq1 eq2<br>
+      )<br>
+    end;<br>
+in<br>
+  let<br>
+    val cv1 = fun_conv (rewr_conv @{thm I_def}) <br>
+    val cv2 = rewr_conv (@{thm A_def[symmetric]})<br>
+  in<br>
+    (cv1 then_conv cv2) @{cterm "I (\&lt;lambda&gt;s::bool. s) True"}<br>
+  end<br>
+end</p>
+<p>(* TRACE:</p>
+<p>RHS1: Abs ("s", "bool", Bound 0) $ Const ("HOL.True", "bool")</p>
+<p>LHS2: Const ("HOL.True", "bool")<br>
+*)</p>
+<p>*}</p>
+
+
+
+<a name="294225351"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20BUG%20in%20conv.ML%3A%20rewr_conv%20and%20then_conv%20fail%20d.../near/294225351" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20BUG.20in.20conv.2EML.3A.20rewr_conv.20and.20then_conv.20fail.20d.2E.2E.2E.html#294225351">(Aug 19 2022 at 09:01)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On Mon, 22 Oct 2012, Peter Lammich wrote:</p>
+<blockquote>
+<p>my understanding of conversions is, that "conv ct" either throws an <br>
+exception or returns a theorem of the form "ct == ...". Here is a <br>
+minimal example where rewr_conv actually returns a theorem that does not <br>
+satisfy this condition, and thus, a subsequent then_conv fails <br>
+unexpectedly.</p>
+<p>definition "I x \&lt;equiv&gt; x"<br>
+definition "A f x \&lt;equiv&gt; f x"</p>
+<p>ML_val {*<br>
+ let<br>
+   open Conv</p>
+<p>val cv1 = fun_conv (rewr_conv @{thm I_def})<br>
+   val cv2 = rewr_conv (@{thm A_def[symmetric]})<br>
+ in<br>
+   (cv1 then_conv cv2) @{cterm "I (\&lt;lambda&gt;s::bool. s) True"}<br>
+ end</p>
+<p>(*<br>
+*** exception THM 0 raised (line 835 of "thm.ML"):<br>
+*** transitive: middle term<br>
+*** I (\&lt;lambda&gt;s\&lt;Colon&gt;bool. s) True \&lt;equiv&gt; True<br>
+*** True \&lt;equiv&gt; A (\&lt;lambda&gt;s\&lt;Colon&gt;bool. s) True<br>
+ *)</p>
+<p>*}</p>
+<p>The reason is, that the term after applying cv1 is not beta-reduced, and<br>
+cv2 returns a theorem with a beta-reduced left-hand side. The exception<br>
+is thrown when then_conv tries to put the two theorems together.</p>
+</blockquote>
+<p>(ML <em>raises</em> exceptions, other languages like Java <em>throw</em> them.)</p>
+<p>What happens here is that cv2 gets a cterm with beta redex, but it is <br>
+rather well-known in Isabelle practice, that this can cause all kinds of <br>
+troubles.  So one could argue that the behaviour is correctly undefined.</p>
+<blockquote>
+<p>I consider this a bug, because it is nowhere documented that the user of <br>
+conversions has to take care of beta-normalization manually.</p>
+</blockquote>
+<p>Despite tons of manuals, which are often hard to keep in overview anyway, <br>
+the real documentaion is the ML source:</p>
+<p>(* single rewrite step, cf. REWR_CONV in HOL *)</p>
+<p>fun rewr_conv rule ct =<br>
+   let<br>
+     val rule1 = Thm.incr_indexes (#maxidx (Thm.rep_cterm ct) + 1) rule;<br>
+     val lhs = Thm.lhs_of rule1;<br>
+     val rule2 = Thm.rename_boundvars (Thm.term_of lhs) (Thm.term_of ct) rule1;<br>
+   in<br>
+     Drule.instantiate_normalize (Thm.match (lhs, ct)) rule2<br>
+       handle Pattern.MATCH =&gt; raise CTERM ("rewr_conv", [lhs, ct])<br>
+   end;</p>
+<p>This says excplitly that your resulting rule instance will be produced by <br>
+Drule.instantiate_normalize, and thus in beta-normal form.  So you loose <br>
+if you try to make a plain then_conv step based on something that is not <br>
+in beta-normal form.</p>
+<p>If this is good or bad, or a "bug" is a completely different question. <br>
+Further judgement would require careful studies how a change would impact <br>
+existing application, and potential interaction with the Simplifier and <br>
+the rule composition mechanisms (RS etc.)  I can't say much on the spot, <br>
+apart from quoting the well-known "Mahabharata" software development <br>
+principle: "Dharma eva hato hanti / Dharmo rakshati rakshitah". In other <br>
+words, it might be easier to change your expectation about what the system <br>
+should do for you.</p>
+<p>Seriously: I am now working a lot with Scala on the JVM platform.  What <br>
+these industrial-strength guys usually do is to declare odd behaviour <br>
+official rather quickly, because too many applications depend on it.</p>
+<blockquote>
+<p>What is the status of beta-equality within Isabelle?<br>
+   Alternative 1) beta-equivalent terms are considered equal: then_conv<br>
+should just work modulo beta-equivalence<br>
+   Alternative 2) They are not considered equal on this low-level:<br>
+rewr_conv should be forced to return an equal term.</p>
+</blockquote>
+<ul>
+<li>
+<p>The system knows alpha, beta, eta conversion.</p>
+</li>
+<li>
+<p>Some layers use alpha (kernel).</p>
+</li>
+<li>
+<p>Some layers use alpha + beta + eta (simplifier, resolution) but<br>
+   normalize in different directions.</p>
+</li>
+<li>
+<p>Insisting too much in one way or the other causes trouble.</p>
+</li>
+<li>
+<p>It is possible not to insist too much.</p>
+</li>
+<li>
+<p>What is your concrete application anyway?</p>
+<p>Makarius</p>
+</li>
+</ul>
+
+
+
+<a name="294225365"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20BUG%20in%20conv.ML%3A%20rewr_conv%20and%20then_conv%20fail%20d.../near/294225365" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20BUG.20in.20conv.2EML.3A.20rewr_conv.20and.20then_conv.20fail.20d.2E.2E.2E.html#294225365">(Aug 19 2022 at 09:01)</a>:</h4>
+<p>From: Lawrence Paulson &lt;<a href="mailto:lp15@cam.ac.uk">lp15@cam.ac.uk</a>&gt;<br>
+This module was written long ago for a specific, internal purpose and was never intended for general use, so it's hard to say what is a bug and what isn't. The beauty of conversions is that they are highly modular, so you can write your own primitives that do exactly what you want.</p>
+<p>Larry Paulson</p>
+
+
+
+<a name="294225372"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20BUG%20in%20conv.ML%3A%20rewr_conv%20and%20then_conv%20fail%20d.../near/294225372" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20BUG.20in.20conv.2EML.3A.20rewr_conv.20and.20then_conv.20fail.20d.2E.2E.2E.html#294225372">(Aug 19 2022 at 09:01)</a>:</h4>
+<p>From: Thomas Sewell &lt;<a href="mailto:Thomas.Sewell@nicta.com.au">Thomas.Sewell@nicta.com.au</a>&gt;<br>
+An additional beauty of the Isabelle library is how often you get to <br>
+build your own primitives because none of the existing ones do what you <br>
+would expect.</p>
+<p>I have this sitting around somewhere:</p>
+<p>fun fix_conv conv ct = let<br>
+     val thm = conv ct<br>
+     val eq = Logic.mk_equals (term_of ct, term_of ct) |&gt; head_of<br>
+   in if (term_of (Thm.lhs_of thm) aconv term_of ct)<br>
+     then thm<br>
+     else thm RS trivial<br>
+       (Thm.mk_binop (cterm_of (theory_of_cterm ct) eq) ct (Thm.rhs_of <br>
+thm)) end</p>
+<p>That fixes the problem with rewr_conv, so fix_conv Conv.rewr_conv does <br>
+what you would expect Conv.rewr_conv to do.</p>
+<p>Yours,<br>
+     Thomas.</p>
+
+
+
+<a name="294225380"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20BUG%20in%20conv.ML%3A%20rewr_conv%20and%20then_conv%20fail%20d.../near/294225380" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20BUG.20in.20conv.2EML.3A.20rewr_conv.20and.20then_conv.20fail.20d.2E.2E.2E.html#294225380">(Aug 19 2022 at 09:02)</a>:</h4>
+<p>From: Brian Huffman &lt;<a href="mailto:huffman@in.tum.de">huffman@in.tum.de</a>&gt;<br>
+We should not interpret Peter's original post as the question, "how<br>
+can I make my concrete application work"; rather, we should treat it<br>
+as a proposal to refine the behavior of the Isabelle conversion<br>
+library.</p>
+<p>Peter neatly stated the behavior that we all expect of conversions:</p>
+<p>On Mon, 22 Oct 2012, Peter Lammich wrote:</p>
+<blockquote>
+<p>my understanding of conversions is, that "conv ct" either throws an<br>
+exception or returns a theorem of the form "ct == ...".</p>
+</blockquote>
+<p>The current situation is this: Conv.rewr_conv only satisfies this<br>
+property if a side-condition is met, namely that the input cterm must<br>
+be already in beta-normal form.</p>
+<p>The proposal is to modify rewr_conv to remove the side-condition: It<br>
+should satisfy the basic property also for non-beta-normal cterms. On<br>
+beta-normal cterms, rewr_conv should behave exactly as it did before.<br>
+(Thomas's fix_conv would be one possible implementation of this<br>
+proposal.)</p>
+<p>So far, I haven't seen any good arguments against this change.</p>
+<p>On Mon, Oct 22, 2012 at 9:27 PM, Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt; wrote:</p>
+<blockquote>
+<p>What happens here is that cv2 gets a cterm with beta redex, but it is rather<br>
+well-known in Isabelle practice, that this can cause all kinds of troubles.<br>
+So one could argue that the behaviour is correctly undefined.</p>
+</blockquote>
+<p>Makarius argues that it is reasonable to have low expectations of the<br>
+conversion library. Yes, but this is no argument against making the<br>
+library exceed his low expectations of it.</p>
+<blockquote>
+<p>Despite tons of manuals, which are often hard to keep in overview anyway,<br>
+the real documentaion is the ML source:</p>
+</blockquote>
+<p>Reading the ML source, we also find various low-level conversions in thm.ML:</p>
+<p>val beta_conversion: bool -&gt; conv<br>
+  val eta_conversion: conv<br>
+  val eta_long_conversion: conv</p>
+<p>Their existence clearly indicates that conversions are not intended to<br>
+work modulo beta- or eta-equivalence.</p>
+<blockquote>
+<p>If this is good or bad, or a "bug" is a completely different question.<br>
+Further judgement would require careful studies how a change would impact<br>
+existing application, and potential interaction with the Simplifier and the<br>
+rule composition mechanisms (RS etc.)<br>
+[...]<br>
+Seriously: I am now working a lot with Scala on the JVM platform.  What<br>
+these industrial-strength guys usually do is to declare odd behaviour<br>
+official rather quickly, because too many applications depend on it.</p>
+</blockquote>
+<p>A quick search reveals that very little code within Isabelle depends<br>
+on rewr_conv; in particular, the simplifier and rule composition<br>
+mechanisms like RS predate the conversion library.</p>
+<p>Furthermore, remember that we are only proposing to change the<br>
+behavior of rewr_conv on <em>non-beta-normal</em> input. I seriously doubt<br>
+that any existing code actually depends on the current behavior of<br>
+rewr_conv on non-beta-normal cterms. In any case, it is easy enough to<br>
+run the usual test suite before committing a change.</p>
+<blockquote>
+<ul>
+<li>
+<p>The system knows alpha, beta, eta conversion.</p>
+</li>
+<li>
+<p>Some layers use alpha (kernel).</p>
+</li>
+<li>
+<p>Some layers use alpha + beta + eta (simplifier, resolution) but<br>
+  normalize in different directions.</p>
+</li>
+</ul>
+</blockquote>
+<p>As I pointed out above, the existence of Thm.{beta,eta}_conversion<br>
+makes it clear that conversions do not use beta + eta.</p>
+<blockquote>
+<ul>
+<li>
+<p>Insisting too much in one way or the other causes trouble.</p>
+</li>
+<li>
+<p>It is possible not to insist too much.</p>
+</li>
+<li>
+<p>What is your concrete application anyway?</p>
+</li>
+</ul>
+</blockquote>
+<p>This is good advice for <em>users</em> of Isabelle/ML libraries: Don't expect<br>
+too much. For <em>developers</em> of Isabelle/ML libraries, this is no<br>
+argument against making improvements.</p>
+<p>On 23/10/12 07:40, Lawrence Paulson wrote:</p>
+<blockquote>
+<p>This module was written long ago for a specific, internal purpose and was<br>
+never intended for general use, so it's hard to say what is a bug and what<br>
+isn't. The beauty of conversions is that they are highly modular, so you can<br>
+write your own primitives that do exactly what you want.</p>
+</blockquote>
+<p>If the module was never intended for general use, then we shouldn't be<br>
+so worried about breaking user code by modifying the module. I would<br>
+read this as an argument in favor of updating the conversion library<br>
+(or at least an argument against <em>not</em> updating it).</p>
+<ul>
+<li>Brian</li>
+</ul>
+
+
+
+<a name="294225426"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20BUG%20in%20conv.ML%3A%20rewr_conv%20and%20then_conv%20fail%20d.../near/294225426" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20BUG.20in.20conv.2EML.3A.20rewr_conv.20and.20then_conv.20fail.20d.2E.2E.2E.html#294225426">(Aug 19 2022 at 09:02)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:lammich@in.tum.de">lammich@in.tum.de</a>&gt;</p>
+<blockquote>
+<blockquote>
+<p>I consider this a bug, because it is nowhere documented that the user of <br>
+conversions has to take care of beta-normalization manually.</p>
+</blockquote>
+<p>Despite tons of manuals, which are often hard to keep in overview anyway, <br>
+the real documentaion is the ML source:</p>
+<p>(* single rewrite step, cf. REWR_CONV in HOL *)</p>
+<p>fun rewr_conv rule ct =<br>
+   let<br>
+     val rule1 = Thm.incr_indexes (#maxidx (Thm.rep_cterm ct) + 1) rule;<br>
+     val lhs = Thm.lhs_of rule1;<br>
+     val rule2 = Thm.rename_boundvars (Thm.term_of lhs) (Thm.term_of ct) rule1;<br>
+   in<br>
+     Drule.instantiate_normalize (Thm.match (lhs, ct)) rule2<br>
+       handle Pattern.MATCH =&gt; raise CTERM ("rewr_conv", [lhs, ct])<br>
+   end;</p>
+<p>This says excplitly that your resulting rule instance will be produced by <br>
+Drule.instantiate_normalize, and thus in beta-normal form.  So you loose <br>
+if you try to make a plain then_conv step based on something that is not <br>
+in beta-normal form.</p>
+</blockquote>
+<p>So what normalizations does instantiate_normalize do (beta?, eta?,<br>
+beta-eta?, how deep?). Looking at the source code does not really help<br>
+here:</p>
+<p>fun instantiate_normalize instpair th =<br>
+  Thm.adjust_maxidx_thm ~1 (Thm.instantiate instpair th COMP_INCR<br>
+asm_rl);</p>
+<p>Even if looking 4 levels deep from here (COMP_INCR -&gt; COMP -&gt; compose -&gt;<br>
+bicompose), one finds no comment mentioning normal forms, nor any<br>
+function whose name would suggest any particular kind of normalization.</p>
+<blockquote>
+<p>If this is good or bad, or a "bug" is a completely different question. <br>
+Further judgement would require careful studies how a change would impact <br>
+existing application, and potential interaction with the Simplifier and <br>
+the rule composition mechanisms (RS etc.)  I can't say much on the spot, <br>
+apart from quoting the well-known "Mahabharata" software development <br>
+principle: "Dharma eva hato hanti / Dharmo rakshati rakshitah". In other <br>
+words, it might be easier to change your expectation about what the system <br>
+should do for you.</p>
+</blockquote>
+<p>As Brian already mentioned: If there is an easy change that does not<br>
+break too much, and makes the system arguably more elegant, why not just<br>
+applying it?</p>
+<blockquote>
+<ul>
+<li>Insisting too much in one way or the other causes trouble.</li>
+</ul>
+</blockquote>
+<p>As my example shows, I have to insist on one way or the other (either<br>
+using something like fix-conv, or manually inserting beta_conv after all<br>
+conversions that may produce beta-redexes). </p>
+<blockquote>
+<ul>
+<li>
+<p>It is possible not to insist too much.</p>
+</li>
+<li>
+<p>What is your concrete application anyway?<br>
+Something similar as the minimal example. I need to do some<br>
+controllable rewriting in a term, replacing patterns like <br>
+"fun_upd f k (Some v)" by "op_map_update$k$v$f" if certain<br>
+side-conditions on f, k, and v are met (infixr $ is a custom constant<br>
+defined as f$x == f x). Another pattern was <br>
+"insert" by "\lambda x s. op_insert$x$s", which caused the beta-redex,<br>
+as I first replaced it by "\lambda x s. op_insert x s", and then wanted<br>
+to insert the $.<br>
+In my concrete case, it was easy to fix by applying beta_conv at the<br>
+right places, however, I wondered why conversions do not meet the simple<br>
+expectation that most of us seem to have (see Brian's mail). Indeed, it<br>
+required me more than an hour to track down why my code did not work, as<br>
+I implicitly assumed that the standard conversions behave as expected,<br>
+such that I searched at the wrong places first.</p>
+</li>
+</ul>
+</blockquote>
+
+
+
+<a name="294225433"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20BUG%20in%20conv.ML%3A%20rewr_conv%20and%20then_conv%20fail%20d.../near/294225433" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20BUG.20in.20conv.2EML.3A.20rewr_conv.20and.20then_conv.20fail.20d.2E.2E.2E.html#294225433">(Aug 19 2022 at 09:02)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+Peter's point is that the <em>given</em> conversions are not as modular as one may wish<br>
+them to be and that it would be nice to improve on that. And as Thomas pointed<br>
+out, improvement in user space is suboptimal.</p>
+<p>Tobias</p>
+
+
+
+<a name="294225446"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20BUG%20in%20conv.ML%3A%20rewr_conv%20and%20then_conv%20fail%20d.../near/294225446" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20BUG.20in.20conv.2EML.3A.20rewr_conv.20and.20then_conv.20fail.20d.2E.2E.2E.html#294225446">(Aug 19 2022 at 09:02)</a>:</h4>
+<p>From: Ondřej Kunčar &lt;<a href="mailto:kuncar@in.tum.de">kuncar@in.tum.de</a>&gt;<br>
+Peter has already mentioned it but I want to do it more explicitly <br>
+because this thread clearly shows how the canonical "look at the ML <br>
+source"-approach fails.<br>
+ML source is not the real documentation!</p>
+<p>How should I know that instantiate_normalize do beta-normalization?</p>
+<p>By looking at this?</p>
+<p>fun bicompose_aux flatten match (state, (stpairs, Bs, Bi, C), lifted)<br>
+                         (eres_flg, orule, nsubgoal) =<br>
+  let val Thm (sder, {maxidx=smax, shyps=sshyps, hyps=shyps, ...}) = state<br>
+      and Thm (rder, {maxidx=rmax, shyps=rshyps, hyps=rhyps,<br>
+              tpairs=rtpairs, prop=rprop,...}) = orule<br>
+          (<em>How many hyps to skip over during normalization</em>)<br>
+      and nlift = Logic.count_prems (strip_all_body Bi) + (if eres_flg <br>
+then ~1 else 0)<br>
+      val thy = Theory.deref (merge_thys2 state orule);<br>
+      (<strong> Add new theorem with prop = '[| Bs; As |] ==&gt; C' to thq </strong>)<br>
+      fun addth A (As, oldAs, rder', n) ((env, tpairs), thq) =<br>
+        let val normt = Envir.norm_term env;<br>
+            (<em>perform minimal copying here by examining env</em>)<br>
+            val (ntpairs, normp) =<br>
+              if Envir.is_empty env then (tpairs, (Bs @ As, C))<br>
+              else<br>
+              let val ntps = map (pairself normt) tpairs<br>
+              in if Envir.above env smax then<br>
+                   (<em>no assignments in state; normalize the rule only</em>)<br>
+                   if lifted<br>
+                   then (ntps, (Bs @ map (norm_term_skip env nlift) As, C))<br>
+                   else (ntps, (Bs @ map normt As, C))<br>
+                 else if match then raise COMPOSE<br>
+                 else (<em>normalize the new rule fully</em>)<br>
+                   (ntps, (map normt (Bs @ As), normt C))<br>
+              end<br>
+            val th =<br>
+              Thm (deriv_rule2<br>
+                    ((if Envir.is_empty env then I<br>
+                      else if Envir.above env smax then<br>
+                        (fn f =&gt; fn der =&gt; f (Proofterm.norm_proof' env <br>
+der))<br>
+                      else<br>
+                        curry op oo (Proofterm.norm_proof' env))<br>
+                     (Proofterm.bicompose_proof flatten Bs oldAs As A n <br>
+(nlift+1))) rder' sder,<br>
+                 {tags = [],<br>
+                  maxidx = Envir.maxidx_of env,<br>
+                  shyps = Envir.insert_sorts env (Sorts.union rshyps <br>
+sshyps),<br>
+                  hyps = union_hyps rhyps shyps,<br>
+                  tpairs = ntpairs,<br>
+                  prop = Logic.list_implies normp,<br>
+                  thy_ref = Theory.check_thy thy})<br>
+         in  Seq.cons th thq  end  handle COMPOSE =&gt; thq;<br>
+      val (rAs,B) = Logic.strip_prems(nsubgoal, [], rprop)<br>
+        handle TERM _ =&gt; raise THM("bicompose: rule", 0, [orule,state]);<br>
+      (<em>Modify assumptions, deleting n-th if n&gt;0 for e-resolution</em>)<br>
+      fun newAs(As0, n, dpairs, tpairs) =<br>
+        let val (As1, rder') =<br>
+          if not lifted then (As0, rder)<br>
+          else<br>
+            let val rename = rename_bvars dpairs tpairs B As0<br>
+            in (map (rename strip_apply) As0,<br>
+              deriv_rule1 (Proofterm.map_proof_terms (rename K) I) rder)<br>
+            end;<br>
+        in (map (if flatten then (Logic.flatten_params n) else I) As1, <br>
+As1, rder', n)<br>
+           handle TERM _ =&gt;<br>
+           raise THM("bicompose: 1st premise", 0, [orule])<br>
+        end;<br>
+      val env = Envir.empty(Int.max(rmax,smax));<br>
+      val BBi = if lifted then strip_assums2(B,Bi) else (B,Bi);<br>
+      val dpairs = BBi :: (rtpairs@stpairs);</p>
+<p>(<em>elim-resolution: try each assumption in turn</em>)<br>
+      fun eres [] = raise THM ("bicompose: no premises", 0, [orule, state])<br>
+        | eres (A1 :: As) =<br>
+            let<br>
+              val A = SOME A1;<br>
+              val (close, asms, concl) = Logic.assum_problems (nlift + <br>
+1, A1);<br>
+              val concl' = close concl;<br>
+              fun tryasms [] _ = Seq.empty<br>
+                | tryasms (asm :: rest) n =<br>
+                    if Term.could_unify (asm, concl) then<br>
+                      let val asm' = close asm in<br>
+                        (case Seq.pull (Unify.unifiers (thy, env, (asm', <br>
+concl') :: dpairs)) of<br>
+                          NONE =&gt; tryasms rest (n + 1)<br>
+                        | cell as SOME ((_, tpairs), _) =&gt;<br>
+                            Seq.it_right (addth A (newAs (As, n, [BBi, <br>
+(concl', asm')], tpairs)))<br>
+                              (Seq.make (fn () =&gt; cell),<br>
+                               Seq.make (fn () =&gt; Seq.pull (tryasms rest <br>
+(n + 1)))))<br>
+                      end<br>
+                    else tryasms rest (n + 1);<br>
+            in tryasms asms 1 end;</p>
+<p>(<em>ordinary resolution</em>)<br>
+      fun res () =<br>
+        (case Seq.pull (Unify.unifiers (thy, env, dpairs)) of<br>
+          NONE =&gt; Seq.empty<br>
+        | cell as SOME ((_, tpairs), _) =&gt;<br>
+            Seq.it_right (addth NONE (newAs (rev rAs, 0, [BBi], tpairs)))<br>
+              (Seq.make (fn () =&gt; cell), Seq.empty));<br>
+  in<br>
+    if eres_flg then eres (rev rAs) else res ()<br>
+  end;</p>
+
+
+
+<a name="294225459"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20BUG%20in%20conv.ML%3A%20rewr_conv%20and%20then_conv%20fail%20d.../near/294225459" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20BUG.20in.20conv.2EML.3A.20rewr_conv.20and.20then_conv.20fail.20d.2E.2E.2E.html#294225459">(Aug 19 2022 at 09:02)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+I think you refer to an even older version of the module, before my time <br>
+working on the Isabelle code base.  The current src/Pure/conv.ML is a <br>
+reconstruction from historic sources and the HOL counterparts that was <br>
+initiated by Amine Chaieb some years ago, and where I engaged myself as <br>
+well in doing research on the old LCF/HOL sources.  The we tried to push <br>
+it forward in time into contemporary Isabelle use.</p>
+<p>Makarius</p>
+
+
+
+<a name="294225484"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20BUG%20in%20conv.ML%3A%20rewr_conv%20and%20then_conv%20fail%20d.../near/294225484" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20BUG.20in.20conv.2EML.3A.20rewr_conv.20and.20then_conv.20fail.20d.2E.2E.2E.html#294225484">(Aug 19 2022 at 09:02)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+You should explain what "_ RS trivial" does.  It is the conventional way <br>
+to let Larry's rule composition calculus do its normalization for you.</p>
+<p>Thinking in terms of "broken" and "fixed" is unwise.  Which is actually my <br>
+main complaint on this thread.</p>
+<p>Makarius</p>
+
+
+
+<a name="294225492"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20BUG%20in%20conv.ML%3A%20rewr_conv%20and%20then_conv%20fail%20d.../near/294225492" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20BUG.20in.20conv.2EML.3A.20rewr_conv.20and.20then_conv.20fail.20d.2E.2E.2E.html#294225492">(Aug 19 2022 at 09:02)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+This is the essence: rewr_conv only satisfies</p>
+<p>"A conversion is any function that maps a term t to a theorem |-t==u."<br>
+LCP, 1983</p>
+<p>up to beta-equivalence. Since conversions are low-level proof methods which are<br>
+sensitive to the precise term structure, this is a wart that causes<br>
+non-modularity. This non-modularity only shows up (to refine Brian's analysis)<br>
+if the lhs of the rewrite rule has a free variable F in an applied position: F<br>
+t. This does not happen very often, but if it does, rewr_conv should still<br>
+behave nicely. It should do a non-normalizing instantiation followed by a<br>
+beta-normalization.</p>
+<p>Tobias</p>
+
+
+
+<a name="294225497"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20BUG%20in%20conv.ML%3A%20rewr_conv%20and%20then_conv%20fail%20d.../near/294225497" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20BUG.20in.20conv.2EML.3A.20rewr_conv.20and.20then_conv.20fail.20d.2E.2E.2E.html#294225497">(Aug 19 2022 at 09:02)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On Tue, 23 Oct 2012, Brian Huffman wrote:</p>
+<blockquote>
+<p>On Mon, 22 Oct 2012, Peter Lammich wrote:</p>
+<blockquote>
+<p>my understanding of conversions is, that "conv ct" either throws an<br>
+exception or returns a theorem of the form "ct == ...".</p>
+</blockquote>
+<p>The current situation is this: Conv.rewr_conv only satisfies this<br>
+property if a side-condition is met, namely that the input cterm must<br>
+be already in beta-normal form.</p>
+<p>The proposal is to modify rewr_conv to remove the side-condition: It<br>
+should satisfy the basic property also for non-beta-normal cterms. On<br>
+beta-normal cterms, rewr_conv should behave exactly as it did before.<br>
+(Thomas's fix_conv would be one possible implementation of this<br>
+proposal.)</p>
+</blockquote>
+<p>This is the point where one would have to start thinking and looking <br>
+carefully.  So far the attitudes towards the system were far too crude, to <br>
+even think of it.</p>
+<blockquote>
+<p>Makarius argues that it is reasonable to have low expectations of the <br>
+conversion library. Yes, but this is no argument against making the <br>
+library exceed his low expectations of it.</p>
+</blockquote>
+<p>Misunderstanding again.  Wrong attitudes towards "good or bad", "wrong or <br>
+right", "broken or fixed" means.  The incident is rather trivial here, but <br>
+the general principles are very important.</p>
+<blockquote>
+<p>Reading the ML source, we also find various low-level conversions in thm.ML:</p>
+<p>val beta_conversion: bool -&gt; conv<br>
+ val eta_conversion: conv<br>
+ val eta_long_conversion: conv</p>
+<p>Their existence clearly indicates that conversions are not intended to<br>
+work modulo beta- or eta-equivalence.</p>
+</blockquote>
+<p>Here you also need to look at the history.  When the type conv was <br>
+re-introduced after a long time, I merely tried to re-integrate many <br>
+existing functions into the framework, without assuming too much semantics <br>
+behind it.</p>
+<blockquote>
+<p>Furthermore, remember that we are only proposing to change the behavior <br>
+of rewr_conv on <em>non-beta-normal</em> input. I seriously doubt that any <br>
+existing code actually depends on the current behavior of rewr_conv on <br>
+non-beta-normal cterms. In any case, it is easy enough to run the usual <br>
+test suite before committing a change.</p>
+</blockquote>
+<p>It will be probably not too hard, but such things have to be done with the <br>
+proper attitude and care.  The "bug" fraction on this thread lacks that.</p>
+<blockquote>
+<p>This is good advice for <em>users</em> of Isabelle/ML libraries: Don't expect <br>
+too much.</p>
+</blockquote>
+<p>I never said said.  You should get your expectations right and realistic. <br>
+The code base is generally not so bad, but after &gt; 25 years it defines it <br>
+own rules.  So as long as you are standing outside somewhere and <br>
+pretending to know how to "fix" it, it wont work for you.</p>
+<p>Makarius</p>
+
+
+
+<a name="294225509"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20BUG%20in%20conv.ML%3A%20rewr_conv%20and%20then_conv%20fail%20d.../near/294225509" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20BUG.20in.20conv.2EML.3A.20rewr_conv.20and.20then_conv.20fail.20d.2E.2E.2E.html#294225509">(Aug 19 2022 at 09:02)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+You also need to include its history.</p>
+<p>It is a matter of long practice and endurance to make sense out of all <br>
+that.  It is important to make a serious start, by giving up what you <br>
+think about it in the first impulse.</p>
+<p>Makarius</p>
+
+
+
+<a name="294225519"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20BUG%20in%20conv.ML%3A%20rewr_conv%20and%20then_conv%20fail%20d.../near/294225519" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20BUG.20in.20conv.2EML.3A.20rewr_conv.20and.20then_conv.20fail.20d.2E.2E.2E.html#294225519">(Aug 19 2022 at 09:03)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Alternatively one could do the normalization before on the input term. <br>
+Empirically, higher-order matching can produce surprises if applied to <br>
+terms with beta redexes, it normally is never used like that in the <br>
+existing tools.  So it is better not to give non-normal stuff to the match <br>
+operation.</p>
+<p>Again, I don't expect too many fundamental problems in this rather small <br>
+incident, but one has to approach it with the proper mindset about how the <br>
+Isabelle code base (and its history) works.</p>
+<p>(Next time I will tell a story how an efficient and fully verified <br>
+merge-sort function included in the core sources caused several days of <br>
+worries.)</p>
+<p>Makarius</p>
+
+
+
+<a name="294225533"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20BUG%20in%20conv.ML%3A%20rewr_conv%20and%20then_conv%20fail%20d.../near/294225533" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20BUG.20in.20conv.2EML.3A.20rewr_conv.20and.20then_conv.20fail.20d.2E.2E.2E.html#294225533">(Aug 19 2022 at 09:03)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+I just tried my suggestion and it seems to break HOL. I'll investigate more.</p>
+<p>Tobias</p>
+
+
+
+<a name="294225540"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20BUG%20in%20conv.ML%3A%20rewr_conv%20and%20then_conv%20fail%20d.../near/294225540" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20BUG.20in.20conv.2EML.3A.20rewr_conv.20and.20then_conv.20fail.20d.2E.2E.2E.html#294225540">(Aug 19 2022 at 09:03)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Larry should be able to tell you.</p>
+<p>It is again the same technique to let rule composition perform some <br>
+normalization.  The above function goes back to Stefan Berghofer, IIRC. <br>
+I merely changed its name Drule.instantiate ~&gt; Drule.instantiate_normalize <br>
+recently, to make it a bit more explicit what was meant here.</p>
+<p>Makarius</p>
+
+
+
+<a name="294225548"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20BUG%20in%20conv.ML%3A%20rewr_conv%20and%20then_conv%20fail%20d.../near/294225548" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20BUG.20in.20conv.2EML.3A.20rewr_conv.20and.20then_conv.20fail.20d.2E.2E.2E.html#294225548">(Aug 19 2022 at 09:03)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+I would have given it a &gt; 50% chance of not breaking immediately, since <br>
+rewrite_conv is relatively new back in Isabelle/HOL.</p>
+<p>Anyway, whoever thinks something needs to be changed in a certain way, the <br>
+first move is to make some empirical studies to test the hypothesis <br>
+against historical reality.</p>
+<p>Makarius</p>
+
+
+
+<a name="294225559"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20BUG%20in%20conv.ML%3A%20rewr_conv%20and%20then_conv%20fail%20d.../near/294225559" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20BUG.20in.20conv.2EML.3A.20rewr_conv.20and.20then_conv.20fail.20d.2E.2E.2E.html#294225559">(Aug 19 2022 at 09:03)</a>:</h4>
+<p>From: Lawrence Paulson &lt;<a href="mailto:lp15@cam.ac.uk">lp15@cam.ac.uk</a>&gt;<br>
+My guess (I don't have time to study the code) is that this will perform beta-eta normalisation.</p>
+<p>As a historical remark, I'm quite attached to conversions, which were the topic of my very first journal article:</p>
+<p>L. C. Paulson. <br>
+A higher-order implementation of rewriting. Science of Computer Programming 3 (1983), 119–149.</p>
+<p>They made a lot of sense in the context of LCF and HOL, where users routinely wrote code as part of the verification process. Although I included this code in Isabelle, it didn't have a central role and I thought it'd got deleted. Obviously it would be sensible to correct any deficiencies or omissions. But I'm still intrigued regarding what sort of application you could have for them.</p>
+<p>Larry</p>
+
+
+
+<a name="294225568"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20BUG%20in%20conv.ML%3A%20rewr_conv%20and%20then_conv%20fail%20d.../near/294225568" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20BUG.20in.20conv.2EML.3A.20rewr_conv.20and.20then_conv.20fail.20d.2E.2E.2E.html#294225568">(Aug 19 2022 at 09:03)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+They found again some uses in relatively small-scale tinkering with <br>
+sub-term structure, things that would be hard with the Simplifier engine <br>
+and its builtin strategies.  This is not so much compared to the<br>
+ancient times and past glory of LCF conversions.</p>
+<p>What I found quite interesting was the presentation by Stefan Berghofer of <br>
+Isabelle conversions at the 2009 isabelle-dev workshop at Munich.  He <br>
+first showed how to make a simplifier with a few conversions and <br>
+conversion combinators, then showed how to make it a little faster using a <br>
+"Boultonized" version of the same (like "Q" conversions in HOL), and then <br>
+showed how to make it really fast using the Isabelle Simplifier techniques <br>
+that came after conversions so many years ago.</p>
+<p>Makarius</p>
+
+
+
+<a name="294225589"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20BUG%20in%20conv.ML%3A%20rewr_conv%20and%20then_conv%20fail%20d.../near/294225589" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20BUG.20in.20conv.2EML.3A.20rewr_conv.20and.20then_conv.20fail.20d.2E.2E.2E.html#294225589">(Aug 19 2022 at 09:03)</a>:</h4>
+<p>From: Brian Huffman &lt;<a href="mailto:huffman@in.tum.de">huffman@in.tum.de</a>&gt;<br>
+I can't speak for Peter, but I am currently using conversions in a few places.</p>
+<p>My main application is for writing simprocs: See e.g.<br>
+HOL/Tools/group_cancel.ML or nat_arith.ML. Rewriting these<br>
+cancellation simprocs to use conversions made the code significantly<br>
+shorter, simpler, more efficient, and more reliable. There used to be<br>
+a few simprocs that would sometimes return an equation whose<br>
+left-hand-side did not match the input term; using conversions ensures<br>
+that this will not happen.</p>
+<p>I would definitely recommend conversions to anyone thinking about<br>
+writing a simproc.</p>
+<p>I am also using conversions inside the transfer package, to do some<br>
+preprocessing steps. For this purpose, conversions are more<br>
+predictable and more customizable than using the simplifier.</p>
+<ul>
+<li>Brian</li>
+</ul>
+
+
+
+<a name="294225599"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20BUG%20in%20conv.ML%3A%20rewr_conv%20and%20then_conv%20fail%20d.../near/294225599" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20BUG.20in.20conv.2EML.3A.20rewr_conv.20and.20then_conv.20fail.20d.2E.2E.2E.html#294225599">(Aug 19 2022 at 09:03)</a>:</h4>
+<p>From: Lawrence Paulson &lt;<a href="mailto:lp15@cam.ac.uk">lp15@cam.ac.uk</a>&gt;<br>
+That application is very interesting! And one can argue that a simproc is a very similar concept as a conversion, anyway.</p>
+<p>Larry</p>
+
+
+
+<a name="294225647"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20BUG%20in%20conv.ML%3A%20rewr_conv%20and%20then_conv%20fail%20d.../near/294225647" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20BUG.20in.20conv.2EML.3A.20rewr_conv.20and.20then_conv.20fail.20d.2E.2E.2E.html#294225647">(Aug 19 2022 at 09:04)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+The problem comes from my matching code that eta-expands even if it does not<br>
+need to. Substituting such a matcher back into the pattern creates new<br>
+beta-redexes that were not there beforehand. This is more subtle than expected.</p>
+<p>In contrast, it seems that Thomas' solution (fix_conv) does the job, but it is a<br>
+bit on the brutal side. I'll see if I can come up with something less brutal.</p>
+<p>Tobias</p>
+
+
+
+<a name="294225672"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20BUG%20in%20conv.ML%3A%20rewr_conv%20and%20then_conv%20fail%20d.../near/294225672" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20BUG.20in.20conv.2EML.3A.20rewr_conv.20and.20then_conv.20fail.20d.2E.2E.2E.html#294225672">(Aug 19 2022 at 09:04)</a>:</h4>
+<p>From: Thomas Sewell &lt;<a href="mailto:Thomas.Sewell@nicta.com.au">Thomas.Sewell@nicta.com.au</a>&gt;</p>
+<blockquote>
+<blockquote>
+<p>fun fix_conv conv ct = let<br>
+    val thm = conv ct<br>
+    val eq = Logic.mk_equals (term_of ct, term_of ct) |&gt;  head_of<br>
+  in if (term_of (Thm.lhs_of thm) aconv term_of ct)<br>
+    then thm<br>
+    else thm RS trivial<br>
+      (Thm.mk_binop (cterm_of (theory_of_cterm ct) eq) ct (Thm.rhs_of thm))<br>
+end<br>
+You should explain what "_ RS trivial" does.  It is the conventional way<br>
+to let Larry's rule composition calculus do its normalization for you.<br>
+Admittedly this is not beautiful code. I just happened to have it.</p>
+</blockquote>
+</blockquote>
+<p>What "thm RS trivial P" does is constructs the trivial theorem "P ==&gt; P" <br>
+and then discharges its assumption using thm.</p>
+<p>The point here is to specify the conclusion we want (Thm.mk_binop ...) <br>
+with the original cterm on the left hand side, construct a theorem with <br>
+that conclusion, and then "prove" it by resolution with a theorem we <br>
+have (which is alpha-beta-eta- equivalent). Yes, that is a big hammer to <br>
+apply, but it won't be applied all that often. The major cost here is <br>
+checking whether it is needed all the time.</p>
+<blockquote>
+<p>Thinking in terms of "broken" and "fixed" is unwise.  Which is actually my<br>
+main complaint on this thread.</p>
+</blockquote>
+<p>Some things are neither broken nor fixed, they are just surprising, but <br>
+surprising for good reason. This is broken. As others have pointed out, <br>
+there is a clear contract for convs to follow so that then_conv can <br>
+chain them using Thm.transitive. This contract is not followed by rewr_conv.</p>
+<p>This is one solution. An alternative would be to broaden the contract by <br>
+having then_conv catch the exception from Thm.transitive and switch to a <br>
+more general mechanism (possibly by doing the above). This might create <br>
+problems for some other consumers of convs, which I have not taken time <br>
+to investigate.</p>
+<p>Yours,<br>
+     Thomas.</p>
+
+
+
+<a name="294225691"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20BUG%20in%20conv.ML%3A%20rewr_conv%20and%20then_conv%20fail%20d.../near/294225691" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20BUG.20in.20conv.2EML.3A.20rewr_conv.20and.20then_conv.20fail.20d.2E.2E.2E.html#294225691">(Aug 19 2022 at 09:04)</a>:</h4>
+<p>From: Christian Sternagel &lt;<a href="mailto:c-sterna@jaist.ac.jp">c-sterna@jaist.ac.jp</a>&gt;<br>
+Does anybody know whether slides/thy-files of this talk are still <br>
+around? (I did not manage to find a website for any of the Isabelle <br>
+Users Workshops besides 2012.) - cheers chris</p>
+
+
+
+<a name="294225699"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20BUG%20in%20conv.ML%3A%20rewr_conv%20and%20then_conv%20fail%20d.../near/294225699" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20BUG.20in.20conv.2EML.3A.20rewr_conv.20and.20then_conv.20fail.20d.2E.2E.2E.html#294225699">(Aug 19 2022 at 09:04)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@kit.edu">andreas.lochbihler@kit.edu</a>&gt;<br>
+Hi Christian,</p>
+<p>the website still has the theory files.</p>
+<p><a href="http://isabelle.in.tum.de/nominal/activities/tphols09/idw.html">http://isabelle.in.tum.de/nominal/activities/tphols09/idw.html</a></p>
+<p>Andreas</p>
+
+
+
+<a name="294225705"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20BUG%20in%20conv.ML%3A%20rewr_conv%20and%20then_conv%20fail%20d.../near/294225705" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20BUG.20in.20conv.2EML.3A.20rewr_conv.20and.20then_conv.20fail.20d.2E.2E.2E.html#294225705">(Aug 19 2022 at 09:04)</a>:</h4>
+<p>From: Christian Sternagel &lt;<a href="mailto:c-sterna@jaist.ac.jp">c-sterna@jaist.ac.jp</a>&gt;<br>
+Thanks!</p>
+<p>No wonder that searching for "Isabelle Users Workshop" did not give the <br>
+desired result ;)... I forgot that in 2009 it was a "Developers Workshop".</p>
+<p>cheers</p>
+<p>chris</p>
+
+
+
+<a name="294225728"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20BUG%20in%20conv.ML%3A%20rewr_conv%20and%20then_conv%20fail%20d.../near/294225728" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20BUG.20in.20conv.2EML.3A.20rewr_conv.20and.20then_conv.20fail.20d.2E.2E.2E.html#294225728">(Aug 19 2022 at 09:04)</a>:</h4>
+<p>From: Christian Urban &lt;<a href="mailto:christian.urban@kcl.ac.uk">christian.urban@kcl.ac.uk</a>&gt;<br>
+I do not have the slides of this talk it seems, but <br>
+the theory Stefan presented in 2009 is here:</p>
+<p><a href="http://isabelle.in.tum.de/nominal/activities/tphols09/IDW/Conversions.thy">http://isabelle.in.tum.de/nominal/activities/tphols09/IDW/Conversions.thy</a></p>
+<p>The workshops in 2009 and 2010 have their webpage here:</p>
+<p><a href="http://isabelle.in.tum.de/nominal/activities/tphols09/idw.html">http://isabelle.in.tum.de/nominal/activities/tphols09/idw.html</a><br>
+<a href="http://isabelle.in.tum.de/nominal/activities/idw10/idw.html">http://isabelle.in.tum.de/nominal/activities/idw10/idw.html</a></p>
+<p>Christian</p>
+
+
+
+<a name="294225792"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20BUG%20in%20conv.ML%3A%20rewr_conv%20and%20then_conv%20fail%20d.../near/294225792" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20BUG.20in.20conv.2EML.3A.20rewr_conv.20and.20then_conv.20fail.20d.2E.2E.2E.html#294225792">(Aug 19 2022 at 09:05)</a>:</h4>
+<p>From: Mathieu Giorgino &lt;<a href="mailto:Mathieu.Giorgino@irit.fr">Mathieu.Giorgino@irit.fr</a>&gt;<br>
+It seems most of the links on this page are broken. An easy fix is to <br>
+replace all occurences of<br>
+   "<a href="http://tphols.in.tum.de">tphols.in.tum.de</a>"<br>
+by<br>
+   "<a href="http://isabelle.in.tum.de/nominal/activities/tphols09/">isabelle.in.tum.de/nominal/activities/tphols09/</a>"<br>
+in the html file.</p>
+<p>Thanks for the link.</p>
+<ul>
+<li>Mathieu</li>
+</ul>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

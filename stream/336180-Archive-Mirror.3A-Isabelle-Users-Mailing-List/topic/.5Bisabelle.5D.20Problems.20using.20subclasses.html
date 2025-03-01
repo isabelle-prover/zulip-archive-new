@@ -1,0 +1,119 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Problems using subclasses · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20using.20subclasses.html">[isabelle] Problems using subclasses</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294251944"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20using%20subclasses/near/294251944" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20using.20subclasses.html#294251944">(Aug 19 2022 at 12:11)</a>:</h4>
+<p>From: René Thiemann &lt;<a href="mailto:rene.thiemann@uibk.ac.at">rene.thiemann@uibk.ac.at</a>&gt;<br>
+Dear all,</p>
+<p>I stumbled upon the following problem: it seems, that it is not possible<br>
+to access generic lemmas with sort-constraints for proving a subclass<br>
+relation:</p>
+<p>theory Test<br>
+imports Main<br>
+begin</p>
+<p>consts P :: "'a =&gt; 'a =&gt; bool"<br>
+consts Q :: "'a =&gt; 'a =&gt; bool"</p>
+<p>class A =<br>
+  fixes foo :: "'a =&gt; 'a"</p>
+<p>class B = A +<br>
+  fixes bar :: "'a =&gt; 'a"<br>
+  assumes P: "P (x :: 'a) (foo x)"<br>
+begin<br>
+lemma PQ: "P (x :: 'a) y ==&gt; Q x y" sorry<br>
+end</p>
+<p>lemma Q: "Q (x :: 'a :: B) (foo x)"<br>
+  using P[of x] PQ by auto</p>
+<p>class C = A +<br>
+  assumes QQ: "? y. Q (x :: 'a) y"</p>
+<p>subclass (in B) C<br>
+proof<br>
+  fix x :: 'a <br>
+  have "bar x = bar x" by simp <br>
+  (* since the term "bar x" is accepted, definitely, x<br>
+     has sort B *)</p>
+<p>note P[of x] PQ[of x] <br>
+  (* one can access lemmas from B like P and PQ which have been<br>
+     defined within the context *)</p>
+<p>show "? y. Q x y" using Q[of x] ..<br>
+  (* delivers "Type unification failed: Variable 'a::type not of sort B" *)<br>
+  (* but not lemmas like Q, which are defined outside the class via<br>
+     sort constraints *)<br>
+qed<br>
+end</p>
+<p>Is this is known limitation, or did I make some mistake?<br>
+In my concrete application, I would have liked to use <br>
+ex_le_of_nat in src/HOL/Archimedean_Field to prove a subclass<br>
+relation, but could not. Instead I currently use ex_le_of_int<br>
+and copied the proof for ex_le_of_nat to finish the subclass proof,<br>
+which works, but is a bit unsatisfactory.</p>
+<p>Best regards,<br>
+René</p>
+<p>PS: I used Isabelle2013-1-RC3</p>
+
+
+
+<a name="294251957"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20using%20subclasses/near/294251957" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20using.20subclasses.html#294251957">(Aug 19 2022 at 12:11)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi René,</p>
+<blockquote>
+<p>subclass (in B) C<br>
+proof<br>
+   fix x :: 'a<br>
+   have "bar x = bar x" by simp<br>
+   (* since the term "bar x" is accepted, definitely, x<br>
+      has sort B *)<br>
+No, 'a has sort type, not B, as can be seen by showing the sorts with [[show_sorts]]. <br>
+Inside a class context, occurrences of class parameters are mapped to the locally fixed <br>
+class parameter whenever type inference says that this is possible.</p>
+</blockquote>
+<blockquote>
+<p>note P[of x] PQ[of x]<br>
+   (* one can access lemmas from B like P and PQ which have been<br>
+      defined within the context *)<br>
+Fact names from class contexts are localised similarly. You can refer to the global <br>
+version of these facts with Test.P and Test.PQ. Then, type unification will fail.</p>
+</blockquote>
+<blockquote>
+<p>Is this is known limitation, or did I make some mistake?<br>
+In my concrete application, I would have liked to use<br>
+ex_le_of_nat in src/HOL/Archimedean_Field to prove a subclass<br>
+relation, but could not. Instead I currently use ex_le_of_int<br>
+and copied the proof for ex_le_of_nat to finish the subclass proof,<br>
+which works, but is a bit unsatisfactory.<br>
+This is a known problem. And for this reason, as many theorems as possible should be <br>
+proven inside the class context. However, many theories have yet not been "optimised" in <br>
+this respect.</p>
+</blockquote>
+<p>Alternatively, you can do an instance declaration instead of a subclass declaration:</p>
+<p>instance B \&lt;subseteq&gt; C</p>
+<p>Then, the type variable 'a has sort B in the proof, and you can use all you need. The <br>
+difference to subclass is that you do not get the sublocale declaration B &lt; C, that <br>
+subclass implicitly issues, i.e., inside the context of B, you cannot refer to theorems <br>
+from C.</p>
+<p>Best,<br>
+Andreas</p>
+<p>PS: All this is explained in the Isar-Ref manual, section 5.7.</p>
+
+
+
+<a name="294252132"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20using%20subclasses/near/294252132" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20using.20subclasses.html#294252132">(Aug 19 2022 at 12:12)</a>:</h4>
+<p>From: René Thiemann &lt;<a href="mailto:rene.thiemann@uibk.ac.at">rene.thiemann@uibk.ac.at</a>&gt;<br>
+Dear Andreas,</p>
+<p>thanks for the clarifying answer and the link to the Isar-Ref manual.</p>
+<p>Best,<br>
+René</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

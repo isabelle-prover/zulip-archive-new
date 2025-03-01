@@ -1,0 +1,116 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] On random variables, dependencies and their ex... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20On.20random.20variables.2C.20dependencies.20and.20their.20ex.2E.2E.2E.html">[isabelle] On random variables, dependencies and their ex...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294733873"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20On%20random%20variables%2C%20dependencies%20and%20their%20ex.../near/294733873" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20On.20random.20variables.2C.20dependencies.20and.20their.20ex.2E.2E.2E.html#294733873">(Aug 22 2022 at 17:24)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:mail@andreas-lochbihler.de">mail@andreas-lochbihler.de</a>&gt;<br>
+Dear Kawin,</p>
+<p>Probability Mass Functions are indeed discrete distributions, not random <br>
+variables. But you can fairly easily build complex distributions out of <br>
+simple ones, using the monadic sequencing operator bind_pmf. The <br>
+function map_pmf is not as powerful.</p>
+<p>For example, to get a distribution over lists of booleans that are all <br>
+sampled independently, you could write the following probabilistic program:</p>
+<p>fun w_list_pmf :: "nat =&gt; bool list pmf" where<br>
+   "w_list_pmf 0 = return_pmf []"<br>
+| "w_list_pmf n =<br>
+    bind_pmf (w_list_pmf (n - 1)) (%xs.<br>
+    bind_pmf (bernoulli_pmf *(1 - e) / 2)) (%x.<br>
+    return_pmf (x # xs)))"</p>
+<p>You can also define the function Δ_n using monadic programming:</p>
+<p>definition Δ_n where "Δ_n n =<br>
+   bind_pmf (w_list_pmf (n + 1)) (%xs.<br>
+   return_pmf (f xs - f (tl xs)))"</p>
+<p>However, you cannot express Δ_n in terms of Φ_i, because as you have <br>
+rightly observed, once you project from the list of Bernoulli choices to <br>
+a single index, then all dependencies between the choices are lost.</p>
+<p>The expectation function always takes a function to transform the <br>
+elementary events into real numbers. In case they are already real <br>
+numbers, then the identity function id is indeed the right choice. This <br>
+additional parameter is important to obtain nice laws for bind_pmf.</p>
+<p>The Archive of Formal Proofs contains a few entries which build on 'a <br>
+pmf, but AFAIK none of them solves the issue with random variables. <br>
+Essentially, you can view a discrete random variable X as a function <br>
+from a probability distribution p to some other space. With 'a pmf, <br>
+you'd model this by the term map_pmf f p.</p>
+<p>Hope this helps,<br>
+Andreas</p>
+
+
+
+<a name="294736661"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20On%20random%20variables%2C%20dependencies%20and%20their%20ex.../near/294736661" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20On.20random.20variables.2C.20dependencies.20and.20their.20ex.2E.2E.2E.html#294736661">(Aug 22 2022 at 17:40)</a>:</h4>
+<p>From: Kawin Worrasangasilpa &lt;<a href="mailto:kw448@cam.ac.uk">kw448@cam.ac.uk</a>&gt;<br>
+Hi,</p>
+<p>I have been trying to deal with random variables in Isabelle/HOL for some<br>
+time and I still can't find out how to deal with them exactly. I found in<br>
+"HOL/Probability/Probability_Mass_Function.thy" on how to define an " 'a<br>
+pmf " value briefly. For example, I could use map_pmf to change to<br>
+different space:</p>
+<p>context<br>
+  fixes ε :: real<br>
+begin</p>
+<p>definition w_n :: "nat pmf" where<br>
+ "w_n = map_pmf (λb. (if b then 1 else 0)) (bernoulli_pmf ((1-ε)/2))"</p>
+<p>(<em>this is to change from {True, False} to {1, 0}</em>)</p>
+<p>definition W_n :: "int pmf" where<br>
+ "W_n = map_pmf (λb. (-1) ^ (if b then 0 else 1)) (bernoulli_pmf ((1-ε)/2))"<br>
+(<em>this is to change from {True, False} to {1, -1}</em>)</p>
+<p>or use lift_definition:</p>
+<p>lift_definition w_list_pmf :: "nat ⇒ bool list pmf" is<br>
+  "λn (l::bool list).<br>
+    if size l = n then (((1-ε)/2)^(count (mset l) True))*((1+ε/2)^(count<br>
+(mset l) False)) else 0"<br>
+(*this is to have a bool list random variable of fixed length and all<br>
+members are independent Bernoulli random variables with p = (1-ε)/2*)</p>
+<p>But when it becomes more complicated and the random variables are dependent<br>
+I have no idea how to phrase it. For example, Let us say I have a sequence<br>
+of random variables Φ_i = f (w_1w_2...w_i) (all w_i are independent<br>
+Bernoulli random variables),<br>
+and then construct Δ_i = Φ_i - Φ_(i-1). The complication, in this case, is<br>
+Φ_i =  f (w_1w_2...w_i) and Φ_(i-1) f (w_1w_2...w_(i-1)) use the same w_t<br>
+sequence which are w_1,w_2,...,w_(i-1), but the first Φ also uses w_i for<br>
+the last element in the list. So, I tried,</p>
+<p>lift_definition w_list_pmf :: "nat ⇒ bool list pmf" is<br>
+  "λn (l::bool list).<br>
+    if size l = n then (((1-ε)/2)^(count (mset l) True))*((1+ε/2)^(count<br>
+(mset l) False)) else 0"<br>
+  sorry</p>
+<p>definition Φ_n :: "nat ⇒ real pmf" where<br>
+  "Φ_n n = map_pmf (λl. f l) (w_list_pmf n)"<br>
+(*with f being any function in "bool list =&gt; real" and "n" is the lenth of<br>
+the input list*)</p>
+<p>definition Δ_n :: "nat ⇒ real pmf" where<br>
+  "Δ_n n = map_pmf<br>
+    (λp. fst p - snd p) (pair_pmf (Φ_n n) (Φ_n (n -1)))",</p>
+<p>But I guess this makes  (Φ_n n)  and  (Φ_n(n-1)) completely independent<br>
+which is not what I want<br>
+since they use common random variables in their generating process:<br>
+w_1,w_2,...,w_(i-1). So I realised that these constants of " 'a pmf" type<br>
+are not supposed to be used as random variables but distribution (please<br>
+correct me on this).</p>
+<p>Also, I would like to calculate these random variables' expectation, for<br>
+which I tried</p>
+<p>lemma "n &gt; 0 ⟶<br>
+  prob_space.expectation (Δ_n n) (id) &lt; -ε"<br>
+  sorry</p>
+<p>,and felt really doubtful of the existence of the function "id" since if  "Δ_n<br>
+n" could be used as a random variable, it wouldn't need any function to be<br>
+involved in calculating the expectation.<br>
+Could I ask whether there are any better ways or repositories I should<br>
+check to sort out this random variables issue and their expectations?</p>
+<p>Thanks,<br>
+Kawin</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

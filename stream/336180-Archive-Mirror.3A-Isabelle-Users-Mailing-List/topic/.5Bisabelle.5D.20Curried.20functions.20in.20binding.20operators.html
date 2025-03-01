@@ -1,0 +1,133 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Curried functions in binding operators · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Curried.20functions.20in.20binding.20operators.html">[isabelle] Curried functions in binding operators</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294327708"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Curried%20functions%20in%20binding%20operators/near/294327708" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Curried.20functions.20in.20binding.20operators.html#294327708">(Aug 19 2022 at 17:12)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear all,</p>
+<p>I have large subgoals with operators that bind variables like let, bind and integrals.<br>
+These operators are just higher-order functions which use the standard function <br>
+abstraction to implement the binding. Unfortunately, lemmas about these operators no <br>
+longer apply when the bound variable is a tuple which is split up into its components <br>
+using patterns (internally implemented via case_prod), because the case_prod destroys the <br>
+pattern. Here is an example to illustrate the problem (also attached as a theory file). <br>
+The bind operation on option commutes.</p>
+<p>notation Option.bind (infixr "»=" 54)</p>
+<p>lemma bind_commute: "x »= (λx. y »= (λy. f x y)) = y »= (λy. x »= (λx. f x y))"<br>
+   by(cases "x = None ∨ y = None") auto</p>
+<p>Now, I would like to apply this lemma in a situation where the "x" is a tupled option and <br>
+the "λx" splits the tuple into its components say "λ((b, c), d)". For example,</p>
+<p>have "f x »= (λ((b, c), d). g x »= h b d) = foo"<br>
+   apply(subst bind_commute)</p>
+<p>Of course, the subst method fails here, because between the two binds there are the <br>
+case_prod functions, i.e., the pattern does not match. I have not been able to find a <br>
+satisfactory solution for this problem. I expect that others have the same problem and <br>
+hope that they share their solutions with me.</p>
+<p>Here are my attempts so far:</p>
+<ol>
+<li>
+<p>apply(unfold split_def)<br>
+This works but the resulting subgoal is</p>
+<p>"g x »= (λy. f x »= (λx. h (fst (fst x)) (snd x) y)) = foo</p>
+</li>
+</ol>
+<p>which is much harder to read than the desired</p>
+<p>"g x »= (λy. f x »= (λ((b, c), d). h b d y)) = foo"</p>
+<p>(Think of f, g, and h being huge terms with many occurrences of b and d.) Moreover, the <br>
+variable names b and d get lost,</p>
+<ol start="2">
+<li>Derive a commutativity rule for each way of splitting:</li>
+</ol>
+<p>lemma bind_commute_ss:<br>
+   "x »= (λ((a, b), c). y »= h a b c) = y »= (λy. x »= (λ((a, b), c). h a b c y))"<br>
+   unfolding split_def by(rule bind_commute)</p>
+<p>Now, I can use apply(subst bind_commute_ss), but the variable names are still lost. The <br>
+new subgoal is<br>
+   "g x »= (λy. f x »= (λ((a, b), c). h a c y)) = foo"<br>
+instead of<br>
+   "g x »= (λy. f x »= (λ((b, c), d). h b d y)) = foo"<br>
+Moreover, I have to derive a new rule for each way in which the tuples are split up.</p>
+<ol start="3">
+<li>
+<p>State the desired result as an intermediate step:</p>
+<p>have "f x »= (λ((b, c), d). g x »= h b d) = g x »= (λy. f x »= (λ((b, c), d). h b d y))"<br>
+   by(unfold split_def)(rule bind_commute)<br>
+ also have "... = foo"</p>
+</li>
+</ol>
+<p>When f, g, and h are huge terms, this is very inconvenient, especially when I am in the <br>
+middle of an apply script.</p>
+<p>Thanks in advance for any pointers and ideas,<br>
+Andreas<br>
+<a href="/user_uploads/14278/J5eKZT-2wDK6QViF2hXTBkDo/Split.thy">Split.thy</a></p>
+
+
+
+<a name="294327754"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Curried%20functions%20in%20binding%20operators/near/294327754" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Curried.20functions.20in.20binding.20operators.html#294327754">(Aug 19 2022 at 17:12)</a>:</h4>
+<p>From: Michael Norrish &lt;<a href="mailto:michael.norrish@nicta.com.au">michael.norrish@nicta.com.au</a>&gt;<br>
+My experience with this sort of situation is that sometimes you are just doomed.<br>
+ However, Konrad Slind and I did have a proof pearl in TPHOLs 2005</p>
+<p><a href="http://nicta.com.au/people/norrishm/attachments/bibliographies_and_papers/2005/tphols2005-pearl.pdf">http://nicta.com.au/people/norrishm/attachments/bibliographies_and_papers/2005/tphols2005-pearl.pdf</a></p>
+<p>where we presented a solution to a pretty similar problem.</p>
+<p>I don't know if the Isabelle simplifier will preserve variable names when it<br>
+applies the relevant rules, but at least the approach doesn't require anything<br>
+more than standard h.o pattern rewriting.</p>
+<p>Michael<br>
+<a href="/user_uploads/14278/7dvJrIkPZlZiXHjO-WarZ637/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294327769"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Curried%20functions%20in%20binding%20operators/near/294327769" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Curried.20functions.20in.20binding.20operators.html#294327769">(Aug 19 2022 at 17:12)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear Michael,</p>
+<p>I am aware of your approach with combinators and have been using it in Isabelle for a <br>
+while. Unfortunately, the simplifier does not preserve variable names as required, but I <br>
+was able to solve that by writing a simproc that takes care of that. Unfortunately, the <br>
+reasoning infrastructure sometimes spontaneously eta-expands (e.g., due to congruence <br>
+rules) or eta-contracts (in particular method subst) terms. Then, new variable names are <br>
+introduced or some of the combinators remain in the goal. So this does not work as <br>
+smoothly as in HOL.</p>
+<p>Maybe I could make your system work to preserve the variable names in my approach no. 2, <br>
+but I don't see how I could avoid devising combinator rules for all combinations of splitting.</p>
+<p>Cheers,<br>
+Andreas</p>
+
+
+
+<a name="294328106"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Curried%20functions%20in%20binding%20operators/near/294328106" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Curried.20functions.20in.20binding.20operators.html#294328106">(Aug 19 2022 at 17:14)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+I have never tried to tackle that issue, but a rough idea comes to my<br>
+mind: an optional simproc which collapses (%x. … fst x … snd x) to (%(a,<br>
+b). … a … b …).  No idea how this would work in practice.</p>
+<p>Florian<br>
+<a href="/user_uploads/14278/m-Kh_Iya45c7VkP_xVK7zL8G/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294328137"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Curried%20functions%20in%20binding%20operators/near/294328137" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Curried.20functions.20in.20binding.20operators.html#294328137">(Aug 19 2022 at 17:14)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear Florian,</p>
+<p>I am not sure that this would work in general, because "fst x" and "snd x" need not both <br>
+be in the remaining term. In my example, we would get "λ(a, d). h (fst a) d y" in the <br>
+first step. For a, there is only "fst a", but no "snd a", so should the simproc trigger <br>
+once more?</p>
+<p>What is more severe is that I do not see how one can possibly get back the original <br>
+variable names. Once split_def has been unfolded, they seem to be gone forever.</p>
+<p>Andreas</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

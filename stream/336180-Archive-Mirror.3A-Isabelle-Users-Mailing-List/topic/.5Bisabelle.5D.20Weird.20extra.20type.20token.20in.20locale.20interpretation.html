@@ -1,0 +1,72 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Weird extra type token in locale interpretation · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Weird.20extra.20type.20token.20in.20locale.20interpretation.html">[isabelle] Weird extra type token in locale interpretation</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294105488"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Weird%20extra%20type%20token%20in%20locale%20interpretation/near/294105488" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Weird.20extra.20type.20token.20in.20locale.20interpretation.html#294105488">(Aug 18 2022 at 15:04)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@kit.edu">andreas.lochbihler@kit.edu</a>&gt;<br>
+Hi all,</p>
+<p>I stumbled across the following problem with locales, see below for a <br>
+small example.</p>
+<p>Locale "heap" simply fixes the operations "empty_heap", "new_obj" and <br>
+"typeof_addr" and defines in terms of them two other functions <br>
+"addr_of_sys_xcpt" and "preallocated".</p>
+<p>The first depends only on the parameters empty_heap and new_obj.<br>
+preallocated is defined in terms of addr_of_sys_xcpt and thus depends on <br>
+all three parameters, although only on typeof_addr directly.</p>
+<p>Next, I interpret this locale (with prefix test), where new_obj gets <br>
+instantiated to some function sc_new_obj that is partially applied to <br>
+some list P, which the for clause declares. In its definition, <br>
+sc_new_obj is polymorphic in the list's element type.</p>
+<p>Since interpretation parameters declared in for clauses become <br>
+additional parameters of the abbreviations that the interpretation <br>
+introduces, I would have expected that "test.preallocated" abbreviates</p>
+<p>%P. heap.preallocated Map.empty (sc_new_obj P) id"</p>
+<p>and has type "'a list =&gt; (nat ~=&gt; ty) =&gt; bool".</p>
+<p>However</p>
+<p>term test.preallocated</p>
+<p>produces</p>
+<p>"%TYPE P. heap.preallocated Map.empty (sc_new_obj P) id"<br>
+   :: "'a itself =&gt; 'a list =&gt; (nat ~=&gt; ty) =&gt; bool"</p>
+<p>test.preallocated expects an additional type token, which is <br>
+unnecessary, because the same type variable also occurs in the second <br>
+parameter! Why is that? And how can I get test.preallocated without the <br>
+extra type token?</p>
+<p>Here is the example for Isabelle2009-1:</p>
+<p>typedecl ty</p>
+<p>locale heap =<br>
+   fixes empty_heap :: "'heap"<br>
+   and new_obj :: "'heap =&gt; string =&gt; ('heap * nat option)"<br>
+   and typeof_addr :: "'heap =&gt; nat =&gt; ty option"<br>
+begin</p>
+<p>definition addr_of_sys_xcpt :: "string =&gt; nat"<br>
+where<br>
+   "addr_of_sys_xcpt C =<br>
+    (let (h0,  a0) = new_obj empty_heap ''foo''<br>
+     in if C = ''foo'' then the a0<br>
+        else undefined)"</p>
+<p>definition preallocated :: "'heap =&gt; bool"<br>
+where<br>
+   "preallocated h = (typeof_addr h (addr_of_sys_xcpt ''foo'') ~= None)"</p>
+<p>end</p>
+<p>types sc_heap = "nat =&gt; ty option"</p>
+<p>definition sc_new_obj :: "'a list =&gt; sc_heap =&gt; string =&gt; (sc_heap * nat <br>
+option)"<br>
+where "sc_new_obj P h C = (h, None)"</p>
+<p>interpretation test!: heap Map.empty "sc_new_obj P" id for P<br>
+.</p>
+<p>term test.preallocated</p>
+<p>Regards,<br>
+Andreas</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

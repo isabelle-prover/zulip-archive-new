@@ -1,0 +1,184 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] How to generate / register a primitive recursi... · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20How.20to.20generate.20.2F.20register.20a.20primitive.20recursi.2E.2E.2E.html">[isabelle] How to generate / register a primitive recursi...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="495950684"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20How%20to%20generate%20/%20register%20a%20primitive%20recursi.../near/495950684" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20How.20to.20generate.20.2F.20register.20a.20primitive.20recursi.2E.2E.2E.html#495950684">(Jan 26 2025 at 09:26)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@cit.tum.de">florian.haftmann@cit.tum.de</a>&gt;<br>
+Hi all,</p>
+<p>I have a couple of related questions concerning the current state of the <br>
+datatype package.</p>
+<p>Find my motivation in the attached theory: I want to »register« a type a <br>
+posteriori as a datatype.</p>
+<p>a) Construct the type</p>
+<p>b) Define the appropriate constructors</p>
+<p>c) Prove them as free constructors</p>
+<p>d) Prove the corresponding induction rule</p>
+<p>But then? Primrec still fails, obviously due to the lack of a recursion <br>
+combinator.</p>
+<p>How to proceed from there?</p>
+<p>(When examining how it is done for the existing elementary types in HOL, <br>
+I found that the »old« datatype package with the traditional <br>
+»rep_datatype« is still in place – which leads to the somehow related <br>
+question if there are further migrations plans there.)</p>
+<p>For the presented example an appropriate solution is to introduce the <br>
+type as a datatype and establish lifting a posteriori, but there might <br>
+be other instances where this is the less comfortable way.</p>
+<p>Cheers,<br>
+    Florian</p>
+<p><a href="/user_uploads/14278/Zqs-DRQWpBDMDXgjohR6Cq7h/Numeral.thy">Numeral.thy</a><br>
+<a href="/user_uploads/14278/yqs8sf-lRyD7ONDrVbvEzrAE/OpenPGP_0xA707172232CFA4E9.asc">OpenPGP_0xA707172232CFA4E9.asc</a><br>
+<a href="/user_uploads/14278/q8sgcryX-Fq5BAEVVW-lwnvQ/OpenPGP_signature.asc">OpenPGP_signature.asc</a></p>
+
+
+
+<a name="497143399"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20How%20to%20generate%20/%20register%20a%20primitive%20recursi.../near/497143399" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20How.20to.20generate.20.2F.20register.20a.20primitive.20recursi.2E.2E.2E.html#497143399">(Feb 01 2025 at 08:24)</a>:</h4>
+<p>From: Dmitriy Traytel &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Hi Florian,</p>
+<p>There is indeed no explicit rep_datatype command anymore, but there is an interface to register a recursor, which makes primrec work. I attach the code below. The ML bits are copied from the equivalent setup for natural numbers (which is the reason why this interface exists in the first place).</p>
+<p>To also make fun work with num, it would be good to also include the corresponding size class instance.</p>
+<p>Best wishes,<br>
+Dmitriy</p>
+<p>fun rec_num_raw :: "'a ⇒ (nat ⇒ 'a ⇒ 'a) ⇒ (nat ⇒ 'a ⇒ 'a) ⇒ nat ⇒ 'a" where<br>
+  "rec_num_raw one bit0 bit1 (Suc 0) = one"<br>
+| "rec_num_raw one bit0 bit1 (Suc n) = (if even n then bit1 (n div 2) (rec_num_raw one bit0 bit1 (n div 2))<br>
+     else bit0 ((Suc n) div 2) (rec_num_raw one bit0 bit1 ((Suc n) div 2)))"</p>
+<p>lift_definition rec_num :: "'a ⇒ (num ⇒ 'a ⇒ 'a) ⇒ (num ⇒ 'a ⇒ 'a) ⇒ num ⇒ 'a" is<br>
+  rec_num_raw<br>
+  subgoal for one bit0 bit0' bit1 bit1' n<br>
+    by (induct one bit0 bit1 n rule: rec_num_raw.induct) auto<br>
+  done</p>
+<p>lemma rec_num:<br>
+  "rec_num one bit0 bit1 One = one"<br>
+  "rec_num one bit0 bit1 (Bit0 x) = bit0 x (rec_num one bit0 bit1 x)"<br>
+  "rec_num one bit0 bit1 (Bit1 x) = bit1 x (rec_num one bit0 bit1 x)"<br>
+  by (transfer; auto simp: gr0_conv_Suc)+</p>
+<p>ML ‹<br>
+val num_basic_lfp_sugar =<br>
+  let<br>
+    val ctr_sugar = the (Ctr_Sugar.ctr_sugar_of_global \&lt;^theory&gt; \&lt;^type_name&gt;‹num›);<br>
+    val recx = Logic.varify_types_global \&lt;^term&gt;‹rec_num›;<br>
+    val C = body_type (fastype_of recx);<br>
+  in<br>
+    {T = @{typ num}, fp_res_index = 0, C = C, fun_arg_Tsss = [[], [[@{typ num}, C]], [[@{typ num}, C]]],<br>
+     ctr_sugar = ctr_sugar, recx = recx, rec_thms = @{thms rec_num}}<br>
+  end;<br>
+›</p>
+<p>ML ‹nat_basic_lfp_sugar›</p>
+<p>setup ‹<br>
+let<br>
+  fun basic_lfp_sugars_of _ [\&lt;^typ&gt;‹num›] _ _ ctxt =<br>
+      ([], [0], [num_basic_lfp_sugar], [], [], [], TrueI (<em>dummy</em>), [], false, ctxt)<br>
+    | basic_lfp_sugars_of bs arg_Ts callers callssss ctxt =<br>
+      BNF_LFP_Rec_Sugar.default_basic_lfp_sugars_of bs arg_Ts callers callssss ctxt;<br>
+in<br>
+  BNF_LFP_Rec_Sugar.register_lfp_rec_extension<br>
+    {nested_simps = [], special_endgame_tac = K (K (K (K no_tac))), is_new_datatype = K (K true),<br>
+     basic_lfp_sugars_of = basic_lfp_sugars_of, rewrite_nested_rec_call = NONE}<br>
+end<br>
+›</p>
+<blockquote>
+<p>On 26 Jan 2025, at 10.26, Florian Haftmann &lt;<a href="mailto:florian.haftmann@cit.tum.de">florian.haftmann@cit.tum.de</a>&gt; wrote:</p>
+<p>Hi all,</p>
+<p>I have a couple of related questions concerning the current state of the datatype package.</p>
+<p>Find my motivation in the attached theory: I want to »register« a type a posteriori as a datatype.</p>
+<p>a) Construct the type</p>
+<p>b) Define the appropriate constructors</p>
+<p>c) Prove them as free constructors</p>
+<p>d) Prove the corresponding induction rule</p>
+<p>But then? Primrec still fails, obviously due to the lack of a recursion combinator.</p>
+<p>How to proceed from there?</p>
+<p>(When examining how it is done for the existing elementary types in HOL, I found that the »old« datatype package with the traditional »rep_datatype« is still in place – which leads to the somehow related question if there are further migrations plans there.)</p>
+<p>For the presented example an appropriate solution is to introduce the type as a datatype and establish lifting a posteriori, but there might be other instances where this is the less comfortable way.</p>
+<p>Cheers,<br>
+  Florian<br>
+&lt;Numeral.thy&gt;&lt;OpenPGP_0xA707172232CFA4E9.asc&gt;</p>
+</blockquote>
+
+
+
+<a name="497143460"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20How%20to%20generate%20/%20register%20a%20primitive%20recursi.../near/497143460" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20How.20to.20generate.20.2F.20register.20a.20primitive.20recursi.2E.2E.2E.html#497143460">(Feb 01 2025 at 08:25)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@cit.tum.de">florian.haftmann@cit.tum.de</a>&gt;<br>
+Thanks a lot.</p>
+<p>Florian</p>
+<p>Am 01.02.25 um 09:23 schrieb Dmitriy Traytel (via cl-isabelle-users <br>
+Mailing List):</p>
+<blockquote>
+<p>Hi Florian,</p>
+<p>There is indeed no explicit rep_datatype command anymore, but there is an interface to register a recursor, which makes primrec work. I attach the code below. The ML bits are copied from the equivalent setup for natural numbers (which is the reason why this interface exists in the first place).</p>
+<p>To also make fun work with num, it would be good to also include the corresponding size class instance.</p>
+<p>Best wishes,<br>
+Dmitriy</p>
+<p>fun rec_num_raw :: "'a ⇒ (nat ⇒ 'a ⇒ 'a) ⇒ (nat ⇒ 'a ⇒ 'a) ⇒ nat ⇒ 'a" where<br>
+   "rec_num_raw one bit0 bit1 (Suc 0) = one"<br>
+| "rec_num_raw one bit0 bit1 (Suc n) = (if even n then bit1 (n div 2) (rec_num_raw one bit0 bit1 (n div 2))<br>
+      else bit0 ((Suc n) div 2) (rec_num_raw one bit0 bit1 ((Suc n) div 2)))"</p>
+<p>lift_definition rec_num :: "'a ⇒ (num ⇒ 'a ⇒ 'a) ⇒ (num ⇒ 'a ⇒ 'a) ⇒ num ⇒ 'a" is<br>
+   rec_num_raw<br>
+   subgoal for one bit0 bit0' bit1 bit1' n<br>
+     by (induct one bit0 bit1 n rule: rec_num_raw.induct) auto<br>
+   done</p>
+<p>lemma rec_num:<br>
+   "rec_num one bit0 bit1 One = one"<br>
+   "rec_num one bit0 bit1 (Bit0 x) = bit0 x (rec_num one bit0 bit1 x)"<br>
+   "rec_num one bit0 bit1 (Bit1 x) = bit1 x (rec_num one bit0 bit1 x)"<br>
+   by (transfer; auto simp: gr0_conv_Suc)+</p>
+<p>ML ‹<br>
+val num_basic_lfp_sugar =<br>
+   let<br>
+     val ctr_sugar = the (Ctr_Sugar.ctr_sugar_of_global \&lt;^theory&gt; \&lt;^type_name&gt;‹num›);<br>
+     val recx = Logic.varify_types_global \&lt;^term&gt;‹rec_num›;<br>
+     val C = body_type (fastype_of recx);<br>
+   in<br>
+     {T = @{typ num}, fp_res_index = 0, C = C, fun_arg_Tsss = [[], [[@{typ num}, C]], [[@{typ num}, C]]],<br>
+      ctr_sugar = ctr_sugar, recx = recx, rec_thms = @{thms rec_num}}<br>
+   end;<br>
+›</p>
+<p>ML ‹nat_basic_lfp_sugar›</p>
+<p>setup ‹<br>
+let<br>
+   fun basic_lfp_sugars_of _ [\&lt;^typ&gt;‹num›] _ _ ctxt =<br>
+       ([], [0], [num_basic_lfp_sugar], [], [], [], TrueI (<em>dummy</em>), [], false, ctxt)<br>
+     | basic_lfp_sugars_of bs arg_Ts callers callssss ctxt =<br>
+       BNF_LFP_Rec_Sugar.default_basic_lfp_sugars_of bs arg_Ts callers callssss ctxt;<br>
+in<br>
+   BNF_LFP_Rec_Sugar.register_lfp_rec_extension<br>
+     {nested_simps = [], special_endgame_tac = K (K (K (K no_tac))), is_new_datatype = K (K true),<br>
+      basic_lfp_sugars_of = basic_lfp_sugars_of, rewrite_nested_rec_call = NONE}<br>
+end<br>
+›</p>
+<blockquote>
+<p>On 26 Jan 2025, at 10.26, Florian Haftmann &lt;<a href="mailto:florian.haftmann@cit.tum.de">florian.haftmann@cit.tum.de</a>&gt; wrote:</p>
+<p>Hi all,</p>
+<p>I have a couple of related questions concerning the current state of the datatype package.</p>
+<p>Find my motivation in the attached theory: I want to »register« a type a posteriori as a datatype.</p>
+<p>a) Construct the type</p>
+<p>b) Define the appropriate constructors</p>
+<p>c) Prove them as free constructors</p>
+<p>d) Prove the corresponding induction rule</p>
+<p>But then? Primrec still fails, obviously due to the lack of a recursion combinator.</p>
+<p>How to proceed from there?</p>
+<p>(When examining how it is done for the existing elementary types in HOL, I found that the »old« datatype package with the traditional »rep_datatype« is still in place – which leads to the somehow related question if there are further migrations plans there.)</p>
+<p>For the presented example an appropriate solution is to introduce the type as a datatype and establish lifting a posteriori, but there might be other instances where this is the less comfortable way.</p>
+<p>Cheers,<br>
+ Florian<br>
+&lt;Numeral.thy&gt;&lt;OpenPGP_0xA707172232CFA4E9.asc&gt;<br>
+</p>
+</blockquote>
+</blockquote>
+<p><a href="/user_uploads/14278/e8odSMQf-Cg6fSC4fKiE3xUM/OpenPGP_0xA707172232CFA4E9.asc">OpenPGP_0xA707172232CFA4E9.asc</a><br>
+<a href="/user_uploads/14278/SGT5EpkRZIeJRSS2bCEGcV-n/OpenPGP_signature.asc">OpenPGP_signature.asc</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

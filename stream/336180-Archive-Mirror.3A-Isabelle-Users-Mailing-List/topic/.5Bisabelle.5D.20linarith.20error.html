@@ -1,0 +1,192 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] linarith error · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20linarith.20error.html">[isabelle] linarith error</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294749090"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20linarith%20error/near/294749090" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20linarith.20error.html#294749090">(Aug 22 2022 at 18:58)</a>:</h4>
+<p>From: Mathias Fleury &lt;<a href="mailto:mathias.fleury12@gmail.com">mathias.fleury12@gmail.com</a>&gt;<br>
+Hi list,</p>
+<p>while investigating why the proof reconstruction (smt) of some veriT proof failed, I found that the tactic linarith fails on the following example:</p>
+<p>lemma ‹¬ (p_241 :: int) &lt; 1 + (p_244 * p_244 + 2 * p_244) ⟹<br>
+p_241 &lt; p_253 * p_253 ⟹<br>
+(1 + p_244) * (1 + p_244) = 1 + p_244 + p_244 * (1 + p_244) ⟹<br>
+ (1 + p_244) * p_244 = p_244 + p_244 * p_244 ⟹<br>
+ p_244 * (1 + p_244) = (1 + p_244) * p_244 ⟹<br>
+ p_253 * p_253 = (1 + p_244) * (1 + p_244) ⟹ False <br>
+›<br>
+  apply linarith</p>
+<p>It fails with the following error message:<br>
+  exception Fail raised (line 416 of "~~/src/Provers/Arith/fast_lin_arith.ML"): Linear arithmetic: failed to add thms<br>
+(the same exception is raised in the repository version).</p>
+<p>I am aware that the goal can be solved by presburger but I would prefer to understand why it fails and whether I can do anything during proof reconstruction to avoid the problem. Does anyone know why linarith fails on this example?</p>
+<p>Cheers,<br>
+Mathias</p>
+
+
+
+<a name="294749256"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20linarith%20error/near/294749256" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20linarith.20error.html#294749256">(Aug 22 2022 at 18:59)</a>:</h4>
+<p>From: Sascha Böhme &lt;<a href="mailto:boehmes@in.tum.de">boehmes@in.tum.de</a>&gt;<br>
+Hi Mathias,</p>
+<p>linarith is some intricate proof method. You can gain some insight by using the option [[linarith_trace]]. In your particular case, it seems that linarith’s internal application of the simplifier is too ambitious and simplifies an equation to True. A subsequent step that tries to conclude a+c=b+d from the equations a=b and c=d fails when given True as one of the two equations. One can certainly transform any True into, for instance, the equation 0=0, but I suspect that this might not be as as easy as it seems.</p>
+<p>A simpler solution is to transform your problem by applying the law of distributivity:</p>
+<p>lemma ‹¬ (p_241 :: int) &lt; 1 + (p_244 * p_244 + 2 * p_244) ⟹<br>
+p_241 &lt; p_253 * p_253 ⟹<br>
+(1 + p_244) * (1 + p_244) = 1 + p_244 + p_244 * (1 + p_244) ⟹<br>
+ (1 + p_244) * p_244 = p_244 + p_244 * p_244 ⟹<br>
+ p_244 * (1 + p_244) = (1 + p_244) * p_244 ⟹<br>
+ p_253 * p_253 = (1 + p_244) * (1 + p_244) ⟹ False <br>
+›<br>
+  by (unfold int_distrib) linarith</p>
+<p>I’m unsure if that helps in your particular case.</p>
+<p>Regards,<br>
+Sascha</p>
+
+
+
+<a name="294749269"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20linarith%20error/near/294749269" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20linarith.20error.html#294749269">(Aug 22 2022 at 18:59)</a>:</h4>
+<p>From: Sascha Böhme &lt;<a href="mailto:boehmes@in.tum.de">boehmes@in.tum.de</a>&gt;<br>
+Hi Dominique,</p>
+<p>linarith is an intricate proof method. You can gain some insight by using the option [[linarith_trace]]. In your case, the simplifier that is applied internally in linarith is too ambitious and reduces an equation to True. Then, a subsequent step that tries to produce a+c=b+d from the two equations a=b and c=d fails when given True as one the equations. One can certainly transform every True into, for instance, the equation 0=0, but I suspect that this would not be as easy as it seems.</p>
+<p>There is fortunately some way to circumvent these intricacies. You can preprocess the lemma by applying the law of distributivity. This results in a goal that is „more“ like a linear problem. Then linarith succeeds.</p>
+<p>lemma ‹¬ (p_241 :: int) &lt; 1 + (p_244 * p_244 + 2 * p_244) ⟹<br>
+p_241 &lt; p_253 * p_253 ⟹<br>
+(1 + p_244) * (1 + p_244) = 1 + p_244 + p_244 * (1 + p_244) ⟹<br>
+ (1 + p_244) * p_244 = p_244 + p_244 * p_244 ⟹<br>
+ p_244 * (1 + p_244) = (1 + p_244) * p_244 ⟹<br>
+ p_253 * p_253 = (1 + p_244) * (1 + p_244) ⟹ False <br>
+›<br>
+  by (unfold int_distrib) linarith</p>
+<p>I’m unsure if that helps in your particular case.</p>
+<p>Regards,<br>
+Sascha</p>
+
+
+
+<a name="294749320"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20linarith%20error/near/294749320" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20linarith.20error.html#294749320">(Aug 22 2022 at 19:00)</a>:</h4>
+<p>From: Mathias Fleury &lt;<a href="mailto:mathias.fleury12@gmail.com">mathias.fleury12@gmail.com</a>&gt;<br>
+Hi Sacha,</p>
+<blockquote>
+<p>On 28. Jan 2019, at 21:58, Sascha Böhme &lt;<a href="mailto:boehmes@in.tum.de">boehmes@in.tum.de</a>&gt; wrote:</p>
+<p>Hi Dominique,</p>
+<p>linarith is an intricate proof method. You can gain some insight by using the option [[linarith_trace]]. In your case, the simplifier that is applied internally in linarith is too ambitious and reduces an equation to True. Then, a subsequent step that tries to produce a+c=b+d from the two equations a=b and c=d fails when given True as one the equations.</p>
+</blockquote>
+<p>Thanks for the analysis.</p>
+<blockquote>
+<p>One can certainly transform every True into, for instance, the equation 0=0, but I suspect that this would not be as easy as it seems.</p>
+<p>There is fortunately some way to circumvent these intricacies. You can preprocess the lemma by applying the law of distributivity. This results in a goal that is „more“ like a linear problem. Then linarith succeeds.</p>
+<p>lemma ‹¬ (p_241 :: int) &lt; 1 + (p_244 * p_244 + 2 * p_244) ⟹<br>
+p_241 &lt; p_253 * p_253 ⟹<br>
+(1 + p_244) * (1 + p_244) = 1 + p_244 + p_244 * (1 + p_244) ⟹<br>
+(1 + p_244) * p_244 = p_244 + p_244 * p_244 ⟹<br>
+p_244 * (1 + p_244) = (1 + p_244) * p_244 ⟹<br>
+p_253 * p_253 = (1 + p_244) * (1 + p_244) ⟹ False <br>
+›<br>
+  by (unfold int_distrib) linarith</p>
+<p>I’m unsure if that helps in your particular case.</p>
+</blockquote>
+<p>Well, I can preprocess the goal before calling Z3_Replay_Methods.arith_th_lemma (<a href="https://isabelle.in.tum.de/repos/isabelle/file/2755c387f1e6/src/HOL/Tools/SMT/z3_replay_methods.ML#l88">https://isabelle.in.tum.de/repos/isabelle/file/2755c387f1e6/src/HOL/Tools/SMT/z3_replay_methods.ML#l88</a> &lt;<a href="https://isabelle.in.tum.de/repos/isabelle/file/2755c387f1e6/src/HOL/Tools/SMT/z3_replay_methods.ML#l88">https://isabelle.in.tum.de/repos/isabelle/file/2755c387f1e6/src/HOL/Tools/SMT/z3_replay_methods.ML#l88</a>&gt;). </p>
+<p>Given that I was reconstructing veriT proofs, do you think that this kind of preprocessing also makes sense to replay arithmetic steps Z3 proof?</p>
+<p>Thanks,<br>
+Mathias</p>
+<blockquote>
+<p>Regards,<br>
+Sascha</p>
+<p>Von: Mathias Fleury &lt;mailto:<a href="mailto:mathias.fleury12@gmail.com">mathias.fleury12@gmail.com</a>&gt;<br>
+Gesendet: Donnerstag, 24. Januar 2019 10:23<br>
+An: Isabelle User &lt;mailto:<a href="mailto:isabelle-users@cl.cam.ac.uk">isabelle-users@cl.cam.ac.uk</a>&gt;<br>
+Betreff: [isabelle] linarith error</p>
+<p>Hi list,</p>
+<p>while investigating why the proof reconstruction (smt) of some veriT proof failed, I found that the tactic linarith fails on the following example:</p>
+<p>lemma ‹¬ (p_241 :: int) &lt; 1 + (p_244 * p_244 + 2 * p_244) ⟹<br>
+p_241 &lt; p_253 * p_253 ⟹<br>
+(1 + p_244) * (1 + p_244) = 1 + p_244 + p_244 * (1 + p_244) ⟹<br>
+(1 + p_244) * p_244 = p_244 + p_244 * p_244 ⟹<br>
+p_244 * (1 + p_244) = (1 + p_244) * p_244 ⟹<br>
+p_253 * p_253 = (1 + p_244) * (1 + p_244) ⟹ False <br>
+›<br>
+  apply linarith</p>
+<p>It fails with the following error message:<br>
+  exception Fail raised (line 416 of "~~/src/Provers/Arith/fast_lin_arith.ML"): Linear arithmetic: failed to add thms<br>
+(the same exception is raised in the repository version).</p>
+<p>I am aware that the goal can be solved by presburger but I would prefer to understand why it fails and whether I can do anything during proof reconstruction to avoid the problem. Does anyone know why linarith fails on this example?</p>
+<p>Cheers,<br>
+Mathias</p>
+</blockquote>
+
+
+
+<a name="294749443"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20linarith%20error/near/294749443" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20linarith.20error.html#294749443">(Aug 22 2022 at 19:00)</a>:</h4>
+<p>From: Sascha Böhme &lt;<a href="mailto:boehmes@in.tum.de">boehmes@in.tum.de</a>&gt;<br>
+Hi Mathias,</p>
+<p>Your suggestion might be beneficial, but I'm not aware of any concrete Z3 example in which this preprocessing would help. Just go ahead and try if nothing breaks. I’ve seen that some definition unfolding is already applied in the Z3 replay code. Maybe you can just add the distributivity rules there?</p>
+<p>Regards,<br>
+Sascha</p>
+<p>Von: Mathias Fleury<br>
+Gesendet: Montag, 28. Januar 2019 22:17<br>
+An: Sascha Böhme<br>
+Cc: Isabelle User<br>
+Betreff: Re: [isabelle] linarith error</p>
+<p>Hi Sacha,</p>
+<blockquote>
+<p>On 28. Jan 2019, at 21:58, Sascha Böhme &lt;<a href="mailto:boehmes@in.tum.de">boehmes@in.tum.de</a>&gt; wrote:</p>
+<p>Hi Dominique,</p>
+<p>linarith is an intricate proof method. You can gain some insight by using the option [[linarith_trace]]. In your case, the simplifier that is applied internally in linarith is too ambitious and reduces an equation to True. Then, a subsequent step that tries to produce a+c=b+d from the two equations a=b and c=d fails when given True as one the equations.</p>
+</blockquote>
+<p>Thanks for the analysis.</p>
+<blockquote>
+<p>One can certainly transform every True into, for instance, the equation 0=0, but I suspect that this would not be as easy as it seems.</p>
+<p>There is fortunately some way to circumvent these intricacies. You can preprocess the lemma by applying the law of distributivity. This results in a goal that is „more“ like a linear problem. Then linarith succeeds.</p>
+<p>lemma ‹¬ (p_241 :: int) &lt; 1 + (p_244 * p_244 + 2 * p_244) ⟹<br>
+p_241 &lt; p_253 * p_253 ⟹<br>
+(1 + p_244) * (1 + p_244) = 1 + p_244 + p_244 * (1 + p_244) ⟹<br>
+(1 + p_244) * p_244 = p_244 + p_244 * p_244 ⟹<br>
+p_244 * (1 + p_244) = (1 + p_244) * p_244 ⟹<br>
+p_253 * p_253 = (1 + p_244) * (1 + p_244) ⟹ False <br>
+›<br>
+  by (unfold int_distrib) linarith</p>
+<p>I’m unsure if that helps in your particular case.</p>
+</blockquote>
+<p>Well, I can preprocess the goal before calling Z3_Replay_Methods.arith_th_lemma (<a href="https://isabelle.in.tum.de/repos/isabelle/file/2755c387f1e6/src/HOL/Tools/SMT/z3_replay_methods.ML#l88">https://isabelle.in.tum.de/repos/isabelle/file/2755c387f1e6/src/HOL/Tools/SMT/z3_replay_methods.ML#l88</a> &lt;<a href="https://isabelle.in.tum.de/repos/isabelle/file/2755c387f1e6/src/HOL/Tools/SMT/z3_replay_methods.ML#l88">https://isabelle.in.tum.de/repos/isabelle/file/2755c387f1e6/src/HOL/Tools/SMT/z3_replay_methods.ML#l88</a>&gt;). </p>
+<p>Given that I was reconstructing veriT proofs, do you think that this kind of preprocessing also makes sense to replay arithmetic steps Z3 proof?</p>
+<p>Thanks,<br>
+Mathias</p>
+<blockquote>
+<p>Regards,<br>
+Sascha</p>
+<p>Von: Mathias Fleury &lt;mailto:<a href="mailto:mathias.fleury12@gmail.com">mathias.fleury12@gmail.com</a>&gt;<br>
+Gesendet: Donnerstag, 24. Januar 2019 10:23<br>
+An: Isabelle User &lt;mailto:<a href="mailto:isabelle-users@cl.cam.ac.uk">isabelle-users@cl.cam.ac.uk</a>&gt;<br>
+Betreff: [isabelle] linarith error</p>
+<p>Hi list,</p>
+<p>while investigating why the proof reconstruction (smt) of some veriT proof failed, I found that the tactic linarith fails on the following example:</p>
+<p>lemma ‹¬ (p_241 :: int) &lt; 1 + (p_244 * p_244 + 2 * p_244) ⟹<br>
+p_241 &lt; p_253 * p_253 ⟹<br>
+(1 + p_244) * (1 + p_244) = 1 + p_244 + p_244 * (1 + p_244) ⟹<br>
+(1 + p_244) * p_244 = p_244 + p_244 * p_244 ⟹<br>
+p_244 * (1 + p_244) = (1 + p_244) * p_244 ⟹<br>
+p_253 * p_253 = (1 + p_244) * (1 + p_244) ⟹ False <br>
+›<br>
+  apply linarith</p>
+<p>It fails with the following error message:<br>
+  exception Fail raised (line 416 of "~~/src/Provers/Arith/fast_lin_arith.ML"): Linear arithmetic: failed to add thms<br>
+(the same exception is raised in the repository version).</p>
+<p>I am aware that the goal can be solved by presburger but I would prefer to understand why it fails and whether I can do anything during proof reconstruction to avoid the problem. Does anyone know why linarith fails on this example?</p>
+<p>Cheers,<br>
+Mathias</p>
+</blockquote>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

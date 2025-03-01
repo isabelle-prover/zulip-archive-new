@@ -1,0 +1,99 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Question on mutual recursion/induction · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Question.20on.20mutual.20recursion.2Finduction.html">[isabelle] Question on mutual recursion/induction</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294704896"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Question%20on%20mutual%20recursion/induction/near/294704896" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Question.20on.20mutual.20recursion.2Finduction.html#294704896">(Aug 22 2022 at 14:59)</a>:</h4>
+<p>From: "Eugene W. Stark" &lt;<a href="mailto:isabelle-users@starkeffect.com">isabelle-users@starkeffect.com</a>&gt;<br>
+I attempted to do as shown below (also see attached).<br>
+I tried to follow the "Tutorial on Functions" to prove something<br>
+about the mutually recursive definition, but I am thwarted by:</p>
+<p>proof (prove)<br>
+  goal (1 subgoal):</p>
+<p>1. (⋀b. P a b ⟹ Q a b) &amp;&amp;&amp; (R a ⟹ S a)<br>
+  Ill-typed instantiation:<br>
+    a :: 'b</p>
+<p>Can some kind soul explain what is happening here?  Thanks.</p>
+<p>BTW, I deleted a few irrelevant clauses from the "term" datatype for the purposes<br>
+of this example and the processing time for the "fun" definition dropped<br>
+from about 9 minutes for the original to less than 20 seconds on the excerpt<br>
+shown here.</p>
+<p>- Gene Stark</p>
+<p>theory Barf<br>
+imports Main<br>
+begin</p>
+<p>datatype (discs_sels) 't "term" =<br>
+      Prim 't<br>
+    | Unit<br>
+    | Tensor "'t term * 't term"<br>
+    | Comp "'t term * 't term"<br>
+    | Lunit "'t term"<br>
+    | Runit "'t term"<br>
+    | Assoc "'t term * 't term * 't term"</p>
+<p>fun normalize :: "'t term ⇒ 't term"<br>
+    where "normalize t = t"</p>
+<p>fun redTensor<br>
+    and red<br>
+    where "redTensor (Unit, Unit) = Lunit Unit"<br>
+        | "redTensor (Prim f, Unit) = Runit (Prim f)"<br>
+        | "redTensor (Tensor (a, b), Unit) = Comp (redTensor (a, b), Runit (Tensor (a, b)))"<br>
+        | "redTensor (Unit, a) = Lunit a"<br>
+        | "redTensor (Prim f, a) = Tensor (Prim f, a)"<br>
+        | "redTensor (Tensor (a, b), c) =<br>
+              Comp (redTensor (a, normalize (Tensor (b, c))), Tensor (a, redTensor (b, c)))"<br>
+        | "redTensor (a, b) = Tensor (a, b)"</p>
+<p>| "red Unit = Unit"<br>
+        | "red (Prim f) = Prim f"<br>
+        | "red (Tensor (a, Unit)) = Comp (red a, Runit a)"<br>
+        | "red (Tensor (Unit, a)) = Comp (red a, Lunit a)"<br>
+        | "red (Tensor (Prim f, a)) = Tensor (Prim f, red a)"<br>
+        | "red (Tensor (Tensor (a, b), c)) =<br>
+             Comp (redTensor (red a, redTensor (red b, red c)), Assoc (a, b, c))"<br>
+        | "red a = a"</p>
+<p>lemma<br>
+    shows "⋀b. P a b ⟹ Q a b"<br>
+    and "R a ⟹ S a"<br>
+    proof (induct a and a rule: redTensor_red.induct)<br>
+      show ?thesis<br>
+      sorry<br>
+    qed</p>
+<p>end<br>
+<a href="/user_uploads/14278/_DupCBgYAhN1xLtlySQh6N37/Barf.thy">Barf.thy</a></p>
+
+
+
+<a name="294704914"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Question%20on%20mutual%20recursion/induction/near/294704914" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Question.20on.20mutual.20recursion.2Finduction.html#294704914">(Aug 22 2022 at 14:59)</a>:</h4>
+<p>From: "Thiemann, Rene" &lt;<a href="mailto:Rene.Thiemann@uibk.ac.at">Rene.Thiemann@uibk.ac.at</a>&gt;<br>
+Dear Gene,</p>
+<p>there is a problem with the types of your expressions.</p>
+<p>From the function definition you have <br>
+  redTensor :: 'a term * ‘a term =&gt; 'a term<br>
+  red :: 'a term =&gt; 'a term</p>
+<p>Consequently the induction rule for redTensor/red expects two arguments a and b<br>
+so that the type of a and b are an instance of 'a term * ‘a term and ‘a term. </p>
+<p>In particular this means that </p>
+<p>(induct a and a rule: redTensor_red.induct)</p>
+<p>must fail, because term term “a" cannot be an instance of 'a term * ‘a term and ‘a term<br>
+for the same instance of “‘a”.  </p>
+<p>Moreover, in your example you do not restrict “a” to be of type “‘a term” at all:<br>
+your “a” is of arbitrary type “‘a”. </p>
+<p>The following invocation applies the induction rule, </p>
+<p>lemma fixes a :: "'a term × 'a term" and b :: "'a term" <br>
+    shows "⋀c. P a c ⟹ Q a c"<br>
+    and "R b ⟹ S b"<br>
+    proof (induct a and b rule: redTensor_red.induct)</p>
+<p>Hope this helps,<br>
+René</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

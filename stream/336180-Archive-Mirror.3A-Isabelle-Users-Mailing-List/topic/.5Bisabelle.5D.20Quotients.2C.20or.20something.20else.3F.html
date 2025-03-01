@@ -1,0 +1,105 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Quotients, or something else? · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Quotients.2C.20or.20something.20else.3F.html">[isabelle] Quotients, or something else?</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294822462"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Quotients%2C%20or%20something%20else%3F/near/294822462" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Quotients.2C.20or.20something.20else.3F.html#294822462">(Aug 23 2022 at 08:20)</a>:</h4>
+<p>From: "John F. Hughes" &lt;<a href="mailto:jfh@cs.brown.edu">jfh@cs.brown.edu</a>&gt;<br>
+I'm having trouble with quotients, and I suspect that I'm trying to use a<br>
+tool in the wrong place, but I'm not sure what tool I *should *be using.<br>
+Here's the setup:</p>
+<p>In synthetic projective geometry, you can define an affine plane to be a<br>
+pair of sets ("points" and "lines") and a function "meets P k" which is<br>
+true when the point P "is on" the line k; the "meets" function has to<br>
+satisfy certain properties ("two points determine a line", etc.) to make<br>
+this an affine plane. (Alternatively, one could define the "lines" to be<br>
+certain subsets of "points", and "meets" gets replaced by "element of";<br>
+that makes it more difficult to prove duality theorems later, though). In<br>
+Isabelle, I've represented this with a locale:</p>
+<p>theory QuoExample<br>
+  imports Complex_Main</p>
+<p>begin<br>
+  locale affine_plane_data =<br>
+    fixes meets :: "'point ⇒ 'line ⇒ bool"<br>
+  begin<br>
+    definition parallel:: "'line  ⇒ 'line ⇒ bool" (infix "||" 50)<br>
+      where "l || m ⟷ (l = m ∨ ¬ (∃ P. meets P l  ∧ meets P m))"<br>
+    definition collinear :: "'point  ⇒ 'point ⇒ 'point ⇒ bool"<br>
+      where "collinear A B C ⟷ (∃ l. meets A l ∧ meets B l ∧ meets C l)"<br>
+  end<br>
+  value "affine_plane_data"</p>
+<p>locale affine_plane =<br>
+    affine_plane_data meets<br>
+  for meets :: "'point ⇒ 'line ⇒ bool" +<br>
+  assumes<br>
+    a1: "P ≠ Q ⟹ ∃!l. meets P l ∧ meets Q l" and<br>
+    a2: "¬ meets P l ⟹ ∃!m. l || m ∧ meets P m" and<br>
+    a3: "∃P Q R. P ≠ Q ∧ P ≠ R ∧ Q ≠ R ∧ ¬ collinear P Q R"<br>
+begin<br>
+  lemma symmetric_parallel: "l || m ⟹ m || l"<br>
+    using parallel_def by auto<br>
+  lemma reflexive_parallel: "l || l"<br>
+    by (simp add: parallel_def)<br>
+  lemma transitive_parallel: "⟦l || m ;  m || n⟧ ⟹ l || n"<br>
+    by (metis a2 parallel_def)<br>
+================<br>
+At this point, I want to "complete" the affine plane. For the ordinary<br>
+Euclidean plane, this consists of adding a "point at infinity" to each<br>
+line, with the rules that two parallel lines have the <em>same</em> point at<br>
+infinity added to them, and then tossing all these newly added points into<br>
+a new line (the line at infinity). So the "points" of my new space (which<br>
+is a PROJECTIVE geometry rather than an affine one) are (1) all the old<br>
+points, and (2) all the new "points at infinity", one for each set of<br>
+parallel lines in the Euclidean plane.</p>
+<p>The same idea works for any affine geometry: for each "family of parallel<br>
+lines", you create a new point, and you then use these new points in<br>
+building a projective plane. The general idea here is that given a function<br>
+"meets: 'point -&gt; 'line -&gt; bool", we can build a function<br>
+"meets2 : 'newpoint -&gt; 'newline -&gt; bool", where the type "newpoint"<br>
+consists of all original points, plus all the "points at infinity." It's<br>
+natural to define something like</p>
+<p>quotient_type pencil = "'line" / "parallel"<br>
+type ('point 'line) newpoints = OriginalPoint 'point | InfinitePoint 'pencil<br>
+type ('point 'line) newline = OriginalLine 'line | InfiniteLine</p>
+<p>and then carefully define the meets2 function on these things. (I'm sure<br>
+I've got the syntax on the second and third lines wrong, but it doesn't<br>
+matter because the very first line of this construction fails: I can't<br>
+construct the type "pencil"; trying to do so gives me</p>
+<p>"pencil": extra type variable(s) on the lhs: "'line"<br>
+"pencil": extra type variable(s) in the relation: "'line", "'point"<br>
+"pencil": illegal variable(s) in the relation: "meets"</p>
+<p>=================</p>
+<p>Is there a way to do this in Isabelle? The general idea --- you have<br>
+something that satisfies some axioms, based on items of some fixed but<br>
+unknown type -- and want to construct associated quotients, certainly<br>
+happens often enough in mathematics. A group, for instance, might<br>
+consist of matrices, or real-to-real functions, or permutations, or ...<br>
+lots of things. But in all cases, we can have a notion of a normal subgroup<br>
+and quotient groups. I looked at the HOL/HOL-Algebra/Coset.html entry,<br>
+thinking I'd see there exactly how to use quotients but ... there are no<br>
+quotients there, which made me suspect that quotients in Isabelle aren't<br>
+quite what I think they might be.</p>
+<p>Advice, anyone?</p>
+
+
+
+<a name="294822475"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Quotients%2C%20or%20something%20else%3F/near/294822475" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Quotients.2C.20or.20something.20else.3F.html#294822475">(Aug 23 2022 at 08:20)</a>:</h4>
+<p>From: "John F. Hughes" &lt;<a href="mailto:jfh@cs.brown.edu">jfh@cs.brown.edu</a>&gt;<br>
+By the way, even if I parameterize that quotient definition, writing</p>
+<p>quotient_type  ('point, 'line) pencil = "'line" / "parallel"</p>
+<p>I still get</p>
+<p>"pencil": illegal variable(s) in the relation: "meets"</p>
+<p>Closer, but not close enough!</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,197 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] System stuck after try0 calls in separate thread · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20System.20stuck.20after.20try0.20calls.20in.20separate.20thread.html">[isabelle] System stuck after try0 calls in separate thread</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="486929455"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20System%20stuck%20after%20try0%20calls%20in%20separate%20thread/near/486929455" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20System.20stuck.20after.20try0.20calls.20in.20separate.20thread.html#486929455">(Dec 09 2024 at 08:13)</a>:</h4>
+<p>From: Fabian Huch &lt;<a href="mailto:huch@in.tum.de">huch@in.tum.de</a>&gt;<br>
+I want to run the mirabelle try0 action in a larger session, e.g. HOL-ex.</p>
+<p>However, this doesn't quite work: the tools invoked by try0 can <br>
+sometimes run out of control and fill up the stack, so the thread gets <br>
+terminated:</p>
+<p>Warning - Unable to increase stack - interrupting thread<br>
+   HOL-ex FAILED (see also "isabelle build_log -H Error HOL-ex")<br>
+   *** exception Interrupt_Breakdown raised (line 77 of <br>
+"./basis/PolyMLException.sml")</p>
+<p>So my solution would be to wrap the try0 call in a separate thread, and <br>
+count any exceptions within that thread as 'error' (see attached patch).</p>
+<p>This does work well in principle, but after a few thousand try0 calls <br>
+(with the invocation 'isabelle mirabelle -A try0 HOL-ex'), the Isabelle <br>
+process gets stuck: There is no further progress (judged by <br>
+printline-debugging), and several CPU cores stay at 100% usage. This <br>
+happens with both Isabelle2024 and current devel (and my actual <br>
+application, which does not use mirabelle).</p>
+<p>Any ideas? From  My guess would be that this has to do with thread-local <br>
+memory that is not properly deallocated, so the system is stuck in a GC <br>
+loop. From further experimentation I can conclude that the thread is <br>
+started, but the system never wakes up from the 'OS.Process.sleep' call <br>
+that happens in 'Isabelle_Thread.join'. I've let the process run for <br>
+several days but it did not make any progress.</p>
+<p>Fabian</p>
+<p><a href="/user_uploads/14278/fovRWCBR1xdrNduQA3zIDkMs/try0_problem.patch">try0_problem.patch</a></p>
+
+
+
+<a name="486940016"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20System%20stuck%20after%20try0%20calls%20in%20separate%20thread/near/486940016" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20System.20stuck.20after.20try0.20calls.20in.20separate.20thread.html#486940016">(Dec 09 2024 at 09:03)</a>:</h4>
+<p>From: Yutaka Nagashima &lt;<a href="mailto:united.reasoning@gmail.com">united.reasoning@gmail.com</a>&gt;<br>
+Hi Fabian,</p>
+<p>I’ve encountered similar issues and explored approaches along the same<br>
+lines.<br>
+For some reason, Isabelle_Thread.joinand Isabelle_Thread.fork didn’t behave<br>
+as I expected. However, leveraging Future helped me resolve these issues in<br>
+my tests so far.</p>
+<p>Jonathan’s code snippet appears straightforward and easy to use.<br>
+<a href="https://github.com/yonoteam/DeepIsaHOL/blob/292aa8ca66db998b98c49aec9a8b630c96fda656/src/main/ml/ops.ML#L202">https://github.com/yonoteam/DeepIsaHOL/blob/292aa8ca66db998b98c49aec9a8b630c96fda656/src/main/ml/ops.ML#L202</a></p>
+<p>I’d be interested to hear Makarius’ thoughts on this, as it seems to<br>
+address a common challenge faced by those integrating Isabelle’s subtools<br>
+into larger automation workflows.</p>
+<p>Regards,<br>
+Yutaka</p>
+<p>On Mon, Dec 9, 2024 at 1:43 PM Fabian Huch &lt;<a href="mailto:huch@in.tum.de">huch@in.tum.de</a>&gt; wrote:</p>
+<blockquote>
+<p>I want to run the mirabelle try0 action in a larger session, e.g. HOL-ex.</p>
+<p>However, this doesn't quite work: the tools invoked by try0 can<br>
+sometimes run out of control and fill up the stack, so the thread gets<br>
+terminated:</p>
+<p>Warning - Unable to increase stack - interrupting thread<br>
+   HOL-ex FAILED (see also "isabelle build_log -H Error HOL-ex")<br>
+   *** exception Interrupt_Breakdown raised (line 77 of<br>
+"./basis/PolyMLException.sml")</p>
+<p>So my solution would be to wrap the try0 call in a separate thread, and<br>
+count any exceptions within that thread as 'error' (see attached patch).</p>
+<p>This does work well in principle, but after a few thousand try0 calls<br>
+(with the invocation 'isabelle mirabelle -A try0 HOL-ex'), the Isabelle<br>
+process gets stuck: There is no further progress (judged by<br>
+printline-debugging), and several CPU cores stay at 100% usage. This<br>
+happens with both Isabelle2024 and current devel (and my actual<br>
+application, which does not use mirabelle).</p>
+<p>Any ideas? From  My guess would be that this has to do with thread-local<br>
+memory that is not properly deallocated, so the system is stuck in a GC<br>
+loop. From further experimentation I can conclude that the thread is<br>
+started, but the system never wakes up from the 'OS.Process.sleep' call<br>
+that happens in 'Isabelle_Thread.join'. I've let the process run for<br>
+several days but it did not make any progress.</p>
+<p>Fabian</p>
+</blockquote>
+
+
+
+<a name="486956965"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20System%20stuck%20after%20try0%20calls%20in%20separate%20thread/near/486956965" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20System.20stuck.20after.20try0.20calls.20in.20separate.20thread.html#486956965">(Dec 09 2024 at 10:23)</a>:</h4>
+<p>From: Lukas Bartl &lt;<a href="mailto:L.Bartl@campus.lmu.de">L.Bartl@campus.lmu.de</a>&gt;<br>
+Hi Fabian,</p>
+<p>I can confirm this issue. I also encountered these exceptions and Isabelle also got stuck when I used the mirabelle sledgehammer action. This happened with the default option "try0" which tries different proof methods similar to the try0 command (there were no errors when only the "metis" proof method was used).</p>
+<p>Lukas</p>
+<p>Am 9. Dezember 2024 09:07:09 MEZ schrieb Fabian Huch &lt;<a href="mailto:huch@in.tum.de">huch@in.tum.de</a>&gt;:</p>
+<blockquote>
+<p>I want to run the mirabelle try0 action in a larger session, e.g. HOL-ex.</p>
+<p>However, this doesn't quite work: the tools invoked by try0 can sometimes run out of control and fill up the stack, so the thread gets terminated:</p>
+<p>Warning - Unable to increase stack - interrupting thread<br>
+  HOL-ex FAILED (see also "isabelle build_log -H Error HOL-ex")<br>
+  *** exception Interrupt_Breakdown raised (line 77 of "./basis/PolyMLException.sml")</p>
+<p>So my solution would be to wrap the try0 call in a separate thread, and count any exceptions within that thread as 'error' (see attached patch).</p>
+<p>This does work well in principle, but after a few thousand try0 calls (with the invocation 'isabelle mirabelle -A try0 HOL-ex'), the Isabelle process gets stuck: There is no further progress (judged by printline-debugging), and several CPU cores stay at 100% usage. This happens with both Isabelle2024 and current devel (and my actual application, which does not use mirabelle).</p>
+<p>Any ideas? From  My guess would be that this has to do with thread-local memory that is not properly deallocated, so the system is stuck in a GC loop. From further experimentation I can conclude that the thread is started, but the system never wakes up from the 'OS.Process.sleep' call that happens in 'Isabelle_Thread.join'. I've let the process run for several days but it did not make any progress.</p>
+<p>Fabian<br>
+</p>
+</blockquote>
+
+
+
+<a name="486970529"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20System%20stuck%20after%20try0%20calls%20in%20separate%20thread/near/486970529" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20System.20stuck.20after.20try0.20calls.20in.20separate.20thread.html#486970529">(Dec 09 2024 at 11:28)</a>:</h4>
+<p>From: "Eugene W. Stark" &lt;<a href="mailto:isabelle-users@starkeffect.com">isabelle-users@starkeffect.com</a>&gt;<br>
+I don't use Mirabelle, but since a thread has appeared on this type of issue I will add<br>
+my observations (which I have posted about in the past) about continuing issues of this nature:</p>
+<p>(*)  It is possible, during a normal session with Isabelle/JEdit, for the system to go unstable,<br>
+    consume memory up to any limits I have set (I have generally been using 64GB for Poly/ML),<br>
+    and then (often) for Poly/ML to be killed by the Linux OOM killer.  As best as I can tell,<br>
+    the actual culprits may be external provers that are invoked via "smt", rather than Poly/ML<br>
+    itself, which usually ends up being the victim.  The situation usually occurs when, due to<br>
+    changes earlier in the proof document, a subsequent proof "by smt" is rendered non-terminating<br>
+    and gets triggered by the normal continuous checking feature.  It is quite often the case<br>
+    that I get up from the computer and come back to find that this has occurred.  I try to<br>
+    work around this issue by making sure there are no proof methods with a "purple" color<br>
+    if I am going to leave the session alone for some time.</p>
+<p>(*)  It appears that under certain conditions Poly/ML can leak heap.  Symptoms are that the heap<br>
+    size gets closer and closer to the limit over time (again, I typically use 64GB), until<br>
+    useful work becomes impossible and it is necessary to restart and reload everything<br>
+    (after which the heap is much smaller).<br>
+    Sometimes the system will go into an "infinite GC" as the limit is neared, which sounds<br>
+    very much like what others on this thread are posting about.  Note that my workflow involves<br>
+    frequent invocations of sledgehammer.  Lately I have been using the sledgehammer panel<br>
+    "Apply" button for this, whereas in the past I was in the habit of using "try" and "try0",<br>
+    but the behavior seems similar.</p>
+<p>I speculate that this issue may be related to the frequent abrupt terminations of external<br>
+    provers -- possibly there are weak references or something to stuff in the Poly/ML heap<br>
+    that do not get freed sometimes when an external provers terminate abruptly.<br>
+    Usually during a session I get several pop-ups from the Linux "apparmor" reporting on the<br>
+    abrupt termination of cvc4, etc. via a signal.  These do not always seem to indicate errors<br>
+    in the external provers, but rather may derive from incorrect signal handling in glue code<br>
+    that causes the underlying system to report on the occurrence of these signals.</p>
+<p>(*)  Poly/ML can embark on full GC's that take <em>many</em>, <em>many</em> minutes (this with a 64GB heap limit,<br>
+    running on a machine with 128GB RAM -- no thrashing is occurring).  Sometimes the GC<br>
+    will not terminate after an hour or more, in which case it is necessary to restart the<br>
+    session and reload everything.  Symptoms while this is occurring usually seems to be<br>
+    cores pegged at 100% utilization (according to "top"), with no change for a long time.<br>
+    Usually GC's that are making progress will switch back and forth between 100% on one core<br>
+    and 100% on multiple cores, as opposed to appearing stagnant.</p>
+<p>System details: Intel i9/10850K (10 cores) with 128GB RAM, running Ubuntu 22.04.5 LTS<br>
+(GNU/Linux 6.8.0-49-generic x86_64).</p>
+<p>- Gene Stark</p>
+<p>On 12/9/24 05:19, Lukas Bartl wrote:</p>
+<blockquote>
+<p>Hi Fabian,</p>
+<p>I can confirm this issue. I also encountered these exceptions and Isabelle also got stuck when I used the mirabelle sledgehammer action. This happened with the default option "try0" which tries different proof methods similar to the try0 command (there were no errors when only the "metis" proof method was used).</p>
+<p>Lukas</p>
+<p>Am 9. Dezember 2024 09:07:09 MEZ schrieb Fabian Huch &lt;<a href="mailto:huch@in.tum.de">huch@in.tum.de</a>&gt;:</p>
+<blockquote>
+<p>I want to run the mirabelle try0 action in a larger session, e.g. HOL-ex.</p>
+<p>However, this doesn't quite work: the tools invoked by try0 can sometimes run out of control and fill up the stack, so the thread gets terminated:</p>
+<p>Warning - Unable to increase stack - interrupting thread<br>
+  HOL-ex FAILED (see also "isabelle build_log -H Error HOL-ex")<br>
+  *** exception Interrupt_Breakdown raised (line 77 of "./basis/PolyMLException.sml")</p>
+<p>So my solution would be to wrap the try0 call in a separate thread, and count any exceptions within that thread as 'error' (see attached patch).</p>
+<p>This does work well in principle, but after a few thousand try0 calls (with the invocation 'isabelle mirabelle -A try0 HOL-ex'), the Isabelle process gets stuck: There is no further progress (judged by printline-debugging), and several CPU cores stay at 100% usage. This happens with both Isabelle2024 and current devel (and my actual application, which does not use mirabelle).</p>
+<p>Any ideas? From  My guess would be that this has to do with thread-local memory that is not properly deallocated, so the system is stuck in a GC loop. From further experimentation I can conclude that the thread is started, but the system never wakes up from the 'OS.Process.sleep' call that happens in 'Isabelle_Thread.join'. I've let the process run for several days but it did not make any progress.</p>
+<p>Fabian<br>
+</p>
+</blockquote>
+</blockquote>
+
+
+
+<a name="488123113"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20System%20stuck%20after%20try0%20calls%20in%20separate%20thread/near/488123113" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20System.20stuck.20after.20try0.20calls.20in.20separate.20thread.html#488123113">(Dec 11 2024 at 15:17)</a>:</h4>
+<p>From: Fabian Huch &lt;<a href="mailto:huch@in.tum.de">huch@in.tum.de</a>&gt;</p>
+<p>On 12/9/24 09:53, Yutaka Nagashima wrote:</p>
+<blockquote>
+<p>I’ve encountered similar issues and explored approaches along the same <br>
+lines.<br>
+For some reason, Isabelle_Thread.joinand Isabelle_Thread.fork didn’t <br>
+behave as I expected. However, leveraging Future helped me resolve <br>
+these issues in my tests so far.</p>
+<p>Jonathan’s code snippet appears straightforward and easy to use. <br>
+<a href="https://github.com/yonoteam/DeepIsaHOL/blob/292aa8ca66db998b98c49aec9a8b630c96fda656/src/main/ml/ops.ML#L202">https://github.com/yonoteam/DeepIsaHOL/blob/292aa8ca66db998b98c49aec9a8b630c96fda656/src/main/ml/ops.ML#L202</a></p>
+</blockquote>
+<p>This works better because Future uses a "worker" thread that stays alive <br>
+during the whole execution.</p>
+<p>Curiously, when I run my real application with Futures, it does finish <br>
+all the work (after a few days) -- but the Isabelle process never stops <br>
+and there are two CPU cores at full load still (though my application <br>
+calls sledgehammer, which does spawn its own threads).</p>
+<p>Best,</p>
+<p>Fabian</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

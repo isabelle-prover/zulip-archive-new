@@ -1,0 +1,26 @@
+[
+    {
+        "content": "<p>From: David Kretzmer &lt;<a href=\"mailto:david.k@posteo.de\">david.k@posteo.de</a>&gt;<br>\nDear all,</p>\n<p>I have formalized a virtual machine roughly in the following way:</p>\n<p>(* Executes a single instruction in the given state and returns the new<br>\n   state. Returns <code>None</code> if the end of the program has been reached. *)<br>\nfun exec_instr :: \"state ⇒ state option\" where<br>\n  \"exec_instr s = ...\"</p>\n<p>(* Now define the transitive closure for <code>exec_instr</code> *)<br>\ninductive exec :: \"state ⇒ state ⇒ bool\" where<br>\n  refl: \"exec s s\" |<br>\n  trans: \"⟦Some s'' = exec_instr s; exec s'' s'⟧ ⟹ exec s s'\"</p>\n<p>The semantics for individual instructions is implemented by<br>\n<code>exec_instr</code>, and complete executions can be performed by the inductive<br>\npredicate <code>exec</code>.</p>\n<p>Code generation works, but execution of <code>exec</code> becomes increasingly<br>\nslower the more instructions are executed. If in the generated code I<br>\ncall <code>exec_instr</code> directly, execution time for one example dropped from<br>\nroughly 10s to 0.2s.</p>\n<p>I use the inductive predicate in the formalization because I don't want<br>\nto specify an upper bound on the number of steps to execute. Is there a<br>\nway to instruct the code generator to generate code for <code>exec</code> that<br>\ncalls <code>exec_instr</code> directly without the indirection caused by<br>\n<code>Predicate.bind</code> and <code>Predicate.apply</code>, which seem to be responsible for<br>\nmost of the slowdown?</p>\n<p>Best regards,<br>\nDavid</p>",
+        "id": 218575068,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1606923991
+    },
+    {
+        "content": "<p>From: Peter Lammich &lt;<a href=\"mailto:lammich@in.tum.de\">lammich@in.tum.de</a>&gt;<br>\nYou could use a tail-recursive function</p>\n<p>partial_function (tailrec) execf where<br>\n  \"execf s = (case exec_instr s of None ⇒ s | Some s' ⇒ execf s')\" </p>\n<p>thm execf.simps<br>\ndeclare execf.simps[code]</p>\n<p>execf will execute the program until it terminates.</p>",
+        "id": 218582489,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1606926845
+    },
+    {
+        "content": "<p>From: Peter Lammich &lt;<a href=\"mailto:lammich@in.tum.de\">lammich@in.tum.de</a>&gt;<br>\nand that's the relation of execf to your exec relation:</p>\n<p>lemma \"exec s s' ⟹ exec_instr s' = None ⟹ execf s = s'\"<br>\n  apply (induction rule: exec.induct)<br>\n  apply (subst execf.simps)<br>\n  apply (auto split: option.split)<br>\n  apply (subst execf.simps)<br>\n  apply (auto split: option.split)<br>\n  done</p>",
+        "id": 218582947,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1606927033
+    },
+    {
+        "content": "<p>From: David Kretzmer &lt;<a href=\"mailto:david.k@posteo.de\">david.k@posteo.de</a>&gt;<br>\nThis indeed gives the same performance as the handwritten version!<br>\nHaving proven the equivalence between <code>exec</code> and <code>execf</code> for complete<br>\nexecutions I can use <code>exec</code> for proves and <code>execf</code> for code generation,<br>\nin case this turns out to be more convenient.</p>\n<p>Thank you very much!<br>\nDavid</p>",
+        "id": 218673733,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1606990259
+    }
+]

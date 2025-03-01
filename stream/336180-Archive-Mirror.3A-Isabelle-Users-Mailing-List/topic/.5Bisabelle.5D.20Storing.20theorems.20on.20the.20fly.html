@@ -1,0 +1,247 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Storing theorems on the fly · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Storing.20theorems.20on.20the.20fly.html">[isabelle] Storing theorems on the fly</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294227018"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Storing%20theorems%20on%20the%20fly/near/294227018" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Storing.20theorems.20on.20the.20fly.html#294227018">(Aug 19 2022 at 09:14)</a>:</h4>
+<p>From: Ognjen Maric &lt;<a href="mailto:ognjen.maric@gmail.com">ognjen.maric@gmail.com</a>&gt;<br>
+Hi all,</p>
+<p>I'm writing some Isabelle/ML code which, given a term, generates<br>
+theorems about it. This is essentially a recursive function which<br>
+generates theorems for the subterms and then combines them. A single<br>
+subterm might appear many times, and I'd like to store the generated<br>
+theorems to avoid repeating the work. Clearly, they could be manually<br>
+threaded through the recursive calls, but I'd like to avoid doing the<br>
+plumbing myself, especially since I'd like to be able to retrieve them<br>
+later (outside of the function) as well.</p>
+<p>So I assume I should be using one of the context.*_Data structures to<br>
+store the theorems in an Item_Net (indexed by the terms). Questions:</p>
+<p>Questions:</p>
+<ol>
+<li>
+<p>Right now I'm trying to do this from an ML {* *} block within Isar<br>
+text, using Generic_Data and then storing the generated theorems with<br>
+Context.&gt;&gt;. However, it appears that the theorems only actually get<br>
+stored after the whole ML {* *} block is executed. Is this a feature,<br>
+and if so, how to get around to it?</p>
+</li>
+<li>
+<p>Could this be done within a proof tactic, and how?</p>
+</li>
+</ol>
+<p>Thanks,<br>
+Ognjen</p>
+
+
+
+<a name="294227022"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Storing%20theorems%20on%20the%20fly/near/294227022" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Storing.20theorems.20on.20the.20fly.html#294227022">(Aug 19 2022 at 09:14)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On Wed, 28 Nov 2012, Ognjen Maric wrote:</p>
+<blockquote>
+<p>A single subterm might appear many times, and I'd like to store the <br>
+generated theorems to avoid repeating the work.</p>
+</blockquote>
+<p>This part in isolation sounds like an application of Thm.cterm_cache or <br>
+Thm.thm_cache, i.e. it is semantically plain function application with <br>
+operational tuning for re-use earlier values (in a thread-safe way, with a <br>
+little overhead).</p>
+<blockquote>
+<p>Clearly, they could be manually threaded through the recursive calls, <br>
+but I'd like to avoid doing the plumbing myself, especially since I'd <br>
+like to be able to retrieve them later (outside of the function) as <br>
+well.</p>
+<p>So I assume I should be using one of the context.*_Data structures to<br>
+store the theorems in an Item_Net (indexed by the terms). Questions:</p>
+<p>Questions:<br>
+1. Right now I'm trying to do this from an ML {* *} block within Isar<br>
+text, using Generic_Data and then storing the generated theorems with<br>
+Context.&gt;&gt;. However, it appears that the theorems only actually get<br>
+stored after the whole ML {* *} block is executed. Is this a feature,<br>
+and if so, how to get around to it?</p>
+</blockquote>
+<p>Sounds all too much like implicit destructive stateful programming to me, <br>
+i.e. not what you normally do in Isabelle/ML.</p>
+<p>What are you trying to achieve concretely?</p>
+<p>The normal way is to "thread through" values, usually using the <br>
+Isabelle/ML combinators for that (variations on |&gt; and fold/map/fold_map <br>
+as explained in the implementation manual). This also avoids the seeming <br>
+Context.&gt;&gt; problem above (ML commands have their own linear context that <br>
+can be updated implicitly -- at compile-time, not run-time).</p>
+<blockquote>
+<ol start="2">
+<li>Could this be done within a proof tactic, and how?</li>
+</ol>
+</blockquote>
+<p>Probably not.  Depends what you actually need.  Tactical proof steps <br>
+cannot change the context.  (I am very glad for that, now that I know how <br>
+messy this is in other major provers on the market.)</p>
+<p>Makarius</p>
+
+
+
+<a name="294227034"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Storing%20theorems%20on%20the%20fly/near/294227034" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Storing.20theorems.20on.20the.20fly.html#294227034">(Aug 19 2022 at 09:14)</a>:</h4>
+<p>From: Ognjen Maric &lt;<a href="mailto:ognjen.maric@gmail.com">ognjen.maric@gmail.com</a>&gt;<br>
+On 11/28/2012 01:44 PM, Makarius wrote:</p>
+<blockquote>
+<p>This part in isolation sounds like an application of Thm.cterm_cache or<br>
+Thm.thm_cache, i.e. it is semantically plain function application with<br>
+operational tuning for re-use earlier values (in a thread-safe way, with<br>
+a little overhead).</p>
+</blockquote>
+<p>I'm not immediately certain if they will work in my scenario, but they<br>
+look very useful, thanks. I didn't know they were there.</p>
+<blockquote>
+<p>Sounds all too much like implicit destructive stateful programming to<br>
+me, i.e. not what you normally do in Isabelle/ML.</p>
+<p>What are you trying to achieve concretely?</p>
+<p>The normal way is to "thread through" values, usually using the<br>
+Isabelle/ML combinators for that (variations on |&gt; and fold/map/fold_map<br>
+as explained in the implementation manual). This also avoids the seeming<br>
+Context.&gt;&gt; problem above (ML commands have their own linear context that<br>
+can be updated implicitly -- at compile-time, not run-time).</p>
+</blockquote>
+<p>They can of course be threaded through, but I haven't been able to come<br>
+up with an elegant way to express it in this case. A stateful solution<br>
+would be straightforward, though (that is, once you offload all the<br>
+worries about potential concurrency issues and whatnot to somebody else<br>
+:) At any rate, it's just an annoyance, not a showstopper.</p>
+<p>Concretely, I prove refinement between monadic programs (I'm aware of<br>
+Peter's AFP entry). In my particular case, the data refinement typically<br>
+affects a few primitive "procedures", for which I prove refinement<br>
+(manually). More complex procedures are then built by combining these<br>
+with monadic operations. Their refinement proofs are straightforward<br>
+(and tedious). Basically unfold their definitions, build refinement<br>
+theorems for the components, combine them appropriately and fold the<br>
+definitions inside the resulting theorems. It is these theorems I'd like<br>
+to cache (since the "intermediate" procedures can appear many times),<br>
+and eventually also export into the context, so that they can be used<br>
+later on in other "top-level" proofs.</p>
+<blockquote>
+<p>Probably not.  Depends what you actually need.  Tactical proof steps<br>
+cannot change the context.  (I am very glad for that, now that I know<br>
+how messy this is in other major provers on the market.)</p>
+</blockquote>
+<p>Thanks, this isn't such an important point for my application anyway.</p>
+<p>Ognjen</p>
+
+
+
+<a name="294227041"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Storing%20theorems%20on%20the%20fly/near/294227041" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Storing.20theorems.20on.20the.20fly.html#294227041">(Aug 19 2022 at 09:14)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On Wed, 28 Nov 2012, Ognjen Maric wrote:</p>
+<blockquote>
+<p>They can of course be threaded through, but I haven't been able to come <br>
+up with an elegant way to express it in this case. A stateful solution <br>
+would be straightforward, though (that is, once you offload all the <br>
+worries about potential concurrency issues and whatnot to somebody else <br>
+:) At any rate, it's just an annoyance, not a showstopper.</p>
+</blockquote>
+<p>I wouldn't use "stateful" and "straightforward" in the same sentence. <br>
+Even without the omnipresent parallelism in Isabelle, it is better to say <br>
+explicitly how you fiddle with your values and updated environment.</p>
+<p>See again section 0.3 "Canonical argument order" in <br>
+<a href="http://isabelle.in.tum.de/dist/Isabelle2012/doc/implementation.pdf">http://isabelle.in.tum.de/dist/Isabelle2012/doc/implementation.pdf</a> -- it <br>
+is one of the success stories of Isabelle/ML.  We gradually eloborated <br>
+this purely functional combinator style for aesthetic reasons over the <br>
+years, and later we found ourselves in the lucky situation to be able to <br>
+get on the multicore train early, with minimal cleanup of the code base.</p>
+<p>Sequentialism is a very strong assumption that is better not imposed on <br>
+any serious program today.</p>
+<blockquote>
+<p>Concretely, I prove refinement between monadic programs (I'm aware of <br>
+Peter's AFP entry). In my particular case, the data refinement typically <br>
+affects a few primitive "procedures", for which I prove refinement <br>
+(manually). More complex procedures are then built by combining these <br>
+with monadic operations. Their refinement proofs are straightforward <br>
+(and tedious). Basically unfold their definitions, build refinement <br>
+theorems for the components, combine them appropriately and fold the <br>
+definitions inside the resulting theorems. It is these theorems I'd like <br>
+to cache (since the "intermediate" procedures can appear many times), <br>
+and eventually also export into the context, so that they can be used <br>
+later on in other "top-level" proofs.</p>
+</blockquote>
+<p>I've seen the AFP entry Refine_Monadic occasionally from a distance, but <br>
+am not familiar with it.</p>
+<p>Generally, it depends a lot how you want to organize things, or rather how <br>
+you need to organize things.</p>
+<p>Within a tactical expression or Isar proof method, you can access the <br>
+Proof.context only as a local immutable value (of course it can be updated <br>
+in a functional manner).  The context might contain funny quasi-functional <br>
+elements, such as lazy values or caches of values, but that is <br>
+semantically still functional.  You cannot have a tactic do some ad-hoc <br>
+poking in a non-monotonic manner.</p>
+<p>Within a proof, you can have commands updating the context according to <br>
+its block structure.  The most basic approach is to make an attribute (see <br>
+the 'attribute_setup' command in the isar-ref manual) and use that with <br>
+'note' or other fact producing commands in the proof.  Whatever you do, it <br>
+will be local to the proof.  Proofs are formally irrelevant, i.e. you <br>
+cannot export anything from them.  The main result is specified before, <br>
+and already determined before commencing the proof.</p>
+<p>Within the theory context, you can have commands of the form "theory -&gt; <br>
+theory" or "local_theory -&gt; local_theory".  You can store whatever you <br>
+want in the theory context, as long as it is plain functional data in any <br>
+of the senses above.</p>
+<p>You could try to move results you discover within a proof back to the <br>
+toplevel context, by exporting it in some logical obvious way.</p>
+<p>In a trivial manner, this happens all the time when you work with <br>
+Isabelle:</p>
+<p>lemma B<br>
+       .<br>
+        .<br>
+         .<br>
+         fix x<br>
+         assume "A x"<br>
+         .<br>
+         txt {* Oh, I need "lemma C x" *}</p>
+<p>At that point you merely go back in the text and prepend this <em>before</em> it:</p>
+<p>lemma<br>
+     fixes x<br>
+     assumes "A x"<br>
+     shows "C x"</p>
+<p>with its proof.  So you re-assemble the text in the editor, without funny <br>
+tricks about implicit context extension in the middle of the other proof.</p>
+<p>In more specific, or more complex situations, one could consider making <br>
+this assembly of properly ordered proof documents supported by some tool. <br>
+It is up to your imagination.</p>
+<p>Makarius</p>
+
+
+
+<a name="294227133"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Storing%20theorems%20on%20the%20fly/near/294227133" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Storing.20theorems.20on.20the.20fly.html#294227133">(Aug 19 2022 at 09:15)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:lammich@in.tum.de">lammich@in.tum.de</a>&gt;<br>
+Sounds interesting. I have a similar problem, when trying to<br>
+automatically refine terms to more executable versions (replacing sets<br>
+by red-black-trees, etc.). Once the basic operations are proven,<br>
+refining more complex terms is straightforward. However, in order to<br>
+refine a term that contains defined constants (procedures in your<br>
+speaking), one either has to prove a separate refinement lemma for each<br>
+constant manually, or unfold all such constants beforehand (one then<br>
+gets one big term, and looses the structure), or do something like you<br>
+propose, i.e., extract those constants from the term first, and<br>
+automatically generate refined versions.</p>
+<p>We have experimented with the first two options already, and they are<br>
+not too bad for our use-cases. For the third option, I thought about<br>
+implementing it as an outer-level command, something like: <br>
+  "refine constant as name", that would generate the refinement of<br>
+constant (and, recursively, of all constants used in the term that need<br>
+to be unfolded), then define a new constant name, and generate a<br>
+refinement lemma name.refine: "new-constant refines constant".</p>
+<p>Note the similarity of this problem to code generation: Also the<br>
+code-generator collects code-theorems for constants and, recursively,<br>
+for constants that are used in those code-theorems.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,68 @@
+[
+    {
+        "content": "<p>I am to use a definition in a proof:</p>\n<p>theory Exercise7_1</p>\n<p>imports \"~~/src/HOL/IMP/Big_Step\" </p>\n<p>begin</p>\n<p>fun assigned :: \"com ⇒ vname set\" where <br>\n  \"assigned SKIP                                   = {}\"<br>\n| \"assigned (Assign var _)                         = { var }\"<br>\n| \"assigned (Seq command1 command2)                = (assigned command1) ∪ (assigned command2)\"<br>\n| \"assigned (If condition then_branch else_branch) = (assigned then_branch) ∪ (assigned else_branch)\"<br>\n| \"assigned (While condition body)                 = assigned body\"</p>\n<p>theorem var_not_mod: <br>\n  assumes \"(c,s) ⇒ t\"<br>\n  assumes \"x ∉ assigned c\"<br>\n  shows   \"s x = t x\"<br>\n  using assms<br>\n  unfolding big_step_def<br>\nproof -</p>\n<p>Interestingly, if you CTRL-click on =&gt;, there is a definition called big_step, so I tried </p>\n<div class=\"codehilite\"><pre><span></span><code> unfolding big_step_def\n</code></pre></div>\n\n<p>but Isabelle says</p>\n<div class=\"codehilite\"><pre><span></span><code> Undefined fact: &quot;big_step_def&quot;\n</code></pre></div>\n\n<p>How should I do this? In another proof such a way of thinking worked, adding _def to the name of an inductive definition.</p>",
+        "id": 216323274,
+        "sender_full_name": "Gergely Buday",
+        "timestamp": 1605086949
+    },
+    {
+        "content": "<p><code>big_step</code> is an inductive predicate. Inductive predicates don't have a definition. You can use induction <code>big_step.induct</code>.</p>",
+        "id": 216323845,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1605087257
+    },
+    {
+        "content": "<p>I see, thanks.</p>",
+        "id": 216323889,
+        "sender_full_name": "Gergely Buday",
+        "timestamp": 1605087292
+    },
+    {
+        "content": "<p>The closest thing to a definition is  <code>big_step.simps</code> (which is recursive and is therefore not safe to use as a simp rule!)</p>",
+        "id": 216323942,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1605087333
+    },
+    {
+        "content": "<p>Section 3.5 of <a href=\"http://isabelle.in.tum.de/dist/Isabelle2020/doc/prog-prove.pdf\">http://isabelle.in.tum.de/dist/Isabelle2020/doc/prog-prove.pdf</a></p>",
+        "id": 216324288,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1605087563
+    },
+    {
+        "content": "<blockquote>\n<p>Inductive predicates don't have a definition.</p>\n</blockquote>\n<p>Well, they do. It is simply hidden from users by default (for good reasons; the induction principle and the intro and elim rules should suffice in most cases).</p>\n<div class=\"spoiler-block\"><div class=\"spoiler-header\">\n<p>Expert spoiler</p>\n</div><div class=\"spoiler-content\" aria-hidden=\"true\">\n<p>If the predicate is defined in a context where the flag <code>inductive_internals</code> is set, one gets access to the big_step_def theorem.</p>\n<div class=\"codehilite\"><pre><span></span><code>theory Scratch\nimports &quot;~~/src/HOL/IMP/Big_Step&quot;\nbegin\n\nno_notation big_step (infix &quot;⇒&quot; 55)\ncontext notes [[inductive_internals]] begin\ninductive\n  big_step :: &quot;com × state ⇒ state ⇒ bool&quot; (infix &quot;⇒&quot; 55)\nwhere\nSkip: &quot;(SKIP,s) ⇒ s&quot; |\nAssign: &quot;(x ::= a,s) ⇒ s(x := aval a s)&quot; |\nSeq: &quot;⟦ (c⇩1,s⇩1) ⇒ s⇩2;  (c⇩2,s⇩2) ⇒ s⇩3 ⟧ ⟹ (c⇩1;;c⇩2, s⇩1) ⇒ s⇩3&quot; |\nIfTrue: &quot;⟦ bval b s;  (c⇩1,s) ⇒ t ⟧ ⟹ (IF b THEN c⇩1 ELSE c⇩2, s) ⇒ t&quot; |\nIfFalse: &quot;⟦ ¬bval b s;  (c⇩2,s) ⇒ t ⟧ ⟹ (IF b THEN c⇩1 ELSE c⇩2, s) ⇒ t&quot; |\nWhileFalse: &quot;¬bval b s ⟹ (WHILE b DO c,s) ⇒ s&quot; |\nWhileTrue:\n&quot;⟦ bval b s⇩1;  (c,s⇩1) ⇒ s⇩2;  (WHILE b DO c, s⇩2) ⇒ s⇩3 ⟧ \n⟹ (WHILE b DO c, s⇩1) ⇒ s⇩3&quot;\nend\n\nthm big_step_def\n\nend\n</code></pre></div>\n\n</div></div>",
+        "id": 216324632,
+        "sender_full_name": "Dmitriy Traytel",
+        "timestamp": 1605087825
+    },
+    {
+        "content": "<p>I pondered whether to say this, but decided against it since this thread is called ‘beginner questions’. ;)</p>",
+        "id": 216324738,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1605087895
+    },
+    {
+        "content": "<p>I have never used <code>inductive_internals</code> and completely forgot that it exists <span aria-label=\"surprise\" class=\"emoji emoji-1f62e\" role=\"img\" title=\"surprise\">:surprise:</span></p>",
+        "id": 216324968,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1605088055
+    },
+    {
+        "content": "<p>It is important for beginners to understand that in Isabelle/HOL everything (except for <code>definition</code> and <code>typedef</code>) has a definition in terms of these lower-level primitives. Often these internal definitions are hidden, but they do exist.</p>",
+        "id": 216325114,
+        "sender_full_name": "Dmitriy Traytel",
+        "timestamp": 1605088146
+    },
+    {
+        "content": "<p>(To clarify: this is not important for actually proving things, but important for having trust in the system.)</p>",
+        "id": 216325248,
+        "sender_full_name": "Dmitriy Traytel",
+        "timestamp": 1605088234
+    },
+    {
+        "content": "<p>Thanks, experts.</p>",
+        "id": 216326889,
+        "sender_full_name": "Gergely Buday",
+        "timestamp": 1605089378
+    }
+]

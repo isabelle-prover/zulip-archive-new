@@ -1,0 +1,81 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Problems with datatype definition · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20datatype.20definition.html">[isabelle] Problems with datatype definition</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294077718"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20datatype%20definition/near/294077718" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20datatype.20definition.html#294077718">(Aug 18 2022 at 13:32)</a>:</h4>
+<p>From: René Thiemann &lt;<a href="mailto:rene.thiemann@uibk.ac.at">rene.thiemann@uibk.ac.at</a>&gt;<br>
+Dear all,</p>
+<p>the following datatype definition is not accepted in Isabelle/HOL,<br>
+presumably since the parameter of foo has been changed to "'a option".</p>
+<p>datatype 'a foo = Bar 'a | Com "'a option foo"</p>
+<p>Is there some known workaround for this problem?</p>
+<p>Thanks in advance,<br>
+René</p>
+
+
+
+<a name="294077776"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20datatype%20definition/near/294077776" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20datatype.20definition.html#294077776">(Aug 18 2022 at 13:32)</a>:</h4>
+<p>From: Brian Huffman &lt;<a href="mailto:brianh@cs.pdx.edu">brianh@cs.pdx.edu</a>&gt;<br>
+This is an instance of "nested" or "non-regular" recursion, which is<br>
+not supported by Isabelle's datatype package. I think you can define<br>
+those kinds of datatypes in Coq, but Isabelle has a much less<br>
+sophisticated type system that makes working with nested recursive<br>
+datatypes very difficult.</p>
+<p>The first problem is, what would an induction rule for type 'a foo<br>
+look like? Here's a first try:</p>
+<p>lemma foo_induct:<br>
+  assumes "ALL a. P (Bar a)"<br>
+  assumes "ALL x. P x --&gt; P (Com x)"<br>
+  shows "ALL x. P x"</p>
+<p>But the above rule doesn't work because it is not type-correct.<br>
+Because of the nested recursion, the predicate in the inductive<br>
+hypothesis needs to have a different type than the one in the<br>
+conclusion. In Coq, I think this can work by giving P a polymorphic<br>
+type like "forall a, foo a -&gt; Prop". But in Isabelle you can't talk<br>
+about polymorphic types in this way.</p>
+<p>The other (related) problem is how to define recursive functions over<br>
+a nested recursive datatype. Here's a definition you might like to be<br>
+able to write:</p>
+<p>primrec "size :: 'a foo =&gt; nat" where<br>
+"size (Foo a) = 0" |<br>
+"size (Com x) = Suc (size x)"</p>
+<p>The problem is that the recursive call to "size" on the rhs is at a<br>
+different type. This means that it is impossible to translate this<br>
+definition into a non-recursive one that uses a fixed-point<br>
+combinator; at what type would you take the fixed-point? In Coq, the<br>
+workaround would be to define a recursive value of type "forall a. foo<br>
+a -&gt; nat", with the type parameter made explicit.</p>
+<p>So basically, unless Isabelle's type system is extended with rank-2<br>
+polymorphism, these kinds of definitions will never be supported. The<br>
+only workaround I can think of would be to use something like ZF set<br>
+theory to encode everything in a single Isabelle type, allowing you to<br>
+essentially bypass Isabelle's type system altogether.</p>
+<ul>
+<li>Brian</li>
+</ul>
+
+
+
+<a name="294077856"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20datatype%20definition/near/294077856" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20datatype.20definition.html#294077856">(Aug 18 2022 at 13:33)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+It often works to define a supertype. The example below can be encoded as</p>
+<p>datatype 'a foo = Bar 'a | Com' "'a foo" nat</p>
+<p>where "Com' f n" encodes "Com (Some(...(Some f)...))", with n nested<br>
+Somes. Fine-grained constraints are expressed as propositions on this type.</p>
+<p>Tobias</p>
+<p>Brian Huffman schrieb:</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

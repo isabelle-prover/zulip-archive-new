@@ -1,0 +1,168 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Invariants on free vs. fixed variables in simp... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Invariants.20on.20free.20vs.2E.20fixed.20variables.20in.20simp.2E.2E.2E.html">[isabelle] Invariants on free vs. fixed variables in simp...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294763971"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Invariants%20on%20free%20vs.%20fixed%20variables%20in%20simp.../near/294763971" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Invariants.20on.20free.20vs.2E.20fixed.20variables.20in.20simp.2E.2E.2E.html#294763971">(Aug 22 2022 at 20:43)</a>:</h4>
+<p>From: Norbert Schirmer via Cl-isabelle-users &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Dear Isabelle Users,</p>
+<p>While using the simplifier to rewrite a cterm I encountered a subtle issue (described below).<br>
+I wonder if I have either encountered a bug in the simplifier or otherwise I was <br>
+breaking some assumptions / invariants on the relation of free variables in a term<br>
+vs. fixed variables in the context.</p>
+<p>I did not find the answer in the implementation manual, hence my question here:</p>
+<p>Are there any assumptions / invariants / (strong) guidelines on the usage of <br>
+free vs. fixed variables in the simplifier (or other proof tools in general) ?</p>
+<p>I have rules in mind like:</p>
+<ul>
+<li>Fix every free variable in the context before calling a proof tool.</li>
+<li>Always set the 'body' flag in the context before calling a proof tool.</li>
+<li>Declare a term to the context before calling a proof tool.</li>
+</ul>
+<p>Or is it the other way around and the responsibility of the proof tool to do a proper setup?</p>
+<p>Here the issue I stumbled upon.</p>
+<p>Simplifies to True as expected.</p>
+<p>lemma "b (0::nat) + (a::int) ≤ n ⟹ b 0 + a ≤ n + 1"<br>
+ apply simp<br>
+ done</p>
+<p>Does not simplify to True</p>
+<p>declare [[linarith_trace=true]]<br>
+ML_val ‹<br>
+val ct = @{cterm "b (0::nat) + (a::int) ≤ n ⟹ b 0 + a ≤ n + 1"}<br>
+val test = Simplifier.asm_full_rewrite @{context} ct<br>
+›</p>
+<p>Diagnoses with ‹linarith_trace› reveals that linarith accidently (re)uses variable name "a" <br>
+as "fresh" name for @{term "b 0"} which in turn makes the proof fail as it collides with the <br>
+already present free variable "a".</p>
+<p>My guess (without inspecting the actual code) is, that linarith creates new variable names merely <br>
+refering to the context, e.g. with @{ML Variable.variant_fixes} without additionally considering the <br>
+free (and not fixed) variables in the present term, e.g. with @{ML Term.variant_frees}.</p>
+<p>When fixing and declaring the variables it simplifies to True as expected.</p>
+<p>ML_val ‹<br>
+val ctxt0 = @{context};<br>
+val ([b, a, n], ctxt1) = ctxt0 |&gt; Variable.add_fixes ["b", "a", "n"];<br>
+val t = Syntax.read_term ctxt1 "b (0::nat) + (a::int) ≤ n ⟹ b 0 + a ≤ n + 1";<br>
+val ctxt2 = ctxt1 |&gt; Variable.declare_term t;<br>
+val ct = Thm.cterm_of ctxt2 t;<br>
+val test = Simplifier.asm_full_rewrite ctxt2 ct;<br>
+›</p>
+<p>Actually, just declaring the term already has the desired effect.</p>
+<p>ML_val ‹<br>
+val ctxt0 = @{context};<br>
+val t = Syntax.read_term ctxt0 "b (0::nat) + (a::int) ≤ n ⟹ b 0 + a ≤ n + 1";<br>
+val ctxt1 = ctxt0 |&gt; Variable.declare_term t;<br>
+val ct = Thm.cterm_of ctxt1 t;<br>
+val test = Simplifier.asm_full_rewrite ctxt1 ct;<br>
+›</p>
+<p>Alternatively, setting the ‹body› flag in the context also has the desired effect.</p>
+<p>ML_val ‹<br>
+val ct = @{cterm "b (0::nat) + (a::int) ≤ n ⟹ b 0 + a ≤ n + 1"}<br>
+val test = Simplifier.asm_full_rewrite (Variable.set_body true @{context}) ct<br>
+›</p>
+<p>Regards,<br>
+Norbert</p>
+
+
+
+<a name="294763980"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Invariants%20on%20free%20vs.%20fixed%20variables%20in%20simp.../near/294763980" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Invariants.20on.20free.20vs.2E.20fixed.20variables.20in.20simp.2E.2E.2E.html#294763980">(Aug 22 2022 at 20:43)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+I will look at your examples in detail later, but here are some abstract<br>
+notes.</p>
+<p>Generally, you should make your formal items as official in the context<br>
+as possible: the minimum is a variant of Variable.declare_term, but it<br>
+is better to use Variable.add_fixes or similar to make it really right.<br>
+Sometimes the latter is not possible for historical reasons.</p>
+<p>There are many intermediate situations for variables in the context, for<br>
+the sake of old tools that don't register properly in the context. It<br>
+would be better to be really strict about demanding everything to be<br>
+properly "fixed" in the context, but this will break some old tools.</p>
+<p>Ah, and the word "bug" has not meaning in the Isabelle context:<br>
+everything is so complex that we can only talk about behaviour that is<br>
+expected / unexpected, simple / complex, desirable / undesirable,<br>
+changeable / unchangeable (for now).</p>
+<p>The usual strategy of survival is to do things in a "canonical" way,<br>
+including certain context disciplines. (Example: normally you should<br>
+<em>not</em> change context flags like "is_body": that belongs to the system<br>
+infrastructure, not the user-space tools).</p>
+<p>Makarius</p>
+
+
+
+<a name="294764529"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Invariants%20on%20free%20vs.%20fixed%20variables%20in%20simp.../near/294764529" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Invariants.20on.20free.20vs.2E.20fixed.20variables.20in.20simp.2E.2E.2E.html#294764529">(Aug 22 2022 at 20:48)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On 09/10/2019 22:26, Norbert Schirmer via Cl-isabelle-users wrote:</p>
+<blockquote>
+<p>Are there any assumptions / invariants / (strong) guidelines on the usage of <br>
+free vs. fixed variables in the simplifier (or other proof tools in general) ?</p>
+</blockquote>
+<blockquote>
+<p>I have rules in mind like:
+* Fix every free variable in the context before calling a proof tool.</p>
+</blockquote>
+<p>This should work, but it is not necessary in the strict sense.</p>
+<blockquote>
+<ul>
+<li>Always set the 'body' flag in the context before calling a proof tool.</li>
+</ul>
+</blockquote>
+<p>Don't do this -- the flag is managed by the system infrastructure, not<br>
+user tools.</p>
+<blockquote>
+<ul>
+<li>Declare a term to the context before calling a proof tool.</li>
+</ul>
+</blockquote>
+<p>Always do that, explicitly or implicitly via other operations that<br>
+ensure that terms become "part of the context" in the proper way. This<br>
+is avtually the main conclusion of this thread.</p>
+<blockquote>
+<p>Does not simplify to True</p>
+<p>declare [[linarith_trace=true]]<br>
+ML_val ‹<br>
+val ct = @{cterm "b (0::nat) + (a::int) ≤ n ⟹ b 0 + a ≤ n + 1"}<br>
+val test = Simplifier.asm_full_rewrite @{context} ct<br>
+›</p>
+<p>Diagnoses with ‹linarith_trace› reveals that linarith accidently (re)uses variable name "a" <br>
+as "fresh" name for @{term "b 0"} which in turn makes the proof fail as it collides with the <br>
+already present free variable "a".</p>
+<p>My guess (without inspecting the actual code) is, that linarith creates new variable names merely <br>
+refering to the context, e.g. with @{ML Variable.variant_fixes} without additionally considering the <br>
+free (and not fixed) variables in the present term, e.g. with @{ML Term.variant_frees}.</p>
+</blockquote>
+<p>The "refering to the context" to create new variables is correct. The<br>
+"merely" wording reveals a wrong (outdated) understanding how things<br>
+work. All terms participating in manipulations by proof tools need to be<br>
+formally part of the context. It is neither efficient nor sufficient to<br>
+re-inspect e.g. a goal state -- like was done routinely many years.</p>
+<blockquote>
+<p>Actually, just declaring the term already has the desired effect.</p>
+<p>ML_val ‹<br>
+val ctxt0 = @{context};<br>
+val t = Syntax.read_term ctxt0 "b (0::nat) + (a::int) ≤ n ⟹ b 0 + a ≤ n + 1";<br>
+val ctxt1 = ctxt0 |&gt; Variable.declare_term t;<br>
+val ct = Thm.cterm_of ctxt1 t;<br>
+val test = Simplifier.asm_full_rewrite ctxt1 ct;<br>
+›</p>
+</blockquote>
+<p>That is the standard approach, but note that the Syntax.read_term<br>
+invocation is only correct by accident in this example. In general the<br>
+local variables a, b would have to be somehow reserved in the context<br>
+beforehand, e.g. via Variable.add_fixes. Some newer tools also have a<br>
+convenient 'for' notation for that (e.g. proof method "ind_cases" in<br>
+Isabelle/HOL). You probably won't need that technique right now, but<br>
+knowing it in advance can avoid many old problems from 20 years ago.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

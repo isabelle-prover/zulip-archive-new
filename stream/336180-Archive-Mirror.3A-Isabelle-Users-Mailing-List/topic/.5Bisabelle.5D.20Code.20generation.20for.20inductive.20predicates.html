@@ -1,0 +1,99 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Code generation for inductive predicates · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20inductive.20predicates.html">[isabelle] Code generation for inductive predicates</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294076119"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20for%20inductive%20predicates/near/294076119" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20inductive.20predicates.html#294076119">(Aug 18 2022 at 13:22)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:peter.lammich@uni-muenster.de">peter.lammich@uni-muenster.de</a>&gt;<br>
+Hi all,</p>
+<p>I tried out code generation for inductive predicates, and wonder when<br>
+the generated code will terminate.</p>
+<p>In the code below, I inductively formulate the reflexive, transitive<br>
+closure of a transition relation.<br>
+No I want code to enumerate all the words that lead from one state to<br>
+another. This works well<br>
+if there exists such words. However, if there exists no such word, the<br>
+generated code simply does not terminate.<br>
+This is the same for the predicate w_nempty, that checks whether there<br>
+exists a word between two given states.</p>
+<p>So what happens here? When does the generated code terminate? And is<br>
+there a simple way to generate code for "w_nempty" that terminates?</p>
+<p>Many thanks in advance for any hints,<br>
+  Peter</p>
+<p>-- "A transition relation"<br>
+  inductive_set d1 :: "(nat * char * nat) set" where<br>
+    "(1,CHR ''a'',2) : d1" |<br>
+    "(2,CHR ''b'',2) : d1"</p>
+<p>-- "Reflexive, transitive closure"<br>
+  inductive word where<br>
+    "word \&lt;delta&gt; q [] q" |<br>
+    "[| (q,a,qh):\&lt;delta&gt;; word \&lt;delta&gt; qh w q' |] ==&gt; word \&lt;delta&gt; q<br>
+(a#w) q'"</p>
+<p>-- "Whether a word from q to q' exists"<br>
+  inductive w_nempty where<br>
+    "word \&lt;delta&gt; q w q' ==&gt; w_nempty \&lt;delta&gt; q q'"</p>
+<p>code_module test<br>
+    contains<br>
+      test1 = "word d1 1 _ 2"<br>
+      test2 = "word d1 2 _ 1"<br>
+      test3 = "%d q q'. w_nempty d q q'"<br>
+  (*<br>
+    test4 = "w_nempty d1 2 1"  However, with this, code generation does<br>
+not terminate.<br>
+  *)</p>
+<p>-- "These behave as expected: "<br>
+  ML {*<br>
+    DSeq.pull (test.test1);<br>
+    *}</p>
+<p>ML {*<br>
+    let val d = [(0,(#"a",1)), (1,(#"b",1))] in<br>
+      test.test3 d 0 1<br>
+    end<br>
+    *}</p>
+<p>-- "These does not terminate:"<br>
+  ML {*<br>
+    DSeq.pull (test.test2);<br>
+    *}<br>
+  ML {*<br>
+    let val d = [(0,(#"a",1)), (1,(#"b",1))] in<br>
+      test.test3 d 1 0<br>
+    end<br>
+    *}</p>
+
+
+
+<a name="294076169"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20for%20inductive%20predicates/near/294076169" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20inductive.20predicates.html#294076169">(Aug 18 2022 at 13:22)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+Hi Peter,</p>
+<p>The simple answer is, that code generation for inductive definitions<br>
+yields a functional version of what Prolog would give you, except that<br>
+there is no unification, only matching. If you give your clauses to<br>
+Prolog, you should see the same (non)termination behaviour as in Isabelle.</p>
+<p>Your example 2 does not terminate because there is no path from 2 to 1,<br>
+but there is an edge from 2 to 2 and thus a recursive call with 2 and 1<br>
+is made etc. The fact that you don't need to answer the same query twice<br>
+on the same branch is not part of a Prolog interpreter because you need<br>
+to tabulate your queries, which can be expensive. If you want it, you<br>
+want "tabled logic programming", which Isabelle does not (yet?) provide.<br>
+However, you are not the only one who would like this, and Stefan<br>
+Berghofer has recently provided a theory of tabled transitive closure,<br>
+which can be used for code generation to avoid nontermination where the<br>
+answer should be No. Unfortunately it did not quite make it into<br>
+Isabelle 2009, out any day now. But Stefan can send you a copy and it<br>
+should solve your problem. (It is a little bit involved because you<br>
+essentially need to prove that it suffices to consider paths without loops).</p>
+<p>Tobias</p>
+<p>Peter Lammich wrote:</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

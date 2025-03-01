@@ -1,0 +1,96 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Efficient_Nat and Imperative-HOL, strange impo... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Efficient_Nat.20and.20Imperative-HOL.2C.20strange.20impo.2E.2E.2E.html">[isabelle] Efficient_Nat and Imperative-HOL, strange impo...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294243480"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Efficient_Nat%20and%20Imperative-HOL%2C%20strange%20impo.../near/294243480" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Efficient_Nat.20and.20Imperative-HOL.2C.20strange.20impo.2E.2E.2E.html#294243480">(Aug 19 2022 at 11:19)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Peter,</p>
+<p>the code generator tutorial tells you that you should list theories at the end of the <br>
+imports list if they are adaptation theories for code generation like Efficient_Nat. Upon <br>
+processing the import list, Isabelle merges the theory data of all the imports in the <br>
+given list according to the merge operation of the theory data. If you now look at the <br>
+merge operation in src/Tools/Code/code_target.ML, you see that it always prefers later <br>
+imports. If you add the empty theory A at the end of the import list, all the imports that <br>
+A inherits from Main will overwrite those from Efficient_Nat and Imperative_HOL.</p>
+<p>The code setup in Imperative_HOL requires that the type nat be mapped to Natural in Scala; <br>
+Heap_Monad therefore imports Code_Natural, which contains the following declaration:</p>
+<p>code_type code_numeral (Scala "Natural")</p>
+<p>This conflicts with the declaration from Code_Numeral that is valid in A (via the Main <br>
+import):</p>
+<p>code_type code_numeral (Scala "BigInt")</p>
+<p>Now, if you import A after Imperative_HOL and Efficient_Nat, the former's declaration wins <br>
+over the latter's and the type error manifests itself.</p>
+<p>The whole trouble arises from a sloppy handling of target numerals in Isabelle2013. The <br>
+type code_numeral is isomorphic to nat, but implemented by arbitrary precision integers of <br>
+the target language (which also contain negative numbers). Code_Natural wraps these <br>
+target-language integers in a new type Natural for Haskell and Scala, but I don't know <br>
+why. In the development version, Florian has renovated the whole business with target <br>
+language numerals such that there are now separate types for all integers and non-negative <br>
+integers. This hopefully solves your problem in the next release although I have not tried <br>
+it yet.</p>
+<p>Hope this helps,<br>
+Andreas</p>
+
+
+
+<a name="294243497"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Efficient_Nat%20and%20Imperative-HOL%2C%20strange%20impo.../near/294243497" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Efficient_Nat.20and.20Imperative-HOL.2C.20strange.20impo.2E.2E.2E.html#294243497">(Aug 19 2022 at 11:19)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:lammich@in.tum.de">lammich@in.tum.de</a>&gt;<br>
+Hi.</p>
+<p>Thanks, this helps understanding the problem.</p>
+<p>It probably means that I have to restructure my theory tree such that<br>
+export_code is only performed in leave-theories, where I can safely<br>
+import Efficient_Nat. I only hope that Imperative_HOL does not make<br>
+changes that get overwritten, too, as this would mean that no non-leaf<br>
+theory could be based on Imperative_HOL.</p>
+<p>Cheers,<br>
+  Peter</p>
+
+
+
+<a name="294243529"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Efficient_Nat%20and%20Imperative-HOL%2C%20strange%20impo.../near/294243529" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Efficient_Nat.20and.20Imperative-HOL.2C.20strange.20impo.2E.2E.2E.html#294243529">(Aug 19 2022 at 11:19)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+This should not be the case.</p>
+<p>Florian<br>
+<a href="/user_uploads/14278/5C4KaLD79Uff4IMIESYv5ciT/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294243586"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Efficient_Nat%20and%20Imperative-HOL%2C%20strange%20impo.../near/294243586" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Efficient_Nat.20and.20Imperative-HOL.2C.20strange.20impo.2E.2E.2E.html#294243586">(Aug 19 2022 at 11:20)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Peter,</p>
+<blockquote>
+<p>It probably means that I have to restructure my theory tree such that<br>
+export_code is only performed in leave-theories, where I can safely<br>
+import Efficient_Nat.<br>
+No, you don't. For this particular case, just make sure that every theory with an <br>
+export_code imports Efficient_Nat at the end of its imports list. AFAIK, the merge is <br>
+performed even if some anchestor theory has already imported Efficient_Nat, so you can <br>
+always force the declarations from Efficient_Nat again.</p>
+</blockquote>
+<blockquote>
+<p>I only hope that Imperative_HOL does not make<br>
+changes that get overwritten, too, as this would mean that no non-leaf<br>
+theory could be based on Imperative_HOL.<br>
+Efficient_Nat violates the locality principle, because it changes some setup of Isabelle <br>
+that can be accessed in other ways. Such non-monotonic changes result in non-trivial <br>
+merges and often cause trouble sooner or later. IIRC, Imperative_HOL respects locality in <br>
+that the whole setup is declared once and for all, so if everything is based on the single <br>
+entry point Imperative_HOL.thy, everything should be fine.</p>
+</blockquote>
+<p>Andreas</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

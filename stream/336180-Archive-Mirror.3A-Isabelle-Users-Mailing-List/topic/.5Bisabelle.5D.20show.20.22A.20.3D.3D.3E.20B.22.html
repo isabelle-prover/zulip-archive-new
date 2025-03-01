@@ -1,0 +1,121 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] show &quot;A ==&gt; B&quot; · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20show.20.22A.20.3D.3D.3E.20B.22.html">[isabelle] show &quot;A ==&gt; B&quot;</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294282117"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20show%20%22A%20%3D%3D%3E%20B%22/near/294282117" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20show.20.22A.20.3D.3D.3E.20B.22.html#294282117">(Aug 19 2022 at 14:51)</a>:</h4>
+<p>From: Askar Safin &lt;<a href="mailto:safinaskar@mail.ru">safinaskar@mail.ru</a>&gt;<br>
+Hi. I think I found a bug in the Isabelle 2013-2 (OS: Debian GNU/Linux 7, Interface: jEdit). For example, I type the following in the jEdit Isabelle interface:</p>
+<p>==begin==<br>
+notepad begin<br>
+have "A ==&gt; B" and "C" proof -<br>
+  show "A ==&gt; B" sorry<br>
+==end==</p>
+<p>Then, Isabelle will accept this "show" and the "Output" section of jEdit will show me:</p>
+<p>==begin==<br>
+show A ⟹ B <br>
+Successful attempt to solve goal by exported rule:<br>
+  A ⟹ B <br>
+proof (state): step 4</p>
+<p>this:<br>
+  A ⟹ B</p>
+<p>goal (2 subgoals):<br>
+ 1. A ⟹ A<br>
+ 2. C<br>
+==end==</p>
+<p>So, we see strange "A ==&gt; A" goal. Then I can continue:</p>
+<p>==begin==<br>
+  show "C" sorry<br>
+qed<br>
+==end==</p>
+<p>And Isabelle will accept my proof. So, proof checking is OK, but the "Output" shows confusing output.</p>
+<p>You may say "just use A --&gt; B". Yes, this works, but in some cases I have to deal with namely "A ==&gt; B"-like goals. For example, when I prove something by induction, I deal with goals like "P n ==&gt; P (Suc n)" (and when I try to solve such goal using 'show "P n ==&gt; P (Suc n)"' I see confusing output in the "Output").</p>
+<p>You may say: just use 'assume "A" thus "B"' instead of 'show "A ==&gt; B"'. Yes, this works, too. But in some cases the resulting proof will became bigger. For example, I have a lot of goals A1 ==&gt; B1, A2 ==&gt; B2, etc, for example, created by induction on some datatype with many constructors. Then the following proof:<br>
+==begin==<br>
+assume A1<br>
+show B1 sorry<br>
+next<br>
+assume A2<br>
+show B2 sorry<br>
+next<br>
+...<br>
+==end==<br>
+is bigger than the following:<br>
+==begin==<br>
+show "A1 ==&gt; B1" sorry<br>
+show "A2 ==&gt; B2" sorry<br>
+...<br>
+==end==</p>
+<p>Moreover, imagine the following situation:<br>
+==begin==<br>
+datatype t =<br>
+  c0<br>
+| c1 t<br>
+| c2 t<br>
+| c3 t</p>
+<p>lemma<br>
+  fixes x :: t<br>
+  assumes prem: "A x"<br>
+  shows "B x"<br>
+using prem proof (induct x)<br>
+  fix x<br>
+  assume "A x ⟹ B x"<br>
+  hence "C x" sorry (* Some intermediate fact *)<br>
+  thus<br>
+    "A (c1 x) ⟹ B (c1 x)" and<br>
+    "A (c2 x) ⟹ B (c2 x)" and<br>
+    "A (c3 x) ⟹ B (c3 x)"<br>
+  sorry (* Let's image "C x" can prove all this goals at once using some simple method, for example, auto *)<br>
+next<br>
+  show "A c0 ⟹ B c0" sorry<br>
+qed<br>
+==end==</p>
+<p>Any attempt to rewrite this proof not using 'thus "A (c1 x) ==&gt; B (c1 x)"' will result in bigger proof (even if we will use "cases"). Of course, all this are toy examples. In real proofs size increase will be more noticeable. In either case user should be able to write 'show "A ==&gt; B"' and not to see strange "Output".</p>
+<p>Also, the last example shows very strange behavior: "thus" solve goals, but simultaneously they leave unchanged (according to the "Output")! If I put cursor between "sorry" and "next" words, I will see in the jEdit "Output":<br>
+==begin==<br>
+show A (c1 x) ⟹ B (c1 x)<br>
+  and A (c2 x) ⟹ B (c2 x)<br>
+  and A (c3 x) ⟹ B (c3 x) <br>
+Successful attempt to solve goal by exported rule:<br>
+  (A ?xa2 ⟹ B ?xa2) ⟹ A (c1 ?xa2) ⟹ B (c1 ?xa2) <br>
+Successful attempt to solve goal by exported rule:<br>
+  (A ?xa2 ⟹ B ?xa2) ⟹ A (c2 ?xa2) ⟹ B (c2 ?xa2) <br>
+Successful attempt to solve goal by exported rule:<br>
+  (A ?xa2 ⟹ B ?xa2) ⟹ A (c3 ?xa2) ⟹ B (c3 ?xa2) <br>
+proof (state): step 6</p>
+<p>this:<br>
+    A (c1 x) ⟹ B (c1 x)<br>
+    A (c2 x) ⟹ B (c2 x)<br>
+    A (c3 x) ⟹ B (c3 x)</p>
+<p>goal (4 subgoals):<br>
+ 1. A c0 ⟹ B c0<br>
+ 2. ⋀x. (A x ⟹ B x) ⟹ A (c1 x) ⟹ A (c1 x)<br>
+ 3. ⋀x. (A x ⟹ B x) ⟹ A (c2 x) ⟹ A (c2 x)<br>
+ 4. ⋀x. (A x ⟹ B x) ⟹ A (c3 x) ⟹ A (c3 x)<br>
+==end==</p>
+<p>I see lots of "Successful attempt to solve goal by exported rule" and then I see this goals again in "goal (4 subgoals)". Even if I put the cursor at the following "next" I will see:<br>
+==begin==<br>
+proof (state): step 7</p>
+<p>goal (4 subgoals):<br>
+ 1. A c0 ⟹ B c0<br>
+ 2. ⋀x. (A x ⟹ B x) ⟹ A (c1 x) ⟹ A (c1 x)<br>
+ 3. ⋀x. (A x ⟹ B x) ⟹ A (c2 x) ⟹ A (c2 x)<br>
+ 4. ⋀x. (A x ⟹ B x) ⟹ A (c3 x) ⟹ A (c3 x)<br>
+==end==</p>
+<p>And despite of all this the proof works! I. e. the last "qed" successfully finishes proof despite lots of goals present at the "Output" (for example, if I put the cursor to "next" or before "qed").</p>
+<p>So, please fix this issue or say how to workaround it or document it.</p>
+<p>(Redirected from <a href="https://mailmanbroy.informatik.tu-muenchen.de/pipermail/isabelle-dev/2014-July/005564.html">https://mailmanbroy.informatik.tu-muenchen.de/pipermail/isabelle-dev/2014-July/005564.html</a> )</p>
+<p>==<br>
+Askar Safin</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

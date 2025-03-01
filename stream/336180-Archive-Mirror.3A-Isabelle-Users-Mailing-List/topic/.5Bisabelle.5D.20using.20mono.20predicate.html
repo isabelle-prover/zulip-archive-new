@@ -1,0 +1,107 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] using mono predicate · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20using.20mono.20predicate.html">[isabelle] using mono predicate</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294135850"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20using%20mono%20predicate/near/294135850" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20using.20mono.20predicate.html#294135850">(Aug 18 2022 at 17:38)</a>:</h4>
+<p>From: Viorel Preoteasa &lt;<a href="mailto:viorel.preoteasa@abo.fi">viorel.preoteasa@abo.fi</a>&gt;<br>
+Hello,</p>
+<p>I have the following theory fragment:</p>
+<p>theory test imports Main<br>
+begin</p>
+<p>class test = lattice<br>
+begin</p>
+<p>theorem test:<br>
+   "f x  = (x::'a) ==&gt; mono f ==&gt; f x = x"</p>
+<p>When processing the theorem test I get the following error:</p>
+<p>*** Type unification failed: Variable 'a::type not of sort order</p>
+<p>The predicate mono is defined in class order and class lattice<br>
+extends the class order.</p>
+<p>Best regards,</p>
+<p>Viorel Preoteasa</p>
+
+
+
+<a name="294135871"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20using%20mono%20predicate/near/294135871" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20using.20mono.20predicate.html#294135871">(Aug 18 2022 at 17:38)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@kit.edu">andreas.lochbihler@kit.edu</a>&gt;<br>
+Dear Viorel,</p>
+<p>this is how the type error arises:<br>
+In the context order, mono has the type "'a :: type =&gt; 'b :: order =&gt; bool", <br>
+which is specified in the definition of mono in theory Orderings. The sort <br>
+constraint order on 'b is necessary such that the order operation are availabe <br>
+on the image type.</p>
+<p>In your theorem test, you are in the locale context test, which is a sublocale <br>
+of order, i.e. mono has the polymorphic type "'a :: type =&gt; ?'b :: order =&gt; <br>
+bool" where ?'b is free and 'a is bound.<br>
+The function f has type "'a :: type =&gt; 'a", i.e., mono's type must be <br>
+specialized such that ?'b becomes 'a. However, 'a is not known to be of sort <br>
+order, so this gives the type error.</p>
+<p>I know of three approaches to your problem:</p>
+<ol>
+<li>State and prove your theorem test outside the context test, but with explicit <br>
+sort constraints:</li>
+</ol>
+<p>class test = lattice</p>
+<p>theorem test: "f x  = (x::'a :: test) ==&gt; mono f ==&gt; f x = x"</p>
+<p>Alternatively, you can use the sort constraint "order" instead of "test".</p>
+<p>This approach is suitable if</p>
+<ul>
+<li>
+<p>you analogously move all theorems that rely on theorem test out of the context <br>
+test and add sort constraints where necessary, and</p>
+</li>
+<li>
+<p>you never need to interpret the locale for class test in a context where 'a is <br>
+instantiated to a type which is not in class test (via the commands sublocale or <br>
+interpretation).</p>
+</li>
+</ul>
+<ol start="2">
+<li>
+<p>Change the definition of class test such that 'a has the sort constraint <br>
+order. The conditions are similar to 1., but now, everything in context test <br>
+includes the sort constraint.</p>
+</li>
+<li>
+<p>Give up on type classes and do everything in locales. Then, you will have to <br>
+define mono yourself in a locale for order morphisms and setup proof automation <br>
+by yourself. The locale tutorial contains such an example with order <br>
+homomorphisms. If you base your order morphism locale on the locale "order" that<br>
+lives behind the type class "order", you get some automation from the type class <br>
+"order" for free, but not everything (cf. <br>
+<a href="https://lists.cam.ac.uk/mailman/htdig/cl-isabelle-users/2011-February/msg00132.html">https://lists.cam.ac.uk/mailman/htdig/cl-isabelle-users/2011-February/msg00132.html</a>).<br>
+You cannot have order morphisms as type class because they would involve <br>
+multiple type variables, which Isabelle does not support.</p>
+</li>
+</ol>
+<p>Hope this helps,<br>
+Andreas</p>
+<p>Viorel Preoteasa schrieb:</p>
+
+
+
+<a name="294135904"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20using%20mono%20predicate/near/294135904" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20using.20mono.20predicate.html#294135904">(Aug 18 2022 at 17:38)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@kit.edu">andreas.lochbihler@kit.edu</a>&gt;<br>
+Hello Viorel,</p>
+<p>there is no direct way to enforce this. The easiest is to add a trivial <br>
+assumption which introduces the sort constraint, for example:</p>
+<p>class test = lattices +<br>
+   assumes "(a :: 'a :: order) = a"</p>
+<p>The class command also accepts the constrains element that locales support, but <br>
+this seems to be without effect.</p>
+<p>Andreas</p>
+<p>Viorel Preoteasa schrieb:</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

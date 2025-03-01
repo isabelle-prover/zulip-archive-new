@@ -1,0 +1,67 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Problems with auto (at ML level) · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20auto.20.28at.20ML.20level.29.html">[isabelle] Problems with auto (at ML level)</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294083426"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20auto%20%28at%20ML%20level%29/near/294083426" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20auto.20.28at.20ML.20level.29.html#294083426">(Aug 18 2022 at 14:03)</a>:</h4>
+<p>From: Burkhart Wolff &lt;<a href="mailto:Burkhart.Wolff@lri.fr">Burkhart.Wolff@lri.fr</a>&gt;<br>
+Dear all,</p>
+<p>I found a somewhat strange difference in the behaviour of auto_tac<br>
+between an ISAR-level execution and an ML-level execution:</p>
+<p>lemma aux :<br>
+"triangle ?X3X79 ?X2X77 ?X1X75 \&lt;and&gt; ?X3X79 ~= ?X2X77 \&lt;and&gt; ?X2X77  <br>
+~= ?X1X75 \&lt;and&gt; ?X3X79 ~= ?X1X75"<br>
+apply(auto intro: abs_cases )<br>
+done</p>
+<p>does the trick: searching between several intro-rules one possible  <br>
+solution that instantiates<br>
+the meta-variables conveniently.</p>
+<p>In contrast:<br>
+ML{* fun auto_solver thms {prems: Thm.thm list, context:  <br>
+Proof.context}  =<br>
+                     auto_tac ((local_claset_of context) addIs thms,<br>
+                                        local_simpset_of context)*}</p>
+<p>lemma aux :<br>
+"triangle ?X3X79 ?X2X77 ?X1X75 \&lt;and&gt; ?X3X79 ~= ?X2X77 \&lt;and&gt; ?X2X77  <br>
+~= ?X1X75 \&lt;and&gt; ?X3X79 ~= ?X1X75"<br>
+apply(tactic "(auto_solver (thms\"abs_cases\")){prems=[], context=  <br>
+@{context}}")</p>
+<p>looks as if "auto intro!: abs_cases" has been fired; backtracking is  <br>
+reduced to just choosing<br>
+the first match and getting stuck.</p>
+<p>The full example is in the appendix.</p>
+<p>Can anybody point me out where I oversimplified Isar's way to control  <br>
+auto_tac ?</p>
+<p>Best regards,</p>
+<p>bu<br>
+<a href="/user_uploads/14278/FlqLElxrI4E0wD8re2FVvGmd/Trian.thy">Trian.thy</a></p>
+
+
+
+<a name="294083433"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20auto%20%28at%20ML%20level%29/near/294083433" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20auto.20.28at.20ML.20level.29.html#294083433">(Aug 18 2022 at 14:03)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+The problem here is that the old operators addIs (and simular) prefer <br>
+rules from right to left, while Isar declarations work in textual order <br>
+from left to right.  Thus the internal priorities of the rules come out <br>
+differently.</p>
+<p>Your example works, if auto_solver is defined like this:</p>
+<p>ML {*<br>
+   fun auto_solver thms {prems: Thm.thm list, context: Proof.context} =<br>
+     auto_tac (local_claset_of context addIs (rev thms),<br>
+       local_simpset_of context)<br>
+*}</p>
+<p>Here (rev thms) does the trick.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

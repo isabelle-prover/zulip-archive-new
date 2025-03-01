@@ -1,0 +1,122 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Declarations not activated by Interpretation.i... · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Declarations.20not.20activated.20by.20Interpretation.2Ei.2E.2E.2E.html">[isabelle] Declarations not activated by Interpretation.i...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="254094556"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Declarations%20not%20activated%20by%20Interpretation.i.../near/254094556" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Declarations.20not.20activated.20by.20Interpretation.2Ei.2E.2E.2E.html#254094556">(Sep 20 2021 at 18:19)</a>:</h4>
+<p>From: Clemens Ballarin &lt;<a href="mailto:ballarin@in.tum.de">ballarin@in.tum.de</a>&gt;<br>
+Hi Norbert,</p>
+<p>There have been many refactorings since I've implemented this, so I <br>
+cannot tell you for sure. However, it seems to me that you should be <br>
+using 'isar_interpretation' rather than 'interpretation'.</p>
+<p>Clemens</p>
+
+
+
+<a name="254118738"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Declarations%20not%20activated%20by%20Interpretation.i.../near/254118738" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Declarations.20not.20activated.20by.20Interpretation.2Ei.2E.2E.2E.html#254118738">(Sep 20 2021 at 21:10)</a>:</h4>
+<p>From: Norbert Schirmer via Cl-isabelle-users &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Hi Clemens,</p>
+<p>Unfortunately this also does not show any effect.</p>
+<p>Regards,<br>
+Norbert</p>
+
+
+
+<a name="254537574"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Declarations%20not%20activated%20by%20Interpretation.i.../near/254537574" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Declarations.20not.20activated.20by.20Interpretation.2Ei.2E.2E.2E.html#254537574">(Sep 23 2021 at 13:46)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Norbert,</p>
+<p>the issue is a little bit delicate.</p>
+<p>First, to clarify the ML interfaces:</p>
+<ul>
+<li>
+<p>Interpretation.interpretation is for bounded interpretation within<br>
+context begin/end blocks.</p>
+</li>
+<li>
+<p>Interpretation.isar_interpretation mimics the Isar keyword<br>
+»interpretation« which has a different meaning at the theory level.</p>
+</li>
+</ul>
+<p>Following »explicit is better than implict«,<br>
+Interpretation.interpretation seems the right thing for your application.</p>
+<p>Now, the problem itself:</p>
+<blockquote>
+<p>context foo<br>
+begin<br>
+ML_val ‹<br>
+val lthy = <br>
+ @{context} <br>
+ |&gt; Interpretation.interpretation expr_one             <br>
+ |&gt; Proof.global_terminal_proof ((Method.Basic (fn ctxt =&gt;  SIMPLE_METHOD (<br>
+      (Locale.intro_locales_tac {strict = false, eager = true} ctxt [] THEN <br>
+       asm_full_simp_tac ctxt 1))), <a href="http://Position.no">Position.no</a><br>
+&lt;http://Position.no&gt;_range), NONE)</p>
+<p>val thms = Named_Theorems.get lthy @{named_theorems my_rules} ―‹[]›</p>
+</blockquote>
+<p>A second glimpse:</p>
+<blockquote>
+<p>val thms = Named_Theorems.get (Local_Theory.target_of lthy)<br>
+@{named_theorems my_rules} ―‹[]›</p>
+</blockquote>
+<p>What happens here?  Declarations stemming from bounded interpretations<br>
+are »as it is by now« only applied in a <em>target</em> context, but never in<br>
+the »eigen context«.  So far this has never raised any attention since<br>
+after each Isar interpretation, the target context is restored, any<br>
+obviously there haven’t been any programmatic applications of<br>
+interpretation in bounded contexts so far.</p>
+<p>I deem the position in the code which is responsible for that glitch is<br>
+in generic_target.ML:</p>
+<p>val local_interpretation = standard_registration (fn (n, level) =&gt; level<br>
+= n - 1);</p>
+<p>The check is too strict: it should not only cover level = n - 1 (the<br>
+uppermost nested local theory) but level = n also (the eigen context).</p>
+<p>I will have a look at this and see whether this suffices.</p>
+<p>Cheers,<br>
+    Florian<br>
+<a href="/user_uploads/14278/E8VBRj7ZCriDUB4tly8709Yk/OpenPGP_signature">OpenPGP_signature</a></p>
+
+
+
+<a name="255371986"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Declarations%20not%20activated%20by%20Interpretation.i.../near/255371986" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Declarations.20not.20activated.20by.20Interpretation.2Ei.2E.2E.2E.html#255371986">(Sep 29 2021 at 09:59)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Norbert,</p>
+<p>see now <a href="https://isabelle.in.tum.de/repos/isabelle/rev/690928dd6f8f">https://isabelle.in.tum.de/repos/isabelle/rev/690928dd6f8f</a></p>
+<p>It would also be possible to apply declarations it <em>all</em> levels of the<br>
+nested target, but at the moment I am reluctant to undertake such a<br>
+change in user-observable behaviour.</p>
+<p>Florian<br>
+<a href="/user_uploads/14278/keHuDgS2VNg6UXDpzqO10Ywq/OpenPGP_signature">OpenPGP_signature</a></p>
+
+
+
+<a name="255375003"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Declarations%20not%20activated%20by%20Interpretation.i.../near/255375003" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Declarations.20not.20activated.20by.20Interpretation.2Ei.2E.2E.2E.html#255375003">(Sep 29 2021 at 10:25)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+I have tried to track the emergence of the level "n - 1" / formerly map_top<br>
+and found this old changeset:</p>
+<p>changeset:   52119:90ba620333d0<br>
+user:        haftmann<br>
+date:        Wed May 22 22:56:17 2013 +0200<br>
+files:       src/Pure/Isar/expression.ML src/Pure/Isar/local_theory.ML<br>
+description:<br>
+interpretation must always operate on the last element in a local theory<br>
+stack, not on all elements: interpretated facts must disappear after pop from<br>
+local theory stack, and transfer from last target is not enough</p>
+<p>The "must always" is not explained in the text; maybe you still remember the<br>
+reasons.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

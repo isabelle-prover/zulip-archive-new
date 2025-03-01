@@ -1,0 +1,76 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Code_Target_Nat and threefold pattern matching · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code_Target_Nat.20and.20threefold.20pattern.20matching.html">[isabelle] Code_Target_Nat and threefold pattern matching</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294710860"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code_Target_Nat%20and%20threefold%20pattern%20matching/near/294710860" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code_Target_Nat.20and.20threefold.20pattern.20matching.html#294710860">(Aug 22 2022 at 15:29)</a>:</h4>
+<p>From: Fabian Hellauer &lt;<a href="mailto:hellauer@in.tum.de">hellauer@in.tum.de</a>&gt;<br>
+Hi,</p>
+<p>in this example</p>
+<p>theory Scratch<br>
+     imports Main "~~/src/HOL/Library/Code_Target_Nat"<br>
+   begin</p>
+<p>fun foo :: "'a list ⇒ 'a list ⇒ nat ⇒ bool" where<br>
+       "foo (t#ts) (s#ss) 0 ⟷ False" |<br>
+       "foo (t#ts) ss (Suc i) ⟷ False" |<br>
+       "foo ts [] 0 ⟷ False" |<br>
+       "foo [] ss _ ⟷ False"</p>
+<p>export_code foo in SML</p>
+<p>end</p>
+<p>the code export fails with the message:<br>
+     "Nat.zero_nat_inst.zero_nat" is not a constructor, on left hand <br>
+side of equation, in theorem: foo ?ts [] zero_nat_inst.zero_nat ≡ False</p>
+<p>If I remove any of the three arguments, it works fine.<br>
+Do you have an idea what is going on?</p>
+<p>Cheers,<br>
+Fabian<br>
+<a href="/user_uploads/14278/n1_KynQptiIDFRWtqerpaAkP/Scratch.thy">Scratch.thy</a></p>
+
+
+
+<a name="294710870"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code_Target_Nat%20and%20threefold%20pattern%20matching/near/294710870" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code_Target_Nat.20and.20threefold.20pattern.20matching.html#294710870">(Aug 22 2022 at 15:29)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Fabian,</p>
+<p>The problem is that your function has been defined with pattern-matching on natural <br>
+numbers and lists, but by importing Code_Target_Nat, you have instructed the code <br>
+generator to implement natural numbers as target-language integers, so pattern matching on <br>
+natural numbers cannot be done any more. This is what the error message tells you.</p>
+<p>In most of the cases, you do not notice this problem because Code_Target_Nat installs a <br>
+preprocessor for code equations that eliminates pattern matches on natural numbers. <br>
+Unfortunately, this preprocessor does not work in all cases. Basically, whenever there is <br>
+an equation</p>
+<p>foo pat1 pat2 0 = rhs1</p>
+<p>then there must also be an equation</p>
+<p>foo pat1 pat2 (Suc n) = rhs2 n</p>
+<p>with the same patterns pat1 and pat2 such that they can be combined to</p>
+<p>foo pat1 pat2 x = if x = 0 then rhs1 else rhs (x - 1)</p>
+<p>For your function foo, this is not the case, as there is the pattern</p>
+<p>foo ts [] 0 = False</p>
+<p>but no corresponding</p>
+<p>foo ts [] (Suc n) = ...</p>
+<p>This problem is well-known [1]. A student of mine and I are currently working on a proper <br>
+solution for this. For the time being, you can manually complete the missing patterns in <br>
+the code equations as follows:</p>
+<p>lemmas foo_code [code] =<br>
+   foo.simps(1)<br>
+   foo.simps(2)[of _ _ "[]"]<br>
+   foo.simps(2)[of _ _ "_ # _"]<br>
+   foo.simps(3)[of "_ # _"]<br>
+   foo.simps(4)[of _ _ "0"]<br>
+   foo.simps(5)</p>
+<p>Hope this helps,<br>
+Andreas</p>
+<p>[1] <a href="https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2016-September/msg00078.html">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2016-September/msg00078.html</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

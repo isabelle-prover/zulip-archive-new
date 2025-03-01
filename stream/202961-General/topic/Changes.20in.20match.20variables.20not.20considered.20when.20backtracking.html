@@ -1,0 +1,57 @@
+<html>
+<head><meta charset="utf-8"><title>Changes in match variables not considered when backtracking · General · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/202961-General/index.html">General</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Changes.20in.20match.20variables.20not.20considered.20when.20backtracking.html">Changes in match variables not considered when backtracking</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="260604562"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/Changes%20in%20match%20variables%20not%20considered%20when%20backtracking/near/260604562" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Wolfgang Jeltsch <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Changes.20in.20match.20variables.20not.20considered.20when.20backtracking.html#260604562">(Nov 08 2021 at 00:27)</a>:</h4>
+<p>I’ve found some odd behavior of <code>match</code> in connection with backtracking.</p>
+<p>Consider the following complex approach of proving that <code>True</code> is true:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">lemma</span> <span class="n">triviality</span><span class="o">:</span>
+  <span class="kp">shows</span> <span class="n">True</span>
+  <span class="k">by</span> <span class="o">(</span>
+    <span class="n">match</span> <span class="n">TrueE</span> <span class="n">FalseE</span> <span class="kp">in</span> <span class="n">elimination</span><span class="o">:</span> <span class="s">"P ⟹ _"</span> <span class="kp">for</span> <span class="n">P</span> <span class="err">⇒</span> <span class="err">‹</span>
+      <span class="n">match</span> <span class="n">TrueI</span> <span class="kp">in</span> <span class="n">P</span> <span class="err">⇒</span> <span class="err">‹</span><span class="n">succeed</span><span class="err">›</span><span class="o">,</span>
+      <span class="n">insert</span> <span class="n">elimination</span> <span class="o">[</span><span class="n">OF</span> <span class="n">TrueI</span> <span class="n">TrueI</span><span class="o">]</span>
+    <span class="err">›</span>
+  <span class="o">)</span>
+</code></pre></div>
+<p>The outer <code>match</code> selects <code>TrueE</code>, resulting in <code>elimination</code> being <code>True ⟹ ?P ⟹ ?P</code> and <code>P</code> being <code>True</code>. The inner <code>match</code> succeeds, since <code>P</code> is <code>True</code>. Finally, <code>elimination [OF TrueI TrueI]</code> is inserted, which is <code>True</code>.</p>
+<p>Now consider the following variant of the above code, which has an invocation of <code>fail</code> added:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">lemma</span> <span class="n">triviality</span><span class="o">:</span>
+  <span class="kp">shows</span> <span class="n">True</span>
+  <span class="k">by</span> <span class="o">(</span>
+    <span class="n">match</span> <span class="n">TrueE</span> <span class="n">FalseE</span> <span class="kp">in</span> <span class="n">elimination</span><span class="o">:</span> <span class="s">"P ⟹ _"</span> <span class="kp">for</span> <span class="n">P</span> <span class="err">⇒</span> <span class="err">‹</span>
+      <span class="n">match</span> <span class="n">TrueI</span> <span class="kp">in</span> <span class="n">P</span> <span class="err">⇒</span> <span class="err">‹</span><span class="n">succeed</span><span class="err">›</span><span class="o">,</span>
+      <span class="n">insert</span> <span class="n">elimination</span> <span class="o">[</span><span class="n">OF</span> <span class="n">TrueI</span> <span class="n">TrueI</span><span class="o">]</span>
+    <span class="err">›</span><span class="o">,</span>
+    <span class="n">fail</span>
+  <span class="o">)</span>
+</code></pre></div>
+<p>After the activities described above, <code>fail</code> triggers backtracking. The outer <code>match</code> selects <code>FalseE</code>, resulting in <code>elimination</code> being <code>False ⟹ ?P</code> and <code>P</code> being <code>False</code>. The inner <code>match</code> should now fail, causing the whole proof to fail.</p>
+<p>However, that is not what happens. Instead, I get the following output:</p>
+<div class="codehilite"><pre><span></span><code>exception THM 0 raised (line 309 of &quot;drule.ML&quot;):
+  OF: no unifiers
+  False ⟹ ?P7
+  True
+  True
+</code></pre></div>
+<p>Apparently, what happens is the following: After backtracking, the inner <code>match</code> is not re-executed, perhaps because it doesn’t depend on <code>elimination</code> and its dependence on <code>P</code> erroneously isn’t taken into account. As a result, Isabelle attempts to execute <code>insert elimination [OF TrueI TrueI]</code>, which has to fail as <code>elimination</code> has <code>False</code> as its sole premise.</p>
+<p>Is this really a bug or have I overlooked something?</p>
+
+
+
+<a name="261119733"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/Changes%20in%20match%20variables%20not%20considered%20when%20backtracking/near/261119733" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Kevin Kappelmann <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Changes.20in.20match.20variables.20not.20considered.20when.20backtracking.html#261119733">(Nov 11 2021 at 11:10)</a>:</h4>
+<p>I am not an expert in that area, but it also seems strange to me. I think this is something that you should post on the <a href="https://lists.cam.ac.uk/mailman/listinfo/cl-isabelle-users">mailing list</a></p>
+
+
+
+<hr><p>Last updated: Jul 15 2022 at 23:21 UTC</p>
+</html>

@@ -1,0 +1,209 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] lattices, typeclasses, notations? · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20lattices.2C.20typeclasses.2C.20notations.3F.html">[isabelle] lattices, typeclasses, notations?</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294137189"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20lattices%2C%20typeclasses%2C%20notations%3F/near/294137189" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20lattices.2C.20typeclasses.2C.20notations.3F.html#294137189">(Aug 18 2022 at 17:45)</a>:</h4>
+<p>From: Randy Pollack &lt;<a href="mailto:rpollack@inf.ed.ac.uk">rpollack@inf.ed.ac.uk</a>&gt;<br>
+Hi,</p>
+<p>I'm a newbie on Isabelle typeclasses.  Doing an information flow<br>
+example, I have:</p>
+<p>datatype policy = ...</p>
+<p>I want make a lattice out of policies, and I have definitions</p>
+<p>function policyMeet :: "policy \&lt;Rightarrow&gt; policy \&lt;Rightarrow&gt;<br>
+policy" (infixl "|\&lt;and&gt;" 100)<br>
+where ...<br>
+function policyJoin :: "policy \&lt;Rightarrow&gt; policy \&lt;Rightarrow&gt;<br>
+policy" (infixl "|\&lt;or&gt;" 100)<br>
+where ...</p>
+<p>I define the order and prove it is a partial order:</p>
+<p>define policyOrder :: "policy \&lt;Rightarrow&gt; policy \&lt;Rightarrow&gt; bool"<br>
+  ( "_ \&lt;sqsubseteq&gt; _" )<br>
+where "(P1 \&lt;sqsubseteq&gt; P2) = ((P1 |\&lt;and&gt; P2) = P1)"</p>
+<p>lemma policyOrderRfl[simp]:<br>
+  fixes P::policy<br>
+  shows "P \&lt;sqsubseteq&gt; P"<br>
+...</p>
+<p>Now to make "policy" into a partial order.  As a locale interpretation<br>
+this works fine:</p>
+<p>interpretation policy: partial_order "policyOrder :: policy<br>
+\&lt;Rightarrow&gt; policy \&lt;Rightarrow&gt; bool"<br>
+proof (unfold_locales, rule policyOrderRfl)<br>
+  fix x y z :: policy assume j1:"x \&lt;sqsubseteq&gt; y" and j2:"y \&lt;sqsubseteq&gt; z"<br>
+  show "x \&lt;sqsubseteq&gt; z" using policyOrderTrn[OF j1 j2] .<br>
+next ...</p>
+<p>However as a typeclass instantiation I get stuck:</p>
+<p>instantiation policy::partial_order<br>
+begin<br>
+definition "leq = policyOrder"<br>
+instance<br>
+proof (intro_classes)</p>
+<p>The first goal is</p>
+<p>\&lt;And&gt;x. x \&lt;sqsubseteq&gt; x</p>
+<p>So I try</p>
+<p>fix x::policy show "x \&lt;sqsubseteq&gt; x"</p>
+<p>Already this is not accepted.  Perhaps there is an ambiguity between<br>
+the \&lt;sqsubseteq&gt; of policyOrder and the \&lt;sqsubseteq&gt; of the<br>
+partial_order class (in spite of the explicit annotation (x::policy").</p>
+<p>So I try</p>
+<p>fix x::policy show "leq x x" using policyOrderRfl  .</p>
+<p>Here the "show" is accepted, but the last step "." still fails.</p>
+<p>What is my problem?  Thanks for any info.</p>
+<p>Randy</p>
+
+
+
+<a name="294137208"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20lattices%2C%20typeclasses%2C%20notations%3F/near/294137208" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20lattices.2C.20typeclasses.2C.20notations.3F.html#294137208">(Aug 18 2022 at 17:45)</a>:</h4>
+<p>From: Alexander Krauss &lt;<a href="mailto:krauss@in.tum.de">krauss@in.tum.de</a>&gt;<br>
+Hi Randy,</p>
+<p>[...]</p>
+<blockquote>
+<p>However as a typeclass instantiation I get stuck:</p>
+<p>instantiation policy::partial_order</p>
+</blockquote>
+<p>First of all, you seem to be using the partial_order class from <br>
+HOL/Lattice session. There is nothing wrong with this, but note that <br>
+there is also a similar class "order" in HOL/Orderings.thy and "lattice" <br>
+in HOL/Lattices.thy. These are already part of the HOL image, and I <br>
+think they are better integrated in terms of reasoning infrastructure, <br>
+but I am not sure. These classes use the symbol \&lt;le&gt; rather than <br>
+\&lt;sqsubseteq&gt; and also include a strict variant.</p>
+<blockquote>
+<p>begin<br>
+definition "leq = policyOrder"<br>
+instance<br>
+proof (intro_classes)</p>
+<p>The first goal is</p>
+<p>\&lt;And&gt;x. x \&lt;sqsubseteq&gt;  x</p>
+<p>So I try</p>
+<p>fix x::policy show "x \&lt;sqsubseteq&gt;  x"</p>
+<p>Already this is not accepted.  Perhaps there is an ambiguity between<br>
+the \&lt;sqsubseteq&gt;  of policyOrder and the \&lt;sqsubseteq&gt;  of the<br>
+partial_order class (in spite of the explicit annotation (x::policy").</p>
+<p>So I try</p>
+<p>fix x::policy show "leq x x" using policyOrderRfl  .</p>
+<p>Here the "show" is accepted, but the last step "." still fails.</p>
+<p>What is my problem?  Thanks for any info.</p>
+</blockquote>
+<p>You are confusing the two constants, "leq" and "policyOrder". They are <br>
+defined to be equal, but the definition must be used explicitly. Since <br>
+you have ambiguous notation, \&lt;sqsubseteq&gt; refers to policyOrder, which <br>
+is why the first attempt fails. In the second attempt, your goal is OK, <br>
+but the proof is not, because policyOrderRfl uses a different constant. <br>
+You should unfold the definition (I think in this context it will be <br>
+called something like leq_policy_def) explicitly.</p>
+<p>It may also be a good idea to get rid of the syntax for policyOrder. It <br>
+makes your grammar ambiguous (which produces tons of warnings), and once <br>
+you have the instance, you can use it anyway, since it is defined for <br>
+the type class.</p>
+<p>Hope this helps,<br>
+Alex</p>
+
+
+
+<a name="294137343"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20lattices%2C%20typeclasses%2C%20notations%3F/near/294137343" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20lattices.2C.20typeclasses.2C.20notations.3F.html#294137343">(Aug 18 2022 at 17:46)</a>:</h4>
+<p>From: Randy Pollack &lt;<a href="mailto:rpollack@inf.ed.ac.uk">rpollack@inf.ed.ac.uk</a>&gt;<br>
+Thanks Alex.  I'm using "order" in HOL/Orderings.thy and "lattice" in<br>
+HOL/Lattices.thy as Alex suggested.  My typeclass instantiation works.</p>
+<p>Now I want to work with the dual of a given lattice.  In HOL/Lattices.thy I see</p>
+<p>lemma dual_lattice:<br>
+  "class.lattice (op \&lt;ge&gt;) (op &gt;) sup inf"<br>
+  by [...]</p>
+<p>What does that mean?  How can I use this lemma?  Please point me to<br>
+examples;.  This lemma is not even used to prove lemma<br>
+dual_bounded_lattice in the same file.</p>
+<p>Looking at the HOL/Lattice session I found the following kind of example</p>
+<p>datatype 'a dual = dual 'a<br>
+primrec undual :: "'a dual \&lt;Rightarrow&gt; 'a" where<br>
+  undual_dual: "undual (dual x) = x"</p>
+<p>instantiation dual:: (lattice) lattice<br>
+begin<br>
+definition "inf_dual x y = dual (sup (undual x) (undual y))"<br>
+[...]<br>
+instance<br>
+proof</p>
+<p>Now I get 12 subgoals (which I can probably prove) but I haven't taken advantage<br>
+of lemma dual_lattice.</p>
+<p>Please explain how this is intended to be done.</p>
+<p>Thanks,<br>
+Randy</p>
+<hr>
+
+
+
+<a name="294137375"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20lattices%2C%20typeclasses%2C%20notations%3F/near/294137375" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20lattices.2C.20typeclasses.2C.20notations.3F.html#294137375">(Aug 18 2022 at 17:46)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@kit.edu">andreas.lochbihler@kit.edu</a>&gt;<br>
+Dear Randy,</p>
+<blockquote>
+<p>Now I want to work with the dual of a given lattice.  In HOL/Lattices.thy I see</p>
+<p>lemma dual_lattice:<br>
+  "class.lattice (op \&lt;ge&gt;) (op &gt;) sup inf"<br>
+  by [...]</p>
+<p>What does that mean?<br>
+This lemma is proven in the context lattice, i.e. it holds for all instances of <br>
+the lattice type class. Thus, this means that the assumptions of the type class <br>
+lattice (expressed by the predicate class.lattice) hold for the operations &gt;=, <br>
+, sup, inf for all instances of the lattice type class. Less formally: <br>
+Whenever &lt;=, &lt;, inf, sup form a lattice, so do &gt;=, &gt;, sup, inf.</p>
+</blockquote>
+<blockquote>
+<p>How can I use this lemma?  Please point me to<br>
+examples;.<br>
+There is just one example in HOL/Lattices for dual_lattice (in the proof of <br>
+dual_distrib_lattice). But there are more examples for dual_semilattice, which <br>
+is essentially the same concept. Lemmas less_supI1 and less_supI2 show how it is <br>
+meant to use this lemma.</p>
+</blockquote>
+<blockquote>
+<p>Looking at the HOL/Lattice session I found the following kind of example</p>
+<p>datatype 'a dual = dual 'a<br>
+primrec undual :: "'a dual \&lt;Rightarrow&gt; 'a" where<br>
+  undual_dual: "undual (dual x) = x"</p>
+<p>instantiation dual:: (lattice) lattice<br>
+begin<br>
+definition "inf_dual x y = dual (sup (undual x) (undual y))"<br>
+[...]<br>
+instance<br>
+proof</p>
+<p>Now I get 12 subgoals (which I can probably prove) but I haven't taken advantage<br>
+of lemma dual_lattice.</p>
+<p>Please explain how this is intended to be done.<br>
+The HOL/Lattice development and Lattices.thy are not compatible connected to <br>
+each other. This is just another way of dealing with dual lattices (or symmetric <br>
+instances of type classes, in general).</p>
+</blockquote>
+<p>Let me briefly compare the two approaches:<br>
+On the one hand, Lattices.thy assumes that you mainly work with the normal type <br>
+class instantiation. In case you need the dual, the recommended scheme is as in <br>
+lemmas less_supI1 and less_supI2, i.e. interpret the local context that is <br>
+associated with the type class with the operations instantiated for the dual <br>
+lattice. Then, use these theorems to prove your goal. This works nicely in terms <br>
+of tool support, but you have to do the local interpretation for every lemma <br>
+that needs the dual. Moreover, you do not get a dual instance for type class <br>
+instances.</p>
+<p>On the other hand, the dual type in HOL/Lattice provides a type wrapper for dual <br>
+lattices. In Isabelle, every type may instantiate a type class only once. Hence, <br>
+you cannot have instantiations of a lattice and its dual for the same type. <br>
+Instead, the type dual instantiates the lattice type classes for the dual <br>
+lattice operations. Suppose you are working on a concrete type my_type which <br>
+instantiates the lattice type class. Then, if you need the operations from the <br>
+lattice, work in type my_type. If you need to work in the dual lattice, transfer <br>
+your statement to type "my_type dual". An example how this can be used, is in <br>
+HOL/Lattice/Lattices.thy in lemmas join_assoc and join_commute.</p>
+<p>Hope this helps,<br>
+Andreas</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

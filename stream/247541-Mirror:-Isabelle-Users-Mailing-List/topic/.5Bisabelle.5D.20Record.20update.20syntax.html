@@ -1,0 +1,358 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Record update syntax · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Record.20update.20syntax.html">[isabelle] Record update syntax</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="205220699"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Record%20update%20syntax/near/205220699" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Record.20update.20syntax.html#205220699">(Jul 28 2020 at 10:39)</a>:</h4>
+<p>From: Lukas Stevens &lt;lukas.stevens+isabelle-users@in.tum.de&gt;<br>
+Hi,</p>
+<p>when using records a common theme is to just update some fields of a <br>
+record and leave the others at is. To this end, many functional <br>
+languages have a record update syntax, e.g. in OCaml you can write {bar <br>
+with x = 1} to obtain a new record that has all the same values as bar <br>
+except for x. As far as I can see, Isabelle/ML currently has no such <br>
+syntax which can lead to quite a bit of bloat. For a pathological <br>
+example, see src/Provers/order.ML where multiple functions are declared <br>
+that each just update one field of the record, but you still have to <br>
+explicitly provide all the other fields. It would be nice to have this <br>
+build into the language. An even more flexible solution would be to <br>
+implement this as an ML antiquotation; however, this requires the <br>
+ability to introspect the type of a record to obtain a list of all the <br>
+record members. I am not sure if this is currently (or at all) possible.</p>
+<p>Is there any interest in having such a language construct?</p>
+<p>Lukas</p>
+
+
+
+<a name="205285683"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Record%20update%20syntax/near/205285683" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Record.20update.20syntax.html#205285683">(Jul 28 2020 at 20:21)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On 28/07/2020 12:39, Lukas Stevens wrote:</p>
+<blockquote>
+<p>when using records a common theme is to just update some fields of a record<br>
+and leave the others at is. To this end, many functional languages have a<br>
+record update syntax, e.g. in OCaml you can write {bar with x = 1} to obtain a<br>
+new record that has all the same values as bar except for x. As far as I can<br>
+see, Isabelle/ML currently has no such syntax which can lead to quite a bit of<br>
+bloat.</p>
+</blockquote>
+<p>The bloat is not just in the syntax, but also in the implementation: a bulky<br>
+record needs to be copied to change just one field.</p>
+<p>Further note that record update is not as exciting as it seems. More important<br>
+is the "map" combinator for each individual field. The pair of (selector, map)<br>
+is called a "lense" in Haskell context (but we can work with it directly in<br>
+Isabelle/ML without the categorical overhead around it, and just compose<br>
+combinators via infix "o").</p>
+<p>Here is a canonical example to cope reasonably well in the absence of<br>
+compiler-generated record operations:<br>
+<a href="https://isabelle.sketis.net/repos/isabelle/file/Isabelle2020/src/Pure/variable.ML#l104">https://isabelle.sketis.net/repos/isabelle/file/Isabelle2020/src/Pure/variable.ML#l104</a></p>
+<p>Another possibility to trim down complexity of syntax (and runtime behaviour)<br>
+is to nest records/tuples in stages. E.g. see<br>
+<a href="https://isabelle.sketis.net/repos/isabelle/file/Isabelle2020/src/Pure/context.ML#l141">https://isabelle.sketis.net/repos/isabelle/file/Isabelle2020/src/Pure/context.ML#l141</a></p>
+<p>Yet another variant is to use tuples, i.e. records with fields named 1, 2, 3,<br>
+... and use the Isabelle/ML antiquotations to inline map combinators like<br>
+@{apply (3)1}, e.g. see<br>
+<a href="https://isabelle.sketis.net/repos/isabelle/file/Isabelle2020/src/Pure/Tools/generated_files.ML#l60">https://isabelle.sketis.net/repos/isabelle/file/Isabelle2020/src/Pure/Tools/generated_files.ML#l60</a></p>
+<blockquote>
+<p>For a pathological example, see src/Provers/order.ML where multiple&gt;<br>
+functions are declared that each just update one field of the record, but you<br>
+still have to explicitly provide all the other fields.</p>
+</blockquote>
+<p>That merely looks like an odd example, so it is better not to imitate it. When<br>
+inspecting existing material, you need to develop a feeling who did it at<br>
+which time, and estimate how well it was actually done.</p>
+<p>The "order" prover is from an undergraduate student project from many years<br>
+ago. It looks like the source text could be deflated a lot, by making it more<br>
+"canonical" in terms of Isabelle/ML style and orthography.<br>
+(MoreoverIsabelleSourcesDoNotUseCamelCaseToImproveReadability.)</p>
+<p>The somewhat awkward type less_arith with its many homogenous fields could be<br>
+just a table that maps a rule name (type string) to a rule (type thm). See our<br>
+bread-and-butter module Pure/src/General/table.ML</p>
+<p>An alternative is to use a 19-tuple and the @{apply} antiquotation.</p>
+<blockquote>
+<p>It would be nice to<br>
+have this build into the language. An even more flexible solution would be to<br>
+implement this as an ML antiquotation; however, this requires the ability to<br>
+introspect the type of a record to obtain a list of all the record members. I<br>
+am not sure if this is currently (or at all) possible.</p>
+<p>Is there any interest in having such a language construct?</p>
+</blockquote>
+<p>"Nice to have" is often a bad reason to add new features. Languages tend to<br>
+accumulate a lot of cruft over the years, and after some decades the<br>
+"must-haves" from the past become a heavy burden. (OCaml has a lot of that<br>
+with its object-oriented twists.)</p>
+<p>Isabelle/ML has its own balance of frugality and richness, both in the same<br>
+language. The rather ancient SML substrate works surprisingly well with the<br>
+minor add-ons provided Isabelle/ML.</p>
+<p>I often find the balance of Isabelle/ML better than Scala, which has many good<br>
+ideas, but also tons of extra weight and gravity to bog it down. In<br>
+particular, Scala "cases classes" with their record-update notation ("copy"<br>
+method) are not as smooth as they should be.</p>
+<p>Makarius</p>
+
+
+
+<a name="205301479"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Record%20update%20syntax/near/205301479" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Record.20update.20syntax.html#205301479">(Jul 28 2020 at 23:08)</a>:</h4>
+<p>From: "Norrish, Michael (Data61, Acton)" &lt;<a href="mailto:Michael.Norrish@data61.csiro.au">Michael.Norrish@data61.csiro.au</a>&gt;<br>
+See also  </p>
+<p><a href="http://mlton.org/FunctionalRecordUpdate">http://mlton.org/FunctionalRecordUpdate</a></p>
+<p>for an SML solution, of sorts.</p>
+<p>Michael</p>
+<p>﻿<br>
+On 29/7/20, 06:23, "<a href="mailto:cl-isabelle-users-bounces@lists.cam.ac.uk">cl-isabelle-users-bounces@lists.cam.ac.uk</a> on behalf of Makarius" &lt;<a href="mailto:cl-isabelle-users-bounces@lists.cam.ac.uk">cl-isabelle-users-bounces@lists.cam.ac.uk</a> on behalf of <a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt; wrote:</p>
+<p>On 28/07/2020 12:39, Lukas Stevens wrote:</p>
+<blockquote>
+<p>when using records a common theme is to just update some fields of a record<br>
+and leave the others at is. To this end, many functional languages have a<br>
+record update syntax, e.g. in OCaml you can write {bar with x = 1} to obtain a<br>
+new record that has all the same values as bar except for x. As far as I can<br>
+see, Isabelle/ML currently has no such syntax which can lead to quite a bit of<br>
+bloat.</p>
+</blockquote>
+<p>The bloat is not just in the syntax, but also in the implementation: a bulky<br>
+record needs to be copied to change just one field.</p>
+<p>Further note that record update is not as exciting as it seems. More important<br>
+is the "map" combinator for each individual field. The pair of (selector, map)<br>
+is called a "lense" in Haskell context (but we can work with it directly in<br>
+Isabelle/ML without the categorical overhead around it, and just compose<br>
+combinators via infix "o").</p>
+<p>Here is a canonical example to cope reasonably well in the absence of<br>
+compiler-generated record operations:<br>
+<a href="https://isabelle.sketis.net/repos/isabelle/file/Isabelle2020/src/Pure/variable.ML#l104">https://isabelle.sketis.net/repos/isabelle/file/Isabelle2020/src/Pure/variable.ML#l104</a></p>
+<p>Another possibility to trim down complexity of syntax (and runtime behaviour)<br>
+is to nest records/tuples in stages. E.g. see<br>
+<a href="https://isabelle.sketis.net/repos/isabelle/file/Isabelle2020/src/Pure/context.ML#l141">https://isabelle.sketis.net/repos/isabelle/file/Isabelle2020/src/Pure/context.ML#l141</a></p>
+<p>Yet another variant is to use tuples, i.e. records with fields named 1, 2, 3,<br>
+... and use the Isabelle/ML antiquotations to inline map combinators like<br>
+@{apply (3)1}, e.g. see<br>
+<a href="https://isabelle.sketis.net/repos/isabelle/file/Isabelle2020/src/Pure/Tools/generated_files.ML#l60">https://isabelle.sketis.net/repos/isabelle/file/Isabelle2020/src/Pure/Tools/generated_files.ML#l60</a></p>
+<blockquote>
+<p>For a pathological example, see src/Provers/order.ML where multiple&gt;<br>
+functions are declared that each just update one field of the record, but you<br>
+still have to explicitly provide all the other fields.</p>
+</blockquote>
+<p>That merely looks like an odd example, so it is better not to imitate it. When<br>
+inspecting existing material, you need to develop a feeling who did it at<br>
+which time, and estimate how well it was actually done.</p>
+<p>The "order" prover is from an undergraduate student project from many years<br>
+ago. It looks like the source text could be deflated a lot, by making it more<br>
+"canonical" in terms of Isabelle/ML style and orthography.<br>
+(MoreoverIsabelleSourcesDoNotUseCamelCaseToImproveReadability.)</p>
+<p>The somewhat awkward type less_arith with its many homogenous fields could be<br>
+just a table that maps a rule name (type string) to a rule (type thm). See our<br>
+bread-and-butter module Pure/src/General/table.ML</p>
+<p>An alternative is to use a 19-tuple and the @{apply} antiquotation.</p>
+<blockquote>
+<p>It would be nice to<br>
+have this build into the language. An even more flexible solution would be to<br>
+implement this as an ML antiquotation; however, this requires the ability to<br>
+introspect the type of a record to obtain a list of all the record members. I<br>
+am not sure if this is currently (or at all) possible.</p>
+<p>Is there any interest in having such a language construct?</p>
+</blockquote>
+<p>"Nice to have" is often a bad reason to add new features. Languages tend to<br>
+accumulate a lot of cruft over the years, and after some decades the<br>
+"must-haves" from the past become a heavy burden. (OCaml has a lot of that<br>
+with its object-oriented twists.)</p>
+<p>Isabelle/ML has its own balance of frugality and richness, both in the same<br>
+language. The rather ancient SML substrate works surprisingly well with the<br>
+minor add-ons provided Isabelle/ML.</p>
+<p>I often find the balance of Isabelle/ML better than Scala, which has many good<br>
+ideas, but also tons of extra weight and gravity to bog it down. In<br>
+particular, Scala "cases classes" with their record-update notation ("copy"<br>
+method) are not as smooth as they should be.</p>
+<p>Makarius</p>
+
+
+
+<a name="205576830"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Record%20update%20syntax/near/205576830" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Record.20update.20syntax.html#205576830">(Jul 31 2020 at 10:20)</a>:</h4>
+<p>From: Lukas Stevens &lt;lukas.stevens+isabelle-users@in.tum.de&gt;<br>
+Thanks for the answer and the additional practical hints.</p>
+<p>Of course, the example is, as I said, pathological but you will find<br>
+clumsy usage of records in other places as well.</p>
+<p>I agree with you that introducing a new language feature would not be a<br>
+good idea. Lenses would probably be a nice and flexible solution. The<br>
+problem with those is that you have to write quite a bit of boilerplate<br>
+if you can't generate them automatically. To generate them<br>
+automatically, one could define an ML antiquotation that reads a record<br>
+type definition and defines the record type while automatically<br>
+generating the code for the lens as well. Or is there a way to generate<br>
+the lens for an existing record type (which would make it more flexible)?</p>
+
+
+
+<a name="205785431"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Record%20update%20syntax/near/205785431" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Record.20update.20syntax.html#205785431">(Aug 03 2020 at 12:00)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On 31/07/2020 12:19, Lukas Stevens wrote:</p>
+<blockquote>
+<p>Of course, the example is, as I said, pathological but you will find<br>
+clumsy usage of records in other places as well.</p>
+</blockquote>
+<p>What is your own application like? Is it more like the 19-tuple in<br>
+src/Provers/order.ML or like the 8-tuple in src/Pure/variable.ML (or even less<br>
+complex)?</p>
+<p>I do see slight inconveniences in using records in SML and thus Isabelle/ML,<br>
+but the overall balance is still quite good (compared to related or unrelated<br>
+inconveniences in Scala, Haskell, OCaml).</p>
+<blockquote>
+<p>I agree with you that introducing a new language feature would not be a<br>
+good idea. Lenses would probably be a nice and flexible solution. The<br>
+problem with those is that you have to write quite a bit of boilerplate<br>
+if you can't generate them automatically. To generate them<br>
+automatically, one could define an ML antiquotation that reads a record<br>
+type definition and defines the record type while automatically<br>
+generating the code for the lens as well. Or is there a way to generate<br>
+the lens for an existing record type (which would make it more flexible)?</p>
+</blockquote>
+<p>In the meantime I have also spent more thoughts on the general problem of<br>
+records in SML.</p>
+<p>I don't want to see genuine language extensions: this would further weaken the<br>
+language and its few implementations. SML is de-facto a dead language (like<br>
+classical Latin), and hypothetical discussions and proposals like<br>
+<a href="https://smlfamily.github.io/successor-ml">https://smlfamily.github.io/successor-ml</a> are not going to change that after<br>
+several decades.</p>
+<p>I also don't want to see fancy workarounds like in MLton<br>
+<a href="http://mlton.org/FunctionalRecordUpdate">http://mlton.org/FunctionalRecordUpdate</a> --- that is a somewhat different<br>
+culture from Isabelle/ML. Why make a relatively simple problem harder than it<br>
+really is?</p>
+<p>Nonetheless, I see a prospect of future refinements of Isabelle/ML as follows:</p>
+<p>* The very essence of a record in SML is the list (or set) of fields, not<br>
+the concrete field types. Field names are global, without scope, but field<br>
+types are determined by type-inference in a particular scope of ML text.</p>
+<p>* There could be an antiquotation @{record RECORD = FIELDS ...} to define a<br>
+named set of fields within the Isabelle/ML compiler context.</p>
+<p>* The existing antiquotation @{apply m(n)} could be generalized to @{apply<br>
+RECORD(FIELD)}.</p>
+<p>* There could be a few more antiquotations, e.g. @{make RECORD} for a<br>
+function that composes a record from its fields.</p>
+<p>Makarius</p>
+
+
+
+<a name="205788507"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Record%20update%20syntax/near/205788507" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Record.20update.20syntax.html#205788507">(Aug 03 2020 at 12:38)</a>:</h4>
+<p>From: Lukas Stevens &lt;lukas.stevens+isabelle-users@in.tum.de&gt;<br>
+The application is exactly src/Provers/order.ML but I'd like to refactor<br>
+the interface of the prover to reduce boilerplate on the ML side of<br>
+things. Reducing boilerplate when instantiating the prover would also be<br>
+great. One way is, as you suggested, to just use tables instead of<br>
+records. This would increase the opaqueness of the code since it hides<br>
+which theorems are needed exactly. Another way would be to use the<br>
+antiquotations you proposed. Especially the generalised antiquotation<br>
+would be great and also make sense since records can be viewed as tuples<br>
+with names instead of indices.</p>
+
+
+
+<a name="205792188"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Record%20update%20syntax/near/205792188" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Record.20update.20syntax.html#205792188">(Aug 03 2020 at 13:18)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On 03/08/2020 14:38, Lukas Stevens wrote:</p>
+<blockquote>
+<p>The application is exactly src/Provers/order.ML but I'd like to refactor<br>
+the interface of the prover to reduce boilerplate on the ML side of<br>
+things. Reducing boilerplate when instantiating the prover would also be<br>
+great. One way is, as you suggested, to just use tables instead of<br>
+records. This would increase the opaqueness of the code since it hides<br>
+which theorems are needed exactly.</p>
+</blockquote>
+<p>In that case, I do propose to use a plain table that maps a thm name to thm<br>
+value: the Order_Tac module has already several operations that use (untyped)<br>
+string "tags" instead of typed record fields, so it fits stylistically and<br>
+actually simplifies the current situation (notably operations like "empty" and<br>
+"update"; the odd dummy_thm will disappear, it is replaced by an undefined<br>
+table entry).</p>
+<p>As you proceed to explore order.ML and learn idiomatic use of Isabelle/ML, you<br>
+will find more and more ways to make the implementation  concise and to the point.</p>
+<p>(The file name should be actually order_tac.ML in correspondence to structure<br>
+Order_Tac in it.)</p>
+<p>There is yet another perspective on the problem: type less_arith is like an<br>
+algebraic structure with "laws" for operations (=), (&lt;=), (&lt;). This could in<br>
+principle become an axiomatic specification as a locale context, and the tool<br>
+then operates "under a morphisms" to move it from the abstract context to<br>
+application contexts.</p>
+<p>Then the record disappears altogether and is replaced by fancy operations on<br>
+logical context elements (due to locale interpretation). An example for this<br>
+approach is src/HOL/Tools/semiring_normalizer.ML but it has its own added<br>
+complexity.</p>
+<blockquote>
+<p>Another way would be to use the<br>
+antiquotations you proposed. Especially the generalised antiquotation<br>
+would be great and also make sense since records can be viewed as tuples<br>
+with names instead of indices.</p>
+</blockquote>
+<p>Right now I recommend to concentrate on the core problems of the application,<br>
+and ignore accidental inconveniences of records in Isabelle/ML.</p>
+<p>Makarius</p>
+
+
+
+<a name="205798654"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Record%20update%20syntax/near/205798654" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Record.20update.20syntax.html#205798654">(Aug 03 2020 at 14:14)</a>:</h4>
+<p>From: Thomas Sewell &lt;<a href="mailto:sewell@chalmers.se">sewell@chalmers.se</a>&gt;<br>
+Excuse me. I haven't read all the emails in this discussion, but it doesn't look like anyone has</p>
+<p>pointed out the fact that the Isabelle equivalent of caml-style</p>
+<p>{bar with x = 1}</p>
+<p>is</p>
+<p>(bar (| x := 1 |) )</p>
+<p>The constant below the syntax is called x_update. Apologies if someone has said this and I missed it.</p>
+<p>There is no equivalent of row-typing, so there's no way to do this polymorphically across all records that have an x field.</p>
+<p>Best regards,</p>
+<p>Thomas.</p>
+<hr>
+<p>From: <a href="mailto:cl-isabelle-users-bounces@lists.cam.ac.uk">cl-isabelle-users-bounces@lists.cam.ac.uk</a> &lt;<a href="mailto:cl-isabelle-users-bounces@lists.cam.ac.uk">cl-isabelle-users-bounces@lists.cam.ac.uk</a>&gt; on behalf of Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Sent: Monday, August 3, 2020 3:18:22 PM<br>
+To: Lukas Stevens; <a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a><br>
+Subject: Re: [isabelle] Record update syntax</p>
+<p>On 03/08/2020 14:38, Lukas Stevens wrote:</p>
+<blockquote>
+<p>The application is exactly src/Provers/order.ML but I'd like to refactor<br>
+the interface of the prover to reduce boilerplate on the ML side of<br>
+things. Reducing boilerplate when instantiating the prover would also be<br>
+great. One way is, as you suggested, to just use tables instead of<br>
+records. This would increase the opaqueness of the code since it hides<br>
+which theorems are needed exactly.</p>
+</blockquote>
+<p>In that case, I do propose to use a plain table that maps a thm name to thm<br>
+value: the Order_Tac module has already several operations that use (untyped)<br>
+string "tags" instead of typed record fields, so it fits stylistically and<br>
+actually simplifies the current situation (notably operations like "empty" and<br>
+"update"; the odd dummy_thm will disappear, it is replaced by an undefined<br>
+table entry).</p>
+<p>As you proceed to explore order.ML and learn idiomatic use of Isabelle/ML, you<br>
+will find more and more ways to make the implementation  concise and to the point.</p>
+<p>(The file name should be actually order_tac.ML in correspondence to structure<br>
+Order_Tac in it.)</p>
+<p>There is yet another perspective on the problem: type less_arith is like an<br>
+algebraic structure with "laws" for operations (=), (&lt;=), (&lt;). This could in<br>
+principle become an axiomatic specification as a locale context, and the tool<br>
+then operates "under a morphisms" to move it from the abstract context to<br>
+application contexts.</p>
+<p>Then the record disappears altogether and is replaced by fancy operations on<br>
+logical context elements (due to locale interpretation). An example for this<br>
+approach is src/HOL/Tools/semiring_normalizer.ML but it has its own added<br>
+complexity.</p>
+<blockquote>
+<p>Another way would be to use the<br>
+antiquotations you proposed. Especially the generalised antiquotation<br>
+would be great and also make sense since records can be viewed as tuples<br>
+with names instead of indices.</p>
+</blockquote>
+<p>Right now I recommend to concentrate on the core problems of the application,<br>
+and ignore accidental inconveniences of records in Isabelle/ML.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Jul 15 2022 at 23:21 UTC</p>
+</html>

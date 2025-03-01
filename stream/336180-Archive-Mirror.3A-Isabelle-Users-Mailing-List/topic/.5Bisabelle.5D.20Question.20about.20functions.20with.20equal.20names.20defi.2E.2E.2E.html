@@ -1,0 +1,126 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Question about functions with equal names defi... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Question.20about.20functions.20with.20equal.20names.20defi.2E.2E.2E.html">[isabelle] Question about functions with equal names defi...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294115443"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Question%20about%20functions%20with%20equal%20names%20defi.../near/294115443" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Question.20about.20functions.20with.20equal.20names.20defi.2E.2E.2E.html#294115443">(Aug 18 2022 at 15:55)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:peter.lammich@uni-muenster.de">peter.lammich@uni-muenster.de</a>&gt;<br>
+Hi all.</p>
+<p>We have some theory A, that defines, among others, the functions:<br>
+  foldl, foldr, insert</p>
+<p>Inside A, and inside theories extending A, these names make perfectly <br>
+sense, and we do not want to change them to, say, "A_foldl".</p>
+<p>However, some theories based on A are now to be used a bigger context, <br>
+where the details of A (including foldl, etc.) are no longer important.<br>
+Nevertheless, the constants remain defined and overwrite the standard <br>
+constants from List.thy and Set.thy, which is embarrassing.</p>
+<p>What's the right solution to this problem?<br>
+I know the hide_const (open) construct, however, its annoying to <br>
+explicitly having to list all constants of the theory again (and perhaps <br>
+forgetting one).<br>
+Moreover, if the constants are hidden "too early", its impossible to use <br>
+them by unqualified names in theories extending A.</p>
+<p>Alternatively, I thought of defining a locale:<br>
+  locale A_loc begin<br>
+     definition foldl, foldr, insert, ...<br>
+  end<br>
+  interpretation A: A_loc .</p>
+<p>And proving extensions to A inside the locale.<br>
+The interpretation is required for code generation, as the code generator<br>
+seems not to generate code for "A_loc.foldl", etc.</p>
+<p>Am I on the right track? Is there a simpler solution?</p>
+<p>Best,<br>
+  Peter</p>
+
+
+
+<a name="294115501"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Question%20about%20functions%20with%20equal%20names%20defi.../near/294115501" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Question.20about.20functions.20with.20equal.20names.20defi.2E.2E.2E.html#294115501">(Aug 18 2022 at 15:56)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@kit.edu">andreas.lochbihler@kit.edu</a>&gt;<br>
+Hi Peter,</p>
+<blockquote>
+<p>However, some theories based on A are now to be used a bigger context, <br>
+where the details of A (including foldl, etc.) are no longer important.<br>
+Nevertheless, the constants remain defined and overwrite the standard <br>
+constants from List.thy and Set.thy, which is embarrassing.<br>
+This sounds like the theory A and some of its descendents form some kind of <br>
+module, so I would suggest to set up a theory file of its own which specifies <br>
+the canonical entry point. Inside this "interface" theory, you can hide all <br>
+"internal" constants as with hide_const (open). If you want to access the <br>
+constants unqualified, you just have to do this in a theory whose imports bypass <br>
+the interface theory. However, this does not solve the problem of having to <br>
+explicitly hide every internal constant.</p>
+</blockquote>
+<blockquote>
+<p>Alternatively, I thought of defining a locale:<br>
+ locale A_loc begin<br>
+    definition foldl, foldr, insert, ...<br>
+ end<br>
+ interpretation A: A_loc .</p>
+<p>And proving extensions to A inside the locale.<br>
+The interpretation is required for code generation, as the code generator<br>
+seems not to generate code for "A_loc.foldl", etc.<br>
+Note that the interpretation is executed only once, i.e. if you later add <br>
+definitions/code equations to locale A, they will not be carried through the <br>
+interpretation automatically. And, AFAIK, there is no way to force a <br>
+re-interpretation of A. If you want to go that way, I recommend that you do your <br>
+code generator setup manually by declaring all necessary equations OUTSIDE the <br>
+locale context as [code].</p>
+</blockquote>
+<blockquote>
+<p>Am I on the right track? Is there a simpler solution?<br>
+If the constant that gets hidden is not visible at the point where the other <br>
+constant of the same name is defined, you could exploit the order of theory <br>
+merges. But this can make your developments very fragile and possibly hard to <br>
+maintain. Here is an example:</p>
+</blockquote>
+<p>theory Foo imports Plain begin<br>
+definition foldl :: "nat" where "foldl = 0"<br>
+end</p>
+<p>theory Bar imports Main Foo begin<br>
+-- "foldl now refers to Foo.foldl"<br>
+end</p>
+<p>theory Bar2 imports Foo Main begin<br>
+-- "foldl now refers to List.foldl"<br>
+end</p>
+<p>Another option is to abuse notation, which also allows to unhide the constant again:</p>
+<p>theory Foo imports Main begin<br>
+definition foldl :: "nat" where "foldl = 0"</p>
+<p>notation List.foldl ("foldl")<br>
+term "foldl" -- "List.foldl"</p>
+<p>no_notation List.fold ("foldl")<br>
+term "foldl" -- "Foo.foldl"<br>
+end</p>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<a name="294115522"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Question%20about%20functions%20with%20equal%20names%20defi.../near/294115522" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Question.20about.20functions.20with.20equal.20names.20defi.2E.2E.2E.html#294115522">(Aug 18 2022 at 15:56)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+For tricks like this I recommend using 'abbreviation' instead, since it <br>
+does not spoil the token table of the syntax with literal "foldl" etc.</p>
+<p>More hardcore manipulations can be done with name space aliases in <br>
+Isabelle2009-2, e.g. like this:</p>
+<p>setup {* Sign.const_alias @{binding fold} @{const_name List.foldr} *}<br>
+   hide_const List.foldr</p>
+<p>term fold<br>
+   term foldr  -- "free variable"</p>
+<p>Workarounds with aliases are not much worse than 'hide_const' etc. Of <br>
+course, we are all waiting for proper name space management at the level <br>
+of theory "modules", "packages", whatever.  After a few more rounds of <br>
+"localization" of old packages we are getting closer and closer to that.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

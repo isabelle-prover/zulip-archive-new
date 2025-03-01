@@ -1,0 +1,209 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Constant folding during code generation from l... · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Constant.20folding.20during.20code.20generation.20from.20l.2E.2E.2E.html">[isabelle] Constant folding during code generation from l...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="418401931"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Constant%20folding%20during%20code%20generation%20from%20l.../near/418401931" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Constant.20folding.20during.20code.20generation.20from.20l.2E.2E.2E.html#418401931">(Jan 27 2024 at 09:04)</a>:</h4>
+<p>From: <a href="mailto:hannobecker@posteo.de">hannobecker@posteo.de</a><br>
+Hi,</p>
+<p>I am running into issues with code generation in the context of nested <br>
+locales and sublocales.</p>
+<p>Even a minimal example is rather elaborate, but focusing on the <br>
+high-level structure, the context is:</p>
+<ul>
+<li>Locale A = ... standalone ...</li>
+<li>Locale B = Locale A + ... additional parameters ...</li>
+<li>Locale C = ... standalone ...</li>
+<li>Sublocale B \subseteq C</li>
+<li>global_interpretation X: A paramsX</li>
+<li>global_interpretation Y: B paramX paramsY</li>
+</ul>
+<p>Using <code>defines ...</code> clauses for <code>X</code>, code-extractable global constants <br>
+are established. However, trying to export code for definitions from <code>C</code> <br>
+in <code>Y</code> using <code>defines</code> and <code>rewrites</code> fails because the constants from <br>
+<code>X</code> are not appropriately folded.</p>
+<p>Please see below for a minimal example -- it's a toy example only, the <br>
+real application context is much more complicated and has nothing to do <br>
+with endomorphisms used in the example.</p>
+<p>One can hack things manually as demonstrated in the example as well, but <br>
+it seems against the point of <code>global_interpretation</code>. Is there a way to <br>
+get the example to work without manual constant folding and provisioning <br>
+of code equations?</p>
+<p>Thanks for your help,<br>
+Hanno</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">theory</span><span class="w"> </span><span class="n">Scratch</span>
+<span class="w">   </span><span class="kp">imports</span><span class="w"> </span><span class="n">Main</span>
+<span class="k">begin</span>
+
+<span class="k">locale</span><span class="w"> </span><span class="n">Endo</span><span class="w"> </span><span class="o">=</span>
+<span class="w">   </span><span class="kp">fixes</span><span class="w"> </span><span class="n">f</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">‹'a ⇒ 'a›</span>
+<span class="w">   </span><span class="kp">assumes</span><span class="w"> </span><span class="s">‹f=f›</span>
+<span class="k">begin</span>
+<span class="w">   </span><span class="k">definition</span><span class="w"> </span><span class="n">ff</span><span class="w"> </span><span class="kp">where</span><span class="w"> </span><span class="s">‹ff ≡ f∘f›</span>
+<span class="k">end</span>
+
+<span class="k">locale</span><span class="w"> </span><span class="n">EndoCopy</span><span class="w"> </span><span class="o">=</span>
+<span class="w">   </span><span class="kp">fixes</span><span class="w"> </span><span class="n">h</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">‹'a ⇒ 'a›</span>
+<span class="w">   </span><span class="kp">assumes</span><span class="w"> </span><span class="s">‹h=h›</span>
+<span class="k">begin</span>
+<span class="w">   </span><span class="k">definition</span><span class="w"> </span><span class="n">hh</span><span class="w"> </span><span class="kp">where</span><span class="w"> </span><span class="s">‹hh ≡ h∘h›</span>
+<span class="k">end</span>
+
+<span class="k">locale</span><span class="w"> </span><span class="n">CommutingEndos</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Endo</span><span class="w"> </span><span class="n">f</span><span class="w"> </span><span class="kp">for</span><span class="w"> </span><span class="n">f</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">‹'a ⇒ 'a›</span><span class="w"> </span><span class="o">+</span>
+<span class="w">   </span><span class="kp">fixes</span><span class="w"> </span><span class="n">g</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">‹'a ⇒ 'a›</span>
+<span class="w">   </span><span class="kp">assumes</span><span class="w"> </span><span class="s">‹f ∘ g = g ∘ f›</span>
+<span class="k">begin</span>
+<span class="k">definition</span><span class="w"> </span><span class="n">gg</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">‹'a ⇒ 'a›</span><span class="w"> </span><span class="kp">where</span><span class="w"> </span><span class="s">‹gg = g ∘ g›</span>
+<span class="k">end</span>
+
+<span class="k">definition</span><span class="w"> </span><span class="n">p1</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">‹nat ⇒ nat›</span><span class="w"> </span><span class="kp">where</span><span class="w"> </span><span class="s">‹p1 ≡ (+) 1›</span>
+<span class="k">definition</span><span class="w"> </span><span class="n">p2</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">‹nat ⇒ nat›</span><span class="w"> </span><span class="kp">where</span><span class="w"> </span><span class="s">‹p2 ≡ (+) 2›</span>
+<span class="k">definition</span><span class="w"> </span><span class="n">p3</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">‹nat ⇒ nat›</span><span class="w"> </span><span class="kp">where</span><span class="w"> </span><span class="s">‹p3 ≡ (+) 3›</span>
+
+<span class="kn">sublocale</span><span class="w"> </span><span class="n">CommutingEndos</span><span class="w"> </span><span class="n">⊆</span><span class="w"> </span><span class="n">EndoCopy</span><span class="w"> </span><span class="s">‹ff ∘ gg›</span>
+<span class="w">   </span><span class="k">by</span><span class="w"> </span><span class="o">(</span><span class="n">simp</span><span class="w"> </span><span class="n">add</span><span class="o">:</span><span class="w"> </span><span class="n">EndoCopy.intro</span><span class="o">)</span>
+
+<span class="n">global_interpretation</span><span class="w"> </span><span class="n">I0</span><span class="o">:</span><span class="w"> </span><span class="n">Endo</span><span class="w"> </span><span class="s">‹p1›</span>
+<span class="w">   </span><span class="kp">defines</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">‹I0.ff›</span>
+<span class="w">   </span><span class="k">by</span><span class="w"> </span><span class="o">(</span><span class="n">simp</span><span class="w"> </span><span class="n">add</span><span class="o">:</span><span class="w"> </span><span class="n">Endo.intro</span><span class="w"> </span><span class="n">p1_def</span><span class="o">)</span>
+
+<span class="kt">thm</span><span class="w"> </span><span class="n">I0.ff_def</span><span class="w"> </span><span class="c">(* OK: x ≡ p1 ∘ p1 *)</span>
+
+<span class="n">global_interpretation</span><span class="w"> </span><span class="n">I1</span><span class="o">:</span><span class="w"> </span><span class="n">CommutingEndos</span><span class="w"> </span><span class="n">p1</span><span class="w"> </span><span class="n">p2</span>
+<span class="w">   </span><span class="kp">defines</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">‹I1.hh›</span>
+<span class="w">       </span><span class="kp">and</span><span class="w"> </span><span class="n">z</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">‹I1.gg›</span>
+<span class="w">   </span><span class="k">by</span><span class="w"> </span><span class="o">(</span><span class="n">simp</span><span class="w"> </span><span class="n">add</span><span class="o">:</span><span class="w"> </span><span class="n">CommutingEndos_axioms.intro</span><span class="w"> </span><span class="n">CommutingEndos_def</span>
+<span class="n">Endo.intro</span><span class="w"> </span><span class="n">o_def</span><span class="w"> </span><span class="n">p1_def</span><span class="w"> </span><span class="n">p2_def</span><span class="o">)</span>
+
+<span class="kt">thm</span><span class="w"> </span><span class="n">I1.gg_def</span><span class="w"> </span><span class="c">(* OK: z = p2 ∘ p2 *)</span>
+<span class="kt">thm</span><span class="w"> </span><span class="n">z_def</span><span class="w">     </span><span class="c">(* z ≡ CommutingEndos.gg p2 *)</span>
+
+<span class="kt">thm</span><span class="w"> </span><span class="n">I1.hh_def</span><span class="w"> </span><span class="c">(* BAD: I1.gg ≡ Endo.ff p1 ∘ z ∘ (Endo.ff p1 ∘ z) *)</span>
+<span class="kt">thm</span><span class="w"> </span><span class="n">y_def</span><span class="w">     </span><span class="c">(* BAD: y ≡ EndoCopy.hh (Endo.ff p1 ∘ CommutingEndos.gg</span>
+<span class="c">p2) *)</span>
+
+<span class="k">export_code</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="kp">in</span><span class="w"> </span><span class="n">OCaml</span><span class="w"> </span><span class="c">(* No code equation for y *)</span>
+
+<span class="c">(* Can force it manually, but I thought the point of</span>
+<span class="c">global_interpretation is that</span>
+<span class="c">    this manual fiddling is not necessary: *)</span>
+<span class="kt">thm</span><span class="w"> </span><span class="n">y_def</span><span class="o">[</span><span class="n">folded</span><span class="w"> </span><span class="n">z_def</span><span class="o">,</span><span class="w"> </span><span class="n">simplified</span><span class="w"> </span><span class="n">I1.hh_def</span><span class="o">,</span><span class="w"> </span><span class="n">folded</span><span class="w"> </span><span class="n">x_def</span><span class="o">]</span><span class="w"> </span><span class="c">(* y ≡ x ∘ z</span>
+<span class="c">∘ (x ∘ z) *)</span>
+<span class="k">declare</span><span class="w"> </span><span class="n">y_def</span><span class="o">[</span><span class="n">folded</span><span class="w"> </span><span class="n">z_def</span><span class="o">,</span><span class="w"> </span><span class="n">simplified</span><span class="w"> </span><span class="n">I1.hh_def</span><span class="o">,</span><span class="w"> </span><span class="n">folded</span><span class="w"> </span><span class="n">x_def</span><span class="o">,</span><span class="w"> </span><span class="n">code</span><span class="o">]</span>
+
+<span class="k">export_code</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="kp">in</span><span class="w"> </span><span class="n">OCaml</span><span class="w"> </span><span class="c">(* OK *)</span>
+
+<span class="c">(* Manually adding a `rewrites` clause does not help either,</span>
+<span class="c">unfortunately: *)</span>
+<span class="n">global_interpretation</span><span class="w"> </span><span class="n">I2</span><span class="o">:</span><span class="w"> </span><span class="n">CommutingEndos</span><span class="w"> </span><span class="n">p1</span><span class="w"> </span><span class="n">p3</span>
+<span class="w">   </span><span class="n">rewrites</span><span class="w"> </span><span class="s">‹Endo.ff p1 = x›</span>
+<span class="w">   </span><span class="kp">defines</span><span class="w"> </span><span class="n">y'</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">‹I2.hh›</span>
+<span class="w">       </span><span class="kp">and</span><span class="w"> </span><span class="n">z'</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">‹I2.gg›</span>
+<span class="w">   </span><span class="k">by</span><span class="w"> </span><span class="o">(</span><span class="n">auto</span><span class="w"> </span><span class="n">simp</span><span class="w"> </span><span class="n">add</span><span class="o">:</span><span class="w"> </span><span class="n">CommutingEndos_axioms.intro</span><span class="w"> </span><span class="n">CommutingEndos_def</span>
+<span class="n">Endo.intro</span><span class="w"> </span><span class="n">o_def</span>
+<span class="w">     </span><span class="n">p1_def</span><span class="w"> </span><span class="n">p3_def</span><span class="w"> </span><span class="n">x_def</span><span class="o">)</span>
+
+<span class="kt">thm</span><span class="w"> </span><span class="n">I2.gg_def</span><span class="w">  </span><span class="c">(* OK: z' = p3 ∘ p3 *)</span>
+<span class="kt">thm</span><span class="w"> </span><span class="n">z'_def</span><span class="w">     </span><span class="c">(* z ≡ CommutingEndos.gg p3 *)</span>
+
+<span class="kt">thm</span><span class="w"> </span><span class="n">I2.hh_def</span><span class="w"> </span><span class="c">(* Better, but still not expected: I1.gg ≡  x ∘ z' ∘ (x ∘</span>
+<span class="c">z')</span>
+<span class="c">                  Need LHS to be folded into y'! *)</span>
+<span class="kt">thm</span><span class="w"> </span><span class="n">y'_def</span><span class="w">     </span><span class="c">(* BAD: y ≡ EndoCopy.hh (Endo.ff p1 ∘ CommutingEndos.gg</span>
+<span class="c">p3) *)</span>
+
+<span class="k">export_code</span><span class="w"> </span><span class="n">y'</span><span class="w"> </span><span class="kp">in</span><span class="w"> </span><span class="n">OCaml</span><span class="w"> </span><span class="c">(* No code equation for y *)</span>
+
+<span class="c">(* Similar hacking still needed *)</span>
+<span class="kt">thm</span><span class="w"> </span><span class="n">y'_def</span><span class="o">[</span><span class="n">folded</span><span class="w"> </span><span class="n">x_def</span><span class="w"> </span><span class="n">z'_def</span><span class="o">,</span><span class="w"> </span><span class="n">simplified</span><span class="w"> </span><span class="n">I2.hh_def</span><span class="o">]</span><span class="w"> </span><span class="c">(* y' ≡ x ∘ z' ∘</span>
+<span class="c">(x ∘ z') *)</span>
+<span class="k">lemmas</span><span class="w"> </span><span class="n">y'_def</span><span class="o">[</span><span class="n">folded</span><span class="w"> </span><span class="n">x_def</span><span class="w"> </span><span class="n">z'_def</span><span class="o">,</span><span class="w"> </span><span class="n">simplified</span><span class="w"> </span><span class="n">I2.hh_def</span><span class="o">,</span><span class="w"> </span><span class="n">code</span><span class="o">]</span>
+
+<span class="k">export_code</span><span class="w"> </span><span class="n">y'</span><span class="w"> </span><span class="kp">in</span><span class="w"> </span><span class="n">OCaml</span><span class="w"> </span><span class="c">(* OK *)</span>
+
+<span class="k">end</span>
+</code></pre></div>
+
+
+
+<a name="419238040"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Constant%20folding%20during%20code%20generation%20from%20l.../near/419238040" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Constant.20folding.20during.20code.20generation.20from.20l.2E.2E.2E.html#419238040">(Feb 01 2024 at 12:42)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Hanno,</p>
+<p>this is an interesting example.</p>
+<p>The explicit rewrite is definitely necessary – mixin rewrites do not <br>
+propagate along local hierarchies.</p>
+<p>Why that still fails to apply as desired I cannot explain at the moment. <br>
+  It might be that internally the composition ‹_ ∘ _› is blurred by <br>
+implicit eta-expansion which might ruin something, but that is entirely <br>
+speculative.</p>
+<p>Cheers,<br>
+    Florian</p>
+<p><a href="/user_uploads/14278/iYINudnF-1WxgUCQGdGs5HNt/Scratch.thy">Scratch.thy</a><br>
+<a href="/user_uploads/14278/WQE6OdzXtjNWuZBAGQkMODat/OpenPGP_0xA707172232CFA4E9.asc">OpenPGP_0xA707172232CFA4E9.asc</a><br>
+<a href="/user_uploads/14278/KeAZeY0qsB-PLFCvzPf1kCf8/OpenPGP_signature.asc">OpenPGP_signature.asc</a></p>
+
+
+
+<a name="419391381"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Constant%20folding%20during%20code%20generation%20from%20l.../near/419391381" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Constant.20folding.20during.20code.20generation.20from.20l.2E.2E.2E.html#419391381">(Feb 02 2024 at 06:25)</a>:</h4>
+<p>From: <a href="mailto:hannobecker@posteo.de">hannobecker@posteo.de</a><br>
+Hi Florian,</p>
+<p>Thanks for the reply!</p>
+
+
+
+<a name="421114670"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Constant%20folding%20during%20code%20generation%20from%20l.../near/421114670" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Constant.20folding.20during.20code.20generation.20from.20l.2E.2E.2E.html#421114670">(Feb 12 2024 at 19:44)</a>:</h4>
+<p>From: <a href="mailto:hannobecker@posteo.de">hannobecker@posteo.de</a><br>
+Hi Florian, all,</p>
+<p>Can we follow up on this? The behaviour is rather unexpected (seeing <br>
+that hierarchies of <code>global_interpretation</code> do work with code <br>
+generation, as below), and cumbersome to work around.</p>
+<p>It would be great if the example in the initial post could be supported <br>
+in Isabelle2024.</p>
+<p>Thanks!<br>
+Hanno</p>
+
+
+
+<a name="421993745"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Constant%20folding%20during%20code%20generation%20from%20l.../near/421993745" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Constant.20folding.20during.20code.20generation.20from.20l.2E.2E.2E.html#421993745">(Feb 17 2024 at 08:44)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Hanno,</p>
+<p>unfortunately, things are not that easy.</p>
+<p>The module system of Isabelle is a very delicate part of the system.</p>
+<p>Sorting out unclear behavior there requires considerable time and <br>
+concentration for a thorough analysis and if analysis suggests <br>
+modifications, these have to be discussed and evaluated diligently.</p>
+<p>This is not realistic in a short time period. At the moment I cannot <br>
+forsee when I personally will be able to have a closer look at it.</p>
+<p>Regards,<br>
+    Florian</p>
+<p><a href="/user_uploads/14278/lqhUhoCmzFnDf3v4KIUgV5n8/OpenPGP_0xA707172232CFA4E9.asc">OpenPGP_0xA707172232CFA4E9.asc</a><br>
+<a href="/user_uploads/14278/Pcq8u1vdTsa_7m1K0KFmXZi8/OpenPGP_signature.asc">OpenPGP_signature.asc</a></p>
+
+
+
+<a name="422067167"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Constant%20folding%20during%20code%20generation%20from%20l.../near/422067167" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Constant.20folding.20during.20code.20generation.20from.20l.2E.2E.2E.html#422067167">(Feb 18 2024 at 05:02)</a>:</h4>
+<p>From: <a href="mailto:hannobecker@posteo.de">hannobecker@posteo.de</a><br>
+Hi Florian,</p>
+<blockquote>
+<p>This is not realistic in a short time period.</p>
+</blockquote>
+<p>Got it, thanks for setting expectations.</p>
+<p>Regards,<br>
+Hanno</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,116 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Proof automation for Types_To_Sets · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof.20automation.20for.20Types_To_Sets.html">[isabelle] Proof automation for Types_To_Sets</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294701052"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof%20automation%20for%20Types_To_Sets/near/294701052" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof.20automation.20for.20Types_To_Sets.html#294701052">(Aug 22 2022 at 14:39)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear list, dear Ondrej and Andrei,</p>
+<p>I've tried out the new Types_To_Set and I find it very convenient to clean my proofs from <br>
+unnecessary invariants. However, I am a bit unsatisfied with the level of proof <br>
+automation. In the ITP2016 paper, it says that the transfer "tool is able to perform the <br>
+relativization completely automatically". So I was wondering what I am doing wrong.</p>
+<p>My typical use case looks like in the following example. Let's define a while loop <br>
+operator on subprobability mass functions (import HOL-Probability for this to work) and <br>
+prove a lemma about probabilistic termination and parametricity of the constants involved:</p>
+<p>locale loop_spmf =<br>
+   fixes guard :: "'a ⇒ bool"<br>
+   and body :: "'a ⇒ 'a spmf"<br>
+begin</p>
+<p>partial_function (spmf) while :: "'a ⇒ 'a spmf" where<br>
+   "while s = (if guard s then bind_spmf (body s) while else return_spmf s)"</p>
+<p>lemma termination_0_1:<br>
+   assumes p: "⋀s. guard s ⟹ spmf (map_spmf guard (body s)) False ≥ p"<br>
+   and p_pos: "0 &lt; p"<br>
+   and lossless: "⋀s. guard s ⟹ lossless_spmf (body s)"<br>
+   shows "lossless_spmf (while s)"<br>
+   sorry</p>
+<p>end</p>
+<p>context includes lifting_syntax begin<br>
+lemma lossless_spmf_parametric [transfer_rule]:<br>
+   "(rel_spmf A ===&gt; op =) lossless_spmf lossless_spmf"<br>
+   sorry</p>
+<p>lemma while_spmf_parametric [transfer_rule]:<br>
+   "((S ===&gt; op =) ===&gt; (S ===&gt; rel_spmf S) ===&gt; S ===&gt; rel_spmf S)<br>
+   loop_spmf.while loop_spmf.while"<br>
+   sorry<br>
+end</p>
+<p>lemma loop_spmf_while_cong:<br>
+   "⟦ guard = guard'; ⋀s. guard' s ⟹ body s = body' s ⟧<br>
+   ⟹ loop_spmf.while guard body = loop_spmf.while guard' body'"<br>
+   sorry</p>
+<p>Now, I would like to add an invariant I on the state of the loop in the termination lemma. <br>
+At the moment, my proof looks as shown below. I would not call this completely automatic, <br>
+so I am wondering what I am doing wrong. Can I improve this somehow?</p>
+<p>I use this scheme to add invariants to a bunch of lemmas about loops. At the moment, I <br>
+just copy-paste the setup script and have it all over the place. Does anyone have an idea <br>
+how to make this more concise and possibly abstract over it?</p>
+<p>lemma termination_0_1_invar:<br>
+   fixes I :: "'s ⇒ bool"<br>
+   assumes p: "⋀s. ⟦ guard s; I s ⟧ ⟹ spmf (map_spmf guard (body s)) False ≥ p"<br>
+   and p_pos: "0 &lt; p"<br>
+   and lossless: "⋀s. ⟦ guard s; I s ⟧ ⟹ lossless_spmf (body s)"<br>
+   and invar: "⋀s s'. ⟦ s' ∈ set_spmf (body s); I s; guard s ⟧ ⟹ I s'"<br>
+   and I: "I s"<br>
+   shows "lossless_spmf (loop_spmf.while guard body s)"<br>
+   including lifting_syntax<br>
+proof -<br>
+   { assume "∃(Rep :: 's' ⇒ 's) Abs. type_definition Rep Abs {s. I s}"<br>
+     then obtain Rep :: "'s' ⇒ 's" and Abs where td: "type_definition Rep Abs {s. I s}"<br>
+       by blast<br>
+     then interpret td: type_definition Rep Abs "{s. I s}" .<br>
+     def cr ≡ "λx y. x = Rep y"<br>
+     have [transfer_rule]: "bi_unique cr" "right_total cr" using td cr_def<br>
+       by(rule typedef_bi_unique typedef_right_total)+<br>
+     have [transfer_domain_rule]: "Domainp cr = I"<br>
+       using type_definition_Domainp[OF td cr_def] by simp</p>
+<p>def guard' ≡ "(Rep ---&gt; id) guard"<br>
+     have [transfer_rule]: "(cr ===&gt; op =) guard guard'"<br>
+       by(simp add: rel_fun_def cr_def guard'_def)<br>
+     def body1 ≡ "λs. if guard s then body s else return_pmf None"<br>
+     def body1' ≡ "(Rep ---&gt; map_spmf Abs) body1"<br>
+     have [transfer_rule]: "(cr ===&gt; rel_spmf cr) body1 body1'"<br>
+       by(auto simp add: rel_fun_def body1'_def body1_def cr_def spmf_rel_map<br>
+               td.Rep[simplified] invar td.Abs_inverse intro!: rel_spmf_reflI)<br>
+     def s' ≡ "Abs s"<br>
+     have [transfer_rule]: "cr s s'" by(simp add: s'_def cr_def I td.Abs_inverse)</p>
+<p>have "⋀s. guard' s ⟹ p ≤ spmf (map_spmf guard' (body1' s)) False"<br>
+       by(transfer fixing: p)(simp add: body1_def p)<br>
+     moreover note p_pos<br>
+     moreover have "⋀s. guard' s ⟹ lossless_spmf (body1' s)"<br>
+       by transfer(simp add: lossless body1_def)<br>
+     ultimately have "lossless_spmf (loop_spmf.while guard' body1' s')"<br>
+       by(rule loop_spmf.termination_0_1_immediate)<br>
+     hence "lossless_spmf (loop_spmf.while guard body1 s)" by transfer }<br>
+   from this[cancel_type_definition] I show ?thesis by(auto cong: loop_spmf_while_cong)<br>
+qed</p>
+<p>Thanks,<br>
+Andreas</p>
+
+
+
+<a name="294702301"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof%20automation%20for%20Types_To_Sets/near/294702301" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof.20automation.20for.20Types_To_Sets.html#294702301">(Aug 22 2022 at 14:46)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+At ITP / Nancy I have actually encouraged Ondrej and Andrei to put this<br>
+experiment into shape for the Isabelle2016-1.</p>
+<p>So far the release branch has nothing else than the "initial commit"<br>
+<a href="https://bitbucket.org/isabelle_project/isabelle-release/commits/ae53f4d901a3">https://bitbucket.org/isabelle_project/isabelle-release/commits/ae53f4d901a3</a><br>
+without any official description in NEWS whatsoever.</p>
+<p>This is OK, but it should be made clear that it is just a<br>
+proof-of-concept that accompanies the very first conference paper<br>
+introducing the ideas behind it (I have myself looked at the paper only<br>
+for 2h: from 3am to 5am one summer night at Nancy).</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

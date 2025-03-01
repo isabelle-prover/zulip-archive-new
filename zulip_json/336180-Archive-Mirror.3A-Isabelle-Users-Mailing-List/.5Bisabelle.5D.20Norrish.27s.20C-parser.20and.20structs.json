@@ -1,0 +1,32 @@
+[
+    {
+        "content": "<p>From: Lars Noschinski &lt;<a href=\"mailto:noschinl@in.tum.de\">noschinl@in.tum.de</a>&gt;<br>\nHi everyone,</p>\n<p>I am using Michael Norrish's C-parser (in the version shipped with <br>\nautocorres-0.1) to import a C-program to Isabelle, but I have some <br>\nproblems dealing with structs: I start with the following C-file</p>\n<p>struct foo_t {<br>\n   unsigned cnt;<br>\n};</p>\n<p>unsigned foo_cnt(struct foo_t *x) {<br>\n   return x-&gt;cnt;<br>\n}</p>\n<p>and want to prove that the value returned by foo_cnt is the value of the <br>\nfield cnt_C of the abstracted version of the struct:</p>\n<p>abbreviation \"c_lift s ≡ lift_t⇡c (hst_mem s, hst_htd s)\"</p>\n<p>fun foo where<br>\n   \"foo h n p = (case c_lift h p of Some g ⇒ cnt_C g = n | None ⇒ False)\"</p>\n<p>lemma \"Γ  ⊢ ⦃ σ. foo σ n ´x ⦄ ´ret__unsigned :== CALL foo_cnt (´x) ⦃ <br>\n´ret__unsigned = n ⦄\"<br>\n   apply vcg<br>\n   apply (clarsimp simp: lift_t_g split: option.split_asm)<br>\n   apply (intro conjI)<br>\n    apply (rule c_guard_field_lvalue)<br>\n      apply (simp add: lift_t_g split: option.split_asm)<br>\n     apply fastforce<br>\n    apply (simp add: typ_uinfo_t_def)</p>\n<p>This leaves me with the following subgoal, which I am not able to prove:</p>\n<p>1. ⋀globals x a.<br>\n        lift_t⇡c (hrs_mem (t_hrs_' globals), hrs_htd (t_hrs_' globals)) <br>\nx = Some a ⟹<br>\n        h_val (hrs_mem (t_hrs_' globals)) (Ptr &amp;(x→[''cnt_C''])) = cnt_C a</p>\n<p>So, how do I relate the projections of an abstracted struct to a field <br>\nwith the pointer access to said field of the concrete struct?</p>\n<p>-- Lars</p>",
+        "id": 294231640,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660902787
+    },
+    {
+        "content": "<p>From: David Greenaway &lt;<a href=\"mailto:david.greenaway@nicta.com.au\">david.greenaway@nicta.com.au</a>&gt;<br>\nHi Lars,</p>",
+        "id": 294231685,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660902812
+    },
+    {
+        "content": "<p>From: Lars Noschinski &lt;<a href=\"mailto:noschinl@in.tum.de\">noschinl@in.tum.de</a>&gt;<br>\nHi David,</p>\n<p>[...]</p>\n<p>Thanks for this lemma; this allows me indeed to make some progress.</p>\n<p>-- Lars</p>",
+        "id": 294231787,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660902858
+    },
+    {
+        "content": "<p>From: Lars Noschinski &lt;<a href=\"mailto:noschinl@in.tum.de\">noschinl@in.tum.de</a>&gt;<br>\nThis Lemma has been very useful for me. Maybe it should be part of the <br>\nFramework?</p>\n<p>I feel there should be a similar lemma for field updates, too. Maybe <br>\nsomething along the lines of</p>\n<p>lemma h_val_update:<br>\n   fixes h val f p<br>\n   defines \"h' ≡ hrs_mem_update (heap_update (Ptr &amp;(p→f) :: 'b ptr) val) h\"<br>\n   assumes fl: \"field_ti TYPE('a::{mem_type}) f = Some t\"<br>\n   assumes \"export_uinfo t = export_uinfo (typ_info_t TYPE('b::{mem_type}))\"<br>\n   shows \"h_val (hrs_mem h') p =<br>\n     update_ti_t t (to_bytes val (replicate (size_td t) 0)) (h_val <br>\n(hrs_mem h) p)\"</p>\n<p>Has somebody proved something similar already?</p>\n<p>-- Lars</p>",
+        "id": 294234815,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660904292
+    },
+    {
+        "content": "<p>From: Thomas Sewell &lt;<a href=\"mailto:Thomas.Sewell@nicta.com.au\">Thomas.Sewell@nicta.com.au</a>&gt;<br>\nHello Lars.</p>\n<p>We think your problem can already be solved for the lift_t case via the <br>\ntheorem lift_t_hrs_mem_update_fld. The parser generates simp rules that <br>\nwill match the assumptions of this theorem.</p>\n<p>If you are using primarily the h_val form, you might need to wrap this <br>\ntheorem a bit. This is a start:</p>\n<p>lemma lift_t_h_val:<br>\n   \"lift_t g hp p = Some x ==&gt; h_val (hrs_mem hp) p = x\"<br>\n   apply (cases hp)<br>\n   apply (rule lift_t_lift[unfolded lift_def])<br>\n   apply (simp add: hrs_mem_def)<br>\n   done</p>\n<p>thm lift_t_h_val[OF trans, OF lift_t_hrs_mem_update_fld[THEN fun_cong]]</p>\n<p>The L4.verified project had a library file that contained a collection <br>\nof rewrite rules for use in rewriting operations from the Tuch UMM <br>\nmodel. Its release status is a bit cloudy because some of it is <br>\nL4.verified-specific and lots of it was, in hindsight, a bad idea.</p>\n<p>In particular, I think that our tendency to deal in lift_t rather than <br>\nh_val + h_t_valid was a bit of a mistake, and I encourage you to keep <br>\nh_val around. I also encourage you to be aware that many of the rules in <br>\nthe library are slanted toward reasoning about lift_t heaps.</p>\n<p>Yours,<br>\n     Thomas.</p>",
+        "id": 294235115,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660904408
+    }
+]

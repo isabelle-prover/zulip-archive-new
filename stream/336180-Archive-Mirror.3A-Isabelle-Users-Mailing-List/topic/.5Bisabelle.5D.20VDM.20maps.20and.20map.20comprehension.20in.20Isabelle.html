@@ -1,0 +1,93 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] VDM maps and map comprehension in Isabelle · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20VDM.20maps.20and.20map.20comprehension.20in.20Isabelle.html">[isabelle] VDM maps and map comprehension in Isabelle</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294239819"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20VDM%20maps%20and%20map%20comprehension%20in%20Isabelle/near/294239819" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20VDM.20maps.20and.20map.20comprehension.20in.20Isabelle.html#294239819">(Aug 19 2022 at 10:54)</a>:</h4>
+<p>From: Leo Freitas &lt;<a href="mailto:leo.freitas@newcastle.ac.uk">leo.freitas@newcastle.ac.uk</a>&gt;<br>
+Hi,</p>
+<p>I am encoding some VDM specifications using Isabelle and I am deciding on what to use to represent them.</p>
+<p>---- option 1: the type (~=&gt;) from Map.thy</p>
+<p>It works well up to the point where I needed to add expressions with map comprehension. In VDM map comprehension is given as </p>
+<p>{ x |-&gt; y | x &lt;- S, y &lt;- T, P(x, y) } , where x and y come from sets S and T and property P(x,y) hold.</p>
+<p>In Isabelle I used the following (convoluted?) construct, given a map f ∈ (Loc ⇀ nat) that is also finite f:</p>
+<p>map_of [ (x, the(f x)) . x ← sorted_list_of_set (dom f) , P x f ] </p>
+<p>This leads to complicated proofs I was hoping to avoid. Map.thy expects a list of pairs for building <br>
+map comprehension through list comprehension, which needs to have its generated values through <br>
+lists instead of the sets of VDM, hence the use of sorted_list_of_set.</p>
+<p>---- option 2: maps as restricted set of pairs</p>
+<p>This doesn't have as much automation and has some extra lemmas about function application that<br>
+I inherited from an encoding of Event-B in Isabelle by Mathias Schimaltz.</p>
+<p>Here map comprehension is just through set comprehension but function application uses THE operator.</p>
+<p>Any thoughts / suggestions / rationale-of-choice on what would be best to use as an adequate representation? </p>
+<p>Many thanks</p>
+<p>Best,<br>
+Leo</p>
+
+
+
+<a name="294239842"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20VDM%20maps%20and%20map%20comprehension%20in%20Isabelle/near/294239842" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20VDM.20maps.20and.20map.20comprehension.20in.20Isabelle.html#294239842">(Aug 19 2022 at 10:54)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Leo,</p>
+<blockquote>
+<p>In VDM map comprehension is given as</p>
+<p>{ x |-&gt; y | x &lt;- S, y &lt;- T, P(x, y) } , where x and y come from sets S and T and<br>
+property P(x,y) hold.<br>
+This example is well-defined only if P(x, y) is single-valued on S and T. Otherwise, there <br>
+might be multiple possible y's for some x, so which one should be taken? Option 2 avoids <br>
+this issue by allowing arbitrary relations, and you have to prove single-valuedness <br>
+yourself when needed.</p>
+</blockquote>
+<p>In general, you should not convert sets to lists. As you have experienced, this <br>
+complicates proofs severely. But you can build map comprehensions from lambda <br>
+abstractions. The following encodes your example more easily:</p>
+<p>%x. if x : S &amp; (EX y. y : T &amp; P (x, y)) then Some (THE y. y : T &amp; P (x, y)) else None</p>
+<p>Note that you cannot avoid the THE operator if you don't have a function to obtain the y <br>
+for any given x. If you already have a map f to specify S and T as dom f and ran f, this <br>
+simplifies to:</p>
+<p>restrict_map f {x. P (x, the (f x))}</p>
+<p>If you only need finite maps, you can represent them directly as associative lists, e.g.,<br>
+[(1, 'a'), (2, 'b')] maps 1 to 'a' and 2 to 'b', but I would not recommend that. This way, <br>
+you clutter your proofs with the representation details and you lose unique <br>
+representations: [(2, 'b'), (1, 'a')] is the same map as above.</p>
+<p>If code generation is of interest, you might want to look at the type ('a, 'b) mapping <br>
+from HOL/Library, but this is just isomorphic to 'a ~=&gt; 'b.</p>
+<p>Hope this helps<br>
+Andreas</p>
+<p>On 15/04/13 17:47, Leo Freitas wrote:</p>
+<blockquote>
+<p>Hi,</p>
+<p>I am encoding some VDM specifications using Isabelle and I am deciding on what to use to represent them.</p>
+<p>---- option 1: the type (~=&gt;) from Map.thy</p>
+<p>It works well up to the point where I needed to add expressions with map comprehension.<br>
+In VDM map comprehension is given as</p>
+<p>{ x |-&gt; y | x &lt;- S, y &lt;- T, P(x, y) } , where x and y come from sets S and T and<br>
+property P(x,y) hold.</p>
+<p>In Isabelle I used the following (convoluted?) construct, given a map f ∈ (Loc ⇀ nat) that is also finite f:</p>
+<p>map_of [ (x, the(f x)) . x ← sorted_list_of_set (dom f) , P x f ]</p>
+<p>This leads to complicated proofs I was hoping to avoid. Map.thy expects a list of pairs for building<br>
+map comprehension through list comprehension, which needs to have its generated values through<br>
+lists instead of the sets of VDM, hence the use of sorted_list_of_set.</p>
+<p>---- option 2: maps as restricted set of pairs</p>
+<p>This doesn't have as much automation and has some extra lemmas about function application that<br>
+I inherited from an encoding of Event-B in Isabelle by Mathias Schimaltz.</p>
+<p>Here map comprehension is just through set comprehension but function application uses THE operator.</p>
+<p>Any thoughts / suggestions / rationale-of-choice on what would be best to use as an adequate representation?</p>
+<p>Many thanks</p>
+<p>Best,<br>
+Leo<br>
+</p>
+</blockquote>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

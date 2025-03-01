@@ -1,0 +1,132 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Code generator: overloaded numeric constants · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generator.3A.20overloaded.20numeric.20constants.html">[isabelle] Code generator: overloaded numeric constants</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294110028"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generator%3A%20overloaded%20numeric%20constants/near/294110028" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generator.3A.20overloaded.20numeric.20constants.html#294110028">(Aug 18 2022 at 15:28)</a>:</h4>
+<p>From: John Matthews &lt;<a href="mailto:matthews@galois.com">matthews@galois.com</a>&gt;<br>
+Hi Florian,</p>
+<p>I was demoing the code generator here at Galois, and someone wanted to  <br>
+see what kind of Haskell code was generated for overloaded arithmetic.  <br>
+We tried this example:</p>
+<p>theory Int_ex<br>
+   imports Main Code_Integer<br>
+   begin</p>
+<p>definition<br>
+     "foo (x::'a::{number,plus,times}) y = x + 2 * y"</p>
+<p>export_code foo in Haskell<br>
+     module_name Int_ex<br>
+     file "IntCode"</p>
+<p>It was able to generate Haskell code, but the code itself is very  <br>
+strange:</p>
+<p>module Int_ex where {</p>
+<p>class Plus a where {<br>
+     plus :: a -&gt; a -&gt; a;<br>
+   };</p>
+<p>class Times a where {<br>
+     times :: a -&gt; a -&gt; a;<br>
+   };</p>
+<p>class Number a where {<br>
+     number_of :: Integer -&gt; a;<br>
+   };</p>
+<p>foo :: forall a. (Plus a, Times a, Number a) =&gt; a -&gt; a -&gt; a;<br>
+   foo x y =<br>
+     plus x (times (number_of (error "Bit0" (error "Bit1" (error  <br>
+"Pls")))) y);</p>
+<p>}</p>
+<p>Notice that in the definition of foo uses the "error" function and  <br>
+Isabelle's internal datatype for integers. I had hoped the Haskell  <br>
+definition would instead be:</p>
+<p>foo x y =<br>
+     plus x (times (number_of 2) y);</p>
+<p>Should I be including a different adaptation theory here?</p>
+<p>Thanks,<br>
+-john<br>
+<a href="/user_uploads/14278/plgkNEXztp6cqIZMJDwG0n74/smime.p7s">smime.p7s</a></p>
+
+
+
+<a name="294110096"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generator%3A%20overloaded%20numeric%20constants/near/294110096" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generator.3A.20overloaded.20numeric.20constants.html#294110096">(Aug 18 2022 at 15:28)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi John,</p>
+<p>the number class in Isabelle/HOL is a little bit arcane;  concerning<br>
+code generation, you may use numerals on numeric types (nat, int, rat,<br>
+real), but not polymorphic ('a::number).  Otherwise you only get<br>
+formally and partially correct code:</p>
+<p>In typical Isabelle/HOL specifications, the number class will not show<br>
+up that often since it is only syntactic -- a classical joke is that you<br>
+cannot prove "2 + 2 = (4::'a::number)".  Of more relevance is the class<br>
+number_ring which describes structures in which the integers can be<br>
+embedded semantically (number_of = of_int).  This you can use to<br>
+circumvent the number_of problem: instead of</p>
+<p>definition double :: "'a::number_ring ⇒ 'a" where<br>
+    "double k = 2 * k"</p>
+<p>write</p>
+<p>definition double :: "'a::number_ring ⇒ 'a" where<br>
+    "double k = of_int 2 * k"</p>
+<p>Since (number_of = of_int), you can even prove the second version from<br>
+the first.  This could also be done by the preprocessor but would<br>
+require writing a simproc since the naive rewrite (number_of k = of_int<br>
+(number_of k)) does not terminate.</p>
+<p>Hope this helps,<br>
+    Florian<br>
+<a href="/user_uploads/14278/NT0z3-VeV5ZhiIMc3vpEr0n8/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294110189"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generator%3A%20overloaded%20numeric%20constants/near/294110189" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generator.3A.20overloaded.20numeric.20constants.html#294110189">(Aug 18 2022 at 15:29)</a>:</h4>
+<p>From: John Matthews &lt;<a href="mailto:matthews@galois.com">matthews@galois.com</a>&gt;<br>
+Hi Florian,</p>
+<p>I'd like to stay with just the "syntactic" number, plus, etc. classes,  <br>
+since our Haskell number instances don't necessarily satisfy the ring  <br>
+axioms. So I can generate reasonable Haskell code from this Isabelle  <br>
+definition:</p>
+<p>definition<br>
+     "foo (x::'a::{number,plus,times}) y = x + number_of 2 * y"</p>
+<p>However I don't want to have to insert "number_of" functions wherever  <br>
+I'm using a numeric literal. But right now I don't see any way of  <br>
+generating reasonable Haskell code from this more readable version of  <br>
+the above definition:</p>
+<p>definition<br>
+     "foo (x::'a::{number,plus,times}) y = x + 2 * y"</p>
+<p>Is there any way to get the code generator to work well on this second  <br>
+form?</p>
+<p>Thanks,<br>
+-john<br>
+<a href="/user_uploads/14278/Y-fGi7lCZY2tEGWjbbgcrYob/smime.p7s">smime.p7s</a></p>
+
+
+
+<a name="294110226"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generator%3A%20overloaded%20numeric%20constants/near/294110226" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generator.3A.20overloaded.20numeric.20constants.html#294110226">(Aug 18 2022 at 15:29)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi John,</p>
+<p>the inherent problem here is that the Isabelle and Haskell concept of<br>
+numeral is quite different.  In the attached theory I have spelled out<br>
+what is the best possible solution I can imagine for this discrepancy<br>
+using the preprocessor:</p>
+<p>a) For instances of number_ring, a substitution number_of k ~&gt; of_int<br>
+(number_of k) is used.</p>
+<p>b) For other polymorphic numeral expressions, the class number_num can<br>
+be used which can be provided with custom instances; then a substitution<br>
+number_of k ~&gt; num_of (number_of k) can be applied.</p>
+<p>I'm not quite sure whether this solves your problem, but if yes I will<br>
+include this into library (or even the Code_Integer theory).</p>
+<p>Cheers,<br>
+    Florian<br>
+<a href="/user_uploads/14278/KyNLHW82C-6qT3SIsQoWwtfB/Number.thy">Number.thy</a><br>
+<a href="/user_uploads/14278/nyGh37_MY4KZA1Tzohttjj0T/signature.asc">signature.asc</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

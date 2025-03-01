@@ -1,0 +1,149 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Efficient Lookups in Lists · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Efficient.20Lookups.20in.20Lists.html">[isabelle] Efficient Lookups in Lists</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294042797"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Efficient%20Lookups%20in%20Lists/near/294042797" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Efficient.20Lookups.20in.20Lists.html#294042797">(Aug 18 2022 at 09:47)</a>:</h4>
+<p>From: Jan Olaf Blech &lt;<a href="mailto:blech@informatik.uni-kl.de">blech@informatik.uni-kl.de</a>&gt;<br>
+Hi,</p>
+<p>We use Isabelle/HOL in a compiler runtime verification <br>
+environment. The verification process comprises "lookup <br>
+operations" in lists, function updates and sets, i.e. <br>
+proving lemmata of the following form:</p>
+<p>lemma "a mem [...,a,...]"<br>
+lemma "f (...,a:= b,...) a = b"<br>
+lemma "a : {...,a,...}"</p>
+<p>If the lists, function updates, and sets grow large, these <br>
+lookups take up almost all of the time of a verification <br>
+run. In our current version we instantiate Isabelle's <br>
+simplifier with some simple rules like</p>
+<p>"x  = a | x : A ==&gt; x : insert a A"</p>
+<p>to achieve time linear to the size of the underlying <br>
+structure the lookup is conducted on.<br>
+However a lookup still takes quite long: several minutes <br>
+for a list of a few thousand elements. For the <br>
+verification of some relatively small programs thousands <br>
+of lookups are needed in structures containing thousands <br>
+of elements.</p>
+<p>Is anyone aware of a technique to do this faster?</p>
+<p>What do you think of "bypassing" Isabelle's simplifier to <br>
+make such lookups faster? One problem is probably that we <br>
+would "spoil" the Isabelle implementation and the "trusted <br>
+computing base" would grow larger.</p>
+<p>Regards</p>
+<p>Jan Olaf Blech</p>
+
+
+
+<a name="294042806"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Efficient%20Lookups%20in%20Lists/near/294042806" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Efficient.20Lookups.20in.20Lists.html#294042806">(Aug 18 2022 at 09:47)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+There are several possible solutions.</p>
+<ol start="0">
+<li>
+<p>If your application is executable you may be able to generate ML code <br>
+from it and run it completely independently of Isabelle. The speedup <br>
+will be about 100. If it is almost executable, it may be worth making it <br>
+fully executable (eg an implementation of finite sets as lists is <br>
+already in the Library).</p>
+</li>
+<li>
+<p>You, as you say, bypass the the simplifier by writing an oracle, i.e. <br>
+trusted piece of ML code that checks if an element is in a list/set. <br>
+This is probably the quick an dirty solution (although you need to <br>
+familiarize yourself with oracles).</p>
+</li>
+<li>
+<p>You explicitly use some efficient data structure rather than a list <br>
+or set, eg a binary tree. This is completely safe, requires no low-level <br>
+coding, but you will need to develop the efficient data structure (the <br>
+theory BinarySearchTree in the AFP may provide much of what you need) <br>
+and will need to use it rather than the abstract type of <br>
+list/function/set (which should not complicate proofs much).</p>
+</li>
+<li>
+<p>Alternative 0 can also be used "locally" by compiling executable <br>
+goals like "a mem [...]" into ML and executing them there. The <br>
+development version of Isabelle contains a proof method "evaluation" <br>
+which does just this. However, currently it can only be used to solve a <br>
+goal outright and it is not integrated with other proof tools. More <br>
+flexible versions are in preparation.</p>
+</li>
+<li>
+<p>You can use "reflection" to translate you list/function/set problem <br>
+into some efficient data structure and execute it there. In contrast to <br>
+alternative 2 you only do this reflection at specific points (when you <br>
+need to solve expensive goals) but otherwise work with the usual <br>
+mathematical types of lists/sets/etc. Efficiency is guaranteed as in 3.</p>
+</li>
+</ol>
+<p>Thanks for bringing this up. Efficient executability is an important <br>
+issue we are working on at the moment. Challenge problems are welcome.</p>
+<p>Tobias</p>
+<p>Jan Olaf Blech schrieb:</p>
+
+
+
+<a name="294042824"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Efficient%20Lookups%20in%20Lists/near/294042824" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Efficient.20Lookups.20in.20Lists.html#294042824">(Aug 18 2022 at 09:47)</a>:</h4>
+<p>From: Brian Huffman &lt;<a href="mailto:brianh@csee.ogi.edu">brianh@csee.ogi.edu</a>&gt;<br>
+A good solution might be to write a simplification procedure (or simproc) to <br>
+solve these kinds of subgoals. A simproc is an ML function that takes a term <br>
+t as an argument, and optionally returns a theorem of the form t == t'. You <br>
+can learn more about them in the Isabelle reference manual.</p>
+<p>For example, you could write some ML code that examines terms of the form x : <br>
+A, checking to see whether term x occurs explicitly in the term A. If so, it <br>
+could then build theorem of the form "x : A == True" using Eq_TrueI, insertI1 <br>
+and insertI2 together with some simple theorem combinators. If term x is not <br>
+found in the term A, the simproc would just fail and do nothing (hopefully <br>
+this is not the common case).</p>
+<p>Note that since a simproc builds an actual theorem that proves the equality, <br>
+you aren't adding anything to the trusted code base. You should still get a <br>
+significant speedup, because the ML code would be much faster than making <br>
+hundreds of recursive calls to the simplifier.</p>
+<p>Hope this helps,</p>
+<ul>
+<li>Brian</li>
+</ul>
+
+
+
+<a name="294042858"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Efficient%20Lookups%20in%20Lists/near/294042858" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Efficient.20Lookups.20in.20Lists.html#294042858">(Aug 18 2022 at 09:47)</a>:</h4>
+<p>From: Steven Obua &lt;<a href="mailto:obua@in.tum.de">obua@in.tum.de</a>&gt;<br>
+There is one more solution possibility, you could use the compute oracle <br>
+in Pure/Tools/compute.ML.<br>
+It is already included in your Isabelle build (so it is somewhere <br>
+between the "trusted base" and the rest :-)),<br>
+you can invoke it by calling once</p>
+<p>Compute.basic_make ....</p>
+<p>and then each time you simplify a term by</p>
+<p>Compute.rewrite ...</p>
+<p>There are two major drawbacks to this method:</p>
+<ol>
+<li>You can only simplify terms which contain no type variables.</li>
+<li>You have to configure the rewrite by calling Compute.basic_make and <br>
+give it ALL the theorems used for rewriting;<br>
+    these theorems must not contain type variables, either;</li>
+</ol>
+<p>The no-type-variables limitation in 2) is not so bad if you know what <br>
+types you can possibly have in your terms; you can just instantiate the <br>
+polymorphic rewrite theorems with all types you need and give these to <br>
+Compute.basic_make.</p>
+<p>I have used above technique successfully for fast matrix multiplication, <br>
+gaining a speed-up-factor comparable to compilation.<br>
+It is more trustworthy than compilation, though, because it builds <br>
+directly on Pure and makes no additional assumptions.</p>
+<p>Steven</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

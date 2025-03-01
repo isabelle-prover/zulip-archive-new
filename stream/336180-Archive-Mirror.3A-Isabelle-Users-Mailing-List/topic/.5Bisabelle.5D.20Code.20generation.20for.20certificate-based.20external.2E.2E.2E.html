@@ -1,0 +1,91 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Code generation for certificate-based external... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20certificate-based.20external.2E.2E.2E.html">[isabelle] Code generation for certificate-based external...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294633715"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20for%20certificate-based%20external.../near/294633715" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20certificate-based.20external.2E.2E.2E.html#294633715">(Aug 22 2022 at 09:08)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear Wenda,</p>
+<p>When certification fails, you can either call a slow implementation or abort with an <br>
+error. The latter option occurs quite frequently in more advanced code setups. There is <br>
+the constant Code.abort. Logically, "Code.abort msg f" is defined as "f ()", but during <br>
+code generation, it raises an exception with msg as error message instead of evaluating f. <br>
+In your case, the code equation could look like the following:</p>
+<p>lemma gcd_int_code [code]:<br>
+   "gcd a b =<br>
+   (let (c,a',b') = untrusted_gcd a b<br>
+    in if valid_gcd_rel a b (c,a',b') then c<br>
+       else Code.abort (STR ''gcd: certification failed'' (%_. gcd a b)))"</p>
+<p>Code.abort works well with code generation and evaluation with code_simp, but not with <br>
+normalisation by evaluation. If you need the latter, you should declare your own constant <br>
+for this specific error case and duplicate the setup for Code.abort.</p>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<a name="294638704"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20for%20certificate-based%20external.../near/294638704" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20certificate-based.20external.2E.2E.2E.html#294638704">(Aug 22 2022 at 09:40)</a>:</h4>
+<p>From: Wenda Li &lt;<a href="mailto:wl302@cam.ac.uk">wl302@cam.ac.uk</a>&gt;<br>
+Dear code generation experts,</p>
+<p>Suppose I have a highly efficient greatest common divisor implementation <br>
+for integers (based on modular arithmetic, subresultants, bit-shifting <br>
+etc.), and I want to use it to boost our default gcd computation in <br>
+Isabelle. A good thing about gcd is that it can produce a certificate <br>
+(i.e. Bezout's identity) such that an untrusted result can be easily <br>
+verified. Therefore, I am thinking about building a certificate-based <br>
+code equation for gcd:</p>
+<p>definition valid_gcd_rel :: "int =&gt; int =&gt; int × int × int =&gt; bool" <br>
+where<br>
+   "valid_gcd_rel a b r= (let (c,a',b') =r in<br>
+     a≠0 ∧ b≠0 ∧ c&gt;0 ∧ c dvd ¦a¦ ∧ c dvd ¦b¦ ∧ ¦a¦<em>a' + ¦b¦</em>b'=c)"</p>
+<p>lemma gcd_valid:<br>
+   fixes a b c a' b' :: int<br>
+   assumes "valid_gcd_rel a b (c,a',b')"<br>
+   shows "gcd a b = c"<br>
+sorry</p>
+<p>(*suppose this is an untrusted but very efficient implementation which<br>
+   produces gcd together with a certificate*)<br>
+definition untrusted_gcd :: "int =&gt; int =&gt; int × int × int" where<br>
+   "untrusted_gcd a b = (if a=6 ∧ b=5 then (1,1,-1) else undefined)"</p>
+<p>declare gcd_code_int [code del]</p>
+<p>lemma gcd_code[code]:<br>
+   "gcd a b = (let<br>
+       (c,a',b') = untrusted_gcd a b<br>
+     in if valid_gcd_rel a b (c,a',b') then c else (SOME c. c=gcd a b)) "<br>
+sorry</p>
+<p>Lemma gcd_valid and gcd_code should both be provable. And the value <br>
+command works just as expected:</p>
+<p>value "gcd (6::int) 5" (<em>1</em>)<br>
+value "gcd (6::int) 4" (<em>gcd 6 4</em>)</p>
+<p>That is, when "valid_gcd_rel a b (c,a',b')" is evaluated to be true, we <br>
+use the result from untrusted_gcd, otherwise we leave the expression <br>
+unchanged. However, when I want to boost the gcd computation further <br>
+using code_reflect:</p>
+<p>code_reflect Foo<br>
+   datatypes int="_"<br>
+   functions "gcd::int=&gt;int=&gt;int"</p>
+<p>an error occurs because Eps has no code equation. Of course, in this <br>
+case, I can resolve this problem by replacing "(SOME c. c=gcd a b)" with <br>
+a "slow" but executable version of gcd (e.g. the default version), but <br>
+in general it is not convenient to build and certify even a slow version <br>
+every time. Is there any way to cope with this problem?</p>
+<p>In general, there are many operations, such as ideal membership test, <br>
+whose results can be easily verified by some certificates while a direct <br>
+implementation (even a naive one) is very hard to verify within <br>
+Isabelle. I was wondering if this certificate-based approach can be a <br>
+way to improve execution efficiency of functions within Isabelle.</p>
+<p>Any comment/suggestion is greatly appreciated,<br>
+Wenda</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

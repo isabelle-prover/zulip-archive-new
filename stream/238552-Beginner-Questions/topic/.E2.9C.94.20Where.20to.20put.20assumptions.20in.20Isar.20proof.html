@@ -1,0 +1,111 @@
+<html>
+<head><meta charset="utf-8"><title>✔ Where to put assumptions in Isar proof · Beginner Questions · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/index.html">Beginner Questions</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20Where.20to.20put.20assumptions.20in.20Isar.20proof.html">✔ Where to put assumptions in Isar proof</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="262213720"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/%E2%9C%94%20Where%20to%20put%20assumptions%20in%20Isar%20proof/near/262213720" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Alex Weisberger <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20Where.20to.20put.20assumptions.20in.20Isar.20proof.html#262213720">(Nov 21 2021 at 00:46)</a>:</h4>
+<p>Hello,</p>
+<p>I am trying to prove the following lemma to aid in a later theorem:</p>
+<div class="codehilite"><pre><span></span><code>lemma char_of_symmetric: &quot;((of_char (char_of n))::nat) = n&quot; (is &quot;?P n&quot;)
+proof (induction n)
+  case 0
+  show ?case by auto
+next
+  fix n assume &quot;?P n&quot;
+  thus &quot;?P (Suc n)&quot; by simp
+qed
+</code></pre></div>
+<p>(<code>of_char</code> and <code>char_of</code> come from the <code>Show.Show_Instances</code> theory)</p>
+<p>After this, the proof state has 1 subgoal remaining:</p>
+<div class="codehilite"><pre><span></span><code>1. n mod 256 = n ⟹ Suc n mod 256 = Suc n
+</code></pre></div>
+<p>I believe this <code>mod 256</code> is coming from the fact that the Isabelle <code>char</code> and <code>string</code> implementation implements UTF-8, which sets this limit on character code digits (I'm not a UTF-8 expert, but this seems plausible).</p>
+<p>In my case, I am serializing single digits, so I know that <code>n</code> here will always be <code>&lt; 10</code>. Where can I put this assumption to hopefully get this proof goal to be discharged?</p>
+<p>I have tried <code>fix n assume "n &lt; 10 /\ (?P n)"</code>, and I've tried <code>assume "n &lt; 10"</code> at the beginning of the proof, before all case analyses. I am always met with a syntax error, or the errors:  "Illegal application of proof command in "state" mode."</p>
+<p>Any tips here?</p>
+
+
+
+<a name="262221295"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/%E2%9C%94%20Where%20to%20put%20assumptions%20in%20Isar%20proof/near/262221295" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Alex Weisberger <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20Where.20to.20put.20assumptions.20in.20Isar.20proof.html#262221295">(Nov 21 2021 at 04:34)</a>:</h4>
+<p>I made some progress by re-reading the "Structured Lemma Statements" section of Concrete Semantics:</p>
+<div class="codehilite"><pre><span></span><code>lemma char_of_symmetric:
+  assumes single_digit: &quot;(n::nat) &lt; 10&quot;
+  shows &quot;((of_char (char_of n))::nat) = n&quot; (is &quot;?P n&quot;)
+proof (induction n)
+  case 0
+  show ?case by auto
+next
+  fix n assume &quot;(?P n)&quot;
+  with single_digit show &quot;?P (Suc n)&quot; by simp
+qed
+</code></pre></div>
+<p>I think adding the assumption <code>single_digit</code> at the top level makes sense, though it doesn't seem to actually apply the assumption unless I use <code>with single_digit_show</code> (which is slightly surprising). Even still, I'm left with this final proof goal:</p>
+<p><code>1. n &lt; 10 ⟹ n mod 256 = n ⟹ Suc n mod 256 = Suc n</code></p>
+<p>This looks to me like a true statement - <code>n mod 256 = n</code> if <code>n &lt; 10</code>. I even proved that in a separate lemma to double check, though it required some casting which might be the source of the issue:</p>
+<div class="codehilite"><pre><span></span><code>lemma &quot;(n::nat) &lt; 10 ⟹ n mod 256 = n&quot;
+  by auto
+
+(* This is correctly proven *)
+</code></pre></div>
+<p>So, I'm not sure how to discharge this final goal.</p>
+
+
+
+<a name="262225917"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/%E2%9C%94%20Where%20to%20put%20assumptions%20in%20Isar%20proof/near/262225917" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20Where.20to.20put.20assumptions.20in.20Isar.20proof.html#262225917">(Nov 21 2021 at 06:58)</a>:</h4>
+<p>you are missing an <code>using assms</code> before the <code>proof (induction n)</code></p>
+
+
+
+<a name="262235534"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/%E2%9C%94%20Where%20to%20put%20assumptions%20in%20Isar%20proof/near/262235534" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Wenda Li <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20Where.20to.20put.20assumptions.20in.20Isar.20proof.html#262235534">(Nov 21 2021 at 11:19)</a>:</h4>
+<p>Assuming the constants<code>of_char</code> and <code>char_of</code> come from <code>HOL.String</code>, a relevant lemma can be found through <code>find_theorems of_char char_of</code>:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="n">String.unique_euclidean_semiring_with_bit_shifts_class.of_char_of</span><span class="o">:</span>
+    <span class="n">of_char</span> <span class="o">(</span><span class="n">char_of</span> <span class="o">?</span><span class="n">a</span><span class="o">)</span> <span class="o">=</span> <span class="o">?</span><span class="n">a</span> <span class="n">mod</span> <span class="n">256</span>
+</code></pre></div>
+<p>In particular, this lemma has been declared as a simplification rule, so that we don't need to invoke it explicitly. Your intended lemma should be provable without induction:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">lemma</span>
+  <span class="kp">assumes</span> <span class="s">"n&lt;256"</span>
+  <span class="kp">shows</span> <span class="s">"((of_char (char_of n))::nat) = n"</span>
+  <span class="k">using</span> <span class="n">assms</span> <span class="k">by</span> <span class="n">auto</span>
+</code></pre></div>
+
+
+
+<a name="262240017"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/%E2%9C%94%20Where%20to%20put%20assumptions%20in%20Isar%20proof/near/262240017" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Alex Weisberger <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20Where.20to.20put.20assumptions.20in.20Isar.20proof.html#262240017">(Nov 21 2021 at 13:09)</a>:</h4>
+<p><code>using assms</code> worked - here is the final proof:</p>
+<div class="codehilite"><pre><span></span><code>lemma char_of_symmetric:
+  fixes n :: nat
+  assumes &quot;n &lt; 10&quot;
+  shows &quot;of_char (char_of n) = n&quot;
+  using assms
+proof (induction n)
+  case 0
+  show ?case by auto
+next
+  case (Suc n)
+  then show ?case by auto
+qed
+</code></pre></div>
+<p>I also didn't know about <code>find_theorems</code>, so that is very helpful. I just wanted to carry the proof out myself for learning purposes, but obviously I want to use existing theorems as much as possible.</p>
+<p>Thanks everyone!</p>
+
+
+
+<a name="262241055"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/%E2%9C%94%20Where%20to%20put%20assumptions%20in%20Isar%20proof/near/262241055" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Notification Bot <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20Where.20to.20put.20assumptions.20in.20Isar.20proof.html#262241055">(Nov 21 2021 at 13:34)</a>:</h4>
+<p><span class="user-mention silent" data-user-id="459086">Alex Weisberger</span> has marked this topic as resolved.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,326 @@
+<html>
+<head><meta charset="utf-8"><title>Type overloading not working · Beginner Questions · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/index.html">Beginner Questions</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working.html">Type overloading not working</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="237637885"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Type%20overloading%20not%20working/near/237637885" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Nicolò Cavalleri <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working.html#237637885">(May 06 2021 at 10:41)</a>:</h4>
+<p>I have the following code, which is not the original but just a mwe to recreate the problem I have:</p>
+<div class="codehilite"><pre><span></span><code>theory Scratch
+  imports Main
+
+begin
+
+locale weird_topological_space = fixes S :: &quot;&#39;a set&quot; and is_open :: &quot;&#39;a set ⇒ bool&quot;
+  assumes open_space [simp, intro]: &quot;is_open S&quot; and open_empty [simp, intro]: &quot;is_open {}&quot;
+    and open_imp_subset: &quot;is_open U ⟹ U ⊆ S&quot;
+    and open_inter [intro]: &quot;⟦is_open U; is_open V⟧ ⟹ is_open (U ∩ V)&quot;
+    and open_union [intro]: &quot;⋀F::(&#39;a set) set. (⋀x. x ∈ F ⟹ is_open x) ⟹ is_open (⋃x∈F. x)&quot;
+
+begin
+
+definition nbhds :: &quot;&#39;a ⇒ &#39;a filter&quot;
+  where &quot;nbhds a = (INF S∈{S. is_open S ∧ a ∈ S}. principal S)&quot;
+
+end
+
+definition pippo :: &quot;&#39;a ⇒ &#39;a filter&quot;
+  where &quot;pippo a = (INF S∈{S. a ∈ S}. principal S)&quot;
+
+locale test_1 =
+fixes f :: &quot;&#39;a ⇒ &#39;b&quot; and x :: &#39;a and y :: &#39;b
+assumes has_derivative_hd: &quot;filterlim f (nbhds y) (nbhds x)&quot;
+
+(* Type unification failed
+
+Type error in application: incompatible operand type
+
+Operator:  nbhds :: &#39;b ⇒ &#39;b filter
+Operand:   x :: &#39;a *)
+
+locale test_2 =
+fixes f :: &quot;&#39;a ⇒ &#39;b&quot; and x :: &#39;a and y :: &#39;b
+assumes has_derivative_hd: &quot;filterlim f (pippo y) (nbhds x)&quot;
+
+locale test_3 =
+fixes f :: &quot;&#39;a ⇒ &#39;b&quot; and x :: &#39;a and y :: &#39;b
+assumes has_derivative_hd: &quot;filterlim f (pippo y) (pippox)&quot;
+
+end
+</code></pre></div>
+<p>and for some reason test 2 and 3 work, whereas test 1 does not. It is as if for some reason the function <code>is_open</code> does not allow the function <code>nbhds</code> to change type in different instances.</p>
+<p>Does anybody know why?</p>
+
+
+
+<a name="237638301"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Type%20overloading%20not%20working/near/237638301" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jakub Kądziołka <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working.html#237638301">(May 06 2021 at 10:47)</a>:</h4>
+<p>as you can see by the identifier being blue, the <code>nbhds</code> in <code>test_1</code> is a free variable, it does not refer to the definition in <code>weird_topological_space</code></p>
+
+
+
+<a name="237638390"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Type%20overloading%20not%20working/near/237638390" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jakub Kądziołka <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working.html#237638390">(May 06 2021 at 10:47)</a>:</h4>
+<p>when you're defining <code>test_1</code>, you're outside of the <code>weird_topological_space</code></p>
+
+
+
+<a name="237638494"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Type%20overloading%20not%20working/near/237638494" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jakub Kądziołka <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working.html#237638494">(May 06 2021 at 10:48)</a>:</h4>
+<p>Take a look at how <code>group_hom</code> is defined <a href="https://isabelle.in.tum.de/library/HOL/HOL-Algebra/Group.html">here</a></p>
+
+
+
+<a name="237638507"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Type%20overloading%20not%20working/near/237638507" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Nicolò Cavalleri <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working.html#237638507">(May 06 2021 at 10:49)</a>:</h4>
+<p>Ok ops that was a stupid mistake, sorry I am not used to Isabelle colors! How can I use it outside?</p>
+
+
+
+<a name="237638535"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Type%20overloading%20not%20working/near/237638535" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jakub Kądziołka <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working.html#237638535">(May 06 2021 at 10:49)</a>:</h4>
+<p>you need to provide the implicit parameters of the locale somehow</p>
+
+
+
+<a name="237638550"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Type%20overloading%20not%20working/near/237638550" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jakub Kądziołka <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working.html#237638550">(May 06 2021 at 10:49)</a>:</h4>
+<p>I assume that you want to have two topological spaces involved</p>
+
+
+
+<a name="237638636"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Type%20overloading%20not%20working/near/237638636" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jakub Kądziołka <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working.html#237638636">(May 06 2021 at 10:50)</a>:</h4>
+<p>if you only needed one, you could do <code>locale test_1 = weird_topological_space  +</code> and <code>nbhds</code> would be in scope</p>
+
+
+
+<a name="237638719"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Type%20overloading%20not%20working/near/237638719" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jakub Kądziołka <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working.html#237638719">(May 06 2021 at 10:51)</a>:</h4>
+<p>if you do need two, you'll need to give explicit names to the topological spaces and then use <code>nbhds⊗⇘T⇙</code> and <code>nbhds⊗⇘U⇙</code> (again, see the <code>group_hom</code> example</p>
+
+
+
+<a name="237641061"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Type%20overloading%20not%20working/near/237641061" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Nicolò Cavalleri <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working.html#237641061">(May 06 2021 at 11:14)</a>:</h4>
+<p>Thank you very much for your help! I am trying to imitate the example you linked. Now it recognizes <code>nbhds</code> but it still have a type overloading problem: if I replace <code>test_1</code> above with</p>
+<div class="codehilite"><pre><span></span><code>locale test_1 =
+X?: weird_topological_space X + Y?: weird_topological_space Y
+for X and Y +
+fixes f :: &quot;&#39;a ⇒ &#39;b&quot; and x :: &#39;a and y :: &#39;b
+assumes at_mem_x : &quot;x ∈ X&quot;
+and at_mem_y : &quot;y ∈ Y&quot;
+and lim: &quot;filterlim f (nbhds x) (nbhds y)&quot;
+
+(* Type unification failed
+
+Type error in application: incompatible operand type
+
+Operator:  (∈) y :: &#39;b set ⇒ bool
+Operand:   Y :: &#39;a set *)
+</code></pre></div>
+<p>I get the above error. What am I doing wrong this time? Again it is as if it forces both topological spaces to be built on the same type</p>
+
+
+
+<a name="237642067"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Type%20overloading%20not%20working/near/237642067" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Nicolò Cavalleri <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working.html#237642067">(May 06 2021 at 11:24)</a>:</h4>
+<p>Also I am not sure what the symbols in <code>nbhds⊗⇘T⇙</code> are! Is it something important? I can't find anything about this notation in the online tutorial on locales!</p>
+
+
+
+<a name="237642323"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Type%20overloading%20not%20working/near/237642323" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Lukas Stevens <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working.html#237642323">(May 06 2021 at 11:26)</a>:</h4>
+<p>This is like <code>\&lt;sub&gt;</code> but you are allowed to use multiple characters (<code>\&lt;bsub&gt;</code> ...<code>\&lt;esub&gt;</code>). Additionally, you are allowed to use parameters inside this notation, which is not allowed for <code>\&lt;sub&gt;</code>. The notation is not displayed correctly but there are patches for jEdit flying around <span class="user-mention" data-user-id="233212">@Mohammad Abdulaziz</span>?</p>
+
+
+
+<a name="237643419"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Type%20overloading%20not%20working/near/237643419" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jakub Kądziołka <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working.html#237643419">(May 06 2021 at 11:36)</a>:</h4>
+<p>ah, ignore the ⊗, copy-paste mishap</p>
+
+
+
+<a name="237645045"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Type%20overloading%20not%20working/near/237645045" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Nicolò Cavalleri <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working.html#237645045">(May 06 2021 at 11:52)</a>:</h4>
+<p><span class="user-mention silent" data-user-id="370356">Nicolò Cavalleri</span> <a href="#narrow/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working/near/237641061">said</a>:</p>
+<blockquote>
+<p>I get the above error. What am I doing wrong this time? Again it is as if it forces both topological spaces to be built on the same type</p>
+</blockquote>
+<p><span class="user-mention" data-user-id="380931">@Jakub Kądziołka</span> do you by chance know anything about this?</p>
+
+
+
+<a name="237645146"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Type%20overloading%20not%20working/near/237645146" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jakub Kądziołka <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working.html#237645146">(May 06 2021 at 11:53)</a>:</h4>
+<p>say <code>for X (structure) and Y (structure)</code> and add subscripts to invokations of <code>nbhds</code></p>
+
+
+
+<a name="237645910"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Type%20overloading%20not%20working/near/237645910" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Nicolò Cavalleri <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working.html#237645910">(May 06 2021 at 12:00)</a>:</h4>
+<p>I added <code>(structure)</code>, but as for subscripts, the error comes out even if I remove the line about nbhds: it comes out for the line</p>
+<div class="codehilite"><pre><span></span><code>and at_mem_y : &quot;y ∈ Y&quot;
+</code></pre></div>
+
+
+
+<a name="237646342"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Type%20overloading%20not%20working/near/237646342" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Nicolò Cavalleri <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working.html#237646342">(May 06 2021 at 12:03)</a>:</h4>
+<p>Also I tried to add subscripts your way, with \&lt;bsub&gt; and \&lt;esub&gt; but Isabelle does not seem to recognize them, it says <code>Inner syntax error⌂
+Failed to parse prop</code>. I don't really know how subscripts work in isabelle and they don't appear to be in any tutorial: neither <code>prog-prove</code> nor "A proof Assistant for Higher-Order Logic"</p>
+
+
+
+<a name="237647028"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Type%20overloading%20not%20working/near/237647028" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jakub Kądziołka <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working.html#237647028">(May 06 2021 at 12:09)</a>:</h4>
+<p>hmm, I do not understand why this is happening</p>
+
+
+
+<a name="237647095"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Type%20overloading%20not%20working/near/237647095" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Nicolò Cavalleri <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working.html#237647095">(May 06 2021 at 12:10)</a>:</h4>
+<p><span class="user-mention silent" data-user-id="370356">Nicolò Cavalleri</span> <a href="#narrow/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working/near/237645910">said</a>:</p>
+<blockquote>
+<p>I added <code>(structure)</code>, but as for subscripts, the error comes out even if I remove the line about nbhds: it comes out for the line</p>
+<p><div class="codehilite"><pre><span></span><code>and at_mem_y : &quot;y ∈ Y&quot;
+</code></pre></div><br>
+</p>
+</blockquote>
+<p>You mean this right?</p>
+
+
+
+<a name="237648047"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Type%20overloading%20not%20working/near/237648047" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jakub Kądziołka <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working.html#237648047">(May 06 2021 at 12:18)</a>:</h4>
+<p>Looks like locales with multiple parameters aren't behaving like they should. I'd suggest posting on the mailing list. Meanwhile you can package up your topological space into a record like HOL-Algebra does:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">theory</span> <span class="n">Scratch</span>
+  <span class="kp">imports</span> <span class="n">Main</span> <span class="s">"HOL-Algebra.Congruence"</span>
+<span class="k">begin</span>
+
+<span class="k">record</span> <span class="n n-Type">'a</span> <span class="n">weird_topological_space</span> <span class="o">=</span>  <span class="s">"'a partial_object"</span> <span class="o">+</span>
+  <span class="n">is_open</span>    <span class="o">::</span> <span class="s">"'a set ⇒ bool"</span> <span class="o">(</span><span class="s">"is'_openı _"</span><span class="o">)</span>
+
+<span class="k">locale</span> <span class="n">weird_topological_space</span> <span class="o">=</span> <span class="kp">fixes</span> <span class="n">S</span> <span class="o">(</span><span class="kp">structure</span><span class="o">)</span>
+  <span class="kp">assumes</span> <span class="n">open_space</span> <span class="o">[</span><span class="n">simp</span><span class="o">,</span> <span class="n">intro</span><span class="o">]:</span> <span class="s">"is_open (carrier S)"</span>
+
+<span class="k">begin</span>
+
+<span class="k">end</span>
+
+<span class="k">locale</span> <span class="n">test_1</span> <span class="o">=</span>
+<span class="n">X</span><span class="o">?:</span> <span class="n">weird_topological_space</span> <span class="n">X</span> <span class="o">+</span> <span class="n">Y</span><span class="o">?:</span> <span class="n">weird_topological_space</span> <span class="n">Y</span>
+<span class="kp">for</span> <span class="n">X</span> <span class="o">(</span><span class="kp">structure</span><span class="o">)</span> <span class="kp">and</span> <span class="n">Y</span> <span class="o">(</span><span class="kp">structure</span><span class="o">)</span> <span class="o">+</span>
+<span class="kp">fixes</span> <span class="n">f</span> <span class="o">::</span> <span class="s">"'a ⇒ 'b"</span> <span class="kp">and</span> <span class="n">x</span> <span class="n">y</span>
+<span class="kp">assumes</span> <span class="n">at_mem_x</span> <span class="o">:</span> <span class="s">"x ∈ carrier X"</span>
+<span class="kp">and</span> <span class="n">at_mem_y</span> <span class="o">:</span> <span class="s">"y ∈ carrier Y"</span>
+</code></pre></div>
+
+
+
+<a name="237659203"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Type%20overloading%20not%20working/near/237659203" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Nicolò Cavalleri <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working.html#237659203">(May 06 2021 at 13:40)</a>:</h4>
+<p>What is happening in the parenthesis <code>("is'_openı _")</code>? I mean what is that and what is its role?</p>
+
+
+
+<a name="237660047"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Type%20overloading%20not%20working/near/237660047" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Nicolò Cavalleri <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working.html#237660047">(May 06 2021 at 13:45)</a>:</h4>
+<p>Also do you know about somewhere where I can read more about how are locales related to records? I don't really understand what is going on and I can't manage to get rid of the carriers, I mean I'd just like to write <code>S :: 'a set</code> instead of <code>"'a partial_object"</code></p>
+
+
+
+<a name="237670457"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Type%20overloading%20not%20working/near/237670457" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jakub Kądziołka <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working.html#237670457">(May 06 2021 at 14:49)</a>:</h4>
+<p>ctrl+click on <code>partial_object</code> -- it is just a record field <code>carrier :: "'a set"</code></p>
+
+
+
+<a name="237670530"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Type%20overloading%20not%20working/near/237670530" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jakub Kądziołka <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working.html#237670530">(May 06 2021 at 14:49)</a>:</h4>
+<p>using this common definition lets you use HOL-Algebra and your definitions without having to disambugate the meaning of <code>carrier</code></p>
+
+
+
+<a name="237671196"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Type%20overloading%20not%20working/near/237671196" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jakub Kądziołka <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working.html#237671196">(May 06 2021 at 14:53)</a>:</h4>
+<p><span class="user-mention silent" data-user-id="370356">Nicolò Cavalleri</span> <a href="#narrow/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working/near/237659203">said</a>:</p>
+<blockquote>
+<p>What is happening in the parenthesis <code>("is'_openı _")</code>? I mean what is that and what is its role?</p>
+</blockquote>
+<p>Right. The motivation is that <code>is_open</code> needs an argument which is the record (topological space) itself. This is the role of the <code>structure</code> mechanism:</p>
+<ul>
+<li>If a variable has been defined with <code>fixes X (structure)</code> or <code>for X (structure)</code> (with optional type signature before the parenthesis), it can be used as a subscript in a place corresponding to a <code>ı</code> in notation</li>
+<li>if only one structure is in scope, the structure parameter will be inferred</li>
+</ul>
+
+
+
+<a name="237671330"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Type%20overloading%20not%20working/near/237671330" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jakub Kądziołka <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working.html#237671330">(May 06 2021 at 14:54)</a>:</h4>
+<p>The carrier is your set <code>S</code></p>
+
+
+
+<a name="237671522"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Type%20overloading%20not%20working/near/237671522" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Nicolò Cavalleri <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working.html#237671522">(May 06 2021 at 14:55)</a>:</h4>
+<p>What is the ' after "is" in <code>is'_open</code>?</p>
+
+
+
+<a name="237671719"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Type%20overloading%20not%20working/near/237671719" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jakub Kądziołka <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working.html#237671719">(May 06 2021 at 14:56)</a>:</h4>
+<p>the <code>'</code> is an escape character — unescaped, an underscore indicates an argument. Think <code>if _ then _ else _</code></p>
+
+
+
+<a name="237671781"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Type%20overloading%20not%20working/near/237671781" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jakub Kądziołka <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working.html#237671781">(May 06 2021 at 14:56)</a>:</h4>
+<p>BTW, I realized why your earlier example wasn't working. This works:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">locale</span> <span class="n">test_1</span> <span class="o">=</span>
+  <span class="n">X</span><span class="o">?:</span> <span class="n">weird_topological_space</span> <span class="n">X</span> <span class="n">open_in_X</span> <span class="o">+</span> <span class="n">Y</span><span class="o">?:</span> <span class="n">weird_topological_space</span> <span class="n">Y</span> <span class="n">open_in_Y</span>
+  <span class="kp">for</span> <span class="n">X</span> <span class="n">open_in_X</span>  <span class="n">Y</span> <span class="kp">and</span> <span class="n">open_in_Y</span> <span class="o">+</span>
+  <span class="kp">fixes</span> <span class="n">f</span> <span class="o">::</span> <span class="s">"'a ⇒ 'b"</span> <span class="kp">and</span> <span class="n">x</span> <span class="o">::</span> <span class="n n-Type">'a</span> <span class="kp">and</span> <span class="n">y</span> <span class="o">::</span> <span class="n n-Type">'b</span>
+  <span class="kp">assumes</span> <span class="n">at_mem_x</span> <span class="o">:</span> <span class="s">"x ∈ X"</span>
+    <span class="kp">and</span> <span class="n">at_mem_y</span> <span class="o">:</span> <span class="s">"y ∈ Y"</span>
+    <span class="kp">and</span> <span class="n">lim</span><span class="o">:</span> <span class="s">"filterlim f (Y.nbhds y) (X.nbhds x)"</span>
+</code></pre></div>
+
+
+
+<a name="237671991"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Type%20overloading%20not%20working/near/237671991" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jakub Kądziołka <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working.html#237671991">(May 06 2021 at 14:58)</a>:</h4>
+<p>note that you need to do <code>for &lt;set&gt; and &lt;open predicate for that set&gt;</code>, and provide both to <code>weird_topological_space</code>, as only both values at once can define a topological space</p>
+
+
+
+<a name="237672114"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Type%20overloading%20not%20working/near/237672114" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jakub Kądziołka <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working.html#237672114">(May 06 2021 at 14:59)</a>:</h4>
+<p>This is why records are so common — a record is essentially a tuple where its elements have been named</p>
+
+
+
+<a name="237672452"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Type%20overloading%20not%20working/near/237672452" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jakub Kądziołka <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working.html#237672452">(May 06 2021 at 15:00)</a>:</h4>
+<p><span class="user-mention silent" data-user-id="370356">Nicolò Cavalleri</span> <a href="#narrow/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working/near/237660047">said</a>:</p>
+<blockquote>
+<p>Also do you know about somewhere where I can read more about how are locales related to records? I don't really understand what is going on and I can't manage to get rid of the carriers, I mean I'd just like to write <code>S :: 'a set</code> instead of <code>"'a partial_object"</code></p>
+</blockquote>
+<p>I guess I wrote some notes on how and why abstract structures like these are defined by Isabelle as they are: <a href="https://github.com/NieDzejkob/isabelle-math-contests/blob/master/NOTES.md#abstract-algebra">https://github.com/NieDzejkob/isabelle-math-contests/blob/master/NOTES.md#abstract-algebra</a></p>
+
+
+
+<a name="237748655"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Type%20overloading%20not%20working/near/237748655" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Nicolò Cavalleri <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Type.20overloading.20not.20working.html#237748655">(May 07 2021 at 00:02)</a>:</h4>
+<p>Thank you very much!!</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

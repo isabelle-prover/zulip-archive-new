@@ -1,0 +1,127 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Automatic theorem/definition printing appears ... · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Automatic.20theorem.2Fdefinition.20printing.20appears.20.2E.2E.2E.html">[isabelle] Automatic theorem/definition printing appears ...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="343274364"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Automatic%20theorem/definition%20printing%20appears%20.../near/343274364" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Automatic.20theorem.2Fdefinition.20printing.20appears.20.2E.2E.2E.html#343274364">(Mar 21 2023 at 04:53)</a>:</h4>
+<p>From: Rafal Kolanski &lt;<a href="mailto:xs@xaph.net">xs@xaph.net</a>&gt;<br>
+Hi,</p>
+<p>most likely in the Isabelle 2022 update, the automatic printing of <br>
+theorems and definitions stopped working for me while in jEdit.</p>
+<p>I have the state and output split into separate buffers. Normally I'd <br>
+expect:</p>
+<p>lemma blah:<br>
+   "something" (* prints goal state in proof state buffer *)<br>
+   apply (simp ...) (* prints goal state in proof state buffer *)<br>
+   done (* prints proved lemma in output buffer *)</p>
+<p>This was especially useful for figuring out what transformed lemmas were <br>
+generated without modifying the buffer, e.g.</p>
+<p>lemmas corres_underlying_gets_pre_rhs =<br>
+   corres_symb_exec_r[OF _ _ gets_inv no_fail_pre[OF no_fail_gets TrueI]]</p>
+<p>This is probably related to the relatively recent feature of turning on <br>
+these outputs when not in interactive mode (show_states/show_results).</p>
+<p>I initially thought this line in proof_display.ML was causing the <br>
+decision whether to print or not:</p>
+<p>fun no_print int ctxt = not (Config.get (Config.put interactive int <br>
+ctxt) show_results);</p>
+<p>but it is clear I don't really comprehend the implications here.</p>
+<p>Can anyone offer some insight?</p>
+<p>Raf.</p>
+
+
+
+<a name="360682976"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Automatic%20theorem/definition%20printing%20appears%20.../near/360682976" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Automatic.20theorem.2Fdefinition.20printing.20appears.20.2E.2E.2E.html#360682976">(May 24 2023 at 04:09)</a>:</h4>
+<p>From: Rafal Kolanski &lt;<a href="mailto:xs@xaph.net">xs@xaph.net</a>&gt;<br>
+I have finally figured out what the regression is. The<br>
+"editor_output_state" setting has conflated two concepts when moving to<br>
+Isabelle 2022:</p>
+<ul>
+<li>it controls whether proof states are sent to the output panel</li>
+<li>but now it <em>also</em> controls whether the results are printed in the<br>
+   output panel (as per Proof_Display.print_results) (which is invoked<br>
+   at the end of a "lemma" command, or for "lemmas")</li>
+</ul>
+<p>Ideally, one would want to control these separately:</p>
+<ul>
+<li>turning off states in Output panel when using a separate State panel</li>
+<li>turning off printing results in Output panel (I'm not sure<br>
+   why someone would want this, but performance maybe?)</li>
+</ul>
+<p>This can be worked around by changing the following in<br>
+src/Tools/jEdit/src/output_dockable.scala :</p>
+<p>val new_output =<br>
+          if (restriction.isEmpty || restriction.get.contains(command))</p>
+<ul>
+<li>Rendering.output_messages(results, JEdit_Options.output_state())</li>
+<li>Rendering.output_messages(results, true)<br>
+          else current_output</li>
+</ul>
+<p>The situation might make sense if output_messages filtered out only<br>
+proof state messages when its output_state argument is false, but it<br>
+seems that:</p>
+<ul>
+<li>
+<p>proof state messages are not passed in anyway because they got<br>
+   filtered much earlier due to "Proof state" checkbox setting the global<br>
+   "editor_output_state" option</p>
+</li>
+<li>
+<p>asking output_messages to not output state messages also makes it drop<br>
+   results messages, i.e.<br>
+     (if (output_state) states else Nil) ::: other</p>
+</li>
+</ul>
+<p>Perhaps the filtering in output_messages is supposed to filter state<br>
+messages into "states" and results messages into "other", but it<br>
+doesn't. I don't have any more time for code decryption.</p>
+<p>Raf.</p>
+
+
+
+<a name="378828466"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Automatic%20theorem/definition%20printing%20appears%20.../near/378828466" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Automatic.20theorem.2Fdefinition.20printing.20appears.20.2E.2E.2E.html#378828466">(Jul 26 2023 at 14:40)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+We have a long and complex history, especially for interaction with Isabelle: <br>
+historically ProofGeneral Emacs (some of its legacy is still there), now PIDE <br>
+with Isabelle/jEdit or Isabelle/VSCode or "isabelle server" as front-ends.</p>
+<p>All that needs to be taken into account when sorting out such fine points. <br>
+Moreover, it is important to look into the formal Mercurial (not git) history, <br>
+e.g. using "hg bisect".</p>
+<p>That was missing on this thread: I did not have time to do your homework.</p>
+<p>Just for the historical record, here are a few relevant changesets:</p>
+<p>changeset:   75840:f8c412a45af8<br>
+user:        wenzelm<br>
+date:        Sat Aug 13 14:29:59 2022 +0200<br>
+summary:     more accurate treatment of option "editor_output_state", e.g. <br>
+when changed via Isabelle/jEdit Plugin Options panel;</p>
+<p>changeset:   56897:c668735fb8b5<br>
+user:        wenzelm<br>
+date:        Wed May 07 13:55:16 2014 +0200<br>
+files:       src/Pure/Isar/obtain.ML src/Pure/Isar/proof.ML <br>
+src/Pure/Isar/proof_display.ML src/Pure/Isar/specification.ML <br>
+src/Pure/Isar/toplevel.ML<br>
+description:<br>
+print results as "state", to avoid intrusion into the source text;<br>
+print new local theory (again);</p>
+<p>changeset:   74156:ecf80e37ed1a<br>
+user:        wenzelm<br>
+date:        Wed Aug 18 23:04:58 2021 +0200<br>
+files:       NEWS src/Pure/Isar/attrib.ML src/Pure/Isar/proof_display.ML<br>
+description:<br>
+support configuration options "show_results";</p>
+<p>If something still emerges from that for Isabelle2023-RC2 depends how other <br>
+details work out.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

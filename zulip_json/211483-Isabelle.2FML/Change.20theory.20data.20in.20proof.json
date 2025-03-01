@@ -1,0 +1,56 @@
+[
+    {
+        "content": "<p>Hi! I'd like to persist some information about a proof in the surrounding <code>theory</code>, but struggle. My attempt so far: Capture the desired data in a <code>Theory_Data</code>, model the data logging as a <code>theory -&gt; theory</code> transform, lift that to <code>Proof.context -&gt; Proof.context</code>, and perform the latter as part of a <code>Method.method</code> (which supports <code>Proof.context</code> transformation). However, while within the proof I do see the <code>Theory_Data</code> appropriately adjusted, after the proof the information is lost. I guess this is due to how <code>Proof.context</code> and surrounding <code>theory</code> are merged after a proof, but I can't figure out how to get it right. I also considered keeping the data as <code>Proof_Data</code> during the proof and transferring it to the <code>theory</code> when the proof concludes, but I don't know how/where one would add the desired 'merge hook'.</p>",
+        "id": 352628047,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1682452277
+    },
+    {
+        "content": "<p>Here's the code for my failed attempt:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">theory</span><span class=\"w\"> </span><span class=\"n\">scratchpad</span>\n<span class=\"w\">  </span><span class=\"kp\">imports</span><span class=\"w\"> </span><span class=\"n\">Main</span>\n<span class=\"k\">begin</span>\n\n\n<span class=\"k\">ML</span><span class=\"s\">‹</span>\n<span class=\"s\">  structure Data = Theory_Data (</span>\n<span class=\"s\">     type T = int</span>\n<span class=\"s\">     val empty = 0</span>\n<span class=\"s\">     fun merge (a,b) = let val _ = \"merge\" |&gt; tracing in a+b end</span>\n<span class=\"s\">   )</span>\n\n\n<span class=\"s\">  val lift: (Proof.context -&gt; Proof.context) -&gt; Method.method =</span>\n<span class=\"s\">     fn f =&gt; fn _ =&gt; fn (ctxt, st) =&gt; (f ctxt, st) |&gt; Seq.single |&gt; Seq.make_results</span>\n\n<span class=\"s\">  val lift' : (theory -&gt; theory) -&gt; Method.method =</span>\n<span class=\"s\">     Proof_Context.background_theory #&gt; lift</span>\n<span class=\"s\">›</span>\n\n\n<span class=\"k\">method_setup</span><span class=\"w\"> </span><span class=\"n\">change_state</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"s\">‹Scan.succeed ((fn i =&gt; i+1) |&gt; Data.map |&gt; lift' |&gt; K)›</span><span class=\"w\"> </span><span class=\"s\">\"\"</span>\n<span class=\"k\">method_setup</span><span class=\"w\"> </span><span class=\"n\">dump_state</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"s\">‹Scan.succeed (fn ctxt =&gt;</span>\n<span class=\"s\">     let val _ = ctxt |&gt; Proof_Context.theory_of |&gt; Data.get |&gt; Int.toString |&gt; tracing in</span>\n<span class=\"s\">       Method.succeed end)›</span>\n\n\n<span class=\"k\">ML</span><span class=\"s\">‹val l = Data.get @{theory}›</span><span class=\"w\"> </span><span class=\"c\">(* 0 *)</span>\n\n\n<span class=\"kn\">lemma</span><span class=\"w\"> </span><span class=\"s\">‹x=x›</span>\n<span class=\"w\">  </span><span class=\"kp\">apply</span><span class=\"w\"> </span><span class=\"n\">dump_state</span><span class=\"w\">    </span><span class=\"c\">(* 0 *)</span>\n<span class=\"w\">  </span><span class=\"kp\">apply</span><span class=\"w\"> </span><span class=\"n\">change_state</span>\n<span class=\"w\">  </span><span class=\"kp\">apply</span><span class=\"w\"> </span><span class=\"n\">dump_state</span><span class=\"w\">    </span><span class=\"c\">(* 1 *)</span>\n<span class=\"w\">  </span><span class=\"kp\">apply</span><span class=\"w\"> </span><span class=\"n\">change_state</span>\n<span class=\"w\">  </span><span class=\"kp\">apply</span><span class=\"w\"> </span><span class=\"n\">change_state</span>\n<span class=\"w\">  </span><span class=\"kp\">apply</span><span class=\"w\"> </span><span class=\"n\">dump_state</span><span class=\"w\">    </span><span class=\"c\">(* 3 *)</span>\n<span class=\"w\">  </span><span class=\"k\">by</span><span class=\"w\"> </span><span class=\"n\">simp</span>\n\n<span class=\"k\">ML</span><span class=\"s\">‹val l = Data.get @{theory}›</span><span class=\"w\"> </span><span class=\"c\">(* 0 *)</span>\n\n<span class=\"k\">end</span>\n</code></pre></div>",
+        "id": 352628416,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1682452414
+    },
+    {
+        "content": "<p>NB The reason I'm interested in this is tactic profiling. I'm gathering some metrics about specific tactic invocations, and would like to persist them in the <code>theory</code> to be able to have a single statistics in the end. Currently, I can only analyze the data from individual proofs.</p>",
+        "id": 352805195,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1682516674
+    },
+    {
+        "content": "<p>Any ideas on this one?</p>",
+        "id": 354879406,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1682948285
+    },
+    {
+        "content": "<p>The best person to answer this would be Makarius but he only reads the mailing list. In general, this seems to go strongly against the idea of a local context.</p>",
+        "id": 354883590,
+        "sender_full_name": "Lukas Stevens",
+        "timestamp": 1682949515
+    },
+    {
+        "content": "<p>Isabelle has a timing panel</p>",
+        "id": 354911319,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1682956190
+    },
+    {
+        "content": "<p>that shows the timings from different tactics</p>",
+        "id": 354911358,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1682956200
+    },
+    {
+        "content": "<p>However, in my experience, the timings vary so widely, that it is completely useless</p>",
+        "id": 354911539,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1682956242
+    },
+    {
+        "content": "<p>I have asked on the mailing list. In my case, I do get very valuable timing statistics from proof-local custom profiling, but it would be even more useful if the statistics could be merged across multiple proofs and theories.</p>",
+        "id": 355029200,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1683004901
+    }
+]

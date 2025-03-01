@@ -1,0 +1,114 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Simplifier hangs (Not: loops!) · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Simplifier.20hangs.20.28Not.3A.20loops.21.29.html">[isabelle] Simplifier hangs (Not: loops!)</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294081410"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Simplifier%20hangs%20%28Not%3A%20loops%21%29/near/294081410" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Simplifier.20hangs.20.28Not.3A.20loops.21.29.html#294081410">(Aug 18 2022 at 13:53)</a>:</h4>
+<p>From: Dennis Walter &lt;<a href="mailto:dennis.walter@gmail.com">dennis.walter@gmail.com</a>&gt;<br>
+Dear all,</p>
+<p>I encountered a goal which makes the simplifier hang, where by<br>
+"hanging" I mean that it does not give any response in the trace, even<br>
+though trace_simp_depth_limit is set to 10 (trace_simp enabled, ofc)<br>
+and the last message in the trace is on level 2. I could boil the goal<br>
+down to what you can see below, where the simplifier displays the same<br>
+behaviour: a partial trace, and no failure or success after one minute<br>
+(yes, I'm somewhat impatient :) ) The problem seems to be introduced<br>
+in theory Int, since simp'ing with the simpsets of Equiv_Relations,<br>
+Nat, or Wellfounded terminates.</p>
+<p>Can somebody comment on this?</p>
+<p>Thanks,<br>
+  Dennis</p>
+<p>=====</p>
+<p>theory Hangs imports Main<br>
+begin</p>
+<p>definition f :: "int =&gt; int"<br>
+where "f x = x"</p>
+<p>lemma<br>
+"f a = M { nat j |j. 0 &lt;= j &amp; j &lt; f b} ==&gt; P"<br>
+  apply simp<br>
+(* even apply (tactic {* asm_full_simp_tac (simpset_of @{theory Int})<br>
+1 *}) does not work *)<br>
+=====</p>
+<p>PS: Isabelle 2009, polyml 5.2.1, Linux</p>
+
+
+
+<a name="294081456"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Simplifier%20hangs%20%28Not%3A%20loops%21%29/near/294081456" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Simplifier.20hangs.20.28Not.3A.20loops.21.29.html#294081456">(Aug 18 2022 at 13:53)</a>:</h4>
+<p>From: Brian Huffman &lt;<a href="mailto:brianh@cs.pdx.edu">brianh@cs.pdx.edu</a>&gt;<br>
+On Tue, Aug 4, 2009 at 8:36 AM, Dennis Walter&lt;<a href="mailto:dennis.walter@gmail.com">dennis.walter@gmail.com</a>&gt; wrote:</p>
+<blockquote>
+<p>Dear all,</p>
+<p>I encountered a goal which makes the simplifier hang,</p>
+</blockquote>
+<p>I managed to simplify the example a bit more; the definition of<br>
+constant "f" has nothing to do with the problem, although the types<br>
+are important.</p>
+<p>lemma "(a::int) = M {x::nat. EX j. x = nat j}"<br>
+apply simp (* hangs *)</p>
+<p>lemma "(a::int) = M {z. P (nat z)}"<br>
+apply simp (* also hangs *)</p>
+<blockquote>
+<p>The problem seems to be introduced<br>
+in theory Int, since simp'ing with the simpsets of Equiv_Relations,<br>
+Nat, or Wellfounded terminates.</p>
+</blockquote>
+<p>The constant "nat" seems to be important here; the simplifier doesn't<br>
+hang if I replace it with another constant of the same type.</p>
+<p>Interestingly, the same behavior is produced if I replace "a::int"<br>
+with "a::nat", "a::rat" or "a::real"; but the simplifier doesn't hang<br>
+for "a::complex", or other types like "a::int list". Only ordered<br>
+numeric types seem to cause a problem. (I also found that the<br>
+simplifier still hangs if you replace the top-level "=" with "&lt;" or<br>
+"&lt;=".)</p>
+<p>My best guess is that one of the default simprocs is causing the<br>
+simplifier to hang. Looking at "Show me ... simplifier rules" in Proof<br>
+General, I don't see any simprocs that mention constant "nat"<br>
+explicitly. I suppose it must be a simproc like fast_int_arith that<br>
+matches the equality at type int. Internally, the simproc must be<br>
+doing some processing of each side that causes it to loop.</p>
+<p>Unfortunately, it seems that the simprocs don't produce any trace<br>
+output unless they succeed, which isn't much help here. Maybe someone<br>
+else can figure out the rest of what's going on here.</p>
+<ul>
+<li>Brian</li>
+</ul>
+
+
+
+<a name="294081811"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Simplifier%20hangs%20%28Not%3A%20loops%21%29/near/294081811" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Simplifier.20hangs.20.28Not.3A.20loops.21.29.html#294081811">(Aug 18 2022 at 13:55)</a>:</h4>
+<p>From: Tjark Weber &lt;<a href="mailto:webertj@in.tum.de">webertj@in.tum.de</a>&gt;<br>
+Dennis,</p>
+<p>the problem was caused by a bug in the solver for linear arithmetic,<br>
+which deals with certain expressions (e.g., "nat j") by case splitting.<br>
+If those expressions contained bound variables, the solver would (in<br>
+some cases) erroneously loop.</p>
+<p>I have committed a fix to the Isabelle repository.  Please let me know<br>
+if the problem persists.</p>
+<p>Regards,<br>
+Tjark</p>
+
+
+
+<a name="294081877"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Simplifier%20hangs%20%28Not%3A%20loops%21%29/near/294081877" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Simplifier.20hangs.20.28Not.3A.20loops.21.29.html#294081877">(Aug 18 2022 at 13:55)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Tjark's change is available here <br>
+<a href="http://isabelle.in.tum.de/repos/isabelle/rev/04af689ce721">http://isabelle.in.tum.de/repos/isabelle/rev/04af689ce721</a></p>
+<p>It looks like you could apply this easily to the official Isabelle2009 <br>
+sources, so you need not experiment with "unofficial undefined" repository <br>
+snapshots in your production work.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

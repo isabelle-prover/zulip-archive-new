@@ -1,0 +1,62 @@
+[
+    {
+        "content": "<p>Hi again! Can someone help me understand better how the simplifier uses quantified (meta or HOL) assumptions? I am looking at the following toy example:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"n\">schematic_goal</span><span class=\"w\"> </span><span class=\"n\">foo</span><span class=\"o\">:</span><span class=\"w\"> </span><span class=\"s\">‹(⋀x. P x y0) ⟹ P x0 ?y0›</span>\n<span class=\"w\">  </span><span class=\"k\">using</span><span class=\"w\"> </span><span class=\"o\">[[</span><span class=\"n\">simp_trace</span><span class=\"o\">]]</span>\n<span class=\"w\">  </span><span class=\"c\">(* [1]Adding rewrite rule \"??.unknown\": P ?x2 y0 ≡ True  *)</span>\n<span class=\"w\">  </span><span class=\"kp\">apply</span><span class=\"w\"> </span><span class=\"n\">simp</span><span class=\"w\"> </span><span class=\"c\">(* FAIL :-( *)</span>\n<span class=\"w\">  </span><span class=\"gr\">oops</span>\n\n<span class=\"n\">schematic_goal</span><span class=\"w\"> </span><span class=\"n\">bar</span><span class=\"o\">:</span><span class=\"w\"> </span><span class=\"s\">‹P ?x0 y0 ⟹ P x0 ?y0›</span>\n<span class=\"w\">  </span><span class=\"k\">by</span><span class=\"w\"> </span><span class=\"n\">simp</span><span class=\"w\"> </span><span class=\"c\">(* SUCCEED *)</span>\n</code></pre></div>\n<p>I don't quite follow, since the simp trace output in the first schematic goal seems to suggest that even with <code>P ?x2 y0 ≡ True</code>, the <code>simp</code> attempt would fail, but this isn't the case as demonstrated by the second schematic goal.</p>",
+        "id": 363619473,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1685946251
+    },
+    {
+        "content": "<p>Any insights anyone?</p>",
+        "id": 363915905,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1686038104
+    },
+    {
+        "content": "<p>I do not know, but note that if you rewrite the second goal to match your insight from the first goal, it also won't finish:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"n\">schematic_goal</span><span class=\"w\"> </span><span class=\"n\">bar</span><span class=\"o\">:</span><span class=\"w\"> </span><span class=\"s\">‹P ?x0 y0 ≡ True ⟹ P x0 ?y0›</span>\n<span class=\"w\">  </span><span class=\"k\">using</span><span class=\"w\"> </span><span class=\"o\">[[</span><span class=\"n\">simp_trace</span><span class=\"o\">]]</span>\n<span class=\"w\">  </span><span class=\"k\">by</span><span class=\"w\"> </span><span class=\"n\">simp</span><span class=\"w\"> </span><span class=\"c\">(* fails*)</span>\n</code></pre></div>",
+        "id": 363916998,
+        "sender_full_name": "Kevin Kappelmann",
+        "timestamp": 1686038395
+    },
+    {
+        "content": "<p>Might have something to do with the fact that the simplifier does not instantiate unknowns during rewrites, but the solver may instantiate unknowns. From the reference manual, page <a href=\"https://isabelle.in.tum.de/doc/isar-ref.pdf\">229</a>:<br>\n<a href=\"/user_uploads/14278/VtH1JEjiDui44jDxZnPD4EGE/image.png\">image.png</a></p>\n<div class=\"message_inline_image\"><a href=\"/user_uploads/14278/VtH1JEjiDui44jDxZnPD4EGE/image.png\" title=\"image.png\"><img src=\"/user_uploads/14278/VtH1JEjiDui44jDxZnPD4EGE/image.png\"></a></div>",
+        "id": 363917463,
+        "sender_full_name": "Kevin Kappelmann",
+        "timestamp": 1686038517
+    },
+    {
+        "content": "<p><span class=\"user-mention\" data-user-id=\"233154\">@Kevin Kappelmann</span> I think that hits the nail on the head...</p>",
+        "id": 363922490,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1686039716
+    },
+    {
+        "content": "<p>Here's how you could add a solver for your problem:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">lemma</span><span class=\"w\"> </span><span class=\"n\">eq_True_eq_self</span><span class=\"o\">:</span><span class=\"w\"> </span><span class=\"s\">\"((P :: bool) ≡ True) ≡ Trueprop P\"</span><span class=\"w\"> </span><span class=\"k\">by</span><span class=\"w\"> </span><span class=\"n\">rule</span><span class=\"w\"> </span><span class=\"n\">simp_all</span>\n\n<span class=\"k\">ML</span><span class=\"w\"> </span><span class=\"s\">‹</span>\n<span class=\"s\">  fun asm_solver ctxt =</span>\n<span class=\"s\">    REPEAT_DETERM o (EqSubst.eqsubst_asm_tac ctxt [0] @{thms eq_True_eq_self})</span>\n<span class=\"s\">    THEN' assume_tac ctxt</span>\n<span class=\"s\">  fun add_asm_solver ctxt = ctxt addSolver Simplifier.mk_solver \"asm_solver\" asm_solver</span>\n<span class=\"s\">›</span>\n\n<span class=\"n\">schematic_goal</span><span class=\"w\"> </span><span class=\"s\">‹P ?x0 y0 ≡ True ⟹ P x0 ?y0›</span>\n<span class=\"w\">  </span><span class=\"k\">by</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">tactic</span><span class=\"w\"> </span><span class=\"s\">‹simp_tac @{context} 1›</span><span class=\"o\">)</span>\n<span class=\"w\">  </span><span class=\"gr\">oops</span>\n\n<span class=\"n\">schematic_goal</span><span class=\"w\"> </span><span class=\"s\">‹P ?x0 y0 ≡ True ⟹ P x0 ?y0›</span>\n<span class=\"w\">  </span><span class=\"k\">by</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">tactic</span><span class=\"w\"> </span><span class=\"s\">‹simp_tac (add_asm_solver @{context}) 1›</span><span class=\"o\">)</span>\n</code></pre></div>",
+        "id": 363923657,
+        "sender_full_name": "Kevin Kappelmann",
+        "timestamp": 1686039961
+    },
+    {
+        "content": "<p>That would not yet solve the original goal, though, would it? Probably one should call <code>eresolve</code> on <code>meta_allE</code> as well?</p>",
+        "id": 363924243,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1686040108
+    },
+    {
+        "content": "<p>It already seems to work in this case:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"n\">schematic_goal</span><span class=\"w\"> </span><span class=\"n\">foo</span><span class=\"o\">:</span><span class=\"w\"> </span><span class=\"s\">‹(⋀x. P x y0) ⟹ P x0 ?y0›</span>\n<span class=\"w\">  </span><span class=\"k\">using</span><span class=\"w\"> </span><span class=\"o\">[[</span><span class=\"n\">simp_trace</span><span class=\"o\">]]</span>\n<span class=\"w\">  </span><span class=\"k\">by</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">tactic</span><span class=\"w\"> </span><span class=\"s\">‹simp_tac (add_asm_solver @{context}) 1›</span><span class=\"o\">)</span>\n</code></pre></div>\n<p>But I do not know why (maybe the simplifier already does some magic such that <code>assume_tac</code> works). But yeah, using <code>meta_allE</code> probably makes the solver more stable.</p>",
+        "id": 363927641,
+        "sender_full_name": "Kevin Kappelmann",
+        "timestamp": 1686040835
+    },
+    {
+        "content": "<p>Interesting... maybe the solver also has access to the rewrite rules added by the simplifier</p>",
+        "id": 363928119,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1686040950
+    },
+    {
+        "content": "<p>Hm, puzzling.. at least <code>prems_of ctxt</code> is empty by the time <code>asm_solver</code> is invoked</p>",
+        "id": 363930845,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1686041651
+    }
+]

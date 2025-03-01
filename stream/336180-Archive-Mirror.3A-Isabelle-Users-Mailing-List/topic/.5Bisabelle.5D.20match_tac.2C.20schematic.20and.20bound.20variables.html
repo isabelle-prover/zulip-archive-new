@@ -1,0 +1,205 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] match_tac, schematic and bound variables · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20match_tac.2C.20schematic.20and.20bound.20variables.html">[isabelle] match_tac, schematic and bound variables</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294246364"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20match_tac%2C%20schematic%20and%20bound%20variables/near/294246364" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20match_tac.2C.20schematic.20and.20bound.20variables.html#294246364">(Aug 19 2022 at 11:37)</a>:</h4>
+<p>From: Lars Noschinski &lt;<a href="mailto:noschinl@in.tum.de">noschinl@in.tum.de</a>&gt;<br>
+Hi,</p>
+<p>I stumbled upon some odd behaviour of match_tac. When match_tac</p>
+<p>- must match a schematic variable in the rule against a schematic<br>
+    variable in the goal and the schematic variable,</p>
+<p>- the schematic in the goal has bound variables as parameters,</p>
+<p>- one of these bound variables x occurs at least twice in the<br>
+    parameters, and</p>
+<p>- there is another bound variable between the occurences of x,</p>
+<p>then match_tac fails (i.e. empty proof sequence / failed to apply proof <br>
+method).</p>
+<p>Has anyone got an explanation for this behaviour? I would have expected <br>
+that the implementation of matching for this quasi-first-order case is <br>
+complete.</p>
+<p>This behaviour occurs both in Isabelle 2012 and in a current development <br>
+snapshot (0cd62cb233e0).</p>
+<p>definition "TT ≡ λx. True"<br>
+lemma TT_I: "TT x" unfolding TT_def by simp</p>
+<p>schematic_lemma "⋀x y. TT (?P x y x )"<br>
+   apply (tactic {* match_tac @{thms TT_I} 1 *})<br>
+   (* fails *)<br>
+   oops</p>
+<p>schematic_lemma "⋀x y. TT (?P x y )"<br>
+   apply (tactic {* match_tac @{thms TT_I} 1 *})<br>
+   done</p>
+<p>schematic_lemma "⋀x y. TT (?P x x y )"<br>
+   apply (tactic {* match_tac @{thms TT_I} 1 *})<br>
+   done</p>
+<p>schematic_lemma "⋀x y. TT (P x y x )"<br>
+   apply (tactic {* match_tac @{thms TT_I} 1 *})<br>
+   done</p>
+<p>schematic_lemma "⋀x. TT (?P x y x )"<br>
+   apply (tactic {* match_tac @{thms TT_I} 1 *})<br>
+   done</p>
+<p>-- Lars</p>
+
+
+
+<a name="294246486"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20match_tac%2C%20schematic%20and%20bound%20variables/near/294246486" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20match_tac.2C.20schematic.20and.20bound.20variables.html#294246486">(Aug 19 2022 at 11:38)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Larry is the one to explain what really happens.</p>
+<p>When I came across match_tac for the first time as a very young student in <br>
+1993, I was already wondering about it -- but it was always document in <br>
+the manner of what is now in "implementation" manual (section 4.2.1):</p>
+<p>\item @{ML match_tac}, @{ML ematch_tac}, @{ML dmatch_tac}, and @{ML<br>
+   bimatch_tac} are similar to @{ML resolve_tac}, @{ML eresolve_tac},<br>
+   @{ML dresolve_tac}, and @{ML biresolve_tac}, respectively, but do<br>
+   not instantiate schematic variables in the goal state.</p>
+<p>Flexible subgoals are not updated at will, but are left alone.<br>
+   Strictly speaking, matching means to treat the unknowns in the goal<br>
+   state as constants; these tactics merely discard unifiers that would<br>
+   update the goal state.</p>
+<p>This sounds like it is better not to lean out of the window too far.</p>
+<p>Makarius</p>
+
+
+
+<a name="294246498"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20match_tac%2C%20schematic%20and%20bound%20variables/near/294246498" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20match_tac.2C.20schematic.20and.20bound.20variables.html#294246498">(Aug 19 2022 at 11:38)</a>:</h4>
+<p>From: Lawrence Paulson &lt;<a href="mailto:lp15@cam.ac.uk">lp15@cam.ac.uk</a>&gt;<br>
+Sorry but I have totally forgotten about these. They are relics from a remote past. <br>
+Larry</p>
+
+
+
+<a name="294246511"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20match_tac%2C%20schematic%20and%20bound%20variables/near/294246511" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20match_tac.2C.20schematic.20and.20bound.20variables.html#294246511">(Aug 19 2022 at 11:38)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+It is the documentation that is leaning too far out of the window. The<br>
+difference between</p>
+<p>schematic_lemma "⋀x y. TT (?P x y x )"<br>
+  apply (tactic {* match_tac @{thms TT_I} 1 *})<br>
+  (* fails *)<br>
+  oops</p>
+<p>and</p>
+<p>schematic_lemma "⋀x y. TT (P x y x )"<br>
+  apply (tactic {* match_tac @{thms TT_I} 1 *})<br>
+  done</p>
+<p>shows that in some situations it is not doing what it claims: "matching means to<br>
+treat the unknowns in the goal state as constants".</p>
+<p>Tobias</p>
+
+
+
+<a name="294246518"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20match_tac%2C%20schematic%20and%20bound%20variables/near/294246518" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20match_tac.2C.20schematic.20and.20bound.20variables.html#294246518">(Aug 19 2022 at 11:38)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+The documentation is also going back to Larry.</p>
+<p>I don't complain about anything he did there many years ago.  One needs to <br>
+be realistic about what certain parts of a system can do and what not.</p>
+<p>Makarius</p>
+
+
+
+<a name="294246532"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20match_tac%2C%20schematic%20and%20bound%20variables/near/294246532" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20match_tac.2C.20schematic.20and.20bound.20variables.html#294246532">(Aug 19 2022 at 11:38)</a>:</h4>
+<p>From: Lawrence Paulson &lt;<a href="mailto:lp15@cam.ac.uk">lp15@cam.ac.uk</a>&gt;<br>
+I see that match_tac is basically part of the classical reasoner. It is for applying rules safely without affecting the proof state. Any significant change in its behaviour would breaks lots of things, but it's conceivable that there's a bug in this example. Or else the documentation isn't quite accurate.<br>
+Larry</p>
+
+
+
+<a name="294246544"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20match_tac%2C%20schematic%20and%20bound%20variables/near/294246544" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20match_tac.2C.20schematic.20and.20bound.20variables.html#294246544">(Aug 19 2022 at 11:38)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+Am 12/08/2013 22:39, schrieb Lawrence Paulson:</p>
+<blockquote>
+<p>I see that match_tac is basically part of the classical reasoner. It is for applying rules safely without affecting the proof state. Any significant change in its behaviour would breaks lots of things, but it's conceivable that there's a bug in this example. Or else the documentation isn't quite accurate.</p>
+</blockquote>
+<p>The term "match" has precisely the definition you quote in the documentation,<br>
+and that should be the specifiation of anything called "match". If the<br>
+implementation does not conform, it should be fixed. I agree this may be hard in<br>
+this case and it is not a top priority. Alternatively the documentation should<br>
+carry a warning.</p>
+<p>Tobias</p>
+<blockquote>
+<p>Larry</p>
+<p>On 12 Aug 2013, at 19:09, Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt; wrote:</p>
+<blockquote>
+<p>The documentation is also going back to Larry.</p>
+<p>I don't complain about anything he did there many years ago.  One needs to be realistic about what certain parts of a system can do and what not.</p>
+</blockquote>
+</blockquote>
+
+
+
+<a name="294246566"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20match_tac%2C%20schematic%20and%20bound%20variables/near/294246566" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20match_tac.2C.20schematic.20and.20bound.20variables.html#294246566">(Aug 19 2022 at 11:39)</a>:</h4>
+<p>From: Lars Noschinski &lt;<a href="mailto:noschinl@in.tum.de">noschinl@in.tum.de</a>&gt;<br>
+Peter and I did some investigation and this seems to be the source of <br>
+this behaviour: If two schematic variables (with only bound variables as <br>
+arguments) are to be unified, Unifiers.unify will always provide a <br>
+single unifier with the schematic variables reordered.</p>
+<p>It might be interesting to note that also Unify.matchers is not able to <br>
+match such term.</p>
+<p>theory Scratch imports Main begin (* Isabelle 2013 *)</p>
+<p>ML {*<br>
+   val pat = @{cpat "⋀x y. ?P x y"}<br>
+   val term = @{cpat "⋀x y. ?Q x y x"}<br>
+   val pair = [(term_of pat, term_of term)]</p>
+<p>fun maxidx_of_cterm ct = case rep_cterm ct of<br>
+     {maxidx, ...} =&gt; maxidx<br>
+   val maxidx = Int.max (maxidx_of_cterm pat, maxidx_of_cterm term)<br>
+*}</p>
+<p>ML {*<br>
+   fun pretty_subst ctxt ((name,_), (typ, term)) =<br>
+     [Pretty.str name, Syntax.pretty_typ ctxt typ, Syntax.pretty_term <br>
+ctxt term]<br>
+     |&gt; Pretty.list "" ""<br>
+   val pretty_env =<br>
+     Envir.term_env #&gt; Vartab.dest #&gt; map (pretty_subst @{context}) #&gt; <br>
+Pretty.big_list "Unifier"<br>
+   val pretty_env_list = map pretty_env #&gt; Pretty.big_list "Unifiers"<br>
+*}</p>
+<p>ML {*<br>
+   Unify.unifiers (@{theory}, Envir.empty maxidx, pair)<br>
+   |&gt; Seq.list_of<br>
+   |&gt; map fst<br>
+   |&gt; pretty_env_list<br>
+   |&gt; Pretty.string_of<br>
+   |&gt; tracing<br>
+*}</p>
+<p>ML {*<br>
+   Unify.matchers @{theory} pair |&gt; Seq.list_of |&gt; pretty_env_list |&gt; <br>
+Pretty.string_of |&gt; tracing<br>
+*}</p>
+
+
+
+<a name="294246645"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20match_tac%2C%20schematic%20and%20bound%20variables/near/294246645" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20match_tac.2C.20schematic.20and.20bound.20variables.html#294246645">(Aug 19 2022 at 11:39)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Larry is of course welcome to reformulate this snippet of the <br>
+documentation to fit better to the implementation, whatever it really is.</p>
+<p>A warning like "the documentation might be inaccurate" does not make any <br>
+sense, because this always applies by default to <em>any</em> documentation.</p>
+<p>Whenever someone sees a function somewhere, and some documentation <br>
+elsewhere, maybe together with some real-world uses of it in some working <br>
+application, one always needs to apply common-sense to estimate if it will <br>
+do a different job in a different context.</p>
+<p>This principle applies to any complex software system, library, framework, <br>
+etc.  For Isabelle the level of precision is actually above average -- I <br>
+am working routinely with more industrial things like the Java Standard <br>
+libraries that are much worse.  And what Apple, Oracle, IBM usually do in <br>
+cases of uncertainty is to adapt the manual only.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

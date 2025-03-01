@@ -1,0 +1,75 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Mutual coinduction · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Mutual.20coinduction.html">[isabelle] Mutual coinduction</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294683060"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Mutual%20coinduction/near/294683060" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Mutual.20coinduction.html#294683060">(Aug 22 2022 at 14:09)</a>:</h4>
+<p>From: Thomas Sternagel &lt;<a href="mailto:Thomas.Sternagel@uibk.ac.at">Thomas.Sternagel@uibk.ac.at</a>&gt;<br>
+Dear List,</p>
+<p>I'm trying to figure out mutual coinduction in a development version of<br>
+Isabelle/HOL (d4b89572ae71). In particular I want to use the coinduction<br>
+scheme for two sets defined by mutual coinduction, but I'm not even able<br>
+to formulate my goal in a way that I can use 'coinduct'.<br>
+Consider the following minimal example:</p>
+<p>theory Tmp<br>
+imports<br>
+  Main<br>
+begin</p>
+<p>coinductive_set X and Y where<br>
+  "n ∈ Y ⟹ Suc n ∈ X"<br>
+| "n ∈ X ⟹ Suc n ∈ Y"</p>
+<p>lemma tmp:<br>
+  shows "(∀x. P x ⟶ x ∈ X) ∧ (∀x. Q x ⟶ x ∈ Y)"<br>
+proof (coinduct rule: X_Y.coinduct)<br>
+sorry</p>
+<p>end</p>
+<p>In the first line of the proof of lemma 'tmp' the following exception is<br>
+raised</p>
+<p>exception TERM raised (line 80 of "Isar/rule_cases.ML"):<br>
+  Expected 2 binop arguments<br>
+  ∃n. B.0 = Suc n ∧ (Q n ∨ n ∈ Y)</p>
+<p>What am I doing wrong? What is 'B.0'? I don't understand what's<br>
+happening here.</p>
+<p>Tom</p>
+
+
+
+<a name="294683125"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Mutual%20coinduction/near/294683125" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Mutual.20coinduction.html#294683125">(Aug 22 2022 at 14:09)</a>:</h4>
+<p>From: Dmitriy Traytel &lt;<a href="mailto:traytel@inf.ethz.ch">traytel@inf.ethz.ch</a>&gt;<br>
+Hi Tom,</p>
+<p>I fear that currently neither coinduct nor coinduction work properly with mutually coinductive predicates. Thus, in your example I would just use rule (+ goal_cases for the case names).</p>
+<p>Note that few weeks ago the coinductive was generating a different (non-mutual) rule, that was exposing the internal construction (see NEWS). In your example this old rule looked like:</p>
+<p>?X ?x ?xa ⟹<br>
+(⋀x xa. ?X x xa ⟹<br>
+         (∃n. ¬ x ∧ xa = Suc n ∧ (?X True n ∨ n ∈ Y)) ∨<br>
+         (∃n. x ∧ xa = Suc n ∧ (?X False n ∨ n ∈ X))) ⟹<br>
+Xp_Yp ?x ?xa</p>
+<p>This rule may have worked better with coinduct(ion), but getting from Xp_Yp to X and Y was tedious in turn.</p>
+<p>When I changed coinductive to produce the new rule, I haven’t seen any uses of mutually coinductive predicates in isabelle + AFP. Is your use-case a new development, or is it one that used to work with the old rule?</p>
+<p>Cheers,<br>
+Dmitriy</p>
+
+
+
+<a name="294683155"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Mutual%20coinduction/near/294683155" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Mutual.20coinduction.html#294683155">(Aug 22 2022 at 14:10)</a>:</h4>
+<p>From: Thomas Sternagel &lt;<a href="mailto:Thomas.Sternagel@uibk.ac.at">Thomas.Sternagel@uibk.ac.at</a>&gt;<br>
+Its a new development.<br>
+Actually, I started with Isabelle/HOL 2016 where I encountered the 'old'<br>
+rule you describe below, but could also not figure out how to use it, so<br>
+I switched to development version d4b89572ae71, because the coinduction<br>
+scheme looked more promising there.<br>
+Thanks for the information, anyway.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,141 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Type Inference · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Type.20Inference.html">[isabelle] Type Inference</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294822490"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Type%20Inference/near/294822490" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Type.20Inference.html#294822490">(Aug 23 2022 at 08:20)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:lammich@in.tum.de">lammich@in.tum.de</a>&gt;<br>
+Hi List,</p>
+<p>I'm writing a tool that converts a term into an equivalent term. <br>
+It works by first generating the new term, and then using the<br>
+simplifier to prove equality. However, when generating the new term, I<br>
+can save a lot of book-keeping work if I insert "dummyT" types in the<br>
+term, and then run type inference later to resolve them.</p>
+<p>Here my question: Syntax.check_term seems to do a lot more than type<br>
+inference. Can I expect that it will leave the rest of my term intact,<br>
+and only replace the dummyT types by something sensible?<br>
+If not, can I run type-inference in isolation?</p>
+<p>Thanks for any help,<br>
+  Peter</p>
+
+
+
+<a name="294822496"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Type%20Inference/near/294822496" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Type.20Inference.html#294822496">(Aug 23 2022 at 08:20)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Syntax.check_term is a bit like "by simp" for abstract syntax: it can<br>
+potentially do many more things than you would normally expect, depending on<br>
+instrumentation in the application context. (Just accidentally, the default<br>
+setup does mostly simple type inference.)</p>
+<p>Here is a more robust way to invoke just the core type-inference:</p>
+<p>ML ‹<br>
+  fun infer_types_simple ctxt =<br>
+    singleton (Type_Infer_Context.infer_types ctxt) #&gt;<br>
+    singleton (Type_Infer.fixate ctxt false);<br>
+›</p>
+<p>ML ‹infer_types_simple \&lt;^context&gt; (Free ("f", dummyT) $ Free ("x", dummyT))›</p>
+<p>That is not an "official" API, but it is reasonably well-defined to be re-used<br>
+by other tools.</p>
+<p>Makarius</p>
+
+
+
+<a name="294822521"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Type%20Inference/near/294822521" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Type.20Inference.html#294822521">(Aug 23 2022 at 08:20)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:eberlm@in.tum.de">eberlm@in.tum.de</a>&gt;<br>
+This is not really an answer to your question and I don't know what your<br>
+exact use case is, but I just as a reminder: type inference might not<br>
+always be enough to determine the type. One example are things like "if<br>
+(2::nat) = 0 then A else B". If you copy that term without types and run<br>
+type inference on it, you will get a new type variable in there and it<br>
+won't be pretty.</p>
+<p>Manuel</p>
+
+
+
+<a name="294826809"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Type%20Inference/near/294826809" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Type.20Inference.html#294826809">(Aug 23 2022 at 08:53)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:lammich@in.tum.de">lammich@in.tum.de</a>&gt;<br>
+Hi Makarius</p>
+<blockquote>
+<p>Here is a more robust way to invoke just the core type-inference:</p>
+<p>ML ‹<br>
+  fun infer_types_simple ctxt =<br>
+    singleton (Type_Infer_Context.infer_types ctxt) #&gt;<br>
+    singleton (Type_Infer.fixate ctxt false);<br>
+›</p>
+<p>ML ‹infer_types_simple \&lt;^context&gt; (Free ("f", dummyT) $ Free ("x",<br>
+dummyT))›<br>
+</p>
+</blockquote>
+<p>This code worked fine until I had a schematic type variable in the<br>
+term, which raises an "Illegal schematic type variable" error.<br>
+As this code is called from inside a conversion, importing and<br>
+exporting the term does not work, as this will rename schematic type<br>
+variables, causing the conversion to fail.</p>
+<p>I now do "Proof_Context.set_mode mode_schematic", which makes the error<br>
+go away. However, the fact that I got this error makes me curious how<br>
+much more than "core type inference" this does, and what other<br>
+surprises to expect, e.g. on terms with internal variable names, etc.</p>
+<p>Best,<br>
+  Peter</p>
+<blockquote>
+<p>That is not an "official" API, but it is reasonably well-defined to<br>
+be re-used<br>
+by other tools.</p>
+<p>Makarius<br>
+</p>
+</blockquote>
+
+
+
+<a name="294826819"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Type%20Inference/near/294826819" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Type.20Inference.html#294826819">(Aug 23 2022 at 08:54)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On 12/04/2020 21:53, Peter Lammich wrote:</p>
+<blockquote>
+<blockquote>
+<p>Here is a more robust way to invoke just the core type-inference:</p>
+<p>ML ‹<br>
+  fun infer_types_simple ctxt =<br>
+    singleton (Type_Infer_Context.infer_types ctxt) #&gt;<br>
+    singleton (Type_Infer.fixate ctxt false);<br>
+›</p>
+<p>ML ‹infer_types_simple \&lt;^context&gt; (Free ("f", dummyT) $ Free ("x",<br>
+dummyT))›<br>
+</p>
+</blockquote>
+<p>This code worked fine until I had a schematic type variable in the<br>
+term, which raises an "Illegal schematic type variable" error.<br>
+As this code is called from inside a conversion, importing and<br>
+exporting the term does not work, as this will rename schematic type<br>
+variables, causing the conversion to fail.</p>
+<p>I now do "Proof_Context.set_mode mode_schematic", which makes the error<br>
+go away.</p>
+</blockquote>
+<p>Proof_Context.set_mode mode_schematic should be OK, it was introduced many<br>
+years ago for exactly such situations.</p>
+<blockquote>
+<p>However, the fact that I got this error makes me curious how<br>
+much more than "core type inference" this does, and what other<br>
+surprises to expect, e.g. on terms with internal variable names, etc.</p>
+</blockquote>
+<p>Type_Infer_Context.infer_types is already the core of type inference, but it<br>
+uses a full Syntax.check_typs here<br>
+<a href="https://isabelle.sketis.net/repos/isabelle/file/Isabelle2020-RC5/src/Pure/type_infer_context.ML#l293">https://isabelle.sketis.net/repos/isabelle/file/Isabelle2020-RC5/src/Pure/type_infer_context.ML#l293</a><br>
+in order to prepare the types occurring within the given terms.</p>
+<p>This is in principle subject to plugins of the context, but de-facto it is<br>
+always Proof_Context.standard_typ_check provided by Isabelle/Pure.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

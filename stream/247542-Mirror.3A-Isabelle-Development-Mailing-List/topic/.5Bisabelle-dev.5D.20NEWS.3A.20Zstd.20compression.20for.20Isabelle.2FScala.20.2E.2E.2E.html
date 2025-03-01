@@ -1,0 +1,157 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle-dev] NEWS: Zstd compression for Isabelle/Scala ... · Mirror: Isabelle Development Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/index.html">Mirror: Isabelle Development Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20NEWS.3A.20Zstd.20compression.20for.20Isabelle.2FScala.20.2E.2E.2E.html">[isabelle-dev] NEWS: Zstd compression for Isabelle/Scala ...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="305415336"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20NEWS%3A%20Zstd%20compression%20for%20Isabelle/Scala%20.../near/305415336" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20NEWS.3A.20Zstd.20compression.20for.20Isabelle.2FScala.20.2E.2E.2E.html#305415336">(Oct 21 2022 at 18:08)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+<strong>* ML </strong>*</p>
+<ul>
+<li>
+<p>Operations for Zstd compression (via Isabelle/Scala):</p>
+<p>Zstd.compress: Bytes.T -&gt; Bytes.T<br>
+ Zstd.uncompress: Bytes.T -&gt; Bytes.T</p>
+</li>
+</ul>
+<p><strong>* System </strong>*</p>
+<ul>
+<li>Isabelle/Scala provides generic support for XZ and Zstd compression,<br>
+via Compress.Options and Compress.Cache. Bytes.uncompress automatically<br>
+detects the compression scheme.</li>
+</ul>
+<p>This refers to Isabelle/f2b98eb6a7a9. See also <br>
+<a href="https://github.com/luben/zstd-jni">https://github.com/luben/zstd-jni</a> and <a href="https://github.com/facebook/zstd">https://github.com/facebook/zstd</a></p>
+<p>Here is an example in Isabelle/ML (proper timing requires to re-check that 1-3 <br>
+times):</p>
+<p>theory Scratch<br>
+   imports Pure<br>
+begin</p>
+<p>ML ‹<br>
+   val b1 = <a href="http://Bytes.read">Bytes.read</a> @{file <br>
+‹~~/src/HOL/Analysis/Henstock_Kurzweil_Integration.thy›};<br>
+   val b2 = timeap Zstd.compress b1;<br>
+   val b3 = timeap Zstd.uncompress b2;<br>
+   @{assert} (Bytes.eq (b1, b3));<br>
+›</p>
+<p>ML ‹<br>
+   val b1 = <a href="http://Bytes.read">Bytes.read</a> @{file <br>
+‹~~/src/HOL/Analysis/Henstock_Kurzweil_Integration.thy›};<br>
+   val b2 = timeap XZ.compress b1;<br>
+   val b3 = timeap XZ.uncompress b2;<br>
+   @{assert} (Bytes.eq (b1, b3));<br>
+›</p>
+<p>end</p>
+<p>This shows that Zstd (JNI library) is much faster than XZ (pure Java), while <br>
+the compression ratio is only slightly lower.</p>
+<p>It remains to be seen how we can use this super-fast compression, e.g. for <br>
+blobs within build databases (presently XZ), or even for heaps of Poly/ML --- <br>
+for the latter it might be better to see if this could be included in Poly/ML.</p>
+<p>Makarius</p>
+<hr>
+<p>isabelle-dev mailing list<br>
+<a href="mailto:isabelle-dev@in.tum.de">isabelle-dev@in.tum.de</a><br>
+<a href="https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev">https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev</a></p>
+
+
+
+<a name="305415461"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20NEWS%3A%20Zstd%20compression%20for%20Isabelle/Scala%20.../near/305415461" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20NEWS.3A.20Zstd.20compression.20for.20Isabelle.2FScala.20.2E.2E.2E.html#305415461">(Oct 21 2022 at 18:09)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Here the same example for Isabelle/Scala, e.g. the Console/Scala plugin in <br>
+Isabelle/jEdit:</p>
+<p>val b1 = <br>
+Bytes.read(Path.explode("~~/src/HOL/Analysis/Henstock_Kurzweil_Integration.thy"))<br>
+val b2 = Timing.timeit() { b1.compress(Compress.Options_Zstd()) }<br>
+val b3 = Timing.timeit() { b2.uncompress() }</p>
+<p>val b1 = <br>
+Bytes.read(Path.explode("~~/src/HOL/Analysis/Henstock_Kurzweil_Integration.thy"))<br>
+val b2 = Timing.timeit() { b1.compress(Compress.Options_XZ()) }<br>
+val b3 = Timing.timeit() { b2.uncompress() }</p>
+<p>It shows how Isabelle/ML (world of mathematics) and Isabelle/Scala (world of <br>
+physics) nicely work together. The ML functions from before actually invoke <br>
+these Scala operations via the PIDE protocol channel, using a custom-made <br>
+Bytes type on both sides (for better scalability).</p>
+<p>Makarius</p>
+<hr>
+<p>isabelle-dev mailing list<br>
+<a href="mailto:isabelle-dev@in.tum.de">isabelle-dev@in.tum.de</a><br>
+<a href="https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev">https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev</a></p>
+
+
+
+<a name="305433410"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20NEWS%3A%20Zstd%20compression%20for%20Isabelle/Scala%20.../near/305433410" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20NEWS.3A.20Zstd.20compression.20for.20Isabelle.2FScala.20.2E.2E.2E.html#305433410">(Oct 21 2022 at 20:01)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Here are some more tests with Isabelle/cff0828c374f --- where large files work <br>
+much better. This is for Isabelle/jEdit with Console/Scala:</p>
+<p>def test_heap(name: String, options: Compress.Options): Unit = {<br>
+   val store = Sessions.store(Options.init())<br>
+   val heap = store.find_heap(name).getOrElse(error("Bad heap " + quote(name)))<br>
+   val b = Timing.timeit("read") { Bytes.read(heap) }<br>
+   val c = Timing.timeit("compress") { b.compress(options, store.cache.compress) }<br>
+   val d = Timing.timeit("uncompress") { c.uncompress(store.cache.compress) }<br>
+   Console.println("uncompressed size = " + d.length + "\ncompressed size = " </p>
+<ul>
+<li>c.length +<br>
+     "\nratio = " + (d.length.toDouble / c.length.toDouble))<br>
+}</li>
+</ul>
+<p>scala&gt; test_heap("Pure", Compress.Options_XZ(3))</p>
+<h3>read: 0.009s elapsed time</h3>
+<h3>compress: 1.792s elapsed time</h3>
+<h3>uncompress: 0.328s elapsed time</h3>
+<p>uncompressed size = 20848737<br>
+compressed size = 3430468<br>
+ratio = 6.077519743661798</p>
+<p>scala&gt; test_heap("Pure", Compress.Options_Zstd(3))</p>
+<h3>read: 0.009s elapsed time</h3>
+<h3>compress: 0.081s elapsed time</h3>
+<h3>uncompress: 0.022s elapsed time</h3>
+<p>uncompressed size = 20848737<br>
+compressed size = 4690553<br>
+ratio = 4.444835608935663</p>
+<p>scala&gt; test_heap("Pure", Compress.Options_Zstd(6))</p>
+<h3>read: 0.008s elapsed time</h3>
+<h3>compress: 0.206s elapsed time</h3>
+<h3>uncompress: 0.021s elapsed time</h3>
+<p>uncompressed size = 20848737<br>
+compressed size = 4255723<br>
+ratio = 4.898988256519515</p>
+<p>scala&gt; test_heap("HOL", Compress.Options_XZ(3))</p>
+<h3>read: 0.148s elapsed time</h3>
+<h3>compress: 27.193s elapsed time</h3>
+<h3>uncompress: 6.162s elapsed time</h3>
+<p>uncompressed size = 340480517<br>
+compressed size = 61810868<br>
+ratio = 5.508424780574186</p>
+<p>scala&gt; test_heap("HOL", Compress.Options_Zstd(3))</p>
+<h3>read: 0.370s elapsed time</h3>
+<h3>compress: 1.559s elapsed time</h3>
+<h3>uncompress: 0.511s elapsed time</h3>
+<p>uncompressed size = 340480517<br>
+compressed size = 88856965<br>
+ratio = 3.8317819767983297</p>
+<p>scala&gt; test_heap("HOL", Compress.Options_Zstd(6))</p>
+<h3>read: 0.164s elapsed time</h3>
+<h3>compress: 3.594s elapsed time</h3>
+<h3>uncompress: 0.378s elapsed time</h3>
+<p>uncompressed size = 340480517<br>
+compressed size = 82115162<br>
+ratio = 4.146378192616852</p>
+<p>Makarius</p>
+<hr>
+<p>isabelle-dev mailing list<br>
+<a href="mailto:isabelle-dev@in.tum.de">isabelle-dev@in.tum.de</a><br>
+<a href="https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev">https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

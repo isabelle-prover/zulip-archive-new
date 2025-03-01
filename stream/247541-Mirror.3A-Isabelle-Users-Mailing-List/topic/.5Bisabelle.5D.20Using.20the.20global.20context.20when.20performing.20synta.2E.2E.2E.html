@@ -1,0 +1,72 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Using the global context when performing synta... · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Using.20the.20global.20context.20when.20performing.20synta.2E.2E.2E.html">[isabelle] Using the global context when performing synta...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="236051418"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Using%20the%20global%20context%20when%20performing%20synta.../near/236051418" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Using.20the.20global.20context.20when.20performing.20synta.2E.2E.2E.html#236051418">(Apr 25 2021 at 09:17)</a>:</h4>
+<p>From: Matthys Grobbelaar &lt;<a href="mailto:m.grobbelaar@uq.net.au">m.grobbelaar@uq.net.au</a>&gt;<br>
+I'm currently creating new syntax translations for a project I'm working on however I'm having issues with incorrect contexts being passed into the parse_translation function.</p>
+<p>For context, I've added the new syntax as follows:<br>
+    syntax "_myrelation" :: "args =&gt; 'a set" ("&lt;\lrel&gt;_&lt;\rrel&gt;")<br>
+where &lt;\lrel&gt;  and &lt;\rrel&gt; are new symbols which have been added.</p>
+<p>The translation is then done via:<br>
+    parse_translation &lt;\open&gt;[(@{syntax_const "_myrelation"}, translate_relation)]</p>
+<p>Essentially what this translation will be doing is taking an expression like<br>
+    &lt;\lrel&gt;x &gt; x'&lt;/rrel&gt;<br>
+and converting it into<br>
+   {((x, y), (x', y')) | x &gt; x'}<br>
+where the variables in the tuples (i.e. (x,y), (x', y')) are dynamic from the context wherein the translation takes place.</p>
+<p>At the moment, I've been able to add these variables into a queue stored in the global context using the following:<br>
+    structure VarList: VAR_LIST =<br>
+    struct</p>
+<p>structure Terms = Theory_Data<br>
+    (<br>
+        type T = term Queue.T;<br>
+        val empty = Queue.empty;<br>
+        val extend = I;<br>
+        fun merge (ts1, ts2) =<br>
+                fold Queue.enqueue (Library.merge (op =) (Queue.content ts1, Queue.content ts2)) Queue.empty;<br>
+    );</p>
+<p>val get = Terms.get</p>
+<p>fun add raw_t thy =<br>
+        let<br>
+            val t = Sign.cert_term thy raw_t<br>
+        in<br>
+<a href="http://Terms.map">Terms.map</a> (Queue.enqueue t) thy<br>
+        end;<br>
+    end;</p>
+<p>With this structure, I have then been able to update the context using setup:<br>
+    setup &lt;\open&gt;<br>
+        VarList.add (@{term "x::int"}) #&gt;<br>
+        VarList.add (@{term "y::int"})<br>
+    &lt;/close&gt;</p>
+<p>To test out whether the context is in fact being updated, I created a dummy translation function which prints out the values stored in the queue.</p>
+<p>ML &lt;\open&gt;<br>
+        fun translate_relation_test ctxt [trm] =<br>
+            let<br>
+                val varlist = VarList.get (Context.theory_of (Context.Proof ctxt))<br>
+                val _ = VarList.print_vars varlist ctxt<br>
+            in undefined<br>
+    &lt;/close&gt;</p>
+<p>If I call this dummy function right below the setup, the variables are printed correctly:<br>
+        &lt;end of setup&gt;<br>
+        translate_relation_test (Context.the_local_context ()) [@{term "x &gt; x'"}];    -- queue has the added variables</p>
+<p>However, when I try to do a translation, the queue remains empty:<br>
+       &lt;lrel&gt;x &gt; x'&lt;/rrel&gt;  -- added variables are not printed</p>
+<p>This leaves me with a lot of questions. Is there something I'm missing about contexts? Is a different context being used for syntax translations? Is this the correct way to go about doing a translation like this?</p>
+<p>Any help would be greatly appreciated.<br>
+Also, this is the first time I'm sending something to this mailing list so please let me know if I'm asking in the correct place.</p>
+<p>Kind regards and thank you in advance,<br>
+Matthys Grobbelaar</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

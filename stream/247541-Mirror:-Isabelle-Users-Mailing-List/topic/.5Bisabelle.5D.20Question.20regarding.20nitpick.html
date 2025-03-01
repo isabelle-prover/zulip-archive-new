@@ -1,0 +1,137 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Question regarding nitpick · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Question.20regarding.20nitpick.html">[isabelle] Question regarding nitpick</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="219580976"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Question%20regarding%20nitpick/near/219580976" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Question.20regarding.20nitpick.html#219580976">(Dec 11 2020 at 09:24)</a>:</h4>
+<p>From: Leon Hansen &lt;<a href="mailto:lhansen@uni-bremen.de">lhansen@uni-bremen.de</a>&gt;<br>
+Hello everybody,</p>
+<p>I am currently writing my master thesis and I am trying to fetch entries <br>
+from a list that fulfil some properties. Similar to a query on a <br>
+database or an ontology.</p>
+<p>My first approach looked like this:</p>
+<p>datatype room = LivingRoom | Kitchen | SleepingRoom<br>
+consts connectedRooms:: "room ⇒ room ⇒ bool"<br>
+axiomatization where<br>
+  a1: "connectedRooms LivingRoom Kitchen"</p>
+<p>lemma patheval2: "connectedRooms X SleepingRoom" <br>
+nitpick[satisfy,show_consts,user_axioms] oops</p>
+<p>In this case nitpick answers "X = LivingRoom" even though that is not <br>
+correct.</p>
+<p>What can i do about that?</p>
+<p>My other approach was to avoid axiomatisation completely and use <br>
+datatypes like this:</p>
+<p>datatype ID = NewID nat<br>
+datatype Thing = Bed (height: nat) ID<br>
+definition bed1 where<br>
+"bed1 ≡ Bed 2 (NewID 1)"<br>
+definition bed2 where<br>
+"bed2 ≡ Bed 8 (NewID 3)"<br>
+definition bed3 where<br>
+"bed3 ≡ Bed 2 (NewID 5)"<br>
+definition bedList where<br>
+"bedList ≡ [bed1, bed2, bed3]"<br>
+lemma "List.filter (%c::Thing. ∃x. c = (Bed 2 (NewName x))) bedList = <br>
+res" nitpick sorry</p>
+<p>However this becomes very slow for larger lists. Is there a way to do <br>
+this more efficiently?</p>
+<p>Kind regards</p>
+<p>Leon Hansen</p>
+
+
+
+<a name="219597829"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Question%20regarding%20nitpick/near/219597829" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Question.20regarding.20nitpick.html#219597829">(Dec 11 2020 at 12:11)</a>:</h4>
+<p>From: "John F. Hughes" &lt;<a href="mailto:jfh@cs.brown.edu">jfh@cs.brown.edu</a>&gt;<br>
+I believe that the problem here is that you've specified what<br>
+"connectedRooms" does <em>only</em> when applied to LivingRoom and Kitchen, but<br>
+have not specified its value on any other pair of rooms. Nitpick says "Hey,<br>
+assigning "connectedRooms LivingRoom SleepingRoom" to be "true" is<br>
+consistent with all the axioms. I guess I'm done!"</p>
+<p>So axiom 1 needs to be much richer --- either a complete enumeration of the<br>
+9 possibilities, or something with an "if" that says "if we're in this one<br>
+special case, then true; otherwise false."</p>
+<p>NB: You could additionally specify a symmetry axiom ---</p>
+<p>connectedRooms a b =&gt; connectedRooms b a   [I'm forgetting the correct<br>
+syntax here]</p>
+<p>and then safely have an enumeration of only 6 items instead of all 9.</p>
+<p>-John</p>
+
+
+
+<a name="219599196"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Question%20regarding%20nitpick/near/219599196" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Question.20regarding.20nitpick.html#219599196">(Dec 11 2020 at 12:24)</a>:</h4>
+<p>From: Leon Hansen &lt;<a href="mailto:lhansen@uni-bremen.de">lhansen@uni-bremen.de</a>&gt;<br>
+I do have the reflexivity and transitivity in there already:</p>
+<p>axiomatization where<br>
+   refl: "connectedRooms x x" and<br>
+   trans: "connectedRooms x y ∧ connectedRooms y z ⟶ connectedRooms x z"</p>
+<p>I just shortend the example by a lot. For that reason it is not possible <br>
+to list every possibility as well.</p>
+<p>I would need to add something like the "connectedRooms _ _ = False" that <br>
+would work if it were a function and not an axiomatisation.</p>
+<p>-Leon</p>
+
+
+
+<a name="220380837"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Question%20regarding%20nitpick/near/220380837" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Question.20regarding.20nitpick.html#220380837">(Dec 18 2020 at 14:55)</a>:</h4>
+<p>From: Jasmin Blanchette via Cl-isabelle-users &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Dear Leon,</p>
+<blockquote>
+<p>My first approach looked like this:</p>
+<p>datatype room = LivingRoom | Kitchen | SleepingRoom<br>
+consts connectedRooms:: "room ⇒ room ⇒ bool"<br>
+axiomatization where<br>
+ a1: "connectedRooms LivingRoom Kitchen"</p>
+<p>lemma patheval2: "connectedRooms X SleepingRoom" nitpick[satisfy,show_consts,user_axioms] oops</p>
+<p>In this case nitpick answers "X = LivingRoom" even though that is not correct.</p>
+</blockquote>
+<p>Although it doesn't correspond to your expectations, Nitpick's behavior is correct. Your "nitpick" command is asking for a model of the formula. Nitpick finds one. In that model, "connectedRooms LivingRoom SleepingRoom" is true. This is perfectly consistent with your axiomatization. It is not <em>entailed</em> by the axiomatization, but it is clearly consistent with it.</p>
+<p>If you want to find a value X such that "connectedRooms X SleepingRoom" is provable -- in other words, a witness for X in "EX X. connectedRooms X SleepingRoom", I'm afraid there's no tool that will reliably give you that in Isabelle. The existential formula would be a candidate for Sledgehammer, but in general you wouldn't get the witness out of the proof.</p>
+<blockquote>
+<p>Is there a way to do this more efficiently?</p>
+</blockquote>
+<p>The problem is that I don't clearly understand what "this" refers to. I'm starting to suspect that your axiomatization above is wrong; you probably also want to say "~ connectedRooms LivingRoom SleepingRoom" etc., if you mean that these are not connected. (Otherwise, they'll be connected in some models of the formulas and not in others.)</p>
+<p>Typically a better approach is to avoid low-level mechanisms such as "consts" and "axiomatization" and instead rely on the definitional mechanisms, like "inductive" (which is probably your best option here), "fun", and "definition". With "inductive", what you don't explicitly make true is automatically false, which is very convenient. You also don't need to worry about models; there's only one model.</p>
+<p>I hope this helps.</p>
+<p>Cheers,</p>
+<p>Jasmin</p>
+
+
+
+<a name="220463116"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Question%20regarding%20nitpick/near/220463116" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Question.20regarding.20nitpick.html#220463116">(Dec 19 2020 at 10:03)</a>:</h4>
+<p>From: Leon Hansen &lt;<a href="mailto:lhansen@uni-bremen.de">lhansen@uni-bremen.de</a>&gt;<br>
+Dear Jasmin,</p>
+<p>thank you for your detailed response.</p>
+<blockquote>
+<p>If you want to find a value X such that "connectedRooms X SleepingRoom" is provable -- in other words, a witness for X in "EX X. connectedRooms X SleepingRoom", I'm afraid there's no tool that will reliably give you that in Isabelle. The existential formula would be a candidate for Sledgehammer, but in general you wouldn't get the witness out of the proof.<br>
+That confirmation is very helpful for me. I thought I was just doing it <br>
+completely wrong.<br>
+The problem is that I don't clearly understand what "this" refers to.<br>
+My goal is to embed knowledge from an owl ontology in an Isabelle theory <br>
+and be able to retrieve it again in reasonable time.<br>
+Typically a better approach is to avoid low-level mechanisms such as "consts" and "axiomatization" and instead rely on the definitional mechanisms, like "inductive" (which is probably your best option here), "fun", and "definition". With "inductive", what you don't explicitly make true is automatically false, which is very convenient. You also don't need to worry about models; there's only one model.</p>
+</blockquote>
+<p>That is more or less what i did in my second approach where i used <br>
+"datatype" and "definition" only. Thank you for the tip with <br>
+"inductive". For small theories nitpick returns the requested <br>
+information reliably and fast. For theories with a few hundred lines it <br>
+was taking way to much time. I hoped there was a simple way to limit <br>
+nitpicks search space and speed up the search for witnesses for X in "EX <br>
+X. connectedRooms X SleepingRoom" for example.</p>
+<p>Kind regards,</p>
+<p>Leon</p>
+
+
+
+<hr><p>Last updated: Jul 15 2022 at 23:21 UTC</p>
+</html>

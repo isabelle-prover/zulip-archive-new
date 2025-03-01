@@ -1,0 +1,142 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Named_Target.reinit · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Named_Target.2Ereinit.html">[isabelle] Named_Target.reinit</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294284153"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Named_Target.reinit/near/294284153" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Named_Target.2Ereinit.html#294284153">(Aug 19 2022 at 15:01)</a>:</h4>
+<p>From: Lars Noschinski &lt;<a href="mailto:noschinl@in.tum.de">noschinl@in.tum.de</a>&gt;<br>
+Hi,</p>
+<p>I see that Named_Target.reinit is gone in 2014-rc0. It seems that it is<br>
+equivalent to leaving to a theory and then entering the target again.<br>
+What was its purpose and what is the right way to replace it?</p>
+<p>It seems that it is sometimes necessary to perform these steps to get<br>
+the simpset updated after changing it in the background theory with<br>
+Local_Theory.background_theory_result.</p>
+
+
+
+<a name="294284370"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Named_Target.reinit/near/294284370" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Named_Target.2Ereinit.html#294284370">(Aug 19 2022 at 15:02)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On Wed, 23 Jul 2014, Lars Noschinski wrote:</p>
+<blockquote>
+<p>I see that Named_Target.reinit is gone in 2014-rc0. It seems that it is <br>
+equivalent to leaving to a theory and then entering the target again. <br>
+What was its purpose and what is the right way to replace it?</p>
+</blockquote>
+<p>This belongs to the system infrastructure -- user-space tools in <br>
+Isabelle/ML should not be affected by the change.</p>
+<blockquote>
+<p>It seems that it is sometimes necessary to perform these steps to get <br>
+the simpset updated after changing it in the background theory with <br>
+Local_Theory.background_theory_result.</p>
+</blockquote>
+<p>This sounds a bit odd, maybe some formerly global-theory tool that was <br>
+updated a bit too quickly, without really leaving the old ways behind.</p>
+<p>Declarations with the "simp" attribute may be done like in Isar source, <br>
+using the ML antiquotation @{attributes [simp]} with Local_Theory.note, <br>
+for example.  (Just hypersearch the sources for examples.)</p>
+<p>If the simpset update is some other ML function, not an attribute, you may <br>
+use Simplifier.map_ss with Local_Theory.declaration, which also allows to <br>
+insist in a pervasive scope, such that the declaration affects the global <br>
+theory as well.</p>
+<p>Makarius</p>
+
+
+
+<a name="294284418"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Named_Target.reinit/near/294284418" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Named_Target.2Ereinit.html#294284418">(Aug 19 2022 at 15:02)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+This is a good opportunity to describe the rationale behind the local<br>
+theory / target / named target matter in more detail »as it is by now«.</p>
+<p>The fundamental ideas have been presented in »Local Theory<br>
+Specifications in Isabelle/Isar« by Haftmann/Wenzel; as usual, the<br>
+implementation is a little bit more involved, and also some extensions<br>
+have appeared since then, notably nested target contexts and confined<br>
+interpretation.</p>
+<p>What is a <em>local theory</em>? The extension of a proof context with an<br>
+abstract signature to allow definitional extensions (most prominently,<br>
+<em>define</em> and <em>note</em> – the actual interface can be found as *type<br>
+operations* in Pure/Isar/local_theory.ML).</p>
+<p>A <em>target</em> is a particular implementation of the local theory signature.</p>
+<p>The picture is a little complicated by the possibility to stack<br>
+arbitrary many auxiliary contexts on top a target (»context fixes …<br>
+assumes … begin … end« in Isar). However, these merely add variables and<br>
+assumptions in a canonical way; the target at the bottom of this stack,<br>
+the <em>bottom target,</em> is not really affected by this. So, if we speak<br>
+about target, we most times refer to a particular bottom target with a<br>
+(possibly empty) stack auf axuiliary contexts on top of it.</p>
+<p>Conceptually, there are two main targets: the theory target and the<br>
+locale target, which can be seen as the most generic targets possible.</p>
+<p>A slight variant of the locale target is the class target, which adds a<br>
+canonical interpretation on the theory level. An important class of<br>
+targets are <em>theory-like targets</em>, which behave almost like the theory<br>
+target, but feature slight modifications like additional syntax and a<br>
+consistency check before leaving the local theory. The overloading and<br>
+instantiation targets are prominent examples.</p>
+<p>Concerning the concept of *named target. *Each type class and locale in<br>
+a theory can be referred to by a string s; if we identify the empty<br>
+string with the theory itself, Named_Target.init s opens a local theory<br>
+for the theory / locale / class with the appropriate theory / locale /<br>
+class target. This »selection by name« manifests in the Isar toplevel<br>
+also (»context s begin … end«), and hence the prominent status of these<br>
+named targets in the system infrastructure.</p>
+<p>An important consequence of the abstract nature of local theories is<br>
+that only target implementations are allowed to break their abstraction;<br>
+client code is expected to operate on any kind of local theory<br>
+regardless of the particular (bottom) target. In the Isabelle<br>
+distribution, there are currently (Isabelle2014-RC0) four spots which<br>
+are candidates for a violation of this principle:</p>
+<p>./Pure/Isar/class_declaration.ML:349:    val proto_sub = case<br>
+Named_Target.class_of lthy of<br>
+./Pure/Isar/expression.ML:925:  if Named_Target.is_theory lthy<br>
+./Pure/Isar/expression.ML:932:      if Named_Target.is_theory lthy<br>
+./Tools/quickcheck.ML:365:    val some_locale =<br>
+Named_Target.bottom_locale_of lthy;</p>
+<p>The first one is sane since the class target is allowed to break its own<br>
+abstraction. Number two and three are similar. The last one is indeed a<br>
+little bit odd, but since its is some kind of diagnostic device, it is<br>
+maybe ok.</p>
+<p>Generally, user space tools should refrain from using those<br>
+abstraction-breaking query operations in Named_Target. The same holds<br>
+for the Named_Target.switch (or its earlier predecessor,<br>
+Named_Target.reinit) which is a device to master the following situation<br>
+with an ad-hoc local theory switch which is currently allowed in Isar:</p>
+<p>context s<br>
+begin</p>
+<p>…</p>
+<p>definition (in t):<br>
+  …</p>
+<p>…</p>
+<p>end</p>
+<p>If client code implements its own target, in most cases it will be a<br>
+theory-like target. There are two possibilites to approach it:</p>
+<p>a) Something like<br>
+    |&gt; Local_Theory.init naming<br>
+       {define = Generic_Target.define …,<br>
+        notes = Generic_Target.notes Generic_Target.theory_notes,<br>
+        abbrev = Generic_Target.abbrev Generic_Target.theory_abbrev,<br>
+        declaration = K Generic_Target.theory_declaration,<br>
+        subscription = Generic_Target.theory_registration,<br>
+        pretty = …,<br>
+        exit = … #&gt; Local_Theory.target_of #&gt; Sign.change_end_local}<br>
+(cf. Pure/Isar/class.ML) See how Generic_Target provides everything<br>
+needed to plug together implementations of local theory operations on<br>
+the spot.</p>
+<p>b) If the target only adds a check or something similar before leaving<br>
+the local theory, it can also be setup using Named_Target.theory_like_init.</p>
+<p>Hope this helps,<br>
+    Florian<br>
+<a href="/user_uploads/14278/RLcd3c-VAxKZK4j4t4-R6tr5/signature.asc">signature.asc</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,103 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] computation_check with &quot;let ... in ...&quot; · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20computation_check.20with.20.22let.20.2E.2E.2E.20in.20.2E.2E.2E.22.html">[isabelle] computation_check with &quot;let ... in ...&quot;</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294728029"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20computation_check%20with%20%22let%20...%20in%20...%22/near/294728029" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20computation_check.20with.20.22let.20.2E.2E.2E.20in.20.2E.2E.2E.22.html#294728029">(Aug 22 2022 at 16:50)</a>:</h4>
+<p>From: Wenda Li &lt;<a href="mailto:wl302@cam.ac.uk">wl302@cam.ac.uk</a>&gt;<br>
+Dear code generation experts,</p>
+<p>I was wondering how can we computation_check a term with the form “let … in …”. Here is a small example: given a proposition that can be proved by evalutaion (i.e., by eval or by by code_simp),</p>
+<p>lemma "let x ::int poly= [:2,3:] in [:1,2:] * x = [:2, 7, 6:]”</p>
+<p>I want to solve it using the computation_check mechanic. If I unfold the “let” constant first, the proposition can be proved like the following:</p>
+<p>ML ‹<br>
+  val holds = @{computation_check terms:<br>
+      Trueprop<br>
+      "times::int poly ⇒ _"<br>
+      "HOL.equal ::int poly ⇒ _"<br>
+      "0 :: int poly"<br>
+      "pCons :: int ⇒ _"<br>
+      "0 :: int" "1 :: int"<br>
+      Code_Target_Int.positive datatypes:num<br>
+  };<br>
+›</p>
+<p>lemma "let x::int poly= [:2,3:] in [:1,2:] * x = [:2, 7, 6:]"<br>
+  unfolding Let_def<br>
+  apply (tactic ‹<br>
+    CONVERSION (holds @{context}) 1<br>
+  ›)<br>
+  by (rule TrueI)</p>
+<p>However, without the unfolding (i.e., remove “unfolding Let_def”), "apply (tactic ‹CONVERSION (holds@{context}) 1›)” will get stuck. I am not sure if there is any other constant I should add to “@{computation_check terms:<br>
+      ...<br>
+  };"<br>
+to make the CONVERSION work.</p>
+<p>Thanks in advance,<br>
+Wenda<br>
+<a href="/user_uploads/14278/yiFA8aff7eOQa8nMANAq2Lmn/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294728043"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20computation_check%20with%20%22let%20...%20in%20...%22/near/294728043" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20computation_check.20with.20.22let.20.2E.2E.2E.20in.20.2E.2E.2E.22.html#294728043">(Aug 22 2022 at 16:50)</a>:</h4>
+<p>From: "Thiemann, Rene" &lt;<a href="mailto:Rene.Thiemann@uibk.ac.at">Rene.Thiemann@uibk.ac.at</a>&gt;<br>
+Dear Wenda,</p>
+<p>one might be tempted to just add “Let" to the list of constants. However,<br>
+this still won’t work since your input term contains an abstraction: </p>
+<p>Let [:2,3:] (% x. [:1,2:] * x = [:2, 7, 6:])</p>
+<p>And according to the code-generator manual (codegen.pdf), abstractions are not supported:</p>
+<p>From the documentation:<br>
+6.5 Pitfalls concerning input terms</p>
+<p>No abstractions. Only constants and applications are admissible as input; abstractions are not   possible. In theory, the compilation schema could be extended to cover abstractions also, but this would increase the trusted code base. If abstractions are required, they can always be eliminated by a dedicated preprocessing step, e.g. using combinatorial logic.</p>
+<p>So your unfolding of the “Let” constant is precisely such a required preprocessing step to get rid of the abstraction in this example.</p>
+<p>With best regards,<br>
+René</p>
+
+
+
+<a name="294728113"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20computation_check%20with%20%22let%20...%20in%20...%22/near/294728113" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20computation_check.20with.20.22let.20.2E.2E.2E.20in.20.2E.2E.2E.22.html#294728113">(Aug 22 2022 at 16:51)</a>:</h4>
+<p>From: Wenda Li &lt;<a href="mailto:wl302@cam.ac.uk">wl302@cam.ac.uk</a>&gt;<br>
+Dear René,</p>
+<p>Thanks for your prompt reply and detailed explanation, which did clarify some of my confusions.</p>
+<p>Eliminating occurrences of “let … in …” when pre-prossessing is of course a viable way, but my main motivation for this “let … in …” expression is possible gain in performance: suppose we want to prove the following proposition</p>
+<p>lemma "let x::int poly= smult 2 [:1,2:] in [:2,3:] * x * x  = [:8, 44, 80, 48:]”</p>
+<p>through evaluation. If we can directly evaluate "let x::int poly= smult 2 [:1,2:] in [:2,3:] * x * x  = [:8, 44, 80, 48:]” in SML, we probably need to do the “smult” operation only once. However, with the “let” expression unfolded, what we need to evaluate is instead</p>
+<p>[:2, 3:] * smult 2 [:1, 2:] * smult 2 [:1, 2:] = [:8, 44, 80, 48:]</p>
+<p>, with which I guess the “smult” operation will be carried out twice.</p>
+<p>To sum up, my main purpose of “let … in …” is to eliminate repeated computations, and I hope to achieve this in the computation_check setups.</p>
+<p>Many thanks,<br>
+Wenda<br>
+<a href="/user_uploads/14278/C74t_Ae12U1coDxQ3aYEQzCK/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294728165"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20computation_check%20with%20%22let%20...%20in%20...%22/near/294728165" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20computation_check.20with.20.22let.20.2E.2E.2E.20in.20.2E.2E.2E.22.html#294728165">(Aug 22 2022 at 16:51)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Dear Wenda,</p>
+<p>a generic solution to the abstraction issue would be a preprocessor<br>
+transforming abstractions into expressions in combinatorial logic.</p>
+<p>There is an implementation of this in meson:</p>
+<p>ML ‹<br>
+  Meson_Clausify.introduce_combinators_in_cterm @{context}<br>
+    @{cterm "let (k::int) = 42 * 7 in k + k * 1705 - k ^ 2"}<br>
+›</p>
+<p>Unfortunately, following the comments in the code, the implementation<br>
+seems suboptimal.</p>
+<p>I would appreciate if someone would use this as a base to provide a<br>
+generic preprocessor in Pure; this could then be an official part of<br>
+computations.</p>
+<p>Cheers,<br>
+    Florian<br>
+<a href="/user_uploads/14278/o1ddohbOmyayAfGEsxO8tb_N/signature.asc">signature.asc</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

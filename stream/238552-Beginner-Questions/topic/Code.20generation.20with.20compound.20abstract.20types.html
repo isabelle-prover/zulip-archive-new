@@ -1,0 +1,111 @@
+<html>
+<head><meta charset="utf-8"><title>Code generation with compound abstract types · Beginner Questions · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/index.html">Beginner Questions</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Code.20generation.20with.20compound.20abstract.20types.html">Code generation with compound abstract types</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="412506501"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Code%20generation%20with%20compound%20abstract%20types/near/412506501" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Hanno Becker <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Code.20generation.20with.20compound.20abstract.20types.html#412506501">(Jan 12 2024 at 09:28)</a>:</h4>
+<p>Hi all. As documented e.g. in 3.2 of the 2013 article <a href="https://isabelle.in.tum.de/~haftmann/pdf/data_refinement_in_isabelle_hol_haftmann_krauss_kuncar_nipkow.pdf">https://isabelle.in.tum.de/~haftmann/pdf/data_refinement_in_isabelle_hol_haftmann_krauss_kuncar_nipkow.pdf</a>,  code generation does not support  code equations for lifted definitions resulting in compound abstract types. Here's a simple example:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">typedef</span><span class="w"> </span><span class="n">nat_pos</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">‹{ n :: nat . n &gt; 0 }›</span>
+<span class="w">  </span><span class="k">by</span><span class="w"> </span><span class="o">(</span><span class="n">simp</span><span class="w"> </span><span class="n">add</span><span class="o">:</span><span class="w"> </span><span class="n">gt_ex</span><span class="o">)</span>
+<span class="k">setup_lifting</span><span class="w"> </span><span class="n">nat_pos.type_definition_nat_pos</span>
+
+<span class="k">definition</span><span class="w"> </span><span class="n">nat_minus_one</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">‹nat ⇒ nat option›</span>
+<span class="w">  </span><span class="kp">where</span><span class="w"> </span><span class="s">‹nat_minus_one n ≡ if n - 1 &gt; 0 then Some (n - 1) else None›</span>
+
+<span class="kn">lift_definition</span><span class="w"> </span><span class="n">nat_pos_minus_one</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">‹nat_pos ⇒ nat_pos option›</span>
+<span class="w">  </span><span class="kp">is</span><span class="w"> </span><span class="s">‹nat_minus_one›</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="o">(</span><span class="n">auto</span><span class="w"> </span><span class="n">simp</span><span class="w"> </span><span class="n">add</span><span class="o">:</span><span class="w"> </span><span class="n">nat_minus_one_def</span><span class="o">)</span>
+
+<span class="k">export_code</span><span class="w"> </span><span class="n">nat_pos_minus_one</span><span class="w"> </span><span class="kp">in</span><span class="w"> </span><span class="n">OCaml</span><span class="w"> </span><span class="c">(* No code equations for nat_pos_minus_one *)</span>
+</code></pre></div>
+<p>I am aware that one can work around this by realizing <code>nat_pos option</code> as a subtype of <code>nat option</code>, but this quickly becomes impractical in non-toy examples.</p>
+<p>Reading loc.cit. above suggests that the issue is with the code generator having to guarantee that <code>Abs_C</code> is only ever applied to terms satisfying the subtype invariant. However, the <code>lift_definition nat_pos_minus_one ...</code> command above _does_ already generate the correct proof obligation here: <code>⋀nat. 0 &lt; nat ⟹ pred_option ((&lt;) 0) (nat_minus_one nat)</code>.  This being discharged, it confuses me that the resulting theorem <code>nat_pos_minus_one ≡ map_fun Rep_nat_pos (map_option Abs_nat_pos) nat_minus_one</code> is not used as a code equation. It seems that the hard part is already done?</p>
+<p>Has there been any progress on this limitation since 2013? Are there any other workaround than realizing <code>nat_pos option</code> as a subtype of <code>nat option</code>? I'm OK with a bit of ML hacking as well, so long as it can be done atop of the existing ML interfaces.</p>
+
+
+
+<a name="412518718"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Code%20generation%20with%20compound%20abstract%20types/near/412518718" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Hanno Becker <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Code.20generation.20with.20compound.20abstract.20types.html#412518718">(Jan 12 2024 at 10:38)</a>:</h4>
+<p>The following would work:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">definition</span><span class="w"> </span><span class="o">[</span><span class="n">code</span><span class="w"> </span><span class="n">del</span><span class="o">]:</span><span class="w"> </span><span class="s">‹Abs_nat_pos' ≡ Abs_nat_pos›</span>
+<span class="k">code_printing</span><span class="w"> </span><span class="kp">constant</span><span class="w"> </span><span class="n">Abs_nat_pos'</span><span class="w"> </span><span class="n">⇀</span><span class="w"> </span><span class="o">(</span><span class="n">OCaml</span><span class="o">)</span><span class="w"> </span><span class="s">"Abs'_nat'_pos"</span>
+
+<span class="k">declare</span><span class="w"> </span><span class="n">nat_pos_minus_one_def</span><span class="o">[</span><span class="n">folded</span><span class="w"> </span><span class="n">Abs_nat_pos'_def</span><span class="o">,</span><span class="w"> </span><span class="n">code</span><span class="o">]</span>
+<span class="k">export_code</span><span class="w"> </span><span class="n">nat_pos_minus_one</span><span class="w"> </span><span class="kp">in</span><span class="w"> </span><span class="n">OCaml</span>
+</code></pre></div>
+<p>Of course, <code>code_printing</code> is generally unsound, but here we are only forcing instances of <code>Abs_C</code> in definitions emitted by <code>lift_definition</code>, and those [so it seems to me] have already been proved to preserve the invariant. So the above seems sound... or am I missing something? If it is indeed sound, it is unclear to me why the code generator doesn't do this automatically.</p>
+
+
+
+<a name="412522645"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Code%20generation%20with%20compound%20abstract%20types/near/412522645" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Code.20generation.20with.20compound.20abstract.20types.html#412522645">(Jan 12 2024 at 11:03)</a>:</h4>
+<p>I am not sure what the question is, but <a href="https://isabelle.in.tum.de/doc/codegen.pdf">https://isabelle.in.tum.de/doc/codegen.pdf</a>, Section 3.3?</p>
+
+
+
+<a name="412522779"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Code%20generation%20with%20compound%20abstract%20types/near/412522779" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Code.20generation.20with.20compound.20abstract.20types.html#412522779">(Jan 12 2024 at 11:04)</a>:</h4>
+<p>Or is the point that you do not want to see the new types at all?</p>
+
+
+
+<a name="412522790"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Code%20generation%20with%20compound%20abstract%20types/near/412522790" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Hanno Becker <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Code.20generation.20with.20compound.20abstract.20types.html#412522790">(Jan 12 2024 at 11:04)</a>:</h4>
+<p>The question is, primarily: Is there a way to extract code for examples like <code>nat_pos_minus_one</code> above, which does not require the definition of intermediate types? And, second, why the code generator does not export code equations already, given that <code>lift_definition</code> does seem to generate the relevant side conditions correctly even when the result type is compound.</p>
+
+
+
+<a name="412524709"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Code%20generation%20with%20compound%20abstract%20types/near/412524709" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Code.20generation.20with.20compound.20abstract.20types.html#412524709">(Jan 12 2024 at 11:17)</a>:</h4>
+<p>Typedef supports any set, so I do not think a general translation is possible:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">typedef</span><span class="w"> </span><span class="n">nat_pos</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">‹(λn.  (SOME x. x &gt; n))  ` { n :: nat . n &gt; 0 }›</span>
+<span class="w">  </span><span class="k">by</span><span class="w"> </span><span class="o">(</span><span class="n">simp</span><span class="w"> </span><span class="n">add</span><span class="o">:</span><span class="w"> </span><span class="n">gt_ex</span><span class="o">)</span>
+</code></pre></div>
+
+
+
+<a name="412525488"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Code%20generation%20with%20compound%20abstract%20types/near/412525488" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Hanno Becker <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Code.20generation.20with.20compound.20abstract.20types.html#412525488">(Jan 12 2024 at 11:22)</a>:</h4>
+<p>I don't follow yet -- can you elaborate this into an example? Note that I am assuming that there is a concrete and extractable 'blueprint'  <code>definition nat_minus_one :: ‹nat ⇒ nat option›</code> for the function <code>nat_pos =&gt; nat_pos option</code> I'm after. <code>lift_definition</code> already generates the right obligations, so why is <code>nat_pos_minus_one ≡ map_fun Rep_nat_pos (map_option Abs_nat_pos) nat_minus_one</code> not accepted as a code equation afterwards?</p>
+
+
+
+<a name="412525679"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Code%20generation%20with%20compound%20abstract%20types/near/412525679" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Code.20generation.20with.20compound.20abstract.20types.html#412525679">(Jan 12 2024 at 11:23)</a>:</h4>
+<p>You cannot generate code for Abs_nat_pos in general</p>
+
+
+
+<a name="412526568"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Code%20generation%20with%20compound%20abstract%20types/near/412526568" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Hanno Becker <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Code.20generation.20with.20compound.20abstract.20types.html#412526568">(Jan 12 2024 at 11:29)</a>:</h4>
+<p>It's understood that <code>Abs_C</code> should only be code-extracted when it can be argued that its inputs will satisfy the respective invariant. My point is that this _is_ being  proved as part of <code>lift_definition</code>, regardless of whether the target is a compound type or not. But when it is, somehow no code equation is being generated.</p>
+
+
+
+<a name="412527536"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Code%20generation%20with%20compound%20abstract%20types/near/412527536" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Hanno Becker <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Code.20generation.20with.20compound.20abstract.20types.html#412527536">(Jan 12 2024 at 11:36)</a>:</h4>
+<p>Maybe I wasn't clear enough: The issue is _wholly_ about <code>lift_definition</code> when the target of the function is a type expression involving the abstract type, but where the abstract type does not appear at the top level. </p>
+<p>The following, for example, works absolutely fine:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">lift_definition</span><span class="w"> </span><span class="n">nat_pos_minus_one'</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">‹nat_pos ⇒ nat_pos›</span>
+<span class="w">  </span><span class="kp">is</span><span class="w"> </span><span class="s">‹λn. if n - 1 &gt; 0 then n - 1 else 42›</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">auto</span>
+
+<span class="k">export_code</span><span class="w"> </span><span class="n">nat_pos_minus_one'</span>
+</code></pre></div>
+<p>But as soon as you use any compound type, like <code>'a + nat_pos</code>, <code>nat_pos option</code>, <code>nat_pos x 'b</code>, or whatever -- subsequent code generation doesn't work anymore, even though <code>lift_definition</code> itself is still generating the right (a) conditions and (b) equations.</p>
+
+
+
+<a name="412820547"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Code%20generation%20with%20compound%20abstract%20types/near/412820547" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Hanno Becker <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Code.20generation.20with.20compound.20abstract.20types.html#412820547">(Jan 14 2024 at 14:46)</a>:</h4>
+<p>For the record: <code>lift_definition (code_dt)</code> does the trick.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

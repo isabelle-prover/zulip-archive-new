@@ -1,0 +1,558 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Sledgehammer in Locale Context? · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Sledgehammer.20in.20Locale.20Context.3F.html">[isabelle] Sledgehammer in Locale Context?</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="286794832"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Sledgehammer%20in%20Locale%20Context%3F/near/286794832" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Sledgehammer.20in.20Locale.20Context.3F.html#286794832">(Jun 20 2022 at 13:30)</a>:</h4>
+<p>From: Steven Obua &lt;<a href="mailto:obua@practal.com">obua@practal.com</a>&gt;<br>
+Hi, </p>
+<p>I am a happy user of Isabelle/Isar and Sledgehammer, but am just now trying to also use locales, as in my use case there are just overwhelming arguments for it.</p>
+<p>I am using the Isabelle/December 2021 distribution, but most of the time when I am trying to use sledgehammer within a locale context, I will get a message like this:</p>
+<p><code>"cvc4": Prover error:
+exception TERM raised (line 457 of "~~/src/HOL/Tools/SMT/smt_translate.ML"): bad SMT term
+</code><br>
+It is the same message for other provers as well. Is this something that is a well-known problem? Without using locales I had such a problem only come up when my theory name was confused with some HOL theory name, and renaming my theory was a workaround. Is there something similar at play here? Is there an easy fix? Because I use sledgehammer a lot, so not being able to use it within a locale would be a severe blow against using locales.</p>
+<p>Cheers,</p>
+<p>Steven</p>
+
+
+
+<a name="286815330"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Sledgehammer%20in%20Locale%20Context%3F/near/286815330" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Sledgehammer.20in.20Locale.20Context.3F.html#286815330">(Jun 20 2022 at 16:11)</a>:</h4>
+<p>From: Mathias Fleury &lt;<a href="mailto:mathias.fleury12@gmail.com">mathias.fleury12@gmail.com</a>&gt;<br>
+Do you have an example theory where this happens?</p>
+<p>Mathias</p>
+
+
+
+<a name="286823834"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Sledgehammer%20in%20Locale%20Context%3F/near/286823834" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Sledgehammer.20in.20Locale.20Context.3F.html#286823834">(Jun 20 2022 at 17:49)</a>:</h4>
+<p>From: Steven Obua &lt;<a href="mailto:obua@practal.com">obua@practal.com</a>&gt;<br>
+Hi Mathias,</p>
+<p>sorry, I don't have an example that I can easily share now. I tried to construct one, see below, where the lemma inside of the context cannot be sledgehammered, but the same lemma outside can. But in this smaller example it works, in my larger real-life theory it fails. </p>
+<p>I am not doubting that sledgehammer works in principle in locales, I am just wondering if it is generally known currently that there can be problems, or if I am just running into some weird special cases.</p>
+<p>Cheers,</p>
+<p>Steven</p>
+<hr>
+<p>theory TestSledge imports Main<br>
+begin</p>
+<p>typedecl 'a algebra<br>
+typedecl signature</p>
+<p>consts Algebra :: "'a algebra" <br>
+consts Sig :: "'a algebra ⇒ signature"</p>
+<p>type_synonym variable = string</p>
+<p>datatype nterm = VarApp variable "nterm list"</p>
+<p>axiomatization nt_frees :: "signature ⇒ nterm ⇒ variable set" where <br>
+  nt_frees_ax: "nt_frees sig (VarApp x ts) =  {x} ∪ ⋃ { nt_frees sig t | t. t ∈ set ts }"</p>
+<p>locale AA = <br>
+  fixes U :: "'a algebra" ("𝔄")</p>
+<p>context AA <br>
+begin</p>
+<p>abbreviation S :: "signature" ("𝒮") where "S ≡ Sig 𝔄" <br>
+abbreviation frees :: "nterm ⇒ variable set" where "frees t ≡ nt_frees 𝒮 t"</p>
+<p>lemma<br>
+  assumes "frees (VarApp x ts) ⊆ X"<br>
+  assumes "i &lt; length ts" <br>
+  shows "frees (ts ! i) ⊆ X"<br>
+  sledgehammer<br>
+  oops</p>
+<p>end</p>
+<p>lemma<br>
+  assumes "nt_frees (Sig U) (VarApp x ts) ⊆ X"<br>
+  assumes "i &lt; length ts" <br>
+  shows "nt_frees (Sig U) (ts ! i) ⊆ X"<br>
+  sledgehammer<br>
+  oops</p>
+<p>end</p>
+<p>On Mon, Jun 20, 2022, at 5:11 PM, Mathias Fleury wrote:</p>
+<blockquote>
+<p>Do you have an example theory where this happens?</p>
+<p>Mathias</p>
+<p>On 20/06/2022 15:26, Steven Obua wrote:</p>
+<blockquote>
+<p>Hi, </p>
+<p>I am a happy user of Isabelle/Isar and Sledgehammer, but am just now trying to also use locales, as in my use case there are just overwhelming arguments for it.</p>
+<p>I am using the Isabelle/December 2021 distribution, but most of the time when I am trying to use sledgehammer within a locale context, I will get a message like this:</p>
+<p><code>"cvc4": Prover error:
+exception TERM raised (line 457 of "~~/src/HOL/Tools/SMT/smt_translate.ML"): bad SMT term
+</code></p>
+<p>It is the same message for other provers as well. Is this something that is a well-known problem? Without using locales I had such a problem only come up when my theory name was confused with some HOL theory name, and renaming my theory was a workaround. Is there something similar at play here? Is there an easy fix? Because I use sledgehammer a lot, so not being able to use it within a locale would be a severe blow against using locales.</p>
+<p>Cheers,</p>
+<p>Steven<br>
+</p>
+</blockquote>
+</blockquote>
+
+
+
+<a name="286844423"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Sledgehammer%20in%20Locale%20Context%3F/near/286844423" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Sledgehammer.20in.20Locale.20Context.3F.html#286844423">(Jun 20 2022 at 22:32)</a>:</h4>
+<p>From: Gerwin Klein &lt;<a href="mailto:kleing@unsw.edu.au">kleing@unsw.edu.au</a>&gt;<br>
+Hi Steven,</p>
+<p>we've definitely had (many) cases where sledgehammer fails to find a proof in a larger locale context, but does find a proof outside the locale. I usually do not get an error message -- it's just timing out, because there are more facts in the context. I'd say that is completely expected behaviour.</p>
+<p>"bad SMT term" sounds to me like a genuine error case, though, and not expected.</p>
+<p>Cheers,<br>
+Gerwin</p>
+
+
+
+<a name="287189954"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Sledgehammer%20in%20Locale%20Context%3F/near/287189954" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Sledgehammer.20in.20Locale.20Context.3F.html#287189954">(Jun 23 2022 at 13:31)</a>:</h4>
+<p>From: Steven Obua &lt;<a href="mailto:obua@practal.com">obua@practal.com</a>&gt;<br>
+Hi Gerwin,</p>
+<p>My locale context is very small so far, so I wouldn't think that is an issue here. But it works now mostly for me, the problems seem to occur, when they occur, only with the provers cvc4, z3 and verit. </p>
+<p>Cheers,</p>
+<p>Steven</p>
+<p>On Mon, Jun 20, 2022, at 11:31 PM, Gerwin Klein wrote:</p>
+<blockquote>
+<p>Hi Steven, </p>
+<p>we've definitely had (many) cases where sledgehammer fails to find a proof in a larger locale context, but does find a proof outside the locale. I usually do not get an error message -- it's just timing out, because there are more facts in the context. I'd say that is completely expected behaviour.</p>
+<p>"bad SMT term" sounds to me like a genuine error case, though, and not expected.</p>
+<p>Cheers,<br>
+Gerwin</p>
+<p>On 21 Jun 2022, at 03:48, Steven Obua &lt;<a href="mailto:obua@practal.com">obua@practal.com</a>&gt; wrote:</p>
+<blockquote>
+<p>Hi Mathias,</p>
+<p>sorry, I don't have an example that I can easily share now. I tried to construct one, see below, where the lemma inside of the context cannot be sledgehammered, but the same lemma outside can. But in this smaller example it works, in my larger real-life theory it fails. </p>
+<p>I am not doubting that sledgehammer works in principle in locales, I am just wondering if it is generally known currently that there can be problems, or if I am just running into some weird special cases.</p>
+<p>Cheers,</p>
+<p>Steven</p>
+<hr>
+<p>theory TestSledge imports Main<br>
+begin</p>
+<p>typedecl 'a algebra<br>
+typedecl signature</p>
+<p>consts Algebra :: "'a algebra" <br>
+consts Sig :: "'a algebra ⇒ signature"</p>
+<p>type_synonym variable = string</p>
+<p>datatype nterm = VarApp variable "nterm list"</p>
+<p>axiomatization nt_frees :: "signature ⇒ nterm ⇒ variable set" where <br>
+  nt_frees_ax: "nt_frees sig (VarApp x ts) =  {x} ∪ ⋃ { nt_frees sig t | t. t ∈ set ts }"</p>
+<p>locale AA = <br>
+  fixes U :: "'a algebra" ("𝔄")</p>
+<p>context AA <br>
+begin</p>
+<p>abbreviation S :: "signature" ("𝒮") where "S ≡ Sig 𝔄" <br>
+abbreviation frees :: "nterm ⇒ variable set" where "frees t ≡ nt_frees 𝒮 t"</p>
+<p>lemma<br>
+  assumes "frees (VarApp x ts) ⊆ X"<br>
+  assumes "i &lt; length ts" <br>
+  shows "frees (ts ! i) ⊆ X"<br>
+  sledgehammer<br>
+  oops</p>
+<p>end</p>
+<p>lemma<br>
+  assumes "nt_frees (Sig U) (VarApp x ts) ⊆ X"<br>
+  assumes "i &lt; length ts" <br>
+  shows "nt_frees (Sig U) (ts ! i) ⊆ X"<br>
+  sledgehammer<br>
+  oops</p>
+<p>end</p>
+</blockquote>
+<p>On Mon, Jun 20, 2022, at 5:11 PM, Mathias Fleury wrote:</p>
+<blockquote>
+<blockquote>
+<p>Do you have an example theory where this happens?</p>
+<p>Mathias</p>
+</blockquote>
+<p>On 20/06/2022 15:26, Steven Obua wrote:</p>
+<blockquote>
+<blockquote>
+<p>Hi, </p>
+<p>I am a happy user of Isabelle/Isar and Sledgehammer, but am just now trying to also use locales, as in my use case there are just overwhelming arguments for it.<br>
+I am using the Isabelle/December 2021 distribution, but most of the time when I am trying to use sledgehammer within a locale context, I will get a message like this:</p>
+<p><code>"cvc4": Prover error:
+exception TERM raised (line 457 of "~~/src/HOL/Tools/SMT/smt_translate.ML"): bad SMT term
+</code></p>
+<p>It is the same message for other provers as well. Is this something that is a well-known problem? Without using locales I had such a problem only come up when my theory name was confused with some HOL theory name, and renaming my theory was a workaround. Is there something similar at play here? Is there an easy fix? Because I use sledgehammer a lot, so not being able to use it within a locale would be a severe blow against using locales.</p>
+<p>Cheers,</p>
+<p>Steven</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+
+
+
+<a name="287291778"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Sledgehammer%20in%20Locale%20Context%3F/near/287291778" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Sledgehammer.20in.20Locale.20Context.3F.html#287291778">(Jun 24 2022 at 05:45)</a>:</h4>
+<p>From: Mathias Fleury &lt;<a href="mailto:mathias.fleury12@gmail.com">mathias.fleury12@gmail.com</a>&gt;<br>
+Hi Steven,</p>
+<p>On 23/06/2022 15:30, Steven Obua wrote:</p>
+<blockquote>
+<p>Hi Gerwin,</p>
+<p>But it works now mostly for me, the problems seem to occur, when they <br>
+occur, only with the provers cvc4, z3 and verit.</p>
+</blockquote>
+<p>Given that these are the only SMT solver called by default from <br>
+Isabelle, this makes a lot of sense that you face that error only with them.</p>
+<p>Without example (I can look at big theories), it is impossible to debug <br>
+the problem.</p>
+<p>Cheers,</p>
+<p>Mathias</p>
+<blockquote>
+<p>Cheers,</p>
+<p>Steven</p>
+<p>On Mon, Jun 20, 2022, at 11:31 PM, Gerwin Klein wrote:</p>
+<blockquote>
+<p>Hi Steven,</p>
+<p>we've definitely had (many) cases where sledgehammer fails to find a <br>
+proof in a larger locale context, but does find a proof outside the <br>
+locale. I usually do not get an error message -- it's just timing <br>
+out, because there are more facts in the context. I'd say that is <br>
+completely expected behaviour.</p>
+<p>"bad SMT term" sounds to me like a genuine error case, though, and <br>
+not expected.</p>
+<p>Cheers,<br>
+Gerwin</p>
+<p>On 21 Jun 2022, at 03:48, Steven Obua &lt;<a href="mailto:obua@practal.com">obua@practal.com</a> </p>
+<blockquote>
+<p>&lt;mailto:<a href="mailto:obua@practal.com">obua@practal.com</a>&gt;&gt; wrote:</p>
+<p>Hi Mathias,</p>
+<p>sorry, I don't have an example that I can easily share now. I tried <br>
+to construct one, see below, where the lemma inside of the context <br>
+cannot be sledgehammered, but the same lemma outside can. But in <br>
+this smaller example it works, in my larger real-life theory it fails.</p>
+<p>I am not doubting that sledgehammer works in principle in locales, I <br>
+am just wondering if it is generally known currently that there can <br>
+be problems, or if I am just running into some weird special cases.</p>
+<p>Cheers,</p>
+<p>Steven</p>
+<hr>
+<p>theory TestSledge imports Main<br>
+begin</p>
+<p>typedecl 'a algebra<br>
+typedecl signature</p>
+<p>consts Algebra :: "'a algebra"<br>
+consts Sig :: "'a algebra ⇒ signature"</p>
+<p>type_synonym variable = string</p>
+<p>datatype nterm = VarApp variable "nterm list"</p>
+<p>axiomatization nt_frees :: "signature ⇒ nterm ⇒ variable set" where<br>
+  nt_frees_ax: "nt_frees sig (VarApp x ts) =  {x} ∪ ⋃ { nt_frees sig <br>
+t | t. t ∈ set ts }"</p>
+<p>locale AA =<br>
+  fixes U :: "'a algebra" ("𝔄")</p>
+<p>context AA<br>
+begin</p>
+<p>abbreviation S :: "signature" ("𝒮") where "S ≡ Sig 𝔄"<br>
+abbreviation frees :: "nterm ⇒ variable set" where "frees t ≡ <br>
+nt_frees 𝒮 t"</p>
+<p>lemma<br>
+  assumes "frees (VarApp x ts) ⊆ X"<br>
+  assumes "i &lt; length ts"<br>
+  shows "frees (ts ! i) ⊆ X"<br>
+  sledgehammer<br>
+  oops</p>
+<p>end</p>
+<p>lemma<br>
+  assumes "nt_frees (Sig U) (VarApp x ts) ⊆ X"<br>
+  assumes "i &lt; length ts"<br>
+  shows "nt_frees (Sig U) (ts ! i) ⊆ X"<br>
+  sledgehammer<br>
+  oops</p>
+<p>end</p>
+</blockquote>
+<p>On Mon, Jun 20, 2022, at 5:11 PM, Mathias Fleury wrote:</p>
+<blockquote>
+<blockquote>
+<p>Do you have an example theory where this happens?</p>
+<p>Mathias</p>
+</blockquote>
+<p>On 20/06/2022 15:26, Steven Obua wrote:</p>
+<blockquote>
+<blockquote>
+<p>Hi,</p>
+<p>I am a happy user of Isabelle/Isar and Sledgehammer, but am just <br>
+now trying to also use locales, as in my use case there are just <br>
+overwhelming arguments for it.<br>
+I am using the Isabelle/December 2021 distribution, but most of <br>
+the time when I am trying to use sledgehammer within a locale <br>
+context, I will get a message like this:</p>
+<p>|"cvc4": Prover error: exception TERM raised (line 457 of <br>
+"~~/src/HOL/Tools/SMT/smt_translate.ML"): bad SMT term |</p>
+<p>It is the same message for other provers as well. Is this <br>
+something that is a well-known problem? Without using locales I <br>
+had such a problem only come up when my theory name was confused <br>
+with some HOL theory name, and renaming my theory was a <br>
+workaround. Is there something similar at play here? Is there an <br>
+easy fix? Because I use sledgehammer a lot, so not being able to <br>
+use it within a locale would be a severe blow against using locales.</p>
+<p>Cheers,</p>
+<p>Steven<br>
+</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+
+
+
+<a name="287339299"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Sledgehammer%20in%20Locale%20Context%3F/near/287339299" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Sledgehammer.20in.20Locale.20Context.3F.html#287339299">(Jun 24 2022 at 14:39)</a>:</h4>
+<p>From: Steven Obua &lt;<a href="mailto:obua@practal.com">obua@practal.com</a>&gt;<br>
+Hi Mathias,</p>
+<p>I would not expect anyone to debug without an example, actually I would not expect anyone to debug!</p>
+<p>In case someone feels the inclination to do so, though, I have now made my theories publicly available. They are not very big (and I hope it stays that way!). It is work in progress and still early stages.</p>
+<p>An example of the error situation can be found at<br>
+<a href="https://github.com/practal/AL-in-HOL/blob/f4557af8109501450009777d03741b9efe56d885/Valuation.thy#L167">https://github.com/practal/AL-in-HOL/blob/f4557af8109501450009777d03741b9efe56d885/Valuation.thy#L167</a></p>
+<p>If you insert a call to sledgehammer there, you will get error messages of the type I talked about, see pictures below. I don't know though if outside of the locale the provers would succeed instead, or just timeout as well.</p>
+<p>Cheers,</p>
+<p>Steven</p>
+<p>On Fri, Jun 24, 2022, at 6:45 AM, Mathias Fleury wrote:</p>
+<blockquote>
+<p>Hi Steven,</p>
+<p>On 23/06/2022 15:30, Steven Obua wrote:</p>
+<blockquote>
+<p>Hi Gerwin,</p>
+<p>But it works now mostly for me, the problems seem to occur, when they occur, only with the provers cvc4, z3 and verit. <br>
+Given that these are the only SMT solver called by default from Isabelle, this makes a lot of sense that you face that error only with them.</p>
+</blockquote>
+<p>Without example (I can look at big theories), it is impossible to debug the problem.</p>
+<p>Cheers,</p>
+<p>Mathias</p>
+<blockquote>
+<p>Cheers,</p>
+<p>Steven<br>
+</p>
+</blockquote>
+<p>On Mon, Jun 20, 2022, at 11:31 PM, Gerwin Klein wrote:</p>
+<blockquote>
+<blockquote>
+<p>Hi Steven, </p>
+<p>we've definitely had (many) cases where sledgehammer fails to find a proof in a larger locale context, but does find a proof outside the locale. I usually do not get an error message -- it's just timing out, because there are more facts in the context. I'd say that is completely expected behaviour.</p>
+<p>"bad SMT term" sounds to me like a genuine error case, though, and not expected.</p>
+<p>Cheers,<br>
+Gerwin</p>
+<p>On 21 Jun 2022, at 03:48, Steven Obua &lt;<a href="mailto:obua@practal.com">obua@practal.com</a>&gt; wrote:</p>
+<blockquote>
+<p>Hi Mathias,</p>
+<p>sorry, I don't have an example that I can easily share now. I tried to construct one, see below, where the lemma inside of the context cannot be sledgehammered, but the same lemma outside can. But in this smaller example it works, in my larger real-life theory it fails. </p>
+<p>I am not doubting that sledgehammer works in principle in locales, I am just wondering if it is generally known currently that there can be problems, or if I am just running into some weird special cases.</p>
+<p>Cheers,</p>
+<p>Steven</p>
+<hr>
+<p>theory TestSledge imports Main<br>
+begin</p>
+<p>typedecl 'a algebra<br>
+typedecl signature</p>
+<p>consts Algebra :: "'a algebra" <br>
+consts Sig :: "'a algebra ⇒ signature"</p>
+<p>type_synonym variable = string</p>
+<p>datatype nterm = VarApp variable "nterm list"</p>
+<p>axiomatization nt_frees :: "signature ⇒ nterm ⇒ variable set" where <br>
+  nt_frees_ax: "nt_frees sig (VarApp x ts) =  {x} ∪ ⋃ { nt_frees sig t | t. t ∈ set ts }"</p>
+<p>locale AA = <br>
+  fixes U :: "'a algebra" ("𝔄")</p>
+<p>context AA <br>
+begin</p>
+<p>abbreviation S :: "signature" ("𝒮") where "S ≡ Sig 𝔄" <br>
+abbreviation frees :: "nterm ⇒ variable set" where "frees t ≡ nt_frees 𝒮 t"</p>
+<p>lemma<br>
+  assumes "frees (VarApp x ts) ⊆ X"<br>
+  assumes "i &lt; length ts" <br>
+  shows "frees (ts ! i) ⊆ X"<br>
+  sledgehammer<br>
+  oops</p>
+<p>end</p>
+<p>lemma<br>
+  assumes "nt_frees (Sig U) (VarApp x ts) ⊆ X"<br>
+  assumes "i &lt; length ts" <br>
+  shows "nt_frees (Sig U) (ts ! i) ⊆ X"<br>
+  sledgehammer<br>
+  oops</p>
+<p>end</p>
+</blockquote>
+<p>On Mon, Jun 20, 2022, at 5:11 PM, Mathias Fleury wrote:</p>
+<blockquote>
+<blockquote>
+<p>Do you have an example theory where this happens?</p>
+<p>Mathias</p>
+</blockquote>
+<p>On 20/06/2022 15:26, Steven Obua wrote:</p>
+<blockquote>
+<blockquote>
+<p>Hi, </p>
+<p>I am a happy user of Isabelle/Isar and Sledgehammer, but am just now trying to also use locales, as in my use case there are just overwhelming arguments for it.<br>
+I am using the Isabelle/December 2021 distribution, but most of the time when I am trying to use sledgehammer within a locale context, I will get a message like this:</p>
+<p><code>"cvc4": Prover error:
+exception TERM raised (line 457 of "~~/src/HOL/Tools/SMT/smt_translate.ML"): bad SMT term
+</code></p>
+<p>It is the same message for other provers as well. Is this something that is a well-known problem? Without using locales I had such a problem only come up when my theory name was confused with some HOL theory name, and renaming my theory was a workaround. Is there something similar at play here? Is there an easy fix? Because I use sledgehammer a lot, so not being able to use it within a locale would be a severe blow against using locales.</p>
+<p>Cheers,</p>
+<p>Steven</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+<p><a href="/user_uploads/14278/pMg-8J6fn2zc2nCvSQypmVHX/image.png">image.png</a><br>
+<a href="/user_uploads/14278/WMNGmWMscQ8XLU4LqN8japu2/image.png">image.png</a></p>
+</blockquote>
+</blockquote>
+
+
+
+<a name="287357826"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Sledgehammer%20in%20Locale%20Context%3F/near/287357826" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Sledgehammer.20in.20Locale.20Context.3F.html#287357826">(Jun 24 2022 at 17:03)</a>:</h4>
+<p>From: Mathias Fleury &lt;<a href="mailto:mathias.fleury12@gmail.com">mathias.fleury12@gmail.com</a>&gt;<br>
+Hi Steven,</p>
+<p>In your definition of eval, unfold the <code>let op =</code> and the SMT <br>
+translation will work.</p>
+<p>I am still looking for the reason for this though. There seem to be some <br>
+interaction between lambdas and lets.</p>
+<p>Mathias<br>
+<a href="/user_uploads/14278/EKgYKAhybx0qxTZ5wvjxOncC/image.png">image.png</a><br>
+<a href="/user_uploads/14278/-36LeDD7uWf_60cLvGxdlPsS/image.png">image.png</a></p>
+<div class="message_inline_image"><a href="/user_uploads/14278/EKgYKAhybx0qxTZ5wvjxOncC/image.png" title="image.png"><img src="/user_uploads/14278/EKgYKAhybx0qxTZ5wvjxOncC/image.png"></a></div><div class="message_inline_image"><a href="/user_uploads/14278/-36LeDD7uWf_60cLvGxdlPsS/image.png" title="image.png"><img src="/user_uploads/14278/-36LeDD7uWf_60cLvGxdlPsS/image.png"></a></div>
+
+
+
+<a name="287363016"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Sledgehammer%20in%20Locale%20Context%3F/near/287363016" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Sledgehammer.20in.20Locale.20Context.3F.html#287363016">(Jun 24 2022 at 17:51)</a>:</h4>
+<p>From: Steven Obua &lt;<a href="mailto:obua@practal.com">obua@practal.com</a>&gt;<br>
+Hi Mathias,</p>
+<p>thank you for finding this! Even if the bug cannot be fixed easily, it is definitely very helpful to know how to not run into it in the first place.</p>
+<p>Cheers,</p>
+<p>Steven</p>
+<p>On Fri, Jun 24, 2022, at 6:02 PM, Mathias Fleury wrote:</p>
+<blockquote>
+<p>Hi Steven,</p>
+<p>In your definition of eval, unfold the <code>let op =</code> and the SMT translation will work.</p>
+<p>I am still looking for the reason for this though. There seem to be some interaction between lambdas and lets.</p>
+<p>Mathias</p>
+<p>On 24/06/2022 16:37, Steven Obua wrote:</p>
+<blockquote>
+<p>Hi Mathias,</p>
+<p>I would not expect anyone to debug without an example, actually I would not expect anyone to debug!</p>
+<p>In case someone feels the inclination to do so, though, I have now made my theories publicly available. They are not very big (and I hope it stays that way!). It is work in progress and still early stages.</p>
+<p>An example of the error situation can be found at<br>
+<a href="https://github.com/practal/AL-in-HOL/blob/f4557af8109501450009777d03741b9efe56d885/Valuation.thy#L167">https://github.com/practal/AL-in-HOL/blob/f4557af8109501450009777d03741b9efe56d885/Valuation.thy#L167</a></p>
+<p>If you insert a call to sledgehammer there, you will get error messages of the type I talked about, see pictures below. I don't know though if outside of the locale the provers would succeed instead, or just timeout as well.</p>
+<p>Cheers,</p>
+<p>Steven</p>
+</blockquote>
+<p>On Fri, Jun 24, 2022, at 6:45 AM, Mathias Fleury wrote:</p>
+<blockquote>
+<blockquote>
+<p>Hi Steven,<br>
+</p>
+</blockquote>
+<p>On 23/06/2022 15:30, Steven Obua wrote:</p>
+<blockquote>
+<blockquote>
+<p>Hi Gerwin,</p>
+<p>But it works now mostly for me, the problems seem to occur, when they occur, only with the provers cvc4, z3 and verit. <br>
+Given that these are the only SMT solver called by default from Isabelle, this makes a lot of sense that you face that error only with them.</p>
+</blockquote>
+<p>Without example (I can look at big theories), it is impossible to debug the problem.</p>
+<p>Cheers,</p>
+<p>Mathias</p>
+<blockquote>
+<p>Cheers,</p>
+<p>Steven<br>
+</p>
+</blockquote>
+<p>On Mon, Jun 20, 2022, at 11:31 PM, Gerwin Klein wrote:</p>
+<blockquote>
+<blockquote>
+<p>Hi Steven, </p>
+<p>we've definitely had (many) cases where sledgehammer fails to find a proof in a larger locale context, but does find a proof outside the locale. I usually do not get an error message -- it's just timing out, because there are more facts in the context. I'd say that is completely expected behaviour.</p>
+<p>"bad SMT term" sounds to me like a genuine error case, though, and not expected.</p>
+<p>Cheers,<br>
+Gerwin</p>
+<p>On 21 Jun 2022, at 03:48, Steven Obua &lt;<a href="mailto:obua@practal.com">obua@practal.com</a>&gt; wrote:</p>
+<blockquote>
+<p>Hi Mathias,</p>
+<p>sorry, I don't have an example that I can easily share now. I tried to construct one, see below, where the lemma inside of the context cannot be sledgehammered, but the same lemma outside can. But in this smaller example it works, in my larger real-life theory it fails. </p>
+<p>I am not doubting that sledgehammer works in principle in locales, I am just wondering if it is generally known currently that there can be problems, or if I am just running into some weird special cases.</p>
+<p>Cheers,</p>
+<p>Steven</p>
+<hr>
+<p>theory TestSledge imports Main<br>
+begin</p>
+<p>typedecl 'a algebra<br>
+typedecl signature</p>
+<p>consts Algebra :: "'a algebra" <br>
+consts Sig :: "'a algebra ⇒ signature"</p>
+<p>type_synonym variable = string</p>
+<p>datatype nterm = VarApp variable "nterm list"</p>
+<p>axiomatization nt_frees :: "signature ⇒ nterm ⇒ variable set" where <br>
+  nt_frees_ax: "nt_frees sig (VarApp x ts) =  {x} ∪ ⋃ { nt_frees sig t | t. t ∈ set ts }"</p>
+<p>locale AA = <br>
+  fixes U :: "'a algebra" ("𝔄")</p>
+<p>context AA <br>
+begin</p>
+<p>abbreviation S :: "signature" ("𝒮") where "S ≡ Sig 𝔄" <br>
+abbreviation frees :: "nterm ⇒ variable set" where "frees t ≡ nt_frees 𝒮 t"</p>
+<p>lemma<br>
+  assumes "frees (VarApp x ts) ⊆ X"<br>
+  assumes "i &lt; length ts" <br>
+  shows "frees (ts ! i) ⊆ X"<br>
+  sledgehammer<br>
+  oops</p>
+<p>end</p>
+<p>lemma<br>
+  assumes "nt_frees (Sig U) (VarApp x ts) ⊆ X"<br>
+  assumes "i &lt; length ts" <br>
+  shows "nt_frees (Sig U) (ts ! i) ⊆ X"<br>
+  sledgehammer<br>
+  oops</p>
+<p>end</p>
+</blockquote>
+<p>On Mon, Jun 20, 2022, at 5:11 PM, Mathias Fleury wrote:</p>
+<blockquote>
+<blockquote>
+<p>Do you have an example theory where this happens?</p>
+<p>Mathias</p>
+</blockquote>
+<p>On 20/06/2022 15:26, Steven Obua wrote:</p>
+<blockquote>
+<blockquote>
+<p>Hi, </p>
+<p>I am a happy user of Isabelle/Isar and Sledgehammer, but am just now trying to also use locales, as in my use case there are just overwhelming arguments for it.<br>
+I am using the Isabelle/December 2021 distribution, but most of the time when I am trying to use sledgehammer within a locale context, I will get a message like this:</p>
+<p><code>"cvc4": Prover error:
+exception TERM raised (line 457 of "~~/src/HOL/Tools/SMT/smt_translate.ML"): bad SMT term
+</code></p>
+<p>It is the same message for other provers as well. Is this something that is a well-known problem? Without using locales I had such a problem only come up when my theory name was confused with some HOL theory name, and renaming my theory was a workaround. Is there something similar at play here? Is there an easy fix? Because I use sledgehammer a lot, so not being able to use it within a locale would be a severe blow against using locales.</p>
+<p>Cheers,</p>
+<p>Steven<br>
+</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+<p><a href="/user_uploads/14278/OysRs1law6ghytaNrdWW3rH9/image.png">image.png</a><br>
+<a href="/user_uploads/14278/1DBRaYbmNsb9G0XYgoKz-ubR/image.png">image.png</a></p>
+</blockquote>
+</blockquote>
+
+
+
+<a name="287363352"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Sledgehammer%20in%20Locale%20Context%3F/near/287363352" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Sledgehammer.20in.20Locale.20Context.3F.html#287363352">(Jun 24 2022 at 17:54)</a>:</h4>
+<p>From: Mathias Fleury &lt;<a href="mailto:mathias.fleury12@gmail.com">mathias.fleury12@gmail.com</a>&gt;<br>
+Hi Steven,</p>
+<p>I found the bug: there is missing recursive call of expand at <br>
+<a href="https://isabelle.in.tum.de/repos/isabelle/file/tip/src/HOL/Tools/SMT/smt_translate.ML#l216">https://isabelle.in.tum.de/repos/isabelle/file/tip/src/HOL/Tools/SMT/smt_translate.ML#l216</a>. <br>
+So lets inside lets are not expanded.</p>
+<p>If testboard does not complain about my patch, I will push it.</p>
+<p>Thanks for reporting the bug!</p>
+<p>Mathias<br>
+<a href="/user_uploads/14278/fhOiWQO9ofD9sBUYiQbLL3xs/image.png">image.png</a><br>
+<a href="/user_uploads/14278/9JUczuTHqVLju0NTCVXHkT0J/image.png">image.png</a></p>
+<div class="message_inline_image"><a href="/user_uploads/14278/fhOiWQO9ofD9sBUYiQbLL3xs/image.png" title="image.png"><img src="/user_uploads/14278/fhOiWQO9ofD9sBUYiQbLL3xs/image.png"></a></div><div class="message_inline_image"><a href="/user_uploads/14278/9JUczuTHqVLju0NTCVXHkT0J/image.png" title="image.png"><img src="/user_uploads/14278/9JUczuTHqVLju0NTCVXHkT0J/image.png"></a></div>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

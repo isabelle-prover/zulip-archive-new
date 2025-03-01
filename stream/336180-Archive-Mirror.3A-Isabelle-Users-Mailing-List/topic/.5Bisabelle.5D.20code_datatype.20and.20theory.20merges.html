@@ -1,0 +1,154 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] code_datatype and theory merges · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20code_datatype.20and.20theory.20merges.html">[isabelle] code_datatype and theory merges</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294135585"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20code_datatype%20and%20theory%20merges/near/294135585" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20code_datatype.20and.20theory.20merges.html#294135585">(Aug 18 2022 at 17:37)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@kit.edu">andreas.lochbihler@kit.edu</a>&gt;<br>
+Dear all,</p>
+<p>I stumbled over the following problem with code_datatype and theory merges. It <br>
+involves 4 theories with diamond inheritance:</p>
+<ol>
+<li>The first theory defines a type and a refined representation for code generation.</li>
+</ol>
+<p>theory Scratch1 imports Main begin</p>
+<p>typedef type = "UNIV :: int set"<br>
+   morphisms rep_Foo Foo<br>
+by blast</p>
+<p>definition Bar where [code del]: "Bar n = Foo (n + 1)"<br>
+code_datatype Bar</p>
+<p>lemma Foo_code [code]: "Foo n = Bar (n - 1)"<br>
+by(simp add: Bar_def)</p>
+<p>end</p>
+<ol start="2">
+<li>The next theory Scratch2 changes the refinement such that Foo is the new <br>
+constructor in the generated code and Bar is implemented in terms of Foo.</li>
+</ol>
+<p>theory Scratch2 imports Scratch1 begin<br>
+declare Foo_code [code del]<br>
+code_datatype Foo<br>
+declare Bar_def [code]<br>
+end</p>
+<ol start="3">
+<li>Scratch3 does nothing but introduce an empty theory.</li>
+</ol>
+<p>theory Scratch3 imports Scratch1 begin end</p>
+<ol start="4">
+<li>Scratch4 merges Scratch2 and Scratch3, the order is irrelevant for the following.</li>
+</ol>
+<p>theory Scratch4 imports Scratch3 Scratch2 begin</p>
+<p>(* This is where the trouble begins: The theory merge imports the code equation <br>
+Bar_def declared in Scratch2 <em>and</em> Foo_code from Scratch, which is visible via <br>
+Scratch3. *)</p>
+<p>code_thms Bar</p>
+<p>produces the following error:</p>
+<p>*** Constructor as head in equation:<br>
+*** Foo ?n ==<br>
+*** Bar (minus_int_inst.minus_int ?n<br>
+***       (number_int_inst.number_of_int (Int.Bit1 Int.Pls)))<br>
+*** At command "code_thms"</p>
+<p>Deleting the offending theorem Foo_code is not straight forward:</p>
+<p>declare Foo_code [code del]<br>
+code_thms Bar</p>
+<p>still gives the same error. To me, this looks like a bug in the code generator.<br>
+I found a way to get rid of the offending equation in Scratch4, but I don't <br>
+consider this a reasonable solution:</p>
+<p>code_datatype Bar<br>
+declare Foo_code [code del]<br>
+code_datatype Foo</p>
+<p>Although the example is constructed, such weird hiearchies and code_datatype <br>
+redeclarations do occur in practice. An example: Restore the code generator <br>
+setup from HOL/Libray/Cset for Cset.set after loading HOL/Library/Dlist. By the <br>
+way, this has been the reason for Lukas proposing to split the data structure <br>
+theories in HOL/Library.</p>
+<p>I'd be glad if anyone of the developers looked into this issue.</p>
+<p>Andreas</p>
+
+
+
+<a name="294136232"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20code_datatype%20and%20theory%20merges/near/294136232" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20code_datatype.20and.20theory.20merges.html#294136232">(Aug 18 2022 at 17:40)</a>:</h4>
+<p>From: Lukas Bulwahn &lt;<a href="mailto:bulwahn@in.tum.de">bulwahn@in.tum.de</a>&gt;<br>
+On 04/21/2011 02:43 PM, Andreas Lochbihler wrote:</p>
+<blockquote>
+<p>Dear all,</p>
+<p>I stumbled over the following problem with code_datatype and theory <br>
+merges. It involves 4 theories with diamond inheritance:</p>
+<ol>
+<li>The first theory defines a type and a refined representation for <br>
+code generation.</li>
+</ol>
+<p>theory Scratch1 imports Main begin</p>
+<p>typedef type = "UNIV :: int set"<br>
+  morphisms rep_Foo Foo<br>
+by blast</p>
+<p>definition Bar where [code del]: "Bar n = Foo (n + 1)"<br>
+code_datatype Bar</p>
+<p>lemma Foo_code [code]: "Foo n = Bar (n - 1)"<br>
+by(simp add: Bar_def)</p>
+<p>end</p>
+<ol start="2">
+<li>The next theory Scratch2 changes the refinement such that Foo is <br>
+the new constructor in the generated code and Bar is implemented in <br>
+terms of Foo.</li>
+</ol>
+<p>theory Scratch2 imports Scratch1 begin<br>
+declare Foo_code [code del]<br>
+code_datatype Foo<br>
+declare Bar_def [code]<br>
+end</p>
+<ol start="3">
+<li>Scratch3 does nothing but introduce an empty theory.</li>
+</ol>
+<p>theory Scratch3 imports Scratch1 begin end</p>
+<ol start="4">
+<li>Scratch4 merges Scratch2 and Scratch3, the order is irrelevant for <br>
+the following.</li>
+</ol>
+<p>theory Scratch4 imports Scratch3 Scratch2 begin</p>
+<p>(* This is where the trouble begins: The theory merge imports the code <br>
+equation Bar_def declared in Scratch2 <em>and</em> Foo_code from Scratch, <br>
+which is visible via Scratch3. *)</p>
+<p>code_thms Bar</p>
+<p>produces the following error:</p>
+<p>*** Constructor as head in equation:<br>
+*** Foo ?n ==<br>
+*** Bar (minus_int_inst.minus_int ?n<br>
+***       (number_int_inst.number_of_int (Int.Bit1 Int.Pls)))<br>
+*** At command "code_thms"</p>
+<p>Deleting the offending theorem Foo_code is not straight forward:</p>
+<p>declare Foo_code [code del]<br>
+code_thms Bar</p>
+<p>still gives the same error. To me, this looks like a bug in the code <br>
+generator.<br>
+I found a way to get rid of the offending equation in Scratch4, but I <br>
+don't consider this a reasonable solution:</p>
+<p>code_datatype Bar<br>
+declare Foo_code [code del]<br>
+code_datatype Foo</p>
+<p>Although the example is constructed, such weird hiearchies and <br>
+code_datatype redeclarations do occur in practice. An example: Restore <br>
+the code generator setup from HOL/Libray/Cset for Cset.set after <br>
+loading HOL/Library/Dlist. By the way, this has been the reason for <br>
+Lukas proposing to split the data structure theories in HOL/Library.</p>
+<p>I'd be glad if anyone of the developers looked into this issue.<br>
+</p>
+</blockquote>
+<p>This issue has been resolved by 42d607a9ae65 in the development version.</p>
+<p>Lukas</p>
+<blockquote>
+<p>Andreas<br>
+</p>
+</blockquote>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

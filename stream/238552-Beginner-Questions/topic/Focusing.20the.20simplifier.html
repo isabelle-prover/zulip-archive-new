@@ -1,0 +1,172 @@
+<html>
+<head><meta charset="utf-8"><title>Focusing the simplifier · Beginner Questions · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/index.html">Beginner Questions</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Focusing.20the.20simplifier.html">Focusing the simplifier</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="351998609"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Focusing%20the%20simplifier/near/351998609" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Hanno Becker <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Focusing.20the.20simplifier.html#351998609">(Apr 23 2023 at 05:50)</a>:</h4>
+<p>Hi! Is there a way to focus the simplifier on part of the current subgoal's conclusion? Say my goal  has the shape <code>a0 OP a1</code> with <code>a1</code> being a very complex term which however doesn't matter yet at the stage of the proof. How could I tell the simplifier to only simplify <code>a0</code>, _but_ take into account the subgoals premises as usual? And, as a variant, how could I tell the simplifier to ignore _some_ assumptions? The current <code>simp (no_asm_use)</code> only switches between using all and ignoring all.</p>
+
+
+
+<a name="352036576"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Focusing%20the%20simplifier/near/352036576" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Lukas Stevens <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Focusing.20the.20simplifier.html#352036576">(Apr 23 2023 at 10:36)</a>:</h4>
+<p>Currently, this is unfortunately not possible. You could use Rewrite in HOL-Library, but that tatctic only applies a single equation.</p>
+
+
+
+<a name="352038264"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Focusing%20the%20simplifier/near/352038264" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Lukas Stevens <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Focusing.20the.20simplifier.html#352038264">(Apr 23 2023 at 10:48)</a>:</h4>
+<p>It shouldn't be too hard to modify the rewrite tactic to use the simplifier, though.</p>
+
+
+
+<a name="352105281"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Focusing%20the%20simplifier/near/352105281" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Hanno Becker <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Focusing.20the.20simplifier.html#352105281">(Apr 23 2023 at 18:02)</a>:</h4>
+<p>Thank you Lukas, I'll have a look.</p>
+
+
+
+<a name="352106219"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Focusing%20the%20simplifier/near/352106219" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Hanno Becker <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Focusing.20the.20simplifier.html#352106219">(Apr 23 2023 at 18:09)</a>:</h4>
+<p>Can one perhaps abstract the conclusion to a generic function application with the single argument being the sub-term to be simplified, then simplify this abstracted goal, and finally transform back into the original goal by instantiating the function accordingly?</p>
+
+
+
+<a name="352161670"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Focusing%20the%20simplifier/near/352161670" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Focusing.20the.20simplifier.html#352161670">(Apr 24 2023 at 05:00)</a>:</h4>
+<p>The SMT method is doing things like that internally a lot for speed. For example, the following from <code>~~src/HOL/Tools/SMT/z3_replay_methods.ML</code>) ignores everything that is not an arithmetic term:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">fun</span><span class="w"> </span><span class="n">arith_th_lemma</span><span class="w"> </span><span class="n">ctxt</span><span class="w"> </span><span class="n">thms</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">=</span>
+<span class="w">  </span><span class="n">SMT_Replay_Methods.prove_abstract</span><span class="w"> </span><span class="n">ctxt</span><span class="w"> </span><span class="n">thms</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="n">arith_th_lemma_tac</span><span class="w"> </span><span class="o">(</span>
+<span class="w">    </span><span class="n">fold_map</span><span class="w"> </span><span class="o">(</span><span class="n">SMT_Replay_Methods.abstract_arith</span><span class="w"> </span><span class="n">ctxt</span><span class="w"> </span><span class="n">o</span><span class="w"> </span><span class="n">dest_thm</span><span class="o">)</span><span class="w"> </span><span class="n">thms</span><span class="w"> </span><span class="n">##&gt;&gt;</span>
+<span class="w">    </span><span class="n">SMT_Replay_Methods.abstract_arith</span><span class="w"> </span><span class="n">ctxt</span><span class="w"> </span><span class="o">(</span><span class="n">dest_prop</span><span class="w"> </span><span class="n">t</span><span class="o">))</span>
+</code></pre></div>
+<p>but I don't know how useful this would be for you.</p>
+
+
+
+<a name="352163238"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Focusing%20the%20simplifier/near/352163238" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Hanno Becker <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Focusing.20the.20simplifier.html#352163238">(Apr 24 2023 at 05:10)</a>:</h4>
+<p>Interesting, thanks Mathias! I will have a look and see if/how it could be adapted</p>
+
+
+
+<a name="352163519"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Focusing%20the%20simplifier/near/352163519" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Hanno Becker <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Focusing.20the.20simplifier.html#352163519">(Apr 24 2023 at 05:12)</a>:</h4>
+<p>What about ignoring some assumptions? In some situations close to finishing a goal, I can just filter out irrelevant premises, but generally, I'd like to tell the simplifier to ignore some assumptions, but not remove them</p>
+
+
+
+<a name="352164106"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Focusing%20the%20simplifier/near/352164106" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Focusing.20the.20simplifier.html#352164106">(Apr 24 2023 at 05:16)</a>:</h4>
+<p>you could abstract them away too</p>
+
+
+
+<a name="352164295"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Focusing%20the%20simplifier/near/352164295" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Focusing.20the.20simplifier.html#352164295">(Apr 24 2023 at 05:18)</a>:</h4>
+<p>or <code>Subgoal.FOCUS</code> after abstracting</p>
+
+
+
+<a name="352169280"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Focusing%20the%20simplifier/near/352169280" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Hanno Becker <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Focusing.20the.20simplifier.html#352169280">(Apr 24 2023 at 05:50)</a>:</h4>
+<p>Do you mind explaining a bit more how <code>prove_abstract</code> is to be used (and how it works)? I see you're one of the authors of <code>z3_replay_methods.ML</code></p>
+
+
+
+<a name="352173322"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Focusing%20the%20simplifier/near/352173322" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Focusing.20the.20simplifier.html#352173322">(Apr 24 2023 at 06:13)</a>:</h4>
+<p>Here is a small example where I embedded it into a tactic:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="c">(*declare [[simp_trace]]*)</span>
+<span class="kn">lemma</span><span class="w"> </span><span class="s">"(if xy then a else b) + 2= (if xy then a else b) + 2"</span>
+<span class="w">  </span><span class="kp">apply</span><span class="w"> </span><span class="o">(</span><span class="n">raw_tactic</span><span class="w"> </span><span class="s">‹HEADGOAL ((Subgoal.FOCUS (fn  {context, prems, concl, ...} =&gt;</span>
+<span class="s">     let val thm = @{print} (SMT_Replay_Methods.arith_th_lemma_wo_shallow context prems (Thm.term_of concl))</span>
+<span class="s">     val _ = @{print} ("concl = ", concl)</span>
+<span class="s">     in HEADGOAL (resolve_tac context [thm]) THEN print_tac context "stuff" end) @{context}))›</span><span class="o">)</span>
+<span class="w">  </span><span class="k">done</span>
+</code></pre></div>
+
+
+
+<a name="352173556"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Focusing%20the%20simplifier/near/352173556" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Focusing.20the.20simplifier.html#352173556">(Apr 24 2023 at 06:14)</a>:</h4>
+<p>prove_abstract takes several arguments, the important ones are the conclusion (as a term), the premises (as premises), and a function to abstract</p>
+
+
+
+<a name="352173630"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Focusing%20the%20simplifier/near/352173630" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Focusing.20the.20simplifier.html#352173630">(Apr 24 2023 at 06:14)</a>:</h4>
+<p>The function to abstract iterates over the term and decides to abstract a term or to continue going into the term itself</p>
+
+
+
+<a name="352173901"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Focusing%20the%20simplifier/near/352173901" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Focusing.20the.20simplifier.html#352173901">(Apr 24 2023 at 06:16)</a>:</h4>
+<p>For example, abstract_arith_shallow (used in the example above) goes into disjunction, but does not go into if-then-else (put the simp_trace back in to see what the simplifier is handling: it does not see the if-then-else and instead has a term <code>t1</code> that abstracts away)</p>
+
+
+
+<a name="352177093"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Focusing%20the%20simplifier/near/352177093" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Focusing.20the.20simplifier.html#352177093">(Apr 24 2023 at 06:34)</a>:</h4>
+<p>For now, prove_abstract supports only a syntactic criterion, but generalization should be easy… (although you need to copy-paste the code)</p>
+
+
+
+<a name="352183153"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Focusing%20the%20simplifier/near/352183153" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Kevin Kappelmann <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Focusing.20the.20simplifier.html#352183153">(Apr 24 2023 at 07:11)</a>:</h4>
+<p>Is your goal always of the shape <code>OP x y</code> where <code>OP</code> is a constant? Because then you may simply use an appropriate congruence rule and pass it to the simplifier.</p>
+
+
+
+<a name="352626985"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Focusing%20the%20simplifier/near/352626985" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Hanno Becker <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Focusing.20the.20simplifier.html#352626985">(Apr 25 2023 at 19:44)</a>:</h4>
+<p><span class="user-mention" data-user-id="233154">@Kevin Kappelmann</span> Not always, but in some meaningful cases, yes. Can you elaborate how I'd instruct the simplifier to ignore <code>y</code> in this case and only simplify <code>x</code>?</p>
+
+
+
+<a name="353891052"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Focusing%20the%20simplifier/near/353891052" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Kevin Kappelmann <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Focusing.20the.20simplifier.html#353891052">(Apr 28 2023 at 14:09)</a>:</h4>
+<p><span class="user-mention" data-user-id="570503">@Hanno Becker</span> sorry for the late reply. Here's an example:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">definition</span><span class="w"> </span><span class="s">"SIMPS_TO s t ≡ s = t"</span>
+
+<span class="kn">lemma</span><span class="w"> </span><span class="n">SIMPS_TO_iff</span><span class="o">:</span><span class="w"> </span><span class="s">"SIMPS_TO s t ⟷ s = t"</span><span class="w"> </span><span class="k">unfolding</span><span class="w"> </span><span class="n">SIMPS_TO_def</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">simp</span>
+
+<span class="k">text</span><span class="w"> </span><span class="s">‹Prevent simplification of second argument›</span>
+<span class="kn">lemma</span><span class="w"> </span><span class="n">SIMPS_TO_cong</span><span class="w"> </span><span class="o">[</span><span class="n">cong</span><span class="o">]:</span><span class="w"> </span><span class="s">"s = s' ⟹ SIMPS_TO s t = SIMPS_TO s' t"</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">simp</span>
+
+<span class="kn">lemma</span><span class="w"> </span><span class="n">SIMPS_TOI</span><span class="o">:</span><span class="w"> </span><span class="s">"SIMPS_TO s s"</span><span class="w"> </span><span class="k">unfolding</span><span class="w"> </span><span class="n">SIMPS_TO_iff</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">simp</span>
+
+<span class="kn">lemma</span><span class="w"> </span><span class="s">"SIMPS_TO (0 + 0 :: nat) (0 + 0)"</span>
+<span class="w">  </span><span class="kp">apply</span><span class="w"> </span><span class="o">(</span><span class="n">simp</span><span class="o">)</span><span class="w"> </span><span class="c">(*simplifies only the first argument*)</span>
+<span class="w">  </span><span class="gr">oops</span>
+
+<span class="c">(*you can use it to find the normal form of a term in a given context like this:*)</span>
+<span class="n">schematic_goal</span><span class="w"> </span><span class="s">"x = 0 ⟹ SIMPS_TO (0 + 0 + x :: nat) ?X"</span>
+<span class="w">  </span><span class="kp">apply</span><span class="w"> </span><span class="o">(</span><span class="n">simp</span><span class="o">)</span>
+<span class="w">  </span><span class="kp">apply</span><span class="w"> </span><span class="o">(</span><span class="n">rule</span><span class="w"> </span><span class="n">SIMPS_TOI</span><span class="o">)</span>
+<span class="w">  </span><span class="k">done</span>
+</code></pre></div>
+
+
+
+<a name="353891621"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Focusing%20the%20simplifier/near/353891621" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Kevin Kappelmann <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Focusing.20the.20simplifier.html#353891621">(Apr 28 2023 at 14:10)</a>:</h4>
+<p>I actually wrote some library functionality for this purpose a couple of days ago. If you are happy to wait another few days, I can share the code with you next week.</p>
+
+
+
+<a name="354879263"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Focusing%20the%20simplifier/near/354879263" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Hanno Becker <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Focusing.20the.20simplifier.html#354879263">(May 01 2023 at 13:37)</a>:</h4>
+<p>Thank you Kevin, that's great and already helps me. I'll likely have further questions on how to best controlled-restrict the simplifier, but I'll read a bit more first.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

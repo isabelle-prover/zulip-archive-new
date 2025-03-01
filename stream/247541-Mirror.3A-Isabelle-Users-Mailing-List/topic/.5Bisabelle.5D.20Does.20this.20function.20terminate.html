@@ -1,0 +1,107 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Does this function terminate · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Does.20this.20function.20terminate.html">[isabelle] Does this function terminate</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="291990860"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Does%20this%20function%20terminate/near/291990860" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Does.20this.20function.20terminate.html#291990860">(Aug 04 2022 at 10:50)</a>:</h4>
+<p>From: Li Yongjian &lt;<a href="mailto:lyj238@gmail.com">lyj238@gmail.com</a>&gt;<br>
+Dear experts:</p>
+<p>The following function is transformed from a function defined in a<br>
+lazy-evaluated function language HAWK.</p>
+<p>[image: image.png]<br>
+I. change it into Isabelle Form, but can' t prove its termination. I think<br>
+Isabelle's evaluation is not lazy, so its termination can't be proved?</p>
+<p>function  nextSig::"bool signal⇒ nat signal" and<br>
+outputSig ::"bool signal ⇒ nat signal" where<br>
+next1:"nextSig bS=delay 0 (outputSig bS)" |<br>
+output1:"outputSig bS = sel bS (constantInt 0) (inc (nextSig bS)) "<br>
+  apply pat_completeness<br>
+  by auto<br>
+termination</p>
+<p>see the attached file</p>
+<p>regards!<br>
+<a href="/user_uploads/14278/7LZfiibuoMp3SfM3FfXuZndu/image.png">image.png</a><br>
+<a href="/user_uploads/14278/fBfLXVkhOmIW3totNtW6oB3N/hawk.thy">hawk.thy</a></p>
+<div class="message_inline_image"><a href="/user_uploads/14278/7LZfiibuoMp3SfM3FfXuZndu/image.png" title="image.png"><img src="/user_uploads/14278/7LZfiibuoMp3SfM3FfXuZndu/image.png"></a></div>
+
+
+
+<a name="292088484"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Does%20this%20function%20terminate/near/292088484" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Does.20this.20function.20terminate.html#292088484">(Aug 05 2022 at 00:30)</a>:</h4>
+<p>From: Wenda Li &lt;<a href="mailto:wl302@cam.ac.uk">wl302@cam.ac.uk</a>&gt;<br>
+Dear Yongjian,</p>
+<p>In you case, I believe you need a bound function of type “bool signal =&gt; nat" such that with each recursion the output of this function decreases.</p>
+<p>For example, in HOL-Computational_Algebra.Polynomial the bound function ‘degree’ is needed to show that the polynomial derivative function terminates:</p>
+<p>function pderiv :: "('a :: {comm_semiring_1,semiring_no_zero_divisors}) poly ⇒ 'a poly"<br>
+  where "pderiv (pCons a p) = (if p = 0 then 0 else p + pCons 0 (pderiv p))"<br>
+  by (auto intro: pCons_cases)<br>
+termination pderiv<br>
+  by (relation "measure degree") simp_all</p>
+<p>Hope this helps,<br>
+Wenda</p>
+
+
+
+<a name="292124273"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Does%20this%20function%20terminate/near/292124273" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Does.20this.20function.20terminate.html#292124273">(Aug 05 2022 at 08:45)</a>:</h4>
+<p>From: Thomas Sewell &lt;<a href="mailto:tals4@cam.ac.uk">tals4@cam.ac.uk</a>&gt;<br>
+You're in a fiddly situation here, unfortunately.</p>
+<p>You typically begin such a termination proof with the "measure" command. There used to be another way, but apparently the relevant theorems were hidden (?).</p>
+<p>If you apply "measure X" after "termination" in your problem, you'll see what needs to be true of your measure. Unfortunately, it's impossible, at the moment.</p>
+<p>The first problem is that your signal functions aren't passing arguments to each other that are decreasing in some measure. In this case, you can apply the clumsy fix of eta-expanding all the rules of the function definition:</p>
+<p>function  nextSig::"bool signal⇒ nat signal" and<br>
+outputSig ::"bool signal ⇒ nat signal" where<br>
+next1:"nextSig bS x = delay 0 (outputSig bS) x" |<br>
+output1:"outputSig bS x = sel bS (constantInt 0) (inc (nextSig bS)) x"<br>
+  apply pat_completeness<br>
+  by auto</p>
+<p>The value "x" is now being passed through the recursion in a way that it decreases. But, that's a byproduct of the way that the combinators delay, sel and inc work. To provide this information to the function package, you need to add congruence rules that look like this:</p>
+<p>lemma inc_cong[fundef_cong]:<br>
+  "(⋀j. n = j ⟹ f j = f' j) ⟹ n = n' ⟹ inc f n = inc f' n'"<br>
+  by (simp add: inc_def lift_def)</p>
+<p>This shape of congruence is used to allow either the simplifier or the fundef package to know that the parameter passed to "f" in "inc f n" will be the same n. Add the correct collection of congruences, and the goal you'll see after "measure" in termination will start to look provable. In fact, the fun package can pick the measure and prove it all by itself, once it has the right information available.</p>
+<p>I attach a partly completed version of your theory.</p>
+<p>The above approach is pretty clunky. There has been a lot of work on supporting other styles of termination/fixpoint definition. See, perhaps, Alexander Krauss' PhD at <a href="https://www21.in.tum.de/~krauss/">https://www21.in.tum.de/~krauss/</a> ? Is there a more up-to-date reference? Anyway, it might be possible to sidestep the manual eta-expansion above, especially if the signal type ends up needing more features than just its evolution over time.</p>
+<p>Good luck with it,<br>
+    Thomas.</p>
+<p>This recursive function isn't exactly terminating because it's passing an argument that's getting smaller. Rather, it's passing an argument that becomes more precise with each iteration. Unfortunately the function package doesn't do the right thing by default.<br>
+<a href="/user_uploads/14278/Bf2ceOgDeOZngBLnrbhFlZvr/image.png">image.png</a><br>
+<a href="/user_uploads/14278/NEOPXQSgtkQYuk1sG6JrVaZA/hawk.thy">hawk.thy</a></p>
+<div class="message_inline_image"><a href="/user_uploads/14278/Bf2ceOgDeOZngBLnrbhFlZvr/image.png" title="image.png"><img src="/user_uploads/14278/Bf2ceOgDeOZngBLnrbhFlZvr/image.png"></a></div>
+
+
+
+<a name="292127982"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Does%20this%20function%20terminate/near/292127982" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Does.20this.20function.20terminate.html#292127982">(Aug 05 2022 at 09:22)</a>:</h4>
+<p>From: Lawrence Paulson &lt;<a href="mailto:lp15@cam.ac.uk">lp15@cam.ac.uk</a>&gt;<br>
+This looks like a job for co-recursion, not terminating recursion, and I hope that an expert on that topic can provide a precise solution.</p>
+<p>Larry Paulson</p>
+
+
+
+<a name="292310700"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Does%20this%20function%20terminate/near/292310700" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Does.20this.20function.20terminate.html#292310700">(Aug 07 2022 at 09:52)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:mail@andreas-lochbihler.de">mail@andreas-lochbihler.de</a>&gt;<br>
+Dear Li,</p>
+<p>as Larry pointed out, this is really something for corecursion. Isabelle's support for <br>
+friendly corecursion (<a href="http://dx.doi.org/10.1007/978-3-662-54434-1_5">http://dx.doi.org/10.1007/978-3-662-54434-1_5</a>) can handle all the <br>
+definitions in the theory without trouble. I've attached a commented theory of how this <br>
+could look like.</p>
+<p>The implementation of the BNF_Corec package has still a few rough edges and limitations, <br>
+but it worked out of the box for the examples in your theory. Please let us know if you <br>
+run into any trouble and we'll be happy to figure out some workaround when possible.</p>
+<p>Hope this helps,<br>
+Andreas<br>
+<a href="/user_uploads/14278/oKT4VLJoQ85_5jHg7GWfQRYe/hawk.thy">hawk.thy</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

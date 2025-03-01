@@ -1,0 +1,128 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] [Agda] Prior work on proof assistant performan... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20.5BAgda.5D.20Prior.20work.20on.20proof.20assistant.20performan.2E.2E.2E.html">[isabelle] [Agda] Prior work on proof assistant performan...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294829009"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20%5BAgda%5D%20Prior%20work%20on%20proof%20assistant%20performan.../near/294829009" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20.5BAgda.5D.20Prior.20work.20on.20proof.20assistant.20performan.2E.2E.2E.html#294829009">(Aug 23 2022 at 09:08)</a>:</h4>
+<p>From: Jason Gross &lt;<a href="mailto:jasongross9@gmail.com">jasongross9@gmail.com</a>&gt;<br>
+Thanks!  This is very interesting.  (And thanks all for sources.)</p>
+<p>I'm still digesting this, but have one question already:</p>
+<blockquote>
+<p>Clearly, we should use NbE/environment machines for evaluation, and<br>
+implement conversion checking in the semantic domain.</p>
+</blockquote>
+<p>Does this mean that we can't be agnostic about whether or not we're<br>
+supporting HoTT, because we either have to pick set theory/irrelevant<br>
+equality proofs or cubical (or some other model of HoTT) when normalizing<br>
+proofs of equality?</p>
+<blockquote>
+<p>I'd be very interested in your findings about proof assistant performance.</p>
+</blockquote>
+<p>I'd be happy to share once I have my thesis in a sufficiently ready state!<br>
+Broadly, the message of my thesis is that performance of<br>
+(dependently-typed) proof assistants / interactive theorem provers is an<br>
+interesting area of research sorely in need of systematic study.  (My<br>
+thesis will also include some of the research work I've done, which can be<br>
+rendered as "how to work around some of the asymptotics in Coq without<br>
+needing to change the system", but I think that's a bit less broadly<br>
+interesting.)</p>
+<p>-Jason</p>
+<p>On Fri, May 8, 2020 at 4:55 AM András Kovács &lt;<a href="mailto:kovacsandras@inf.elte.hu">kovacsandras@inf.elte.hu</a>&gt;<br>
+wrote:</p>
+<blockquote>
+<p>Hi Jason,</p>
+<p>You may be interested in my github repos: smalltt<br>
+&lt;<a href="https://github.com/AndrasKovacs/smalltt">https://github.com/AndrasKovacs/smalltt</a>&gt;, normalization-bench<br>
+&lt;<a href="https://github.com/AndrasKovacs/normalization-bench">https://github.com/AndrasKovacs/normalization-bench</a>&gt;. I haven't yet<br>
+updated the smalltt repo, but there's a simplified implementation<br>
+&lt;<a href="https://gist.github.com/AndrasKovacs/a0e0938113b193d6b9c1c0620d853784">https://gist.github.com/AndrasKovacs/a0e0938113b193d6b9c1c0620d853784</a>&gt;<br>
+of its evaluator, which seems to have roughly the same performance but<br>
+which is much simpler to implement.</p>
+<p>The basic idea is that in elaboration there are two primary computational<br>
+tasks, one is conversion checking and the other is generating solutions for<br>
+metavariables. Clearly, we should use NbE/environment machines for<br>
+evaluation, and implement conversion checking in the semantic domain.<br>
+However, when we want to generate meta solutions, we need to compute<br>
+syntactic terms, and vanilla NbE domain only supports quote/readback to<br>
+normal forms. Normal forms are way too big and terrible for this purpose.<br>
+Hence, we extend vanilla NbE domain with lazy non-deterministic choice<br>
+between two or more evaluation strategies. In the simplest case, the point<br>
+of divergence is whether we unfold some class of definitions or not. Then,<br>
+the conversion checking algorithm can choose to take the full-unfolding<br>
+branch, and the quoting operation can choose to take the non-unfolding<br>
+branch. At the same time, we have a great deal of shared computation<br>
+between the two branches; we avoid recomputing many things if we choose to<br>
+look at both branches.</p>
+<p>I believe that a feature like this is absolutely necessary for robust<br>
+performance. Otherwise, we choke on bad asymptotics, which is surprisingly<br>
+common in dependent settings. In Agda and Coq, even something as trivial as<br>
+elaborating a length-indexed vector expression has quadratic complexity in<br>
+the length of the vector.</p>
+<p>It is also extremely important to stick to the spirit of Coquand's<br>
+semantic checking algorithm as much as possible. In summary: core syntax<br>
+should support <em>no</em> expensive computation: no substitution, shifting,<br>
+renaming, or other ad-hoc term massaging. Core syntax should be viewed as<br>
+immutable machine code, which supports evaluation into various semantic<br>
+domains, from which sometimes we can read syntax back; this also leaves it<br>
+open to swap out the representation of core syntax to efficient<br>
+alternatives such as bytecode or machine code.</p>
+<p>Only after we get  the above two basic points right, can we start to think<br>
+about more specific and esoteric optimizations. I am skeptical of proposed<br>
+solutions which do not include these. Hash consing has been brought up many<br>
+times, but it is very unsatisfying compared to non-deterministic NbE,<br>
+because of its large constant costs, implementation complexity, and the<br>
+failure to handle sharing loss from beta-redexes in any meaningful way<br>
+(which is the most important source of sharing loss!). I am also skeptical<br>
+of exotic evaluators such as interaction nets and optimal beta reducers;<br>
+there is a good reason that all modern functional languages run on<br>
+environment machines instead of interaction nets.</p>
+<p>If we want to support type classes, then tabled instance resolution<br>
+&lt;<a href="https://arxiv.org/pdf/2001.04301.pdf">https://arxiv.org/pdf/2001.04301.pdf</a>&gt; is also a must, otherwise we are<br>
+again smothered by bad asymptotics even in modestly complex class<br>
+hierarchies. This can be viewed as a specific instance of hash-consing (or<br>
+rather  "memoization"), so while I think ubiquitous hash-consing is bad,<br>
+some focused usage can do good.</p>
+<p>Injectivity analysis is another thing which I believe has large potential<br>
+impact. By this I mean checking whether functions are injective up to<br>
+definitional equality, which is decidable, and can be used to more<br>
+precisely optimize unfolding in conversion checking.</p>
+<p>I'd be very interested in your findings about proof assistant performance.<br>
+This has been a topic that I've been working on on-and-off for several<br>
+years. I've recently started to implement a system which I intend to be<br>
+eventually "production strength" and also as fast as possible, and<br>
+naturally I want to incorporate existing performance know-how.</p>
+<p>Jason Gross &lt;<a href="mailto:jasongross9@gmail.com">jasongross9@gmail.com</a>&gt; ezt írta (időpont: 2020. máj. 8., P,<br>
+0:20):</p>
+<blockquote>
+<p>I'm in the process of writing my thesis on proof assistant performance<br>
+bottlenecks (with a focus on Coq).  I'm having some trouble finding prior<br>
+work on performance engineering and/or benchmarking of proof assistants<br>
+(other than the paper on the Lean tactic language (<br>
+<a href="https://leanprover.github.io/papers/tactic.pdf">https://leanprover.github.io/papers/tactic.pdf</a>)), and figured I'd reach<br>
+out to these lists.</p>
+<p>Does anyone have references for prior work on performance analysis or<br>
+engineering of proof assistants or dependently typed languages?  (Failing<br>
+that, I'd also be interested in papers about compile-time performance of<br>
+compilers.)</p>
+<blockquote>
+<p>Thanks,<br>
+Jason</p>
+</blockquote>
+<hr>
+<p>Agda mailing list<br>
+<a href="mailto:Agda@lists.chalmers.se">Agda@lists.chalmers.se</a><br>
+<a href="https://lists.chalmers.se/mailman/listinfo/agda">https://lists.chalmers.se/mailman/listinfo/agda</a></p>
+</blockquote>
+</blockquote>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,146 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] BNFs and sort constraints · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20BNFs.20and.20sort.20constraints.html">[isabelle] BNFs and sort constraints</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294732905"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20BNFs%20and%20sort%20constraints/near/294732905" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20BNFs.20and.20sort.20constraints.html#294732905">(Aug 22 2022 at 17:18)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+Dear BNF developers,</p>
+<p>I'm looking for some information about the way the BNF package treats<br>
+sort constraints. This is going to be a footnote in a paper, maybe a bit<br>
+more.</p>
+<p>Consider this typedef:</p>
+<p>typedef (overloaded) 'a::plus id = "UNIV :: 'a set" by auto</p>
+<p>(Please ignore for a moment that the sort constraint is entirely<br>
+unnecessary here.)</p>
+<p>Observation #1:</p>
+<p>"copy_bnf 'a id" fails with tactic errors and a THM exception. Should<br>
+this produce a better error message?</p>
+<p>Observation #2:</p>
+<p>"copy_bnf (dead 'a :: plus) id" gives a better error message, namely "No<br>
+live variables".</p>
+<p>At this point I'm assuming that "copy_bnf" can't deal with sort constraints.</p>
+<p>So let's try with raw "bnf".</p>
+<p>Observation #3:</p>
+<p>Some setup:</p>
+<p>lift_definition map_id :: "('a::plus ⇒ 'b::plus) ⇒ 'a id ⇒ 'b id" is "λf<br>
+x. f x" .<br>
+lift_definition set_id :: "'a::plus id ⇒ 'a set" is "λx. {x}" .</p>
+<p>bnf "'a::plus id"<br>
+bnf "'a id"</p>
+<p>Both produce identical proof obligations. First subgoal after applying<br>
+"rule ext":</p>
+<ol>
+<li>⋀x. map_id id x = id x</li>
+</ol>
+<p>"x" does not have any sort constraints. So it is not provable (?).</p>
+<p>Observation #4:</p>
+<p>I can define</p>
+<p>datatype ('a::plus) id = Id 'a</p>
+<p>just fine, but "map_id" does not have any sort constraints (whereas "Id"<br>
+and "case_id" have them).</p>
+<p>Could somebody shed some light onto how this works? I looked at some of<br>
+the papers but didn't find anything.</p>
+<p>Cheers<br>
+Lars</p>
+
+
+
+<a name="294732919"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20BNFs%20and%20sort%20constraints/near/294732919" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20BNFs.20and.20sort.20constraints.html#294732919">(Aug 22 2022 at 17:18)</a>:</h4>
+<p>From: Jasmin Blanchette &lt;<a href="mailto:jasmin.blanchette@inria.fr">jasmin.blanchette@inria.fr</a>&gt;<br>
+Hi Lars,</p>
+<blockquote>
+<p>Could somebody shed some light onto how this works? I looked at some of<br>
+the papers but didn't find anything.</p>
+</blockquote>
+<p>I can answer Observation 4, which involves some of my code.</p>
+<p>BNF type variables may not have sort constraints. "map_id" is part of the BNF structure, so it accordingly doesn't have sort constraints. More high-level theorems and constants are declared with the sort constraints. To overgeneralize a bit, Dmitriy's low-level BNF code doesn't like sort constraints, whereas my higher-level "(co)datatype" code copes with them to the extent possible. In the code, you'll see this by grepping for "unsorted_As" in "bnf_fp_def_sugar.ML".</p>
+<p>I presume there's no deep reason for not supporting syntactic type class constraints in BNFs. It would complicate the composition operators for sure, and in a bunch of places we'd have to discharge 0 goals arising from syntactic type class instantiations. If you're up for putting in the effort, we won't stop you.</p>
+<p>Incidentally, what is the motivation for your example? Is your application related to item 5 in the "Known Bugs and Limitations" of the "datatypes" document?</p>
+<p>Cheers,</p>
+<p>Jasmin</p>
+
+
+
+<a name="294732945"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20BNFs%20and%20sort%20constraints/near/294732945" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20BNFs.20and.20sort.20constraints.html#294732945">(Aug 22 2022 at 17:19)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+Hi Jasmin,</p>
+<blockquote>
+<p>BNF type variables may not have sort constraints. "map_id" is part of<br>
+the BNF structure, so it accordingly doesn't have sort constraints.<br>
+More high-level theorems and constants are declared with the sort<br>
+constraints. To overgeneralize a bit, Dmitriy's low-level BNF code<br>
+doesn't like sort constraints, whereas my higher-level "(co)datatype"<br>
+code copes with them to the extent possible. In the code, you'll see<br>
+this by grepping for "unsorted_As" in "bnf_fp_def_sugar.ML".</p>
+</blockquote>
+<p>that sounds basically like what I guessed from my observations. Thanks <br>
+for the clarification!</p>
+<blockquote>
+<p>Incidentally, what is the motivation for your example? Is your<br>
+application related to item 5 in the "Known Bugs and Limitations" of<br>
+the "datatypes" document?</p>
+</blockquote>
+<p>I don't intend to use this in any way. I'm merely trying to "tie up <br>
+loose ends":</p>
+<p>My dictionary construction will just ignore sort constraints from data <br>
+constructors, and I was trying to figure out to what extent they might <br>
+be introduced in datatypes, e.g. by having a constrained BNF through <br>
+which recursion occurs.</p>
+<p>The "meta-theorem" I am aiming for is that by dropping the sort <br>
+constraints you'll still end up with exactly the same datatype; i.e., I <br>
+want to argue that not supporting constraints in constructors is not a <br>
+problem because I can always ask the user to remove the constraints.</p>
+<p>NB, because you mentioned "limitation 5": The fact that the overloaded 0 <br>
+is a constructor for "nat" is the bane of my existence. It messes with <br>
+so many things and it is surprising that it works at all :-)</p>
+<p>Cheers<br>
+Lars</p>
+
+
+
+<a name="294733006"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20BNFs%20and%20sort%20constraints/near/294733006" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20BNFs.20and.20sort.20constraints.html#294733006">(Aug 22 2022 at 17:19)</a>:</h4>
+<p>From: Dmitriy Traytel &lt;<a href="mailto:traytel@inf.ethz.ch">traytel@inf.ethz.ch</a>&gt;<br>
+Hi Lars,</p>
+<p>let me refine Jasmin's anwer.</p>
+<p><em>Live</em> BNF type variables may not have sort constraints.</p>
+<p>This is inherent: live variables indicate where we may recurse through. Imagine a BNF "'a :: foo F" with 'a live. Then we should be able to define:</p>
+<p>datatype X = N | C "X F"</p>
+<p>which in turn would require X to be an instance foo. Suddenly the datatype command would need to instantiate arbitrary type classes simultaneously with defining the type, which sounds quite ambitious even for syntactic type classes (e.g., one might get the "wrong" instance).</p>
+<p>In contrast, <em>dead</em> BNF type variables may carry sort constraints. Consider e.g.,</p>
+<p>datatype (dead 'a::plus, 'b) X = N 'b | C 'a "('a, 'b) X"<br>
+term map_X</p>
+<p>where the first type argument of X in map_X has the sort constraint.</p>
+<p>Sometimes one can even use the sort constraints on dead type variables to prove that some type is a BNF. My favorite example that uses this trick are arity-correct first-order terms:</p>
+<p>declare [[typedef_overloaded]]</p>
+<p>class arity =<br>
+ fixes arity :: "'a ⇒ nat"</p>
+<p>instantiation unit :: arity begin<br>
+definition arity_unit :: "unit ⇒ nat" where "arity_unit x = 0"<br>
+instance proof qed</p>
+<p>typedef (overloaded) ('c :: arity, 'ty) comb (infixr "$" 65) =<br>
+ "{(s :: 'c, Ts :: 'ty list). arity s = length Ts}"<br>
+ morphisms Rep_comb comb<br>
+ by (auto intro!: exI[of _ "replicate _ undefined"])</p>
+<p>lift_bnf (no_warn_wits) (dead 'c :: arity, 'ty) comb by auto</p>
+<p>setup_lifting type_definition_comb</p>
+<p>lift_definition "fun" :: "'c :: arity $ 'ty ⇒ 'c" is fst .<br>
+lift_definition "args" :: "'c :: arity $ 'ty ⇒ 'ty list" is snd .</p>
+<p>datatype ('x, 'c :: arity) "term" = Var 'x | App  "'c $ ('x, 'c) term"</p>
+<p>Dmitriy</p>
+<p>PS: For sure, copy_bnf should emit a proper failure instead of the tactic failure in "observation 1". I will have a look eventually.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

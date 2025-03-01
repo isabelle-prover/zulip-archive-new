@@ -1,0 +1,94 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Dealing with lets in Isar · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Dealing.20with.20lets.20in.20Isar.html">[isabelle] Dealing with lets in Isar</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294257692"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Dealing%20with%20lets%20in%20Isar/near/294257692" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Dealing.20with.20lets.20in.20Isar.html#294257692">(Aug 19 2022 at 12:46)</a>:</h4>
+<p>From: Christian Urban &lt;<a href="mailto:christian.urban@kcl.ac.uk">christian.urban@kcl.ac.uk</a>&gt;<br>
+Dear All,</p>
+<p>We have a question about how to deal conveniently with <br>
+Lets in Isar proofs. Some of our definitions contain many <br>
+nested lets, as in</p>
+<p>definition <br>
+   "foo f e1 e2 e3 == let (x, y) = e1; (u, v) = e2; (w, k) = e3 in f x y u v w k"</p>
+<p>The problem is that we have foo unfolded in our premises, say</p>
+<p>lemma<br>
+    assumes "P (let (x, y) = e1; (u, v) = e2; (w, k) = e3 in f x y u v w k)"<br>
+    shows "thesis"</p>
+<p>We could prove such lemmas with </p>
+<p>lemma<br>
+    assumes "P (let (x, y) = e1; (u, v) = e2; (w, k) = e3 in f x y u v w k)"<br>
+    shows "thesis"<br>
+  proof -<br>
+    from assms<br>
+    obtain x y u v w k<br>
+    where "P (f x y u v w k)" and <br>
+          "(x, y) = e1" and "(u, v) = e2" and "(w, k) = e3" by ...</p>
+<p>but we are wondering whether there is a simpler way. Essentially,<br>
+we want to avoid having to fix the variables and to avoid to write <br>
+the equations explicitly. We rather prefer the way how the cases-construction<br>
+works, which automatically fixes variables and puts such equations<br>
+into the context, for example</p>
+<p>lemma <br>
+    assumes "P (n:: nat)"<br>
+    shows "thesis"<br>
+  proof (cases n)</p>
+<p>In this example you have "n = 0" in the "first" case and fix nat/n = Suc nat <br>
+in the "second" case. Is there something similar for many nested lets?</p>
+<p>If not, how would we have to go about implementing (presumably in ML)<br>
+such a construction?</p>
+<p>Best wishes,<br>
+Christian</p>
+
+
+
+<a name="294257706"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Dealing%20with%20lets%20in%20Isar/near/294257706" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Dealing.20with.20lets.20in.20Isar.html#294257706">(Aug 19 2022 at 12:46)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Christian,</p>
+<p>I don't completely understand why this is related to let. A let just introduces an <br>
+abbreviation. However, in your example, you are more concerned with patterns such as <br>
+tuples, but</p>
+<p>let (x, y) = e in f x y</p>
+<p>is syntactic sugar for</p>
+<p>Let e (prod_case (%x y. f x y))</p>
+<p>So, do you also want to introduce variables if there's no pattern-matching involved, such <br>
+that "P (let x = e in f x)" gets transformed into "!!x. x = e ==&gt; P (f x)"?</p>
+<p>In principle, you can use Isabelle's splitter:</p>
+<p>lemma Let_prod_split_asm:<br>
+   "P (Let e (prod_case f)) = (~ (EX x y. (x, y) = e &amp; ~ P (f x y)))"<br>
+by(auto simp add: Let_def prod.split_asm)</p>
+<p>lemma Let_split_asm: "P (Let e f) = (~ (EX x. x = e &amp; ~ P (f x)))"<br>
+by(auto simp add: Let_def)</p>
+<p>lemma<br>
+   assumes "P (let (x, y) = e1; (u, v) = e2; (w, k) = e3 in f x y u v w k)"<br>
+   shows "thesis"<br>
+using assms<br>
+apply -<br>
+proof(split Let_prod_split_asm Let_split_asm)+<br>
+   case (goal1 x y u v w k)</p>
+<p>With some ML programming, it should be easy to make this more readable.</p>
+<p>Hope this helps,<br>
+Andreas</p>
+
+
+
+<a name="294257721"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Dealing%20with%20lets%20in%20Isar/near/294257721" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Dealing.20with.20lets.20in.20Isar.html#294257721">(Aug 19 2022 at 12:46)</a>:</h4>
+<p>From: Michael Norrish &lt;<a href="mailto:Michael.Norrish@nicta.com.au">Michael.Norrish@nicta.com.au</a>&gt;<br>
+You can implement a nice expansion of lets into equations with the simplifier as per Konrad Slimd's and my proof pearl paper in TPHOLs 2005</p>
+<p>Michael</p>
+<hr>
+<p>The information in this e-mail may be confidential and subject to legal professional privilege and/or copyright. National ICT Australia Limited accepts no liability for any damage caused by this email or its attachments.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

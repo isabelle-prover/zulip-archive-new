@@ -1,0 +1,228 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Haskell code-generation · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Haskell.20code-generation.html">[isabelle] Haskell code-generation</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294133823"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Haskell%20code-generation/near/294133823" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Haskell.20code-generation.html#294133823">(Aug 18 2022 at 17:28)</a>:</h4>
+<p>From: Christian Sternagel &lt;<a href="mailto:christian.sternagel@uibk.ac.at">christian.sternagel@uibk.ac.at</a>&gt;<br>
+Hi all,</p>
+<p>recently I tried to embed some generated code more deeply into the <br>
+Haskell standard library (by using Prelude functions whenever possible). <br>
+The initial problem (which many of you may know) is that whenever in <br>
+Isabelle you are using "nat" the corresponding Haskell function would <br>
+use either Int or Integer... since many Prelude functions are using Int, <br>
+lets just assume that Int should replace "nat" (ignoring the fact that <br>
+nat's may get arbitrarily large but Int's don't).</p>
+<p>First HOL/Library/Efficient_Nat.thy seemed exactly to be what I needed, <br>
+but unfortunately it doesn't seem to hold what is claimed in the header: <br>
+"The efficiency of the generated code can be improved<br>
+drastically by implementing natural numbers by target-language<br>
+integers.  To do this, just include this theory."</p>
+<p>I did just import Efficient_Nat.thy, is there anything else to do <br>
+afterwards (maybe for Haskell Integers are used instead of Int's?).</p>
+<p>Does anybody have experience with using Efficient_Nat for Haskell <br>
+code-generation?</p>
+<p>cheers</p>
+<p>chris</p>
+<p>A minor comment: the code-generator setup for Haskell (in HOL.thy) <br>
+declares "&amp;&amp;" and "||" as infixl, whereas in Haskell's Prelude they are <br>
+declared infixr.</p>
+
+
+
+<a name="294133862"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Haskell%20code-generation/near/294133862" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Haskell.20code-generation.html#294133862">(Aug 18 2022 at 17:28)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@kit.edu">andreas.lochbihler@kit.edu</a>&gt;<br>
+Dear Christian,</p>
+<p>Efficient_Nat does implement nat in terms of Haskell Integer, so the comment is <br>
+not wrong - provided you import Efficient_Nat as the <em>last</em> theory in your <br>
+import list in the theory where you invoke the Haskell code generator. Even if <br>
+you have imported Efficient_Nat in some ancestor theory, reimport it.</p>
+<p>However, nat is not literally translated to Integer, but wraps Integer in a type <br>
+Nat (cf. the generated Nat.hs). This seems necessary to do because otherwise <br>
+type class instantiations could not be Isabelle-specific, e.g., division by 0 is <br>
+defined in Isabelle whereas not on Haskell integers. See also the comment in <br>
+Efficient_Nat on this.</p>
+<p>The easiest way to use the Haskell standard library is probably to unpack Nat to <br>
+Integer via toInteger and to wrap it back via fromInteger whenever this is <br>
+needed in your custom translations.</p>
+<p>If you wish to replace Integer by Int, you will have to rewrite Efficent_Nat.thy <br>
+to use Int in all Haskell translations.</p>
+<p>Possibly, Florian can tell you more on that topic.</p>
+<p>Andreas</p>
+
+
+
+<a name="294133894"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Haskell%20code-generation/near/294133894" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Haskell.20code-generation.html#294133894">(Aug 18 2022 at 17:29)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Christian,</p>
+<blockquote>
+<p>A minor comment: the code-generator setup for Haskell (in HOL.thy)<br>
+declares "&amp;&amp;" and "||" as infixl, whereas in Haskell's Prelude they are<br>
+declared infixr.</p>
+</blockquote>
+<p>thanks for pointing that out, this seems to have been wrong from the<br>
+very beginning.  Fixed in the hg repository (rev b992c8e6394b).</p>
+<blockquote>
+<p>First HOL/Library/Efficient_Nat.thy seemed exactly to be what I needed,<br>
+but unfortunately it doesn't seem to hold what is claimed in the header:<br>
+"The efficiency of the generated code can be improved<br>
+drastically by implementing natural numbers by target-language<br>
+integers.  To do this, just include this theory."</p>
+<p>I did just import Efficient_Nat.thy, is there anything else to do<br>
+afterwards (maybe for Haskell Integers are used instead of Int's?).</p>
+</blockquote>
+<p>Well, for Haskell indeed Integers are used for consistency.  But if your<br>
+code involves massive computation on considerably large nats,<br>
+Efficient_Nat should bring a considerable speedup.  Maybe the bottleneck<br>
+is somewhere else?  A clear statement requires an inspection of the<br>
+corresponding code.</p>
+<p>Hope this helps,<br>
+    Florian<br>
+<a href="/user_uploads/14278/W8Fj751ZVhTDa5deVig9n3-u/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294133917"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Haskell%20code-generation/near/294133917" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Haskell.20code-generation.html#294133917">(Aug 18 2022 at 17:29)</a>:</h4>
+<p>From: Lukas Bulwahn &lt;<a href="mailto:bulwahn@in.tum.de">bulwahn@in.tum.de</a>&gt;<br>
+Hello Christian,</p>
+<p>we also provide the type code_numeral for Integers (Haskell Integer) for <br>
+code generation, cf. src/HOL/Code_Numeral.thy</p>
+<p>Currently, in development, I added a type code_int that I map to bounded <br>
+Integers (Haskell int), cf. src/HOL/Library/Quickcheck_Narrowing.thy<br>
+But I developed the necessary theory about code_int only as far as I <br>
+needed it for my purpose.<br>
+I am aware that the code generation setup for code_int could be <br>
+potentially unsound, if you exploit overflows in some tricky way.</p>
+<p>By this replacement, I have measured an overall 50% speed-up by <br>
+replacing Integer by Int in my setting, the speed-up in the replaced <br>
+parts must be even larger.</p>
+<p>But from my experience, foreseeing or estimating possible performance <br>
+increases in Isabelle's generated code is a difficult task.<br>
+E.g., it is still unclear to me, if the resulting non-overlapping code <br>
+equations from overlapping sequential function definitions make a <br>
+measurable performance difference in the runtime of the generated code.</p>
+<p>Of course, these dedicated types code_numeral and code_int are for some <br>
+very special purposes,  evaluation by code generation, with ML, nbe and <br>
+quickcheck, in the system.<br>
+They do not provide much theorems to reason about them, and should be <br>
+chosen with care.</p>
+<p>Hope this helps.</p>
+<p>Lukas</p>
+
+
+
+<a name="294133934"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Haskell%20code-generation/near/294133934" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Haskell.20code-generation.html#294133934">(Aug 18 2022 at 17:29)</a>:</h4>
+<p>From: Christian Sternagel &lt;<a href="mailto:christian.sternagel@uibk.ac.at">christian.sternagel@uibk.ac.at</a>&gt;<br>
+Thanks for all your fast answers,</p>
+<p>just for clarification, I want to use Haskell's Int in order to be able <br>
+to map many functions to Prelude functions (like mapping List.length :: <br>
+'a list =&gt; nat to length :: [a] -&gt; Int). I'm aware that this might lead <br>
+to inconsistencies (as Lukas already pointed out) -- not only because of <br>
+potential overflows but also since you cannot be sure that the Prelude <br>
+implementation is correct -- but for the time being I just wanted to be <br>
+able to do it anyway :)</p>
+<p>In the end I'm thinking of a "safe" version of the generated code and a <br>
+"fast" version (using Int's and Prelude functions wherever possible).</p>
+<p>It seems as if what Lukas has developed is exactly what I was searching <br>
+for. But first I will thoroughly read through the code-generation manual <br>
+(again) ;)</p>
+<p>cheers</p>
+<p>chris</p>
+
+
+
+<a name="294133961"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Haskell%20code-generation/near/294133961" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Haskell.20code-generation.html#294133961">(Aug 18 2022 at 17:29)</a>:</h4>
+<p>From: Lukas Bulwahn &lt;<a href="mailto:bulwahn@in.tum.de">bulwahn@in.tum.de</a>&gt;<br>
+On 03/31/2011 10:56 AM, Christian Sternagel wrote:</p>
+<blockquote>
+<p>Thanks for all your fast answers,</p>
+<p>just for clarification, I want to use Haskell's Int in order to be <br>
+able to map many functions to Prelude functions (like mapping <br>
+List.length :: 'a list =&gt; nat to length :: [a] -&gt; Int). I'm aware that <br>
+this might lead to inconsistencies (as Lukas already pointed out) -- <br>
+not only because of potential overflows but also since you cannot be <br>
+sure that the Prelude implementation is correct -- but for the time <br>
+being I just wanted to be able to do it anyway :)</p>
+<p>In the end I'm thinking of a "safe" version of the generated code and <br>
+a "fast" version (using Int's and Prelude functions wherever possible).</p>
+<p>It seems as if what Lukas has developed is exactly what I was <br>
+searching for. But first I will thoroughly read through the <br>
+code-generation manual (again) ;)<br>
+</p>
+</blockquote>
+<p>If this is of general interest, I am happy to move this development into <br>
+a separate theory and incorporate your contributions. But I think we <br>
+should discuss all the gory details offline.</p>
+<p>Lukas</p>
+<blockquote>
+<p>cheers</p>
+<p>chris</p>
+<p>On 03/31/2011 10:36 AM, Lukas Bulwahn wrote:</p>
+<blockquote>
+<p>Hello Christian,</p>
+<p>we also provide the type code_numeral for Integers (Haskell Integer) for<br>
+code generation, cf. src/HOL/Code_Numeral.thy</p>
+<p>Currently, in development, I added a type code_int that I map to bounded<br>
+Integers (Haskell int), cf. src/HOL/Library/Quickcheck_Narrowing.thy<br>
+But I developed the necessary theory about code_int only as far as I<br>
+needed it for my purpose.<br>
+I am aware that the code generation setup for code_int could be<br>
+potentially unsound, if you exploit overflows in some tricky way.</p>
+<p>By this replacement, I have measured an overall 50% speed-up by<br>
+replacing Integer by Int in my setting, the speed-up in the replaced<br>
+parts must be even larger.</p>
+<p>But from my experience, foreseeing or estimating possible performance<br>
+increases in Isabelle's generated code is a difficult task.<br>
+E.g., it is still unclear to me, if the resulting non-overlapping code<br>
+equations from overlapping sequential function definitions make a<br>
+measurable performance difference in the runtime of the generated code.</p>
+<p>Of course, these dedicated types code_numeral and code_int are for some<br>
+very special purposes, evaluation by code generation, with ML, nbe and<br>
+quickcheck, in the system.<br>
+They do not provide much theorems to reason about them, and should be<br>
+chosen with care.</p>
+<p>Hope this helps.</p>
+<p>Lukas</p>
+</blockquote>
+<p>On 03/31/2011 09:48 AM, Andreas Lochbihler wrote:</p>
+<blockquote>
+<blockquote>
+<p>Dear Christian,</p>
+<p>Efficient_Nat does implement nat in terms of Haskell Integer, so the<br>
+comment is not wrong - provided you import Efficient_Nat as the <em>last</em><br>
+theory in your import list in the theory where you invoke the Haskell<br>
+code generator. Even if you have imported Efficient_Nat in some<br>
+ancestor theory, reimport it.</p>
+<p>However, nat is not literally translated to Integer, but wraps Integer<br>
+in a type Nat (cf. the generated Nat.hs). This seems necessary to do<br>
+because otherwise type class instantiations could not be<br>
+Isabelle-specific, e.g., division by 0 is defined in Isabelle whereas<br>
+not on Haskell integers. See also the comment in Efficient_Nat on this.</p>
+<p>The easiest way to use the Haskell standard library is probably to<br>
+unpack Nat to Integer via toInteger and to wrap it back via<br>
+fromInteger whenever this is needed in your custom translations.</p>
+<p>If you wish to replace Integer by Int, you will have to rewrite<br>
+Efficent_Nat.thy to use Int in all Haskell translations.</p>
+<p>Possibly, Florian can tell you more on that topic.</p>
+<p>Andreas<br>
+</p>
+</blockquote>
+</blockquote>
+</blockquote>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,293 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Importing classes into a locale in Isabelle an... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Importing.20classes.20into.20a.20locale.20in.20Isabelle.20an.2E.2E.2E.html">[isabelle] Importing classes into a locale in Isabelle an...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294731991"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Importing%20classes%20into%20a%20locale%20in%20Isabelle%20an.../near/294731991" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Importing.20classes.20into.20a.20locale.20in.20Isabelle.20an.2E.2E.2E.html#294731991">(Aug 22 2022 at 17:13)</a>:</h4>
+<p>From: xanonec xyz &lt;<a href="mailto:xanonec@gmail.com">xanonec@gmail.com</a>&gt;<br>
+Dear All,</p>
+<p>Approximately a week ago I posted a question on stack overflow with regard<br>
+to a possibility to import Isabelle classes into a locale. However, the<br>
+question has not been answered yet. Furthermore, the question received no<br>
+comments from the users of stack overflow. The question can be accessed via<br>
+the following link:<br>
+<a href="https://stackoverflow.com/questions/50085849/importing-classes-into-a-locale-in-isabelle-and-other-related-questions">https://stackoverflow.com/questions/50085849/importing-classes-into-a-locale-in-isabelle-and-other-related-questions</a><br>
+.</p>
+<p>Please find a copy of the statement of the question below:<br>
+<em>Question</em></p>
+<p>- I would like to understand if there exists a simple method for<br>
+   importing classes into locales.</p>
+<p>- Alternatively, I would like to understand if there is a simple method<br>
+   that would enable me to use multiple types within the assumptions in<br>
+   classes.</p>
+<p>I would like to reuse theorems that are associated with certain pre-defined<br>
+classes in the library HOL for the development of my own locales. However,<br>
+it seems to me that, at the moment, there are no standard methods that<br>
+would allow me to achieve this (e.g. see this question<br>
+&lt;<a href="https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2014-August/msg00237.html">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2014-August/msg00237.html</a>&gt;<br>
+-<br>
+clause 5).</p>
+<p>Unfortunately, my problem will require the definition of structures (i.e.<br>
+locales or classes) with the assumptions that use multiple types. Thus, I<br>
+would prefer to use locales. However, I would also like to avoid code<br>
+duplication and reuse the structures that already exist in the library HOL<br>
+as much as I can.</p>
+<p>theory my_theory<br>
+imports Complex_Main<br>
+begin</p>
+<p>(*It is possible to import other classes, establish a subclass relationship and<br>
+use theorems from the super classes. However, if I understand correctly, it<br>
+is not trivial to ensure that multiple types can be used in the assumptions<br>
+that are associated with the subclass.*)<br>
+class my_class = order +<br>
+  fixes f :: "'a ⇒ real"<br>
+begin<br>
+subclass order<br>
+proof<br>
+qed<br>
+end</p>
+<p>lemma (in my_class) property_class: "⟦ x ≤ y; y ≤ z ⟧ ⟹ x ≤ z"<br>
+  by auto</p>
+<p>(*Multiple types can be used with ease. However, I am not sure how (if<br>
+it is possible) to ensure that the lemmas that are associated with the<br>
+imported class can be reused in the locale.*)<br>
+locale my_locale =<br>
+  less_eq: order less_eq<br>
+  for less_eq :: "'a ⇒ 'a ⇒ bool" +<br>
+  fixes f :: "'a ⇒ 'b"<br>
+begin<br>
+sublocale order<br>
+proof<br>
+qed<br>
+end</p>
+<p>sublocale my_locale ⊆ order<br>
+proof<br>
+qed</p>
+<p>(*nitpick finds a counterexample, because, for example, less_eq is treated<br>
+as a free variable.*)<br>
+lemma (in my_locale) property_locale: "⟦ x ≤ y; y ≤ z ⟧ ⟹ x ≤ z"<br>
+  by nitpick</p>
+<p>end</p>
+<p><em>Proposed solution</em></p>
+<p>At the moment I am thinking about redefining the minimal amount of axioms<br>
+in my own locales that is sufficient to establish the equivalence between<br>
+my locales and the corresponding classes in HOL. However, this approach<br>
+results in a certain amount of code duplication:</p>
+<p>theory my_plan<br>
+imports Complex_Main<br>
+begin</p>
+<p>locale partial_order =<br>
+  fixes less_eq :: "'a ⇒ 'a ⇒ bool" (infixl "≼" 50)<br>
+    and less :: "'a ⇒ 'a ⇒ bool" (infixl "≺" 50)<br>
+  assumes refl [intro, simp]: "x ≼ x"<br>
+    and anti_sym [intro]: "⟦ x ≼ y; y ≼ x ⟧ ⟹ x = y"<br>
+    and trans [trans]: "⟦ x ≼ y; y ≼ z ⟧ ⟹ x ≼ z"<br>
+    and less_eq: "(x ≺ y) = (x ≼ y ∧ x ≠ y)"<br>
+begin<br>
+end</p>
+<p>sublocale partial_order ⊆ order<br>
+proof<br>
+  fix x y z<br>
+  show "x ≼ x" by simp<br>
+  show "x ≼ y ⟹ y ≼ z ⟹ x ≼ z" using local.trans by blast<br>
+  show "x ≼ y ⟹ y ≼ x ⟹ x = y" by blast<br>
+  show "(x ≺ y) = (x ≼ y ∧ ¬ y ≼ x)" using less_eq by auto<br>
+qed</p>
+<p>sublocale order ⊆ partial_order<br>
+proof<br>
+  fix x y z<br>
+  show "x ≤ x" by simp<br>
+  show "x ≤ y ⟹ y ≤ x ⟹ x = y" by simp<br>
+  show "x ≤ y ⟹ y ≤ z ⟹ x ≤ z" by simp<br>
+  show "(x &lt; y) = (x ≤ y ∧ x ≠ y)" by auto<br>
+qed</p>
+<p>lemma (in partial_order) le_imp_less_or_eq: "x ≼ y ⟹ x ≺ y ∨ x = y"<br>
+  by (simp add: le_imp_less_or_eq)</p>
+<p>end</p>
+<p>Is the approach that I intend to follow considered to be an acceptable<br>
+style for the development of a library in Isabelle? Unfortunately, I have<br>
+not seen this approach being used within the context of the development of<br>
+HOL. However, I am still not familiar with a large part of the library.</p>
+<p>- Also, please let me know if any of the information that is stated in<br>
+   the definition of the question is incorrect: I am new to Isabelle.</p>
+<hr>
+<p><em>General comments that are not directly related to the question</em></p>
+<p>Lastly, as a side note, I have noticed that there may be a certain amount<br>
+of partial code duplication in HOL. In particular, it seems to me that the<br>
+theories in HOL/Lattice/, HOL/Algebra/Order-HOL/Algebra/Lattice and<br>
+HOL/Library/Boolean_Algebra resemble the theory in HOL/Orderings-<br>
+HOL/Lattices. However, I am not certain if the equivalence between these<br>
+theories was established through the sublocale/subclass relationship (e.g.<br>
+see class_deps) to a sufficient extent. Of course, I understand that the<br>
+theories use distinct axiomatisation and the theories in HOL/Algebra/ and<br>
+HOL/Library/Boolean_Algebra are based on locales. Furthermore, the theories<br>
+in HOL/Algebra/ contain a certain amount of information that has not been<br>
+formalised in other theories. However, I would still like to gain a better<br>
+understanding why all four theories co-exist in HOL and the relationship<br>
+between these theories is not always clearly indicated.</p>
+
+
+
+<a name="294732039"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Importing%20classes%20into%20a%20locale%20in%20Isabelle%20an.../near/294732039" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Importing.20classes.20into.20a.20locale.20in.20Isabelle.20an.2E.2E.2E.html#294732039">(Aug 22 2022 at 17:13)</a>:</h4>
+<p>From: Akihisa Yamada &lt;<a href="mailto:ayamada@trs.cm.is.nagoya-u.ac.jp">ayamada@trs.cm.is.nagoya-u.ac.jp</a>&gt;<br>
+Dear xanonec,</p>
+<p>let me comment to your technical questions as I also tackled the same <br>
+goal as you. I'll be happy if there's a better solution, though.</p>
+<blockquote>
+<p>lemma (in my_locale) property_locale: "⟦ x ≤ y; y ≤ z ⟧ ⟹ x ≤ z"<br>
+  by nitpick</p>
+</blockquote>
+<p>Interpreting a class as a locale doesn't seem to import notations, so <br>
+here "≤" refers to the global one for "ord", which assumes nothing (you <br>
+can check by ctrl+hover on x etc.).</p>
+<p>My solution is to define a locale for syntax and interpret it (sublocale <br>
+is somehow slow) whenever you want to use the syntax.</p>
+<p>locale ord_syntax = ord<br>
+begin</p>
+<p>notation less_eq (infix "⊑" 50)<br>
+notation less (infix "⊏" 50)<br>
+abbreviation greater_eq_syntax (infix "⊒" 50) where "greater_eq_syntax ≡ <br>
+ord.greater_eq less_eq"<br>
+abbreviation greater_syntax (infix "⊐" 50) where "greater_syntax ≡ <br>
+ord.greater less"</p>
+<p>end</p>
+<p>context my_locale begin<br>
+interpretation ord_syntax.<br>
+lemma property_locale: "⟦ x ⊑ y; y ⊑ z ⟧ ⟹ x ⊑ z" using less_eq.order_trans.<br>
+end</p>
+<p>Best regards,<br>
+Akihisa</p>
+
+
+
+<a name="294732049"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Importing%20classes%20into%20a%20locale%20in%20Isabelle%20an.../near/294732049" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Importing.20classes.20into.20a.20locale.20in.20Isabelle.20an.2E.2E.2E.html#294732049">(Aug 22 2022 at 17:13)</a>:</h4>
+<p>From: xanonec xyz &lt;<a href="mailto:xanonec@gmail.com">xanonec@gmail.com</a>&gt;<br>
+Dear Dr Akihisa Yamada,</p>
+<p>Thank you for your reply. It seems that the solution that you have proposed<br>
+may be the best solution that is currently available because it was used in<br>
+HOL on several occasions. Anecdotally, it is possible that someone else has<br>
+struggled with the same problem - theory Dense_Linear_Order in the folder<br>
+HOL/Decision_Procs/ contains the following code:</p>
+<hr>
+<p>locale <em>linorder_stupid_syntax</em> = linorder<br>
+begin</p>
+<p>notation<br>
+  less_eq  ("op ⊑") and<br>
+  less_eq  ("(_/ ⊑ _)" [51, 51] 50) and<br>
+  less  ("op ⊏") and<br>
+  less  ("(_/ ⊏ _)"  [51, 51] 50)</p>
+<p>end</p>
+<hr>
+<p>I have to admit that I thought that the problem is likely to be related to<br>
+notation before asking the question. However, I became slightly confused<br>
+after reading clause 5 in the following question:<br>
+<a href="https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2014-August/msg00237.html">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2014-August/msg00237.html</a>.<br>
+After reading clause 5 in the aforementioned question I thought that the<br>
+problem may not have a trivial solution and decided to postpone the<br>
+independent investigation until I receive a reply from the community.</p>
+<p>If possible, I would like to provide a copy of your reply on stack<br>
+overflow. Please let me know if this is acceptable (of course, I will<br>
+provide a link to your original answer). Alternatively, please let me know<br>
+if you would prefer to provide an answer on stack overflow yourself or you<br>
+would prefer your answer not to be copied to stack overflow.</p>
+<p>xanonec</p>
+
+
+
+<a name="294732558"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Importing%20classes%20into%20a%20locale%20in%20Isabelle%20an.../near/294732558" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Importing.20classes.20into.20a.20locale.20in.20Isabelle.20an.2E.2E.2E.html#294732558">(Aug 22 2022 at 17:16)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Dear xanonec,</p>
+<p>to start with:</p>
+<blockquote>
+<p>Lastly, as a side note, I have noticed that there may be a certain amount&gt; of partial code duplication in HOL. In particular, it seems to me that<br>
+the&gt; theories in HOL/Lattice/, HOL/Algebra/Order-HOL/Algebra/Lattice<br>
+and&gt; HOL/Library/Boolean_Algebra resemble the theory in HOL/Orderings-&gt;<br>
+HOL/Lattices. However, I am not certain if the equivalence between<br>
+these&gt; theories was established through the sublocale/subclass<br>
+relationship (e.g.&gt; see class_deps) to a sufficient extent. Of course, I<br>
+understand that the&gt; theories use distinct axiomatisation and the<br>
+theories in HOL/Algebra/ and&gt; HOL/Library/Boolean_Algebra are based on<br>
+locales. Furthermore, the theories&gt; in HOL/Algebra/ contain a certain<br>
+amount of information that has not been&gt; formalised in other theories.<br>
+However, I would still like to gain a better&gt; understanding why all four<br>
+theories co-exist in HOL and the relationship&gt; between these theories is<br>
+not always clearly indicated.</p>
+</blockquote>
+<p>This is a re-occuring topic on this mailing list, so let me quote from<br>
+an older post<br>
+(<a href="https://groups.google.com/forum/#!topic/fa.isabelle/kRHYNQ3uFCU/discussion">https://groups.google.com/forum/#!topic/fa.isabelle/kRHYNQ3uFCU/discussion</a>):</p>
+<blockquote>
+<p>as a rule of thumb, there are basically two algebraic hierarchy<br>
+developments in HOL:</p>
+<p>HOL-Main with type classes:
+* implicit use due to type inference
+* pragmatic and simple sharing between similar types
+* explicit definitions
+* directly executable</p>
+<p>HOL-Algebra with locales:
+* explicit carrier – possibility to develop proper meta theory (*)
+* implicit definitions where possible
+* suitable for mathematics </p>
+</blockquote>
+<p>(*) The meaning of »meta theory« in this context is roughly that you can<br>
+reason <em>about</em> algebraic structures, not only on properties of their<br>
+elements.  For example, the classification of all simple groups would be<br>
+meta theory, whereas the statement »The integers form a group wrt. +, 0<br>
+and -« is not.</p>
+<p>HOL/Library/Boolean_Algebra is somewhat special as it seems to be used<br>
+only in HOL-Word.</p>
+<p>Concerning re-using classes in locales: classes carry only global<br>
+syntax: i.e. &lt; always refers to the global constant less, but during<br>
+input / output occurences on local type 'a are replaces by the local<br>
+less (»user space type system«).  Hence, when building a local upon a<br>
+class, syntax must be installed explicitly.</p>
+<p>It might also be the case that you only want to take over some results<br>
+from an existing class; then it is usually better to formulate the<br>
+locale stand-alone and use a confined interpretation:</p>
+<p>class c = …</p>
+<p>locale l = … &lt;operations, syntax, assumptions…&gt;<br>
+begin</p>
+<p>interpretation c: c … &lt;proof&gt;</p>
+<p>lemma result1 = c.result1</p>
+<p>lemma result2 = c.result2</p>
+<p>…</p>
+<p>end</p>
+<p>Hope this helps,<br>
+    Florian<br>
+<a href="/user_uploads/14278/tcTnu06yMqzq1U_WNHykjNzH/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294732626"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Importing%20classes%20into%20a%20locale%20in%20Isabelle%20an.../near/294732626" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Importing.20classes.20into.20a.20locale.20in.20Isabelle.20an.2E.2E.2E.html#294732626">(Aug 22 2022 at 17:17)</a>:</h4>
+<p>From: xanonec xyz &lt;<a href="mailto:xanonec@gmail.com">xanonec@gmail.com</a>&gt;<br>
+Dear Dr Florian Haftmann,</p>
+<p>Thank your comments.</p>
+<p>The extracts from the post that is available on <a href="https://groups.google.com/">https://groups.google.com/</a><br>
+forum/#!topic/fa.isabelle/kRHYNQ3uFCU/discussion were helpful and provide<br>
+an explanation for the observation that I made in the concluding remarks of<br>
+my question.</p>
+<p>Also, with the help of the previous answer and your comments, I believe I<br>
+have gained a certain level of understanding of the problem that is related<br>
+to the propagation of the notation/syntax from classes to locales. However,<br>
+I would also like to gain further understanding of the meaning and<br>
+significance of clause 5 in the post that is available on<br>
+<a href="https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2014-August/msg00237.html">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2014-August/msg00237.html</a><br>
+(I<br>
+could not find any comments on clause 5 within the post, although several<br>
+comments on other clauses were made):</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

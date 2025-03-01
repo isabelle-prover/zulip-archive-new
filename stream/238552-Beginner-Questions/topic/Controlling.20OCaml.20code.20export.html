@@ -1,0 +1,66 @@
+<html>
+<head><meta charset="utf-8"><title>Controlling OCaml code export · Beginner Questions · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/index.html">Beginner Questions</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Controlling.20OCaml.20code.20export.html">Controlling OCaml code export</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="299242678"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Controlling%20OCaml%20code%20export/near/299242678" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Alex Weisberger <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Controlling.20OCaml.20code.20export.html#299242678">(Sep 16 2022 at 21:16)</a>:</h4>
+<p>When exporting constants to OCaml, I'm seeing that the corresponding type definitions that a function operates on are serialized to OCaml within a module. In the case of <code>datatype</code>, this means that the datatype constructors aren't accessible outside of the module.</p>
+<p>Here's what I mean:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">theory</span><span class="w"> </span><span class="n">CodeTest</span><span class="w"></span>
+
+<span class="kp">imports</span><span class="w"> </span><span class="n">Main</span><span class="w"></span>
+
+<span class="k">begin</span><span class="w"></span>
+
+<span class="k">datatype</span><span class="w"> </span><span class="n">color</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Red</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Green</span><span class="w"></span>
+
+<span class="k">definition</span><span class="w"> </span><span class="s">"is_red c = (case c of Red ⇒ True | _ ⇒ False)"</span><span class="w"></span>
+
+<span class="k">export_code</span><span class="w"> </span><span class="n">is_red</span><span class="w"> </span><span class="kp">in</span><span class="w"> </span><span class="n">OCaml</span><span class="w"></span>
+
+<span class="k">end</span><span class="w"></span>
+</code></pre></div>
+<p>This is the theory in Isabelle, and here's the generate OCaml code:</p>
+<div class="codehilite" data-code-language="OCaml"><pre><span></span><code><span class="k">module</span> <span class="nc">CodeTest</span> <span class="o">:</span> <span class="k">sig</span>
+  <span class="k">type</span> <span class="n">color</span>
+  <span class="k">val</span> <span class="n">is_red</span> <span class="o">:</span> <span class="n">color</span> <span class="o">-&gt;</span> <span class="kt">bool</span>
+<span class="k">end</span> <span class="o">=</span> <span class="k">struct</span>
+
+<span class="k">type</span> <span class="n">color</span> <span class="o">=</span> <span class="nc">Red</span> <span class="o">|</span> <span class="nc">Green</span><span class="o">;;</span>
+
+<span class="k">let</span> <span class="k">rec</span> <span class="n">is_red</span> <span class="n">c</span> <span class="o">=</span> <span class="o">(</span><span class="k">match</span> <span class="n">c</span> <span class="k">with</span> <span class="nc">Red</span> <span class="o">-&gt;</span> <span class="bp">true</span> <span class="o">|</span> <span class="nc">Green</span> <span class="o">-&gt;</span> <span class="bp">false</span><span class="o">);;</span>
+
+<span class="k">end</span><span class="o">;;</span> <span class="c">(*struct CodeTest*)</span>
+</code></pre></div>
+<p><code>type color</code> in the module signature means that some code outside of the <code>CodeTest</code> module can't create values of that type.</p>
+<p>I've found a good amount of documentation of the code generation process, but can't find anything about this specific scenario. Is this something that I'd need to write custom code equations for, or is there some configuration that could control this?</p>
+
+
+
+<a name="299245720"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Controlling%20OCaml%20code%20export/near/299245720" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Simon Roßkopf <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Controlling.20OCaml.20code.20export.html#299245720">(Sep 16 2022 at 21:44)</a>:</h4>
+<p>I am not sure if there is a nicer solution, but usually export one constructor of the datatype. This leads to the type being part of the signature</p>
+
+
+
+<a name="299246649"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Controlling%20OCaml%20code%20export/near/299246649" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Simon Roßkopf <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Controlling.20OCaml.20code.20export.html#299246649">(Sep 16 2022 at 21:52)</a>:</h4>
+<p>There is also the keyword <code>open</code> (<code>export open ...</code>, See chapter 13 in the isar-ref), but that leads to exposing everything in the modules.</p>
+
+
+
+<a name="299264300"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Controlling%20OCaml%20code%20export/near/299264300" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Alex Weisberger <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Controlling.20OCaml.20code.20export.html#299264300">(Sep 17 2022 at 01:58)</a>:</h4>
+<p>Exporting one of the constructors works perfectly, and makes enough sense that I have no problem doing that. That solves my problem exactly. Thanks!</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

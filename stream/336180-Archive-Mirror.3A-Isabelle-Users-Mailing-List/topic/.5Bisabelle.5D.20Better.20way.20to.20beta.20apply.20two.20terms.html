@@ -1,0 +1,90 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Better way to beta apply two terms · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Better.20way.20to.20beta.20apply.20two.20terms.html">[isabelle] Better way to beta apply two terms</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294143142"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Better%20way%20to%20beta%20apply%20two%20terms/near/294143142" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Better.20way.20to.20beta.20apply.20two.20terms.html#294143142">(Aug 18 2022 at 18:16)</a>:</h4>
+<p>From: Steve Wong &lt;<a href="mailto:s.wong.731@gmail.com">s.wong.731@gmail.com</a>&gt;<br>
+Hi,</p>
+<p>What is a better way to beta-apply two terms without using betapply, which<br>
+can cause a type mismatch. For example:</p>
+<p>consts<br>
+a :: nat<br>
+F :: "'a =&gt; nat"<br>
+ML {*<br>
+val ftrm = @{term "F"};<br>
+val atrm = @{term "a"};<br>
+val res = betapply((ftrm,atrm));<br>
+type_of res<br>
+*}</p>
+<p>The application succeeds, but the resulting term isn't well-typed (thus<br>
+type_of fails). betapply doesn't seem to change the input type of F from a<br>
+variable to "Nat.nat". Is there a better way of beta applying such that the<br>
+input type can automatically be updated?</p>
+<p>Thanks for the help in advance!</p>
+<p>Steve</p>
+
+
+
+<a name="294143294"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Better%20way%20to%20beta%20apply%20two%20terms/near/294143294" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Better.20way.20to.20beta.20apply.20two.20terms.html#294143294">(Aug 18 2022 at 18:17)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Term.betapply is not used that often, although there is nothing wrong with <br>
+it.  Other term constructions (even plain Abs and $) are used more <br>
+frequently.</p>
+<p>The experiment above has failed for other reasons: the example terms are <br>
+internalized independently, i.e. the system did not know they are <br>
+correlated.  Normally you use something like Syntax.read_terms, <br>
+Syntax.check_terms or even Specification.read_specification / <br>
+check_specification for simultaneous processing of formal input in an <br>
+shared syntactic context.</p>
+<p>An alternative is to compose untyped preterms (using dummyT) in some <br>
+places and then let Syntax.check_term(s) work out the details.  (It also <br>
+requires some care because many basic term operations assume fully typed <br>
+terms.)</p>
+<p>Another note concerning readability of ML sources: "ftrm" and "atrm" are <br>
+rather long and unwieldy names for plain formal entities that could be <br>
+just called "f" and "a", or "t" and "u".</p>
+<p>Makarius</p>
+
+
+
+<a name="294146335"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Better%20way%20to%20beta%20apply%20two%20terms/near/294146335" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Better.20way.20to.20beta.20apply.20two.20terms.html#294146335">(Aug 18 2022 at 18:33)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Depends what you want to do exactly.  The following reconstructs types for <br>
+the given schematic term, treating schematic type variables as fixed in <br>
+type-inference.  The context needs to be configured to allow <br>
+schematic terms explicitly:</p>
+<p>ML {*<br>
+val ctxt = @{context} |&gt; Proof_Context.set_mode <br>
+Proof_Context.mode_schematic;<br>
+val s = Var (("s", 0), dummyT);<br>
+val t = Var (("t", 0), TVar (("'a", 0), HOLogic.typeS));<br>
+Syntax.check_term ctxt (s $ t)<br>
+*}</p>
+<p>Note that I have used proper type variable name "'a" here.  The system <br>
+does not insist in that, but the behaviour for a TVar called "a" is <br>
+undefined.</p>
+<p>This variant is slightly different, it uses a named type inference <br>
+parameter that may get instantiated in type-inference:</p>
+<p>ML {*<br>
+val ctxt = @{context} |&gt; Proof_Context.set_mode <br>
+Proof_Context.mode_schematic;<br>
+val s = Var (("s", 0), dummyT);<br>
+val t = Var (("t", 0), Type_Infer.mk_param 0 @{sort HOL.type});<br>
+Syntax.check_term ctxt (s $ t)<br>
+*}</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

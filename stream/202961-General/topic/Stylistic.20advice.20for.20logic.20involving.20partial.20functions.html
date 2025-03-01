@@ -1,0 +1,82 @@
+<html>
+<head><meta charset="utf-8"><title>Stylistic advice for logic involving partial functions · General · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/202961-General/index.html">General</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Stylistic.20advice.20for.20logic.20involving.20partial.20functions.html">Stylistic advice for logic involving partial functions</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="395542151"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/Stylistic%20advice%20for%20logic%20involving%20partial%20functions/near/395542151" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Alex Weisberger <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Stylistic.20advice.20for.20logic.20involving.20partial.20functions.html#395542151">(Oct 08 2023 at 13:25)</a>:</h4>
+<p>I'm finding that working with partial functions (Maps) is convenient, because I can place constraints on the domain and range of the functions via <code>Map.graph</code>, e.g. I've defined well-typedness of a step function on a permissive state type as:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">definition</span><span class="w"> </span><span class="s">"well_typed stp = (∀(s, s') ∈ Map.graph stp. dom s = dom s')"</span>
+</code></pre></div>
+<p>One issue that comes up is that working with partial functions leads to a lot of <code>case</code> statements in the logic, which corresponds to a lot of nested <code>cases</code> applications in proofs. While this works, it feels like I'm brute-forcing things, and seems inelegant. <code>case_option</code> cleans things up a little bit, but still leads to a lot of nesting.</p>
+<p>So, I was wondering if there was any helper functions / proof methods for this that I'm not aware of.</p>
+<p>The example I'm working on is sort of long, but here's an example snippet:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">definition</span><span class="w"> </span><span class="s">"local_simulates afl am_i am_m e s = (</span>
+<span class="s">  let istp = step (am_i e) in</span>
+<span class="s">  let mstp = step (am_m e) in</span>
+<span class="s">  let impl_start = (Get (lens (am_i e))) s in</span>
+
+<span class="s">  case_option True (λms.</span>
+<span class="s">    let model_start = (Get (lens (am_m e))) ms in</span>
+<span class="s">    (case_option True (λir.</span>
+<span class="s">      (case_option True (λmr.</span>
+<span class="s">        afl ir  = Some mr)</span>
+<span class="s">        (mstp model_start)))</span>
+<span class="s">    (istp impl_start)))</span>
+
+<span class="s">    (afl impl_start))"</span>
+</code></pre></div>
+<p>I'm working on some state machine simulation proofs and here the step functions of two SMs are partial functions, and the abstraction function between states is also partial. So there's three nested <code>case_options</code> and three corresponding <code>cases</code> method application in the proof.</p>
+
+
+
+<a name="395544176"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/Stylistic%20advice%20for%20logic%20involving%20partial%20functions/near/395544176" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Lukas Stevens <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Stylistic.20advice.20for.20logic.20involving.20partial.20functions.html#395544176">(Oct 08 2023 at 13:48)</a>:</h4>
+<p>You can use <a href="https://isabelle.in.tum.de/library/HOL/HOL-Library/Monad_Syntax.html">Monad Syntax</a></p>
+
+
+
+<a name="395544822"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/Stylistic%20advice%20for%20logic%20involving%20partial%20functions/near/395544822" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Alex Weisberger <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Stylistic.20advice.20for.20logic.20involving.20partial.20functions.html#395544822">(Oct 08 2023 at 13:56)</a>:</h4>
+<p>How does that work with Options? Because a default value needs to be specified for the None case.</p>
+
+
+
+<a name="395545016"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/Stylistic%20advice%20for%20logic%20involving%20partial%20functions/near/395545016" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Lukas Stevens <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Stylistic.20advice.20for.20logic.20involving.20partial.20functions.html#395545016">(Oct 08 2023 at 13:58)</a>:</h4>
+<p>You can use a function such as <code>the_default a opt = (case opt of None =&gt; a | Some b =&gt; b)</code></p>
+
+
+
+<a name="395545102"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/Stylistic%20advice%20for%20logic%20involving%20partial%20functions/near/395545102" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Lukas Stevens <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Stylistic.20advice.20for.20logic.20involving.20partial.20functions.html#395545102">(Oct 08 2023 at 13:59)</a>:</h4>
+<p>This function should probably go into <code>Option.thy</code></p>
+
+
+
+<a name="395545171"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/Stylistic%20advice%20for%20logic%20involving%20partial%20functions/near/395545171" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Lukas Stevens <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Stylistic.20advice.20for.20logic.20involving.20partial.20functions.html#395545171">(Oct 08 2023 at 14:00)</a>:</h4>
+<p>I have seen it being duplicated in different formalisations</p>
+
+
+
+<a name="395582716"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/Stylistic%20advice%20for%20logic%20involving%20partial%20functions/near/395582716" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Alex Weisberger <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Stylistic.20advice.20for.20logic.20involving.20partial.20functions.html#395582716">(Oct 08 2023 at 23:02)</a>:</h4>
+<p>Do you have a link to any theories that use the monad syntax? I'm having trouble getting mine to parse after importing the HOL-Library.Monad_Syntax theory.</p>
+
+
+
+<a name="395652497"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/Stylistic%20advice%20for%20logic%20involving%20partial%20functions/near/395652497" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Lukas Stevens <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Stylistic.20advice.20for.20logic.20involving.20partial.20functions.html#395652497">(Oct 09 2023 at 09:09)</a>:</h4>
+<p>I don't have a good example at hand. In general you replace <code>let _ = _ in</code> with <code>let _ = _;</code> and <code>case_option True (λx. t) s</code> with <code>x ← s; t;</code> and then wrap the whole thing in <code>the_default True</code> in the end.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,38 @@
+[
+    {
+        "content": "<p>From: Stephan Merz &lt;<a href=\"mailto:Stephan.Merz@loria.fr\">Stephan.Merz@loria.fr</a>&gt;<br>\nDear all,</p>\n<p>I have been playing with the Collection framework lately and having trouble when trying to set up executable sets of sets. The theory below illustrates the problem: the function maxima is meant to compute the maximal sets contained in a set of sets. Using the value command, I can evaluate the function for the empty and for singleton sets, but evaluation fails for any argument containing two or more element sets.</p>\n<p>I've then exported ML code computing the maxima of a two-element set. When trying to evaluate this code, exception \"Fail\" is raised, and sure enough the code contains</p>\n<p>fun equal_dlista _ _ _ = raise Fail \"equal_dlist\";</p>\n<p>which is responsible for this. However, looking into theory DList I find </p>\n<p>instantiation dlist :: (equal) equal</p>\n<p>so I presumed that appropriate code for checking equality of two dlists would be generated. (I haven't looked much further, though, how this code would be set up.)</p>\n<p>Am I doing something wrong here, or is this a known limitation?</p>\n<p>NB: When I try to replace lists ('a ls) by hash sets ('a hs), I get the more sensible error message</p>\n<p>No type arity HashMap.hashmap :: hashable</p>\n<p>for the definition of maxima -- I can understand that there is no hash function set up for hash sets themselves.</p>\n<p>Thanks,<br>\nStephan<br>\n<a href=\"/user_uploads/14278/V7V8P44rLtK56ShqpiuFMaji/Maxima.thy\">Maxima.thy</a></p>",
+        "id": 294141322,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660845918
+    },
+    {
+        "content": "<p>From: Alexander Krauss &lt;<a href=\"mailto:krauss@in.tum.de\">krauss@in.tum.de</a>&gt;<br>\nHi Stephan,</p>\n<p>There seems to be a problem with the setup of type Dlist. I reduced your <br>\nexample to a minimal one, which does not use the Collection framework.</p>\n<p>The problem goes away when I remove the [code nbe] declaration that <br>\ncomes after the instance proof of equal in Dlist.thy <br>\n(<a href=\"http://isabelle.in.tum.de/repos/isabelle/file/Isabelle2011/src/HOL/Library/Dlist.thy#l128\">http://isabelle.in.tum.de/repos/isabelle/file/Isabelle2011/src/HOL/Library/Dlist.thy#l128</a>). <br>\nI don't know about the precise semantics of [code nbe] wrt. normal code <br>\nequations, but it seems to override the previous code equation.</p>\n<p>Maybe Florian can comment...</p>\n<p>Alex</p>",
+        "id": 294141534,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660845995
+    },
+    {
+        "content": "<p>From: Stephan Merz &lt;<a href=\"mailto:Stephan.Merz@loria.fr\">Stephan.Merz@loria.fr</a>&gt;<br>\nForwarding the helpful reply from Andreas who apparently forgot to reply to the list as well as to me -- since others may be interested as well.</p>\n<p>Thanks Andreas!</p>\n<p>Stephan</p>\n<p>Begin forwarded message:</p>",
+        "id": 294141542,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660845997
+    },
+    {
+        "content": "<p>From: Florian Haftmann &lt;<a href=\"mailto:florian.haftmann@informatik.tu-muenchen.de\">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>\nHi all,</p>\n<p>all [code …] declarations simply override any default equation.</p>\n<p>Btw. the explicit declaration is currently tested for addition.</p>\n<p>Cheers,<br>\n    Florian<br>\n<a href=\"/user_uploads/14278/cCoPuq0YEFNm5dx0YVsURt7Y/signature.asc\">signature.asc</a></p>",
+        "id": 294141582,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660846017
+    },
+    {
+        "content": "<p>From: Peter Lammich &lt;<a href=\"mailto:peter.lammich@uni-muenster.de\">peter.lammich@uni-muenster.de</a>&gt;<br>\nHowever, we know that problem and have already discussed it. I think<br>\nthat the result was that it is, in principle, possible. The set<br>\nimplementation would then store custom equals (and hashcode, compare,<br>\netc.) functions,<br>\nthat have to be specified, e.g. on construction of a set<br>\n(empty-operation). The data structure invariant (and the precondition of<br>\nthe empty-operation) would require that the custom equals, hashcode,<br>\ncompare, etc functions are sensible.<br>\nA default empty-operation, setting the functions to default values (e.g.<br>\nop =, op &lt;), would still be possible.</p>\n<p>Best,<br>\n  Peter</p>",
+        "id": 294141601,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660846023
+    },
+    {
+        "content": "<p>From: Andreas Lochbihler &lt;<a href=\"mailto:andreas.lochbihler@kit.edu\">andreas.lochbihler@kit.edu</a>&gt;<br>\nHi Peter and Stephan,</p>\n<p>just let me add a few comments. We have not done this yet because the <br>\ncollections framework reuses as much as possible from the Isabelle/HOL library, <br>\ne.g. red-black trees and associative lists. Since HOL equality is ubiquitous in <br>\nthere, all this would have to be generalised to arbitrary equivalence classes. <br>\nUnfortunately, HOL equality is not a type class parameter as the comparison <br>\noperators are. Hence, we cannot even exploit locale hackery to avoid redoing a <br>\nlot. But it's not just copying and replaying the proofs, the simplifier as is <br>\ndoes not support rewriting w.r.t. equivalence classes. Thus, we expect that many <br>\nproofs have to be rewritten.</p>\n<p>An alternative approach would be to move the multiple representation problem <br>\nfrom the logic to in the code generator setup. For example, you could quotient <br>\nyour favorite data structure for sets w.r.t. the equivalence relation induced by <br>\nthe abstraction function and use the new type to represent the inner sets.<br>\nThe challenge then is to set up the code equations for the quotient type. <br>\nHowever, this only works for operations whose result does not depend on the <br>\ndifferent representation of equal sets. For example, iteration over distinct <br>\nlists would no longer be executable because iterating over [2, 1] visits 2 <br>\nbefore 1, over [1, 2] visits 1 before 2. For red-black-trees, this would be an <br>\noption because they implement totally ordered sets, for which iteration is <br>\nuniquely specified.</p>\n<p>This second approach is similar to the Cset approach in HOL/Library. 'a cset is <br>\nisomorphic to 'a set, but has backing implementations with lists, distinct lists <br>\nand red black trees. However, it does not support underspecified operations like <br>\niteration, as the collections framework does. the quotient construction above <br>\ndiffers from Cset in that it is not isomorphic to set and adds the additional <br>\nstructure of the backing implementation (actually, only the structure of ordered <br>\nlists) such that a few more code equations are provable.</p>\n<p>Andreas</p>",
+        "id": 294141619,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660846028
+    }
+]

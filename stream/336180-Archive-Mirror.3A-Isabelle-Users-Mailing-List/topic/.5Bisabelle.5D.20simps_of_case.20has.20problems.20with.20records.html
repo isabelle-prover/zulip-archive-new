@@ -1,0 +1,108 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] simps_of_case has problems with records · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20simps_of_case.20has.20problems.20with.20records.html">[isabelle] simps_of_case has problems with records</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294644705"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20simps_of_case%20has%20problems%20with%20records/near/294644705" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20simps_of_case.20has.20problems.20with.20records.html#294644705">(Aug 22 2022 at 10:19)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear all,</p>
+<p>The simps_of_case conversion function does not seem to like records. Consider the <br>
+following minimal example:</p>
+<p>record foo = foo :: nat</p>
+<p>definition f :: "foo ⇒ nat × nat ⇒ nat"<br>
+   where "f s xy = (case xy of (x, y) ⇒ foo s + x + y)"</p>
+<p>simps_of_case f_def</p>
+<p>In this example, simps_of_case raises an exception THM, because unification of "TERM _"<br>
+and "⟦?Q ⟷ ?P; ?Q⟧ ⟹ ?P" has failed in line 315 in drule.ML. This error occurs only if one <br>
+of the parameters of the function is a record.</p>
+<p>Is this a general limitation of simps_of_case?</p>
+<p>Background on my use case: I want to a function with many cases. Using fun with nested <br>
+pattern matching is too slow because the internal splitting procedure creates several <br>
+hundred disambiguiations and the internal constructions then take too long. However, it <br>
+works nicely with a case expression on the right hand side. So I'd like to get the simp <br>
+rules back with simps_of_case. Any suggestions on this are welcome.</p>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<a name="294644882"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20simps_of_case%20has%20problems%20with%20records/near/294644882" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20simps_of_case.20has.20problems.20with.20records.html#294644882">(Aug 22 2022 at 10:20)</a>:</h4>
+<p>From: Lars Noschinski &lt;<a href="mailto:noschinl@in.tum.de">noschinl@in.tum.de</a>&gt;<br>
+The problem is that "#splits o Ctr_Sugar.ctr_sugar_of ctxt" returns<br>
+Drule.dummy_thm for records, which has not the expected format for a<br>
+split rule.</p>
+<p>See <a href="http://isabelle.in.tum.de/testboard/Isabelle/rev/ccafd7d193e7">http://isabelle.in.tum.de/testboard/Isabelle/rev/ccafd7d193e7</a> for a<br>
+patch which ignores these rules.</p>
+<p>-- Lars</p>
+
+
+
+<a name="294645028"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20simps_of_case%20has%20problems%20with%20records/near/294645028" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20simps_of_case.20has.20problems.20with.20records.html#294645028">(Aug 22 2022 at 10:21)</a>:</h4>
+<p>From: Jasmin Blanchette &lt;<a href="mailto:jasmin.blanchette@inria.fr">jasmin.blanchette@inria.fr</a>&gt;<br>
+Hi Lars, Andreas,</p>
+<p>Lars wrote:</p>
+<p>This immediately points to a workaround for Andreas:</p>
+<p>free_constructors foo_ext for foo_ext<br>
+      by (erule foo.cases_scheme) (rule foo.ext_inject)</p>
+<p>will update the “Ctr_Sugar” entry for your record type so that it works with “simps_of_case”.</p>
+<p>This of course raises the question of whether we can/should integrate records better with the emerging “free constructor” architecture. This is mostly an engineering or design issue. Records and datatypes have some obvious conceptual overlap: A plain (non-extended) record is like a nonrecursive single-constructor datatype. Also, for extended records, there is no single constant that acts as a constructor, so the “free constructor” architecture would have to be extended to cope with that. Hence, right now we do the minimum automatically and let users invoke “free_constructors” if they want to go further. If this is too much of an annoyance, we could at least derive the split rule automatically from “foo.cases_scheme".</p>
+<p>Jasmin</p>
+
+
+
+<a name="294645216"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20simps_of_case%20has%20problems%20with%20records/near/294645216" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20simps_of_case.20has.20problems.20with.20records.html#294645216">(Aug 22 2022 at 10:23)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Jasmin and Lars,</p>
+<p>Thanks for your input. After Lars' explanations, I found another workaround, namely <br>
+explicitly listing the relevant split rules using (splits: ...).</p>
+<p>Of course, I'd appreciate a better integration of record with the other packages. This <br>
+would, e.g., allow to pattern-match on records in function definitions, as in</p>
+<p>record foo = foo :: nat<br>
+   record bar = foo + bar :: int</p>
+<p>free_constructors foo_ext for foo_ext by (fact foo.cases_scheme foo.ext_inject)+<br>
+   free_constructors bar_ext for bar_ext by (meson bar.ext_surjective)(fact bar.ext_inject)</p>
+<p>fun f :: "'a bar_scheme ⇒ int" where "f (|foo = x, bar = y, … = z|) = int x + y"</p>
+<p>Though, I do not see why the free constructor architecture would have to be extended. An <br>
+extended extensible record like 'a bar_scheme just abbreviates "'a bar_ext foo_ext" and <br>
+the functions foo_ext and bar_ext can serve as constructors for foo_ext and bar_ext, <br>
+respectively. That is, we just have nested types with free constructors. What am I missing?</p>
+<p>Unfortunately, the record package is still completely unlocalised. That's probably the <br>
+bigger hurdle.</p>
+<p>Cheers,<br>
+Andreas</p>
+
+
+
+<a name="294645404"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20simps_of_case%20has%20problems%20with%20records/near/294645404" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20simps_of_case.20has.20problems.20with.20records.html#294645404">(Aug 22 2022 at 10:24)</a>:</h4>
+<p>From: Jasmin Blanchette &lt;<a href="mailto:jasmin.blanchette@inria.fr">jasmin.blanchette@inria.fr</a>&gt;<br>
+Hi Andreas,</p>
+<blockquote>
+<p>Though, I do not see why the free constructor architecture would have to be extended. An extended extensible record like 'a bar_scheme just abbreviates "'a bar_ext foo_ext" and the functions foo_ext and bar_ext can serve as constructors for foo_ext and bar_ext, respectively. That is, we just have nested types with free constructors. What am I missing?</p>
+</blockquote>
+<p>Some of the architecture doesn’t like complex types like “‘a bar_ext foo_ext” — e.g. lookup is performed on a type name. That’s the main problem IIRC. It might be easy to fix. I thought there was also an issue with the “bar_ext” constant being an abbreviation, but I apparently remembered this wrong.</p>
+<p>Another worry I have is just the naming and wealth of theorems. Automatically performing what you do when you manually do “free_constructors” yields quite a few theorems coming from two worlds. It seems like the prefixes keep things apart, e.g. “foo.splits” (generated by record) vs. “foo_ext.splits” (generated by “free_constructors”) — but the situation is still not entirely satisfactory IMO. Hence, I would rather tread carefully here, and perhaps wait one more iteration of Isabelle and new datatypes before doing more “reforms”.</p>
+<p>I’m also not sure all infrastructure will be equally happy to have two views on records — the records one and the “ctr_sugar” one (which has largely displaced the old datatype one here and there). This is a minor issue that can be addressed one tool at a time (Nitpick, Quickcheck, etc.), but it might require some weeks before all problems have been identified and solved.</p>
+<p>Finally, this would enable the datatype plugins on records — generation of a size function etc. Again, this is not completely impact-free, if nothing else on the number of theorems/constants/etc. generated and hence on the performance of the prover. This is another reason why I’m inclined to wait.</p>
+<p>All this having been said, I believe that records belong in “ctr_sugar” and that the convenience of having them in there by default would be appreciated by many users. If anybody is willing to jump in and make it happen faster than I’m likely going to, they’re welcome. ;)</p>
+<blockquote>
+<p>Unfortunately, the record package is still completely unlocalised. That's probably the bigger hurdle.</p>
+</blockquote>
+<p>I think that’s fine as far as “Ctr_Sugar” goes, thanks to the “generic data” abstraction. “Ctr_Sugar” can also deal with old-style datatypes, after all.</p>
+<p>Cheers,</p>
+<p>Jasmin</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

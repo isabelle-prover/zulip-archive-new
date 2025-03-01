@@ -1,0 +1,79 @@
+<html>
+<head><meta charset="utf-8"><title>Number literals and explicit type annotations · Beginner Questions · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/index.html">Beginner Questions</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Number.20literals.20and.20explicit.20type.20annotations.html">Number literals and explicit type annotations</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="272042075"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Number%20literals%20and%20explicit%20type%20annotations/near/272042075" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> waynee95 <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Number.20literals.20and.20explicit.20type.20annotations.html#272042075">(Feb 15 2022 at 21:39)</a>:</h4>
+<p>I know that number literals are overloaded in Isabelle/HOL and that explicit type annotations are necessary in the following cases. <br>
+Most of the time I following the rule of thumb of "if there's an error involving number literals, add explicit type annotations". </p>
+<p>But I wanted to understand the errors that arise in the following examples a little bit better:</p>
+<p>Doing</p>
+<div class="codehilite"><pre><span></span><code>value &quot;5 - 10&quot;
+</code></pre></div>
+<p>will yield the error</p>
+<div class="codehilite"><pre><span></span><code>Wellsortedness error:
+Type &#39;a not of sort term_of
+Cannot derive subsort relation {minus,numeral} &lt; term_of
+</code></pre></div>
+<p>and doing</p>
+<div class="codehilite"><pre><span></span><code>value &quot;5 + 10&quot;
+</code></pre></div>
+<p>will yield the error</p>
+<div class="codehilite"><pre><span></span><code>Wellsortedness error:
+Type &#39;a not of sort term_of
+Cannot derive subsort relation numeral &lt; term_of
+</code></pre></div>
+<p>I would say that both cases cause an error because a) number literals are overloaded and b) the operations + and - are also overloaded, so Isabelle does not know which functions to apply here. </p>
+<ol>
+<li>Why does the second example not mention <code>plus</code> in the error message but the first example does mention <code>minus</code>?</li>
+<li>And what does <code>numeral &lt; term_of</code> mean?</li>
+</ol>
+<p>If these questions can be answered by looking into the official docs, any pointers to them would be appreciated.</p>
+
+
+
+<a name="272076467"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Number%20literals%20and%20explicit%20type%20annotations/near/272076467" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Number.20literals.20and.20explicit.20type.20annotations.html#272076467">(Feb 16 2022 at 05:54)</a>:</h4>
+<div class="codehilite"><pre><span></span><code>class numeral = one + semigroup_add
+</code></pre></div>
+<p>So numerals always have an addition</p>
+
+
+
+<a name="272076479"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Number%20literals%20and%20explicit%20type%20annotations/near/272076479" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Number.20literals.20and.20explicit.20type.20annotations.html#272076479">(Feb 16 2022 at 05:55)</a>:</h4>
+<p>(I just did a control-click on <code>numeral</code>, because I did not remember it either)</p>
+
+
+
+<a name="272417565"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Number%20literals%20and%20explicit%20type%20annotations/near/272417565" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Number.20literals.20and.20explicit.20type.20annotations.html#272417565">(Feb 18 2022 at 15:46)</a>:</h4>
+<p>What <code>value</code> does (in its default setting) is to run the code generator on the given term and then execute the generated ML code. The result is an ML value, and that ML value then has to be converted back to a HOL term in order to be displayed. This is done with the <code>term_of</code> type class that contains a function that converts a value of the type to a representation of a HOL term. See the theory <code>HOL.Code_Evaluation</code> for more details.</p>
+<p>There are instances of <code>term_of</code> for pretty much anything you should ever encounter, but of course that only works if the term in question is monomorphic. If there are free type variables in there, those do not have the <code>term_of</code> sort (and indeed that approach cannot work even on a conceptual level – how would you execute ML code that contains free variables?).</p>
+<p>There are other modes for <code>value</code> that <em>can</em> work with free variables, namely ‘nbe’ (normalisation by evaluation) and ‘simp’ (using the simplifier), but they are much slower.</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kt">value</span> <span class="o">[</span><span class="n">nbe</span><span class="o">]</span> <span class="s">"3"</span>
+<span class="kt">value</span> <span class="o">[</span><span class="n">simp</span><span class="o">]</span> <span class="s">"3"</span>
+</code></pre></div>
+<p>With these, you get the result <code>1 + 1 + 1 :: 'a :: numeral</code>, which is not particularly helpful, but at least it works.</p>
+<p>A more useful example would be this:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kt">value</span> <span class="o">[</span><span class="n">nbe</span><span class="o">]</span> <span class="s">"replicate 3 x"</span>
+</code></pre></div>
+<p>Here you get the result <code>[x, x, x]</code> (for some reason, ‘simp’ does not seem to work here).</p>
+
+
+
+<a name="272417974"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Number%20literals%20and%20explicit%20type%20annotations/near/272417974" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Number.20literals.20and.20explicit.20type.20annotations.html#272417974">(Feb 18 2022 at 15:49)</a>:</h4>
+<p>Oh and <code>numeral &lt; term_of</code> simply means that the sort <code>numeral</code> subsumes <code>term_of</code>. Your term has the sort <code>numeral</code>, but we also need the <code>term_of</code> class here, and that would only be possible if <code>numeral</code> subsumed <code>term_of</code>. Which it doesn't. (And even if it did, you would then get another error due to the polymorphic nature of the term you are trying to evaluate. Something about free dictionaries being present.)</p>
+
+
+
+<hr><p>Last updated: Jul 15 2022 at 23:21 UTC</p>
+</html>

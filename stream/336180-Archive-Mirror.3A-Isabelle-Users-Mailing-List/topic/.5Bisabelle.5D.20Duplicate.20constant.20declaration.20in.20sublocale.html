@@ -1,0 +1,95 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Duplicate constant declaration in sublocale · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Duplicate.20constant.20declaration.20in.20sublocale.html">[isabelle] Duplicate constant declaration in sublocale</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294240117"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Duplicate%20constant%20declaration%20in%20sublocale/near/294240117" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Duplicate.20constant.20declaration.20in.20sublocale.html#294240117">(Aug 19 2022 at 10:56)</a>:</h4>
+<p>From: Lars Noschinski &lt;<a href="mailto:noschinl@in.tum.de">noschinl@in.tum.de</a>&gt;<br>
+Hi,</p>
+<p>I have locale A, B and I want to declare B as a sublocale of A. In doing <br>
+so, some of the constants in A can be replaced by simpler ones. I tried <br>
+to use the same names first, but got the following error from the <br>
+sublocale command:</p>
+<p>Duplicate constant declaration "local.g" vs. "local.g"</p>
+<p>This is not to surprising. However, if I change the definition of g in B <br>
+by removing the explicit type annotation (or use some other type <br>
+variable there), the sublocale command succeeds (of course, this is not <br>
+a solution to my problem, because I want to have exactly the specified <br>
+type for my constant).</p>
+<p>Can anyone explain to me what is happening here? Is there a way to <br>
+declare B a sublocale of A without adding a prefix to A?</p>
+<p>-- Lars</p>
+<p>=====================<br>
+theory Sublocale_Equations imports Main<br>
+begin</p>
+<p>record ('a,'b) rec =<br>
+   proj :: "'b ⇒ 'a"</p>
+<p>locale A = fixes G :: "('a, 'b) rec" begin</p>
+<p>definition g :: "'a ⇒ 'b  ⇒ bool" where<br>
+   "g u e = (proj G e = u)"</p>
+<p>end</p>
+<p>locale B = fixes dummy :: 'a begin</p>
+<p>definition "to_rec = ⦇ proj = (fst :: 'a × 'a ⇒ 'a) ⦈"</p>
+<p>definition g  :: "'a ⇒ ('a × 'a) ⇒ bool" where<br>
+   "g u e = (fst e = u)"</p>
+<p>lemma [simp]: "proj to_rec = fst" by (auto simp: to_rec_def)</p>
+<p>lemma [simp]:<br>
+   "A.g to_rec = g"<br>
+by (auto simp: g_def A.g_def fun_eq_iff to_rec_def)</p>
+<p>end</p>
+<p>sublocale B ⊆ A "to_rec"<br>
+    where "proj to_rec = fst" and "A.g to_rec = B.g"<br>
+   apply unfold_locales<br>
+   apply auto<br>
+   done<br>
+=======</p>
+
+
+
+<a name="294240126"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Duplicate%20constant%20declaration%20in%20sublocale/near/294240126" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Duplicate.20constant.20declaration.20in.20sublocale.html#294240126">(Aug 19 2022 at 10:56)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Lars,</p>
+<p>This looks really weird and I don't have an explanation, either, But you can make B a <br>
+sublocale of A if you move g's definition in A into the locale declaration:</p>
+<p>locale A = fixes G :: "('a, 'b) rec"<br>
+   fixes g :: "'a =&gt; 'b =&gt; bool"<br>
+   defines g_def: "g u e == proj G e = u"<br>
+begin<br>
+end</p>
+<p>Andreas</p>
+
+
+
+<a name="294240196"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Duplicate%20constant%20declaration%20in%20sublocale/near/294240196" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Duplicate.20constant.20declaration.20in.20sublocale.html#294240196">(Aug 19 2022 at 10:57)</a>:</h4>
+<p>From: Lars Noschinski &lt;<a href="mailto:noschinl@in.tum.de">noschinl@in.tum.de</a>&gt;<br>
+Hi Andreas,</p>
+<p>Thanks for your suggestion. Unfortunately, this is not an option for me <br>
+as g is defined much later than the the locale.</p>
+<p>-- Lars</p>
+
+
+
+<a name="294241223"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Duplicate%20constant%20declaration%20in%20sublocale/near/294241223" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Duplicate.20constant.20declaration.20in.20sublocale.html#294241223">(Aug 19 2022 at 11:04)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Lars,</p>
+<p>I have no concrete idea, but I guess this is due to the pitfalls of<br>
+parsing and processing those interpretation expressions, as Clemens has<br>
+indicated on a similar thread on isabelle-dev.</p>
+<p>Cheers,<br>
+    Florian<br>
+<a href="/user_uploads/14278/_SzRFjeAQ07GNjuHSS8hd24K/signature.asc">signature.asc</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,90 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] question on type classes and subclasses · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20question.20on.20type.20classes.20and.20subclasses.html">[isabelle] question on type classes and subclasses</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294706492"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20question%20on%20type%20classes%20and%20subclasses/near/294706492" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20question.20on.20type.20classes.20and.20subclasses.html#294706492">(Aug 22 2022 at 15:06)</a>:</h4>
+<p>From: Esseger &lt;<a href="mailto:esseger@free.fr">esseger@free.fr</a>&gt;<br>
+Dear all,</p>
+<p>When trying to prove that a class C is a subclass of a class B, say, I <br>
+am having trouble using lemmas that I have proved in C. The following <br>
+stupid example illustrates it well:</p>
+<p>class A = fixes f g::"'a ⇒ 'a" assumes HA: "f x = g x"</p>
+<p>class B = A + assumes HB: "f x = x"</p>
+<p>class C = A + assumes HC: "g x = x"<br>
+lemma lemmaC: "g x = (x::'a::C)" using HC by auto</p>
+<p>subclass (in C) B<br>
+proof<br>
+   (<em>fix x::'a show "f x = x" using HA[of x] HC[of x] by auto</em>)<br>
+   fix x::'a show "f x = x" using HA[of x] lemmaC[of x] by auto<br>
+qed</p>
+<p>The proof fails, complaining that lemmaC[of x] makes no sense as the <br>
+type 'a of x is not of class C (while it is...). On the other hand, the <br>
+commented line succeeds. I do not understand what is going on here, as <br>
+to me HC and lemmaC are the same statement.</p>
+<p>In my real use case, I want to use serious lemmas that I have proved in <br>
+C, should I use another syntax for this?</p>
+<p>Esseger</p>
+
+
+
+<a name="294706703"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20question%20on%20type%20classes%20and%20subclasses/near/294706703" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20question.20on.20type.20classes.20and.20subclasses.html#294706703">(Aug 22 2022 at 15:07)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:eberlm@in.tum.de">eberlm@in.tum.de</a>&gt;<br>
+The problem is that lemmaC is /not/ proved in the class C; it is proved <br>
+without any surrounding context, but with a sort constraint C on the <br>
+type 'a. This is, unfortunately, something different insofar as you <br>
+cannot use such facts from within the context of the class.</p>
+<p>It is therefore advisable to prove facts like this within the class <br>
+context whenever possible, e.g.:</p>
+<p>class C = A + assumes HC: "g x = x"<br>
+begin</p>
+<p>lemma lemmaC: "g x = x"<br>
+…</p>
+<p>end</p>
+<p>or</p>
+<p>context C<br>
+begin</p>
+<p>lemma lemmaC: "g x = x"<br>
+…</p>
+<p>end</p>
+<p>or</p>
+<p>lemma (in C) lemmaC: "g x = x"<br>
+…</p>
+<p>Cheers,</p>
+<p>Manuel</p>
+
+
+
+<a name="294706990"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20question%20on%20type%20classes%20and%20subclasses/near/294706990" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20question.20on.20type.20classes.20and.20subclasses.html#294706990">(Aug 22 2022 at 15:08)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear Esseger and Manuel,</p>
+<p>In real-world cases, proving theorems within the class context may be require more work <br>
+than outside. For example, all theorems about the Isabelle constant mono live in the <br>
+global context, because mono's type is too polymorphic (two type variables) for a class <br>
+context. This means that you cannot use any theorem about mono in a subclass proof, even <br>
+if the concrete instance just contains one type variable. :-(</p>
+<p>Fortunately, Types_To_Sets from Isabelle2016-1 can help in such cases. Import <br>
+"~~/src/HOL/Types_To_Sets/Types_To_Sets" and put the following lines outside of any <br>
+context. Then, you get a version lemmaC'' in the class context.</p>
+<p>setup ‹Sign.add_const_constraint (@{const_name "g"}, SOME @{typ "'a ⇒ 'a"})›<br>
+setup ‹Sign.add_const_constraint (@{const_name "f"}, SOME @{typ "'a ⇒ 'a"})›<br>
+lemmas lemmaC' = lemmaC[internalize_sort "'a :: C",<br>
+   unoverload "g :: 'a ⇒ 'a", unoverload "f :: 'a ⇒ 'a"]<br>
+lemma (in C) lemmaC'': "g x = x" by(rule lemmaC') unfold_locales</p>
+<p>All this is still very experimental, but it works if you absolutely need it.</p>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

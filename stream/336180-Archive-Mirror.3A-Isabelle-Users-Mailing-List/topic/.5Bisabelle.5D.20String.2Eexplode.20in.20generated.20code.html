@@ -1,0 +1,88 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] String.explode in generated code · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20String.2Eexplode.20in.20generated.20code.html">[isabelle] String.explode in generated code</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294130477"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20String.explode%20in%20generated%20code/near/294130477" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20String.2Eexplode.20in.20generated.20code.html#294130477">(Aug 18 2022 at 17:10)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@kit.edu">andreas.lochbihler@kit.edu</a>&gt;<br>
+Dear all,</p>
+<p>In Isabelle2009-2, the code generator translated the theory String into the <br>
+module Stringa. In Isabelle2011, it uses String. Consequently, the SML <br>
+translations in HOL/Library/Code_Char for String.implode and String.explode to <br>
+String.implode and String.explode no longer refer to ML's built-in implode and <br>
+explode functions, but are captured by the new String module, which does not <br>
+declare such functions. Consequently, PolyML 5.4 rejects generated code that <br>
+uses String.implode and String.explode.</p>
+<p>Surprisingly, with the @{code} antiquotation, everything seems to work fine.<br>
+Here's a small example:</p>
+<p>theory Test imports Main Code_Char begin<br>
+definition foo where "foo = String.explode (STR ''abc'')"<br>
+export_code foo in SML file "test.ML"<br>
+ML {* @{code foo} *}<br>
+end</p>
+<p>If I adjust the translation to</p>
+<p>code_const explode (SML "explode")</p>
+<p>then the raw polyml accepts the code produced by export_code, but the <br>
+antiquotation no longer works.</p>
+<p>What do I have to do such that both work?</p>
+<p>Regards,<br>
+Andreas</p>
+
+
+
+<a name="294130882"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20String.explode%20in%20generated%20code/near/294130882" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20String.2Eexplode.20in.20generated.20code.html#294130882">(Aug 18 2022 at 17:12)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Andreas,</p>
+<p>first, the appropriate solution to your problem should be</p>
+<p>code_modulename SML<br>
+  String Stringa</p>
+<p>The reason is that all runtime services uses target language Eval rather<br>
+than SML (as noted in code generation tutorial p. 31) and typically do<br>
+not use different structures.</p>
+<p>After some experimentation I have a feeling that code_reserved does not<br>
+exactly behave as expected, I will keep track on this.</p>
+<p>Cheers,<br>
+    Florian<br>
+<a href="/user_uploads/14278/cyNm25-rvjG4Z9dAzD9NIo1L/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294131346"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20String.explode%20in%20generated%20code/near/294131346" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20String.2Eexplode.20in.20generated.20code.html#294131346">(Aug 18 2022 at 17:15)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi again,</p>
+<blockquote>
+<p>After some experimentation I have a feeling that code_reserved does not<br>
+exactly behave as expected, I will keep track on this.</p>
+</blockquote>
+<p>the reason for this »misbevahiour« were the following lines added to<br>
+String.thy: <a href="http://isabelle.in.tum.de/reports/Isabelle/rev/0a3fa8fbcdc5">http://isabelle.in.tum.de/reports/Isabelle/rev/0a3fa8fbcdc5</a></p>
+<p>E.g. they would fix the module name »String«.</p>
+<p>I am not able to reconstruct was my motivation was to add these, but now<br>
+they are removed for good.</p>
+<p>Florian<br>
+<a href="/user_uploads/14278/5iLZAWEBT59tgmkjtH45qPg1/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294131397"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20String.explode%20in%20generated%20code/near/294131397" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20String.2Eexplode.20in.20generated.20code.html#294131397">(Aug 18 2022 at 17:15)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@kit.edu">andreas.lochbihler@kit.edu</a>&gt;<br>
+Hi Florian,</p>
+<p>thanks for figuring this out. I will keep your code_modulename workaround until <br>
+I switch to the development version again.</p>
+<p>Andreas</p>
+<p>Florian Haftmann schrieb:</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,301 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] isar in PIDE : strange behavior · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20isar.20in.20PIDE.20.3A.20strange.20behavior.html">[isabelle] isar in PIDE : strange behavior</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294707338"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20isar%20in%20PIDE%20%3A%20strange%20behavior/near/294707338" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20isar.20in.20PIDE.20.3A.20strange.20behavior.html#294707338">(Aug 22 2022 at 15:10)</a>:</h4>
+<p>From: Michel via Cl-isabelle-users &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+To understand Isar, I try to write proofs without automation.<br>
+I have understood that after the word "proof", PIDE try to apply the implicit rule of the formula to prove and with "r", such a rule does not exists.<br>
+But with show "r" using 1, it's worst.</p>
+<p>Intuitively, the proof of "r" is simple.<br>
+4: "q --&gt; r" by mp (modus ponens) on 1, 3<br>
+"r" by mp on 4, 2<br>
+Why it's impossible to write this in Isar ?<br>
+How to avoid the implicit use of rules?</p>
+<p>lemma trivial3isar : "(p ⟶ (q ⟶ r)) ⟶ (q ⟶ (p ⟶ r))"<br>
+  proof<br>
+    assume 1: "p ⟶ (q ⟶ r)"<br>
+    show "q ⟶ (p ⟶ r)"<br>
+    proof<br>
+      assume 2: "q"<br>
+      show "p ⟶ r"<br>
+      proof<br>
+        assume  3: "p"<br>
+        show "r"<br>
+          using 1<br>
+        proof</p>
+<p>With show "r" using 1,  the last proof gives two unsolvable goals<br>
+1 (q --&gt; r)==&gt; r<br>
+2 p --&gt; (q --&gt; r) ==&gt; p</p>
+
+
+
+<a name="294707364"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20isar%20in%20PIDE%20%3A%20strange%20behavior/near/294707364" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20isar.20in.20PIDE.20.3A.20strange.20behavior.html#294707364">(Aug 22 2022 at 15:10)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:lammich@in.tum.de">lammich@in.tum.de</a>&gt;<br>
+Just note that this highly nested proof structure is very unusual in<br>
+practice. </p>
+<p>The parenthesis structure of your goal is a bit misleading. Try </p>
+<p>term "(p ⟶ (q ⟶ r)) ⟶ (q ⟶ (p ⟶ r))"  </p>
+<p>to see how it looks with only necessary parenthesis:<br>
+  "(p ⟶ q ⟶ r) ⟶ q ⟶ p ⟶ r"</p>
+<p>Chains of implications are a very common thing in HOL, and usually you<br>
+handle them all at once by repeated implication introduction ... there<br>
+is no need to open a new nesting level for every single impI:<br>
+<br>
+  lemma "(p ⟶ (q ⟶ r)) ⟶ (q ⟶ (p ⟶ r))"  <br>
+  proof (intro impI)</p>
+<p>having done this, the proof is almost as easy as you would write it<br>
+down on paper. You have several stylistic possibilities here. You could<br>
+number your assumptions:</p>
+<p>assume 1: "p ⟶ (q ⟶ r)" and 2: "q" and 3: "p"<br>
+    from 1 have "q⟶r" using 3 by (rule mp)<br>
+    then show "r" using 2 by (rule mp)<br>
+  qed      <br>
+<br>
+or you could refer to the short assumptions explicitly by fact<br>
+antiquotations (note that you have to assume them anyway):</p>
+<p>lemma "(p ⟶ (q ⟶ r)) ⟶ (q ⟶ (p ⟶ r))"  <br>
+  proof (intro impI)<br>
+    assume "q" "p"<br>
+    assume "p ⟶ (q ⟶ r)" <br>
+    then have "q⟶r" using ‹p› by (rule mp)<br>
+    then show "r" using ‹q› by (rule mp)<br>
+  qed      </p>
+<p>I posted this email because I feel that this thread has the potential<br>
+to scare new Isabelle users and leave them with the impression they<br>
+need deeply nested lengthy proofs to handle simple chains of<br>
+implications ...</p>
+<p>Note to more advanced beginners:<br>
+Usually, you never state top-level implications on the HOL level, but<br>
+you use the meta-level directly, e.g., you would write:</p>
+<p>lemma "(p ⟶ (q ⟶ r)) ⟹ q ⟹ p ⟹ r" or, equivalently:<br>
+  lemma "⟦(p ⟶ (q ⟶ r)); q; p⟧ ⟹ r" <br>
+  proof -<br>
+    assume "q" "p"<br>
+    assume "p ⟶ (q ⟶ r)" <br>
+    then have "q⟶r" using ‹p› by (rule mp)<br>
+    then show "r" using ‹q› by (rule mp)<br>
+  qed      </p>
+<p>(whether to use brackets or chains of implications is a matter of<br>
+taste, and actually, brackets are just syntactic sugar for chains of<br>
+implication. I, personally, find brackets easier to read.)</p>
+<p>Even more likely, you would use the long-goal format, which saves you<br>
+from re-stating the assumptions in the proof:</p>
+<p>lemma <br>
+    assumes 1: "(p ⟶ (q ⟶ r))" and "q" "p" <br>
+    shows "r"  <br>
+  proof -<br>
+    from 1 have "q⟶r" using ‹p› by (rule mp)<br>
+    then show "r" using ‹q› by (rule mp)<br>
+  qed</p>
+
+
+
+<a name="294707401"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20isar%20in%20PIDE%20%3A%20strange%20behavior/near/294707401" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20isar.20in.20PIDE.20.3A.20strange.20behavior.html#294707401">(Aug 22 2022 at 15:10)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Here are more examples that you can try: De Morgan laws.</p>
+<p>The predicate logic versions are actually simpler than the propositional<br>
+ones, but you need to know how to introduce and eliminate quantifiers<br>
+(especially the 'obtain' element of Isar).</p>
+<p>Makarius<br>
+<a href="/user_uploads/14278/MuT4QsZCbMGlSAH-ldS5k884/De_Morgan.thy">De_Morgan.thy</a></p>
+
+
+
+<a name="294707427"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20isar%20in%20PIDE%20%3A%20strange%20behavior/near/294707427" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20isar.20in.20PIDE.20.3A.20strange.20behavior.html#294707427">(Aug 22 2022 at 15:10)</a>:</h4>
+<p>From: Lawrence Paulson &lt;<a href="mailto:lp15@cam.ac.uk">lp15@cam.ac.uk</a>&gt;<br>
+Absolutely right.</p>
+<p>To learn a natural proof style, it’s crucial to use automation. Most proofs involve a string of steps stated using “have” and concluding with “show”. The steps may be connected using “then” or using “moreover/ultimately”. And each justification should involve just a couple of steps involving simp/auto/blast or generated using sledgehammer. </p>
+<p>Nesting only arises when one of the intermediate steps is too difficult to prove directly by automation, but even then, the structure of the inner proof would be as described above.</p>
+<p>A nesting deeper than three is unusual except in long and complicated proofs.</p>
+<p>Try to find an example that goes outside pure logic.</p>
+<p>Larry Paulson</p>
+
+
+
+<a name="294707473"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20isar%20in%20PIDE%20%3A%20strange%20behavior/near/294707473" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20isar.20in.20PIDE.20.3A.20strange.20behavior.html#294707473">(Aug 22 2022 at 15:11)</a>:</h4>
+<p>From: Michel via Cl-isabelle-users &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Thank you really much for your examples.  I try to write basic proofs if <br>
+it possible without automation and with your suggestion it was possible. <br>
+I have written a software &lt;<a href="http://teachinglogic.liglab.fr/DN/">http://teachinglogic.liglab.fr/DN/</a>&gt; (a long <br>
+time ago) to produce proof in natural deduction.</p>
+<p>This software was originally written in Prolog by Robert Stärk, who was <br>
+assistant at ETH Zürich. I try to see if the proofs given by this <br>
+software can be translated in Isar. That is the origin of my questions <br>
+on Isar.</p>
+<p>Lawrence Paulson has said : It’s essential to understand that “proof” by <br>
+itself will attempt to use the default proof method. But this default <br>
+proof method can lead to an unprovable goal.</p>
+<p>If you have to show a not propositional formula, as in the examples <br>
+triv1 and triv2 below, you have to give a "by method" or suggest an <br>
+hypothesis to eliminate.<br>
+In the example triv1 below, the default proof method leads to an <br>
+unprovable goal, and there is no hypothesis to eliminate, so you are <br>
+obliged to give a "by method". In the example triv2, the default method <br>
+leads to an unprovable goal, but we can indicates an hypothesis to <br>
+eliminate.</p>
+<p>lemma triv1 : "p ⟹ q ∨ p"<br>
+   (* proof : after the word proof, the new goal produced automatically<br>
+      by the intro rule disjI1 would be p ⟹ q<br>
+      which is unprovable. You have to give a method<br>
+      because you don't have an hypothesis to eliminate<br>
+   *)<br>
+     by (rule disjI2)</p>
+<p>lemma triv2 : assumes 1: "p ∨ q" shows "q ∨ p"<br>
+   (* proof : after the word proof, the new goal, produced by<br>
+      the implicit intro rule disjI1 would be<br>
+      p ∨ q ⟹ q which is unprovable<br>
+      so either you give a method (by method) to prove the lemma<br>
+      or you must indicate, with using, the assumption that can be <br>
+eliminated<br>
+       *)<br>
+   using 1<br>
+   proof<br>
+     assume "p"<br>
+     then show "q ∨ p" by (rule disjI2)<br>
+     next<br>
+     assume "q"<br>
+     then show   "q ∨ p" by (rule disjI1)<br>
+   qed</p>
+<p>In the proof triv3, the thesis is a proposition, so you must use an <br>
+hypothesis (or a direct by method).</p>
+<p>lemma triv3 : assumes 1: "p ∧ q" shows "p"<br>
+   using 1<br>
+proof<br>
+   (* you must use the hypothesis 1 because no rule<br>
+   can be applied to the thesis "p".<br>
+   The new goal, thanks to the elimination of 1, is the trivial p ⟹ q ⟹ p<br>
+   *)<br>
+   show ?thesis by assumption<br>
+qed</p>
+<p>I think the indication above on how to prove a thesis must be written in <br>
+the tutorial prog-prove or an another short tutorial on<br>
+the manner to write proofs in Isar.</p>
+<p>Sincerely yours.</p>
+
+
+
+<a name="294707543"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20isar%20in%20PIDE%20%3A%20strange%20behavior/near/294707543" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20isar.20in.20PIDE.20.3A.20strange.20behavior.html#294707543">(Aug 22 2022 at 15:11)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On 03/03/17 15:26, Michel via Cl-isabelle-users wrote:</p>
+<blockquote>
+<p>Thank you really much for your examples.  I try to write basic proofs if<br>
+it possible without automation and with your suggestion it was possible.<br>
+I have written a software &lt;<a href="http://teachinglogic.liglab.fr/DN/">http://teachinglogic.liglab.fr/DN/</a>&gt; (a long<br>
+time ago) to produce proof in natural deduction.</p>
+<p>This software was originally written in Prolog by Robert Stärk, who was<br>
+assistant at ETH Zürich. I try to see if the proofs given by this<br>
+software can be translated in Isar. That is the origin of my questions<br>
+on Isar.</p>
+<p>Lawrence Paulson has said : It’s essential to understand that “proof” by<br>
+itself will attempt to use the default proof method. But this default<br>
+proof method can lead to an unprovable goal.</p>
+</blockquote>
+<p>The main Isar proof scheme is as follows:</p>
+<p>from facts1 have goal<br>
+    using facts2<br>
+  proof method1<br>
+    ...<br>
+  qed method2</p>
+<p>The body "..." then consists recursively of sub-proofs, each with a<br>
+local context:</p>
+<p>fix parameters<br>
+  assume premises<br>
+  show conclusion<br>
+    &lt;proof&gt;</p>
+<p>These usually address each sub-goal in turn, but the order is arbitrary.<br>
+The "next" command may be used to proceed with a fresh local context;<br>
+alternatively it is always possible to use { ... } to indicate context<br>
+block structure.</p>
+<p>The initial refinement of "proof method1" uses facts = facts1 facts2<br>
+(appended in that order) and passes that to the proof method. It is<br>
+"standard" by default; "standard" is a bit more than just "rule", but<br>
+usually it is sufficient to think of "rule" as the standard step.</p>
+<p>The terminal method2 has a chance to finish-off remaining sub-goals (it<br>
+may be omitted). Afterwards there is always an implicit stage to finish<br>
+everything implicitly by-assumption.</p>
+<p>Some important abbreviations:</p>
+<p>proof method1 qed method2  == by method1 method2<br>
+  ..  == by standard<br>
+  .   == by this</p>
+<p>Proof method "standard" applies a standard rule: the facts are put into<br>
+its premises (in that order), the remaining rule is applied to the goal.</p>
+<p>Proof method "this" applies all "used" facts directly, without putting a<br>
+rule in between.</p>
+<p>To apply these Isar principles in practice, I recommend to take all the<br>
+Natural Deduction rules for predicate logic as examples, and turn them<br>
+into canonical Isar proof outlines, e.g. like this for conjunction:</p>
+<p>have "A ∧ B"<br>
+  proof<br>
+    show A sorry<br>
+    show B sorry<br>
+  qed</p>
+<p>next</p>
+<p>assume *: "A ∧ B"<br>
+  then have A ..<br>
+  from * have B ..</p>
+<p>The double projection is a bit awkward. Better eliminate conjunction<br>
+simultaneously:</p>
+<p>assume "A ∧ B"<br>
+  then obtain A B ..</p>
+<p>Etc. ... Here is<br>
+<a href="http://teachinglogic.liglab.fr/DN/index.php?formula=p+%26+q+%3D%3E+q+%26+p&amp;action=Prove+Formula">http://teachinglogic.liglab.fr/DN/index.php?formula=p+%26+q+%3D%3E+q+%26+p&amp;action=Prove+Formula</a><br>
+in Isar:</p>
+<p>have "A ∧ B ⟶ B ∧ A"<br>
+  proof<br>
+    assume "A ∧ B"<br>
+    then obtain B A ..<br>
+    then show "B ∧ A" ..<br>
+  qed</p>
+<p>You can enclose the above snippets into "notepad begin ... end", to<br>
+avoid having toplevel theorem statements (which have separate syntax).</p>
+<p>I also recommend to start Isar without ever writing Pure rule statements<br>
+in the text: these somehow belong to the "implementation" of logic and<br>
+are rarely needed in proof texts.</p>
+<blockquote>
+<p>I think the indication above on how to prove a thesis must be written in<br>
+the tutorial prog-prove or an another short tutorial on<br>
+the manner to write proofs in Isar.</p>
+</blockquote>
+<p>After more than 30 years, the situation of Isabelle manuals is very<br>
+complex. Everything can be found somewhere, but it might take time to<br>
+find it. Moreover, some old materials needs to be ignored, especially<br>
+when getting started.</p>
+<p>Makarius</p>
+
+
+
+<a name="294707550"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20isar%20in%20PIDE%20%3A%20strange%20behavior/near/294707550" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20isar.20in.20PIDE.20.3A.20strange.20behavior.html#294707550">(Aug 22 2022 at 15:11)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Here is more exercise material based on the above website. It uses<br>
+Isabelle/Pure directly, without the huge Isabelle/HOL library.  Thus it<br>
+is really confined to single-step structure proofs in Isar. Moreover,<br>
+classical logic is not assumed globally, but confined to a separate<br>
+locale context (in contrast, most Isabelle/HOL tools use classical logic<br>
+implicitly).</p>
+<p>As Peter has already pointed out before, these proofs are a bit atypical<br>
+for practical Isar: there is a fine art to write rule statements in open<br>
+form, without too many auxiliary logical connectives getting in between.<br>
+This is occasionally called "logic-free reasoning".</p>
+<p>Makarius<br>
+<a href="/user_uploads/14278/bUGCOIV4GgJ0RMFKxTCIO9mi/Pure_Logic.thy">Pure_Logic.thy</a><br>
+<a href="/user_uploads/14278/OZ9_1kWygPojkD0Eh5Mfx76e/Ex.thy">Ex.thy</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

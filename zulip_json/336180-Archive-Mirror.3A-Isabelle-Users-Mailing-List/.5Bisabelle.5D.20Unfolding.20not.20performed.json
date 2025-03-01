@@ -1,0 +1,50 @@
+[
+    {
+        "content": "<p>From: Wolfgang Jeltsch &lt;<a href=\"mailto:wolfgang-it@jeltsch.info\">wolfgang-it@jeltsch.info</a>&gt;<br>\nHi!</p>\n<p>I’m experiencing a situation where the simplifier doesn’t solve an<br>\napparently trivial goal. I was able to narrow the problem down to an<br>\nissue with unfolding, which is exemplified by the following code:</p>\n<p>lemma rewrite_rule:<br>\n      shows \"((a ⟷ b) ∧ (a ⟶ c)) = ((a ⟷ b) ∧ (b ⟶ c))\"<br>\n      by blast</p>\n<p>lemma<br>\n      shows \"((a ⟷ b) ∧ (a ⟶ c)) = ((a ⟷ b) ∧ (b ⟶ c))\"<br>\n      unfolding rewrite_rule<br>\n      oops</p>\n<p>I would expect <code>unfolding rewrite_rule</code> to change the goal to<br>\n<code>((a ⟷ b) ∧ (b ⟶ c)) = ((a ⟷ b) ∧ (b ⟶ c))</code>. However, it doesn’t change<br>\nthe goal at all. Why is that?</p>\n<p>I’m using Isabelle2018.</p>\n<p>All the best,<br>\nWolfgang</p>",
+        "id": 294761367,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661199738
+    },
+    {
+        "content": "<p>From: Wolfgang Jeltsch &lt;<a href=\"mailto:wolfgang-it@jeltsch.info\">wolfgang-it@jeltsch.info</a>&gt;<br>\nI added <code>using [[simp_trace]]</code> and found out that Isabelle thinks the<br>\nrule <code>?a = ?b ∧ (?a ⟶ ?c) ≡ ?a = ?b ∧ (?b ⟶ ?c)</code> is permutative (and<br>\ndoesn’t apply it, because it wouldn’t make the term smaller). However,<br>\nI’d say that this rule is clearly <em>not</em> permutative.</p>\n<p>All the best,<br>\nWolfgang</p>",
+        "id": 294761375,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661199743
+    },
+    {
+        "content": "<p>From: Tobias Nipkow &lt;<a href=\"mailto:nipkow@in.tum.de\">nipkow@in.tum.de</a>&gt;<br>\nHi Wolfgang,</p>\n<p>The test is indeed only approximate, it just checks if the two terms have the <br>\nsame skeleton. Maybe for misguided efficiency reasons? I cannot remember. It is <br>\none of those things that if we changed it now, it would probably break too many <br>\nexistig proofs.</p>\n<p>Best<br>\nTobias<br>\n<a href=\"/user_uploads/14278/GtFP-rLGJnrFHm8rMjV5jCqv/smime.p7s\">smime.p7s</a></p>",
+        "id": 294761388,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661199750
+    },
+    {
+        "content": "<p>From: Lawrence Paulson &lt;<a href=\"mailto:lp15@cam.ac.uk\">lp15@cam.ac.uk</a>&gt;<br>\nI’m wondering whether</p>\n<p>simp cong: conj_cong</p>\n<p>might solve your original problem. This will simplify e.g. x=t &amp; P x to x=t &amp; P t.</p>\n<p>Larry Paulson</p>",
+        "id": 294761399,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661199756
+    },
+    {
+        "content": "<p>From: mailing-list anonymous &lt;<a href=\"mailto:mailing.list.anonymous@gmail.com\">mailing.list.anonymous@gmail.com</a>&gt;<br>\nDear Wolfgang Jeltsch</p>\n<p>On the practical side, you can also use a lower level rewrite method for similar problems - something that I adopted from the existing implementation of the command unoverload_definition in Types-To-Sets [1]:</p>\n<p>ML ‹</p>\n<p>fun pure_unfold ctxt thms =<br>\n   (<br>\n     ctxt<br>\n     |&gt;<br>\n       (<br>\n         thms<br>\n         |&gt; map (Local_Defs.meta_rewrite_rule ctxt)<br>\n         |&gt; Conv.rewrs_conv<br>\n         |&gt; Conv.try_conv<br>\n         |&gt; K<br>\n         |&gt; Conv.top_conv<br>\n       )<br>\n   );</p>\n<p>val unfold_tac' = CONVERSION oo pure_unfold;<br>\nfun unfold_meth' ths ctxt = SIMPLE_METHOD' (unfold_tac' ctxt ths);</p>\n<p>Theory.setup (<br>\n   Method.setup \\&lt;^binding&gt;‹unfold'› (Attrib.thms &gt;&gt; unfold_meth')<br>\n    \"primitive unfold definitions\"<br>\n);</p>\n<p>›</p>\n<p>lemma rewrite_rule:<br>\n   shows \"((a ⟷ b) ∧ (a ⟶ c)) = ((a ⟷ b) ∧ (b ⟶ c))\"<br>\n   by auto</p>\n<p>lemma \"((a ⟷ b) ∧ (a ⟶ c)) = ((a ⟷ b) ∧ (b ⟶ c))\"<br>\n   apply (unfold' rewrite_rule)<br>\n   apply (rule HOL.refl)<br>\n   done</p>\n<p>[1] F. Immler, “Automation for unverloading definitions,” Jan. 2019. [Online]. Available: <a href=\"http://isabelle.in.tum.de/repos/isabelle/rev/ab5a8a2519b0\">http://isabelle.in.tum.de/repos/isabelle/rev/ab5a8a2519b0</a></p>\n<p>Thank you</p>\n<p>Hi!</p>\n<p>I’m experiencing a situation where the simplifier doesn’t solve an<br>\n    apparently trivial goal. I was able to narrow the problem down to an<br>\n    issue with unfolding, which is exemplified by the following code:</p>\n<p>lemma rewrite_rule:<br>\n           shows \"((a ⟷ b) ∧ (a ⟶ c)) = ((a ⟷ b) ∧ (b ⟶ c))\"<br>\n           by blast</p>\n<p>lemma<br>\n           shows \"((a ⟷ b) ∧ (a ⟶ c)) = ((a ⟷ b) ∧ (b ⟶ c))\"<br>\n           unfolding rewrite_rule<br>\n           oops</p>\n<p>I would expect <code>unfolding rewrite_rule</code> to change the goal to<br>\n<code>((a ⟷ b) ∧ (b ⟶ c)) = ((a ⟷ b) ∧ (b ⟶ c))</code>. However, it doesn’t change<br>\n    the goal at all. Why is that?</p>\n<p>I’m using Isabelle2018.</p>\n<p>All the best,<br>\n    Wolfgang</p>",
+        "id": 294761408,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661199766
+    },
+    {
+        "content": "<p>From: Wolfgang Jeltsch &lt;<a href=\"mailto:wolfgang-it@jeltsch.info\">wolfgang-it@jeltsch.info</a>&gt;<br>\nHello!</p>\n<p>Yes, this indeed solves this goal. That said, the code I sent in my<br>\ninitial e-mail was only a minimal example to expose the problem. The<br>\nactual code is about process calculi, where the solution with the<br>\ncongruence rule is not applicable.</p>\n<p>All the best,<br>\nWolfgang</p>",
+        "id": 294761428,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661199781
+    },
+    {
+        "content": "<p>From: Wolfgang Jeltsch &lt;<a href=\"mailto:wolfgang-it@jeltsch.info\">wolfgang-it@jeltsch.info</a>&gt;<br>\nHi!</p>\n<p>Thanks for the code.</p>\n<p>That said, in my actual formalization, I’m using a custom proof method<br>\nthat uses rewriting only internally. This proof method is supposed to<br>\nsolve goals automatically and therefore has to invoke <code>simp</code>, so that<br>\nmultiple rewrite steps with automatically picked rules are possible. A<br>\nmore manual method, like your <code>unfold'</code> is unfortunately not usable<br>\nthere.</p>\n<p>All the best,<br>\nWolfgang</p>",
+        "id": 294761450,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661199793
+    },
+    {
+        "content": "<p>From: Wolfgang Jeltsch &lt;<a href=\"mailto:wolfgang-it@jeltsch.info\">wolfgang-it@jeltsch.info</a>&gt;<br>\nHi, Tobias!</p>\n<p>Thanks a lot for this explanation. I’ll see that I’ll somehow work<br>\naround this issue.</p>\n<p>Could perhaps the reference manual be changed to reflect the definition<br>\nof permutative rule that the implementation uses?</p>\n<p>All the best,<br>\nWolfgang</p>",
+        "id": 294761470,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661199805
+    }
+]

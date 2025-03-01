@@ -1,0 +1,77 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] typecheck a term · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20typecheck.20a.20term.html">[isabelle] typecheck a term</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="293899824"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20typecheck%20a%20term/near/293899824" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20typecheck.20a.20term.html#293899824">(Aug 17 2022 at 13:46)</a>:</h4>
+<p>From: Sean McLaughlin &lt;<a href="mailto:seanmcl@cmu.edu">seanmcl@cmu.edu</a>&gt;<br>
+Hi,</p>
+<p>I needed to create some Isabelle terms by hand, and would like to  <br>
+make<br>
+sure they typecheck as a sanity check.  So, eg.</p>
+<p>Const ("==", "bool =&gt; bool =&gt; bool") $ Free ("a", "bool") $<br>
+       Free ("b", "prop") : Term.term</p>
+<p>Doesn't typecheck.  What function do I call?</p>
+<p>Thanks,</p>
+<p>Sean</p>
+
+
+
+<a name="293899828"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20typecheck%20a%20term/near/293899828" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20typecheck.20a.20term.html#293899828">(Aug 17 2022 at 13:46)</a>:</h4>
+<p>From: Lawrence Paulson &lt;<a href="mailto:lp15@cam.ac.uk">lp15@cam.ac.uk</a>&gt;<br>
+One way is to call the function cterm_of, which converts a raw term  <br>
+to a "certified term". Note that typechecking only makes sense in the  <br>
+context of a theory. The most basic theory is ProtoPure.thy, which  <br>
+only knows about the meta-logic connectives. Or HOL.thy (for the  <br>
+basic HOL types) or Main.thy (for everything).</p>
+<p>Larry</p>
+
+
+
+<a name="293899829"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20typecheck%20a%20term/near/293899829" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20typecheck.20a.20term.html#293899829">(Aug 17 2022 at 13:46)</a>:</h4>
+<p>From: Jeremy Dawson &lt;<a href="mailto:Jeremy.Dawson@rsise.anu.edu.au">Jeremy.Dawson@rsise.anu.edu.au</a>&gt;<br>
+Sean McLaughlin wrote:<br>
+If I understand you correctly, you have entered the code</p>
+<p>Const ("==", "bool =&gt; bool =&gt; bool") $ Free ("a", "bool") $</p>
+<blockquote>
+<p>Free ("b", "prop") : Term.term</p>
+</blockquote>
+<p>by hand - is that right?</p>
+<p>If so you have the problem that the type which is printed as<br>
+"bool =&gt; bool =&gt; bool" isn't actually a string, to create it you<br>
+have to do something like</p>
+<p>fun ctyp str = Type (str, []) ;<br>
+val charT = ctyp "List.char" ; (* was "Main.char" *)<br>
+val nibbleT = ctyp "List.nibble" ; (* was "Main.nibble" *)<br>
+val boolT = ctyp "bool" ;<br>
+fun listT ty = Type ("List.list", [ty]) ;<br>
+fun setT ty = Type ("set", [ty]) ;<br>
+fun pairT (t1, t2) = Type ("*", [t1, t2]) ;<br>
+fun funT (t1, t2) = Type ("fun", [t1, t2]) ;<br>
+fun ifunT [] t2 = t2<br>
+   | ifunT (t :: ts) t2 = funT (t, ifunT ts t2) ;</p>
+<p>ifunT [boolT, boolT] boolT ;<br>
+val it = "bool =&gt; bool =&gt; bool" : Term.typ</p>
+<p>Then you can do</p>
+<p>val t = Free ("==",  ifunT [boolT, boolT] boolT) $ Free ("a", boolT) $<br>
+        Free ("b", boolT) : Term.term ;</p>
+<p>cterm_of (the_context ()) t ;</p>
+<p>Is this the sort of thing you wanted to do?</p>
+<p>Note that you can't use Const except for an already exsiting Const of <br>
+the right type,<br>
+and "prop" and "bool" are different types.</p>
+<p>Jeremy</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

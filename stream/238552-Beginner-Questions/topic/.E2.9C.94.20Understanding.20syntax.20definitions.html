@@ -1,0 +1,64 @@
+<html>
+<head><meta charset="utf-8"><title>✔ Understanding syntax definitions · Beginner Questions · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/index.html">Beginner Questions</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20Understanding.20syntax.20definitions.html">✔ Understanding syntax definitions</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="270492607"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/%E2%9C%94%20Understanding%20syntax%20definitions/near/270492607" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> pdc20 <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20Understanding.20syntax.20definitions.html#270492607">(Feb 03 2022 at 02:38)</a>:</h4>
+<p>So I'm looking into a file called <code>AExp.thy</code> (link here: <a href="https://github.com/seL4/isabelle/blob/master/src/HOL/IMP/AExp.thy">https://github.com/seL4/isabelle/blob/master/src/HOL/IMP/AExp.thy</a>) and I'm trying to understand the syntax and translations from line 30.</p>
+<div class="codehilite"><pre><span></span><code>definition null_state (&quot;&lt;&gt;&quot;) where
+  &quot;null_state ≡ λx. 0&quot;
+syntax
+  &quot;_State&quot; :: &quot;updbinds =&gt; &#39;a&quot; (&quot;&lt;_&gt;&quot;)
+translations
+  &quot;_State ms&quot; == &quot;_Update &lt;&gt; ms&quot;
+  &quot;_State (_updbinds b bs)&quot; &lt;= &quot;_Update (_State b) bs&quot;
+</code></pre></div>
+<p>The writer(s) then demonstrate the translation in effect through a lemma</p>
+<div class="codehilite"><pre><span></span><code>lemma &quot;&lt;a := 1, b := 2&gt; = (&lt;&gt; (a := 1)) (b := (2::int))&quot; by (rule refl)
+</code></pre></div>
+<p>Could I please know how Isabelle managed to translate <code>&lt;a := 1, b := 2&gt;</code> into <code>(&lt;&gt; (a := 1)) (b := (2::int))</code>? My initial thought process went as follows but I'm not sure if it's right.</p>
+<div class="codehilite"><pre><span></span><code>&lt;a := 1, b := 2&gt; = &lt;b := 2&gt; (a := 1)
+                 = (&lt;&gt; (a := 1)) (b := 2)
+</code></pre></div>
+<p>My teammates would also like to change the definition such that it now uses option types. They would prefer <code>&lt;a := 1, b := 2&gt;</code> to be translated into <code>(&lt;&gt; (a := Some 1)) (b := Some 2)</code> so they proposed</p>
+<div class="codehilite"><pre><span></span><code>definition null_state :: &quot;&#39;a =&gt; &#39;b option&quot; (&quot;&lt;&gt;&quot;) where
+  &quot;null_state ≡ λx. None&quot;
+syntax
+  &quot;_State&quot; :: &quot;updbinds =&gt; &#39;a&quot; (&quot;&lt;_&gt;&quot;)
+translations
+  &quot;_State ms&quot; == &quot;_Update &lt;&gt; (Some ms)&quot;
+  &quot;_State (_updbinds b bs)&quot; &lt;= &quot;_Update (_State b) bs&quot;
+</code></pre></div>
+<p>Unfortunately they got the following error:</p>
+<div class="codehilite"><pre><span></span><code>Error in syntax translation rule: rhs contains extra variables
+(&quot;_State&quot; ms) ↝ (&quot;_Update&quot; &quot;\&lt;^const&gt;AExp.null_state&quot; (Some ms))
+</code></pre></div>
+<p>We aren't exactly sure why this error pops up. Could we please have some help?</p>
+<p>Thanks in advance!</p>
+
+
+
+<a name="270519874"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/%E2%9C%94%20Understanding%20syntax%20definitions/near/270519874" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Florian Sextl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20Understanding.20syntax.20definitions.html#270519874">(Feb 03 2022 at 09:24)</a>:</h4>
+<p>I'm not an expert in using the <code>syntax</code> and <code>translation</code> commands but I hope that I can still help you. </p>
+<p>First of all, you seem to want to switch from states that are simple functions of type <code>'a ⇒ nat</code> to maps of type <code>'a ⇀ 'b</code>. Thus, you can leverage the map update syntax, e.g. exchange <code>_Update</code> with <code>_MapUpd</code> and <code>updbinds</code> with <code>maplets</code>. This will directly wrap the values that you map to in a <code>Some</code>.  </p>
+<p>Now about the error you get: <code>Some</code> is just an unknown variable on a syntactic level so you can't use it in this way. You can use constant names like <code>Some</code> if you add a <code>CONST</code> in front of them (e.g. <code>m(x := CONST Some y)</code> is the base case of the map update syntax). Another problem with your approach is that you would not wrap the value in a <code>Some</code> in your code but, afaict, the result of the function update, which isn't what you'd want.</p>
+<p>Lastly, let my try to explain how the syntax translation works. <code>&lt;a := 1, b := 2&gt;</code> is on the syntactic level an application of <code>_State</code> to an object of <code>updbinds</code> (which is several <code>:=</code> notations separated by a comma). The second translation rule for <code>_State</code> is just a print rule, so it doesn't matter in this case. The first rule however tells us that <code>&lt;a:=1,b:=2&gt;</code> is the same as <code>&lt;&gt; (a:=1,b:=2)</code> which is just the syntax for function updates and thus the same as <code>fun_upd (fun_upd (λ_. 0) a 1) b 2</code>.</p>
+
+
+
+<a name="270802119"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/%E2%9C%94%20Understanding%20syntax%20definitions/near/270802119" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Notification Bot <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/.E2.9C.94.20Understanding.20syntax.20definitions.html#270802119">(Feb 05 2022 at 03:40)</a>:</h4>
+<p><span class="user-mention silent" data-user-id="461163">pdc20</span> has marked this topic as resolved.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

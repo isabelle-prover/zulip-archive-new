@@ -1,0 +1,38 @@
+[
+    {
+        "content": "<p>From: David Fuenmayor &lt;<a href=\"mailto:davfuenmayor@gmail.com\">davfuenmayor@gmail.com</a>&gt;<br>\n(See file attached)<br>\nAs an example, below I use the keyword \"abbreviation\" (instead of<br>\n\"definition\") and the system  blocks/freezes in the next lemma</p>\n<p>abbreviation app::\"'a ⇒ ('a ⇒ 'b) ⇒ 'b\" (\"@_ _\")<br>\n  where \"@a F ≡ F a\"<br>\nlemma \"(@a F) = (F a)\" by simp (<em>blocks!</em>)</p>\n<p>abbreviation swap::\"('a ⇒ 'b ⇒ 'c) ⇒ ('b ⇒ 'a ⇒ 'c)\"<br>\n  where \"swap f ≡ λa b. f b a\"<br>\nlemma \"(swap F) a b = (F b a)\" .. (<em>blocks!</em>)</p>\n<p>I have been having this problem since many years. It appears every time I<br>\nintroduce shorthand for function application or the swapping of arguments.<br>\nIt would be nice (from a DSL designer perspective) to be able to introduce<br>\ndomain-specific abbreviations for the cases above (and similar ones)<br>\nwithout the overload of constantly having to unfold definitions in proofs.</p>\n<p>Best<br>\nDavid</p>\n<p><a href=\"/user_uploads/14278/rONRTtDx99a8gMvt0x969Nfr/error.thy\">error.thy</a></p>",
+        "id": 327248334,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1676120961
+    },
+    {
+        "content": "<p>From: Andreas Lochbihler &lt;<a href=\"mailto:mail@andreas-lochbihler.de\">mail@andreas-lochbihler.de</a>&gt;<br>\nHi David,</p>\n<p>abbreviations are applied both for parsing and pretty-printing of terms. For parsing, your <br>\nabbreviations work just fine. Pretty-printing however ends up in an endless loop. Since <br>\nabbreviations disappear during parsing, Isabelle's pretty printer tries to fold all <br>\nabbreviations again, and the right-hand side of swap can be applied over and over again.</p>\n<p>You can declare your abbreviations to be used only for parsing or for pretty-printing <br>\nusing the <code>input</code> and <code>output</code> modes, respectively. For example, the following should work.</p>\n<p>abbreviation (input) app::\"'a ⇒ ('a ⇒ 'b) ⇒ 'b\" (\"@_ _\")<br>\n    where \"@a F ≡ F a\"<br>\nlemma \"(@a F) = (F a)\" by simp (<em>blocks!</em>)</p>\n<p>abbreviation (input) swap::\"('a ⇒ 'b ⇒ 'c) ⇒ ('b ⇒ 'a ⇒ 'c)\"<br>\n    where \"swap f ≡ λa b. f b a\"<br>\nlemma \"(swap F) a b = (F b a)\" .. (<em>blocks!</em>)</p>\n<p>I'm not sure that this is what you want though; you can write the abbreviations in your <br>\nDSL, but you won't see them in the terms that Isabelle displays in the state or output <br>\nwindows.</p>\n<p>Hope this helps,<br>\nAndreas</p>",
+        "id": 327351762,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1676190929
+    },
+    {
+        "content": "<p>From: David Fuenmayor &lt;<a href=\"mailto:davfuenmayor@gmail.com\">davfuenmayor@gmail.com</a>&gt;<br>\nHi Andreas</p>\n<p>This is in fact very helpful, since I always wanted to 'decouple' parsing<br>\nand pretty-printing of abbreviations. Thank you!<br>\nWith hindsight, the endless-folding issue with pretty-printing makes now<br>\ntotal sense. Still, since this literally crashes the system (even if<br>\nrecoverably), I still think this might be something to have fixed in future<br>\nIsabelle releases.</p>\n<p>Best<br>\nDavid</p>",
+        "id": 327367818,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1676200313
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nThere is nothing broken and nothing to be \"fixed\".</p>\n<p>Theorem proving involves many operations that may not terminate. Here we are <br>\napplying a version of the Simplifier to abstract syntax: the \"simp\" method may <br>\nalso run into non-terminating situations.</p>\n<p>Makarius</p>",
+        "id": 327390493,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1676211014
+    },
+    {
+        "content": "<p>From: David Fuenmayor &lt;<a href=\"mailto:davfuenmayor@gmail.com\">davfuenmayor@gmail.com</a>&gt;<br>\nI think you misunderstood the bug report.<br>\nThe problem is not the simplifier or any proof method. As Andreas rightly<br>\nnoted, the problem seems to be the pretty-printer which crashes the system<br>\nwith endless folding.<br>\nTo see why try just replacing in the example I gave the \"by simp\" by an<br>\n\"oops\" and then move on to proving anything, e.g. \"True = True\".</p>\n<p>abbreviation app::\"'a ⇒ ('a ⇒ 'b) ⇒ 'b\" (\"@_ _\")<br>\n  where \"@a F ≡ F a\"</p>\n<p>lemma \"(@a F) = H\" oops (<em>dummy whatever stuff</em>)<br>\nlemma \"True = True\" by simp (<em>crash!</em>)</p>\n<p>Thanks for the attention<br>\nDavid</p>",
+        "id": 327395369,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1676213258
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nWhat bug?</p>\n<p>Here is an extract from the isar-ref manual:</p>\n<p>\"\"\"<br>\n   ➧ ⬚‹abbreviation c where eq› introduces a syntactic constant which is<br>\n   associated with a certain term according to the meta-level equality ‹eq›.</p>\n<p>Abbreviations participate in the usual type-inference process, but are<br>\n   expanded before the logic ever sees them. Pretty printing of terms involves<br>\n   higher-order rewriting with rules stemming from reverted abbreviations. This<br>\n   needs some care to avoid overlapping or looping syntactic replacements!</p>\n<p>The optional ‹mode› specification restricts output to a particular print<br>\n   mode; using <code>‹input›'' here achieves the effect of one-way abbreviations.\n   The mode may also include an </code>⬚‹output›'' qualifier that affects the<br>\n   concrete syntax declared for abbreviations, cf.\\ ⬚‹syntax› in<br>\n   \\secref{sec:syn-trans}.<br>\n\"\"\"</p>\n<p>We have some more mechanisms in Isabelle syntax that might not terminate: <br>\n'translations'. There could be also severe scalability problems with plain <br>\nmixfix grammar, especially in the face of ambiguity.</p>\n<p>This might be surprising to users elsewhere, but theorem proving is full of <br>\npotential nontermination everywhere.</p>\n<p>Makarius</p>",
+        "id": 327421882,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1676227051
+    }
+]

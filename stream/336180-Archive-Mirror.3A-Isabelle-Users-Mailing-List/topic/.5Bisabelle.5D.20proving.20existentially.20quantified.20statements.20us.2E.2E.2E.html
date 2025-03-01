@@ -1,0 +1,205 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] proving existentially quantified statements us... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20proving.20existentially.20quantified.20statements.20us.2E.2E.2E.html">[isabelle] proving existentially quantified statements us...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294227627"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20proving%20existentially%20quantified%20statements%20us.../near/294227627" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20proving.20existentially.20quantified.20statements.20us.2E.2E.2E.html#294227627">(Aug 19 2022 at 09:19)</a>:</h4>
+<p>From: Julian Brunner &lt;<a href="mailto:julianbrunner@gmail.com">julianbrunner@gmail.com</a>&gt;<br>
+Hello,</p>
+<p>While using Isabelle, I keep running into the problem of not being able to<br>
+prove existentially quantified statements using a witness with the show<br>
+statement telling me that the "Local statement will fail to refine any<br>
+pending goal".</p>
+<p>For instance:</p>
+<p>theorem "EX x. x = (0 :: nat)"<br>
+proof<br>
+  obtain x where x_def: "x = (0 :: nat)" by simp<br>
+  show "x = 0" using x_def by simp<br>
+qed</p>
+<p>This example results in "Local statement will fail to refine any pending<br>
+goal" in line 4 of the proof. Furthermore, replacing line 3 with</p>
+<p>def x == "0 :: nat"</p>
+<p>makes everything work just fine. This is a minimal example built from a<br>
+bigger proof where the witness used for proving the existential statement<br>
+was an expression containing variables that originated in an obtain<br>
+statement. From what I've observed so far, it appears that whenever<br>
+variables from an obtain statement are part of the witness, the show<br>
+statement fails. I've used [[show_types]] to confirm that the types aren't<br>
+part of the issue, both x and 0 are of type nat. Also, the output doesn't<br>
+give me the usual "Failed attempt to solve goal by exported rule" line<br>
+stating why the show statement failed, as is the case with assume<br>
+statements that don't match any assumption in the goal.</p>
+<p>Of course I can work around this by invoking proof with the '-' method and<br>
+using automation to prove the existentially quantified statement using the<br>
+witness, but it'd be nicer if it'd work like this, I feel like this is just<br>
+a minor technical issue, but I couldn't figure out what's going on.</p>
+<p>I think I've also run into a similar problem that didn't involve obtain<br>
+statements but I can't find the theory where that happened right now, maybe<br>
+I'll post again if I run into that issue once more. For now, I'd be happy<br>
+with figuring this one out.</p>
+<p>Cheers,<br>
+ Julian</p>
+
+
+
+<a name="294227643"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20proving%20existentially%20quantified%20statements%20us.../near/294227643" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20proving.20existentially.20quantified.20statements.20us.2E.2E.2E.html#294227643">(Aug 19 2022 at 09:19)</a>:</h4>
+<p>From: Lars Noschinski &lt;<a href="mailto:noschinl@in.tum.de">noschinl@in.tum.de</a>&gt;<br>
+On 12.11.2012 20:21, Julian Brunner wrote:</p>
+<blockquote>
+<p>Hello,</p>
+<p>While using Isabelle, I keep running into the problem of not being able to<br>
+prove existentially quantified statements using a witness with the show<br>
+statement telling me that the "Local statement will fail to refine any<br>
+pending goal".</p>
+</blockquote>
+<p>This error message is not very helpful (and I seem to remember there <br>
+once was a more useful one, mentioning obtained variables?). There is a <br>
+more useful error message when the last theorem of a {-}-block contains <br>
+an obtained variable</p>
+<p>{ obtain x where "x = Suc 0" by auto<br>
+     then have "x &gt; 0" by auto }</p>
+<p>results in:</p>
+<p>Result contains obtained parameters: x</p>
+<p>This is due to the same reason. When you use "fix" or "def" to define a <br>
+variable, they either get just generalized (i.e. turned into schematics) <br>
+(fix) or replaced by their right hand side (definitions)<br>
+when a block is closed / a show is performed.</p>
+<p>This cannot be done for obtained variables.</p>
+<blockquote>
+<p>Of course I can work around this by invoking proof with the '-' method and<br>
+using automation to prove the existentially quantified statement using the<br>
+witness, but it'd be nicer if it'd work like this, I feel like this is just<br>
+a minor technical issue, but I couldn't figure out what's going on.</p>
+</blockquote>
+<p>A good scheme for proving such things is</p>
+<p>lemma "EX x. P x"<br>
+proof -<br>
+   obtain x where &lt;...&gt;<br>
+   &lt;...&gt;<br>
+   have "P x" &lt;...&gt;<br>
+   show ?thesis ..<br>
+qed</p>
+<p>where .. is a shorthand for "by rule".</p>
+<p>-- Lars</p>
+
+
+
+<a name="294227684"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20proving%20existentially%20quantified%20statements%20us.../near/294227684" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20proving.20existentially.20quantified.20statements.20us.2E.2E.2E.html#294227684">(Aug 19 2022 at 09:20)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+The reason for this failure is consistency: when proving P(?x), you delay the<br>
+point at which you give the actual witness t for ?x. But that is just an<br>
+operational rearrangement of the proof. Logically it must be possible to<br>
+construct that t right away. Hence t must not depend on anything that only came<br>
+into existence while proving P(?x). Otherwise you could prove EX x. ALL y. x=y:</p>
+<p>apply(rule exI)</p>
+<ol>
+<li>ALL y. ?x = y</li>
+</ol>
+<p>apply(rule allI)</p>
+<ol>
+<li>!!y. ?x = y</li>
+</ol>
+<p>apply(rule refl)</p>
+<p>fails because you would need to instantiate ?x with the local y, which Isabelle<br>
+prevents. (Contrast this with a proof of ALL x. EX y. x=y)</p>
+<p>Your failed proof attempt was morally correct, but you need to convince the<br>
+system that the witness could have been constructed up front, usually by<br>
+rearranging your proof text, eg as Lars suggested.</p>
+<p>Best<br>
+Tobias</p>
+
+
+
+<a name="294227809"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20proving%20existentially%20quantified%20statements%20us.../near/294227809" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20proving.20existentially.20quantified.20statements.20us.2E.2E.2E.html#294227809">(Aug 19 2022 at 09:21)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Julian,</p>
+<p>a further comment:</p>
+<blockquote>
+<p>theorem "EX x. x = (0 :: nat)"<br>
+proof</p>
+</blockquote>
+<p>the statement to prove here contains a schematic variable ?x or such.<br>
+This is something better to be avoided except for good reason.</p>
+<p>Cheers,<br>
+    Florian<br>
+<a href="/user_uploads/14278/L2lQYwMEAEdhw__KvBfO6bca/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294228458"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20proving%20existentially%20quantified%20statements%20us.../near/294228458" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20proving.20existentially.20quantified.20statements.20us.2E.2E.2E.html#294228458">(Aug 19 2022 at 09:26)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On Tue, 13 Nov 2012, Lars Noschinski wrote:</p>
+<blockquote>
+<p>On 12.11.2012 20:21, Julian Brunner wrote:</p>
+<blockquote>
+<p>While using Isabelle, I keep running into the problem of not being able <br>
+to prove existentially quantified statements using a witness with the <br>
+show statement telling me that the "Local statement will fail to refine <br>
+any pending goal".</p>
+</blockquote>
+<p>This error message is not very helpful (and I seem to remember there <br>
+once was a more useful one, mentioning obtained variables?).</p>
+</blockquote>
+<p>It seems that I've destroyed that error messahe by accident in Jan-2009, <br>
+but it is likely to work again in the coming release.</p>
+<blockquote>
+<p>For instance:</p>
+<p>theorem "EX x. x = (0 :: nat)"<br>
+proof<br>
+ obtain x where x_def: "x = (0 :: nat)" by simp<br>
+ show "x = 0" using x_def by simp<br>
+qed</p>
+</blockquote>
+<p>BTW, a more compact way to write that wrong proof is this:</p>
+<p>theorem "EX x. x = (0 :: nat)"<br>
+proof<br>
+   obtain x where "x = (0 :: nat)" by simp<br>
+   then show ?this .<br>
+qed</p>
+<p>But that does not work for logical reasons, as has been pointed out <br>
+before.  You cannot apply an obtained result with parameters to the <br>
+enclosing goal.  This is also the deeper reason why there is 'have' for <br>
+local results, and 'show' for local results that get exported into the <br>
+enclosing goal context, but only 'obtain' and not 'obtain_show'.</p>
+<p>(And you don't need to obtain local definitions in the first place, has <br>
+has been said already.)</p>
+<p>Makarius</p>
+
+
+
+<a name="294228464"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20proving%20existentially%20quantified%20statements%20us.../near/294228464" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20proving.20existentially.20quantified.20statements.20us.2E.2E.2E.html#294228464">(Aug 19 2022 at 09:26)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Just for fun some further vacuous 'obtain' proofs:</p>
+<p>notepad<br>
+begin<br>
+   obtain x where "x = (0 :: nat)" by (rule that) (rule refl)<br>
+next<br>
+   obtain x where "x == (0 :: nat)" by (rule that) (rule reflexive)<br>
+next<br>
+   obtain x where "x == (0 :: nat)" ..<br>
+end</p>
+<p>The last form works, because "that" is declared as Pure.intro, and Pure <br>
+"reflexive" implicit (like assumption).</p>
+<p>The better form is this:</p>
+<p>def x == "0 :: nat"</p>
+<p>Here the system does the reflexicity step for you, and it bypasses the <br>
+full "may-assume-that-holds" mechanism of 'obtain', that involves the <br>
+restriction on variable occurrences (as seen in the exE rule).</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

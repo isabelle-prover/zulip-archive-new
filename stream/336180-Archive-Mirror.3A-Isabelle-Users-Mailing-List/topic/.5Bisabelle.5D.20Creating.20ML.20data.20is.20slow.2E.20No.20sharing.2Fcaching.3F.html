@@ -1,0 +1,302 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Creating ML data is slow. No sharing/caching? · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Creating.20ML.20data.20is.20slow.2E.20No.20sharing.2Fcaching.3F.html">[isabelle] Creating ML data is slow. No sharing/caching?</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294648120"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Creating%20ML%20data%20is%20slow.%20No%20sharing/caching%3F/near/294648120" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Creating.20ML.20data.20is.20slow.2E.20No.20sharing.2Fcaching.3F.html#294648120">(Aug 22 2022 at 10:42)</a>:</h4>
+<p>From: "C. Diekmann" &lt;<a href="mailto:diekmann@in.tum.de">diekmann@in.tum.de</a>&gt;<br>
+Dear ML and Isabelle experts,</p>
+<p>I observed that my code written in Isabelle got horribly slow after a<br>
+small change. Currently, I evaluate my code with</p>
+<p>value[code]</p>
+<p>Here is a small Isabelle/HOL example that illustrates the issue:</p>
+<p>datatype 'a expr = Prim 'a | And "'a expr" "'a expr"</p>
+<p>definition add_expr :: "'a expr ⇒ 'a expr list ⇒ 'a expr list"<br>
+  where "add_expr e es = map (λe'. And e e') es"</p>
+<p>1) Constructing a list of expressions is quite fast:<br>
+value[code] "map Prim [1..1000]" (*0.339s elapsed time, 0.678s cpu<br>
+time, 0.000s GC time*)</p>
+<p>2) If I add a small expression to a large list of expressions, it is also fast:<br>
+value[code] "add_expr (Prim 42) (map Prim [1..1000])" (*0.604s elapsed<br>
+time, 1.201s cpu time, 0.026s GC time*)</p>
+<p>3) Constructing one larger expression is also fast:<br>
+value[code] "fold And (map Prim [1..10]) (Prim 0)" (*too fast to give<br>
+a timing?*)</p>
+<p>4) Adding bigger expressions to a list of expressions is more than 10<br>
+times slower than (2):<br>
+value[code] "add_expr (fold And (map Prim [1..10]) (Prim 0)) (map Prim<br>
+[1..1000])" (<em>5.853s elapsed time, 11.495s cpu time, 0.316s GC time</em>)</p>
+<p>5) Almost the same result if the expression is written down explicitly:<br>
+value[code] "add_expr (And (Prim 10) (And (Prim 9) (And (Prim 8) (And<br>
+(Prim 7) (And (Prim 6) (And (Prim 5) (And (Prim 4) (And (Prim 3) (And<br>
+(Prim 2) (And (Prim 1) (Prim 0))))))))))) (map Prim [1..1000])"<br>
+(<em>5.715s elapsed time, 11.148s cpu time, 0.316s GC time</em>)</p>
+<p>I played around with this, repeated these small measurements and<br>
+shuffled the value statements to make sure that we are not observing<br>
+some CPU turbo boost artifact here.</p>
+<p>By the way, the performance doesn't seem to get worse If the list of<br>
+expressions consists of large expressions:<br>
+value[code] "add_expr (fold And (map Prim [1..10]) (Prim 0)) (map (λi.<br>
+(fold And (map Prim [1..10]) (Prim i))) [1..1000])" (*5.291s elapsed<br>
+time, 6.138s cpu time, 0.366s GC time*)</p>
+<p>Why is (4) so slow, compared to (2)?</p>
+<p>How can I speed this up? Currently, this renders my theory unusable.</p>
+<p>Doesn't ML use sharing or caching? I always assumed that, if I have<br>
+expressions e1 and e2, then constructing "And e1 e2" would reuse the<br>
+values e1 and e2 and this operation would be independent of the sizes<br>
+of e1 and e2.</p>
+<p>Best,<br>
+  Cornelius</p>
+
+
+
+<a name="294648134"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Creating%20ML%20data%20is%20slow.%20No%20sharing/caching%3F/near/294648134" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Creating.20ML.20data.20is.20slow.2E.20No.20sharing.2Fcaching.3F.html#294648134">(Aug 22 2022 at 10:42)</a>:</h4>
+<p>From: Christian Sternagel &lt;<a href="mailto:c.sternagel@gmail.com">c.sternagel@gmail.com</a>&gt;<br>
+Dear Cornelius,</p>
+<p>isn't the problem merely that the expression</p>
+<p>"fold And (map Prim [1..10]) (Prim 0)"</p>
+<p>is evaluated 1000 times? I guess you could speed-up things by using <br>
+something like:</p>
+<p>"let e = fold And (map Prim [1..10]) (Prim 0) in add_expr e (map Prim <br>
+[1..1000]"</p>
+<p>I did not yet test my intuition though.</p>
+<p>cheers</p>
+<p>chris</p>
+
+
+
+<a name="294648141"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Creating%20ML%20data%20is%20slow.%20No%20sharing/caching%3F/near/294648141" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Creating.20ML.20data.20is.20slow.2E.20No.20sharing.2Fcaching.3F.html#294648141">(Aug 22 2022 at 10:42)</a>:</h4>
+<p>From: Christian Sternagel &lt;<a href="mailto:c.sternagel@gmail.com">c.sternagel@gmail.com</a>&gt;<br>
+Sorry for the noise, I'm wrong. -cheers chris</p>
+
+
+
+<a name="294648196"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Creating%20ML%20data%20is%20slow.%20No%20sharing/caching%3F/near/294648196" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Creating.20ML.20data.20is.20slow.2E.20No.20sharing.2Fcaching.3F.html#294648196">(Aug 22 2022 at 10:43)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Cornelius,</p>
+<p>Your problem is not the evaluation, it's the pretty printing. Evaluations 4 and 5 result <br>
+in quite large terms, which have a fairly deep nesting of functions. The Isabelle/ML <br>
+process sends to Isabelle/jEdit the whole syntax tree, which includes type annotations for <br>
+every subterm and layout information (suitable positions for line breaks). All this <br>
+information has to be parsed and type-set in the output buffer.</p>
+<p>If you really want to measure the evaluation time, you should either make sure that your <br>
+evaluations result in small terms or use the ML interface which avoids most of the <br>
+pretty-printing overhead.  For example,</p>
+<p>value [code]<br>
+     "let x = add_expr (fold And (map Prim [1..10]) (Prim 0)) (map Prim [1..1000]) in ()"</p>
+<p>is pretty fast (note that HOL's let gets compiled to ML's let, so the let binding is <br>
+always evaluated) and so is</p>
+<p>definition "four = add_expr (fold And (map Prim [1..10]) (Prim 0)) (map Prim [1..1000])"<br>
+   ML ‹ @{code four} ›</p>
+<p>I do not know the details of the implementation in Isabelle/Scala, so I cannot tell why 2 <br>
+is much faster than 4 in terms of pretty printing. My guess is that 2 consists of a long <br>
+list of values, i.e., you have a fairly flat term structure and special notation for lists <br>
+(which suppresses a lot of the auxiliary information passed along with the constants).</p>
+<p>Hope this helps,<br>
+Andreas</p>
+
+
+
+<a name="294648257"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Creating%20ML%20data%20is%20slow.%20No%20sharing/caching%3F/near/294648257" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Creating.20ML.20data.20is.20slow.2E.20No.20sharing.2Fcaching.3F.html#294648257">(Aug 22 2022 at 10:43)</a>:</h4>
+<p>From: "C. Diekmann" &lt;<a href="mailto:diekmann@in.tum.de">diekmann@in.tum.de</a>&gt;</p>
+<blockquote>
+<p>Your problem is not the evaluation, it's the pretty printing.</p>
+</blockquote>
+<p>Thanks Andreas! This explains everything.</p>
+<p>Cheers,<br>
+  Cornelius</p>
+
+
+
+<a name="294648348"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Creating%20ML%20data%20is%20slow.%20No%20sharing/caching%3F/near/294648348" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Creating.20ML.20data.20is.20slow.2E.20No.20sharing.2Fcaching.3F.html#294648348">(Aug 22 2022 at 10:44)</a>:</h4>
+<p>From: "C. Diekmann" &lt;<a href="mailto:diekmann@in.tum.de">diekmann@in.tum.de</a>&gt;<br>
+Dear list,</p>
+<p>pretty printing can cause quite some overhead. I just wanted to</p>
+<p>(<em>2174.839s elapsed time, 3308.410s cpu time, 161.539s GC time</em>)<br>
+value[code] "unfolded"</p>
+<p>(<em>0.561s</em>)<br>
+value[code] "let x = unfolded in ()"</p>
+<p>(<em>39.257s</em>)<br>
+value[code] "map (my_toString) unfolded"</p>
+
+
+
+<a name="294648361"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Creating%20ML%20data%20is%20slow.%20No%20sharing/caching%3F/near/294648361" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Creating.20ML.20data.20is.20slow.2E.20No.20sharing.2Fcaching.3F.html#294648361">(Aug 22 2022 at 10:44)</a>:</h4>
+<p>From: "C. Diekmann" &lt;<a href="mailto:diekmann@in.tum.de">diekmann@in.tum.de</a>&gt;<br>
+... I just wanted to share those numbers in the previous mail. I never<br>
+thought that writing a custom toString function can make such a huge<br>
+difference. 30min vs. 30sec. The tested data is a ~500 rules iptables<br>
+firewall [1]</p>
+<p>Cornelius</p>
+<p>(and probably I should unify my mail clients key binding to avoid<br>
+those half-finished mails. Sorry for the noise.)</p>
+<p>[1] <a href="https://github.com/diekmann/Iptables_Semantics">https://github.com/diekmann/Iptables_Semantics</a> paper at FM'15</p>
+
+
+
+<a name="294648370"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Creating%20ML%20data%20is%20slow.%20No%20sharing/caching%3F/near/294648370" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Creating.20ML.20data.20is.20slow.2E.20No.20sharing.2Fcaching.3F.html#294648370">(Aug 22 2022 at 10:44)</a>:</h4>
+<p>From: Gerwin Klein &lt;<a href="mailto:Gerwin.Klein@nicta.com.au">Gerwin.Klein@nicta.com.au</a>&gt;<br>
+We’ve observed similar things in the past with printing large goal states and Simpl terms, esp when lots of abbreviations are active.</p>
+<p>It has gotten below the pain threshold for us, I think mainly after Makarius reorganised the whole syntax stack a few years ago, so we haven’t done anything about it in a long time. (Maybe we just got used to it too much).</p>
+<p>If someone feels motivated to look at what exactly is taking so long in printing and if there is anything that could be done about it, we’d be happy to help and dig out examples.</p>
+<p>Cheers,<br>
+Gerwin</p>
+<hr>
+<p>The information in this e-mail may be confidential and subject to legal professional privilege and/or copyright. National ICT Australia Limited accepts no liability for any damage caused by this email or its attachments.</p>
+
+
+
+<a name="294654283"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Creating%20ML%20data%20is%20slow.%20No%20sharing/caching%3F/near/294654283" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Creating.20ML.20data.20is.20slow.2E.20No.20sharing.2Fcaching.3F.html#294654283">(Aug 22 2022 at 11:22)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+That is occasionally called "hash consing", but it would introduce a <br>
+central (synchronized) place for construction data structures.  Not very <br>
+efficient in the multicore era ...</p>
+<p>Even in ancient single-core times, this old idea did not became very <br>
+popular, probably because most data is rather short-lived and it is better <br>
+not to make such a fuss about its allocation.</p>
+<p>The Poly/ML runtime-system has other means to organize long-time survivers <br>
+on the heap efficiently, by re-introducing sharing on demand.  You won't <br>
+see that in such micro-benchmarks, though.  In AFP/JinjaThreads you do see <br>
+the CPU crunching a lot, to fit the resulting heap into the tiny 4 GB <br>
+address space: the Monitor/Heap dockable in Isabelle/jEdit gives an <br>
+impression of what is going on in the ML RTS.</p>
+<p>Makarius</p>
+
+
+
+<a name="294654295"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Creating%20ML%20data%20is%20slow.%20No%20sharing/caching%3F/near/294654295" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Creating.20ML.20data.20is.20slow.2E.20No.20sharing.2Fcaching.3F.html#294654295">(Aug 22 2022 at 11:22)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+I've done some ML timing here <br>
+<a href="http://isabelle.in.tum.de/repos/isabelle/file/Isabelle2015/src/HOL/Tools/value.ML#l58">http://isabelle.in.tum.de/repos/isabelle/file/Isabelle2015/src/HOL/Tools/value.ML#l58</a><br>
+and here <br>
+<a href="http://isabelle.in.tum.de/repos/isabelle/file/Isabelle2015/src/HOL/Tools/value.ML#l61">http://isabelle.in.tum.de/repos/isabelle/file/Isabelle2015/src/HOL/Tools/value.ML#l61</a><br>
+and here<br>
+<a href="http://isabelle.in.tum.de/repos/isabelle/file/Isabelle2015/src/HOL/Tools/value.ML#l64">http://isabelle.in.tum.de/repos/isabelle/file/Isabelle2015/src/HOL/Tools/value.ML#l64</a></p>
+<p>The timing for value_maybe_select is about the same as the pretty_term + <br>
+writeln together.  Looking at the profile of value_maybe_select, there are <br>
+a lot of Simplifier operations, which probably belong to the preparation <br>
+stage of the code-generator, including preparation of the result before <br>
+actual printing.</p>
+<p>So my guess is that "let x = add_expr ..." is so much faster, because its <br>
+result is so small, independtly of printing.</p>
+<p>In the above timing experiments, Isabelle/Scala is not measured at all. <br>
+The front-end is asynchronous.  It might burn a lot of CPU cycles on its <br>
+own for displaying big output, but that is not directly seen here. I don't <br>
+think this particularly example is big enough to be a big problem.  Other <br>
+examples can bomb the front-end as usual.</p>
+<p>Makarius</p>
+
+
+
+<a name="294654306"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Creating%20ML%20data%20is%20slow.%20No%20sharing/caching%3F/near/294654306" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Creating.20ML.20data.20is.20slow.2E.20No.20sharing.2Fcaching.3F.html#294654306">(Aug 22 2022 at 11:23)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Makarius,</p>
+<p>The code generator does quite some post-processing of the term output using the simplifier <br>
+(by unfolding the equations in code_post). You might be right in that this kind of <br>
+post-processing is the main bottleneck here. Technically, this is not part of the pretty <br>
+printer, but I would still consider this as a part of pretty-printing after evaluation.</p>
+<p>Preprocessing of the code equations can take considerable time in some cases, but AFAIK <br>
+Florian implemented a cache for code equations. Thus, a second invocation of "value <br>
+[code]" for the same term should not suffer from preprocessing time.</p>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<a name="294654606"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Creating%20ML%20data%20is%20slow.%20No%20sharing/caching%3F/near/294654606" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Creating.20ML.20data.20is.20slow.2E.20No.20sharing.2Fcaching.3F.html#294654606">(Aug 22 2022 at 11:25)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;</p>
+<blockquote>
+<p>Preprocessing of the code equations can take considerable time in some<br>
+cases, but AFAIK Florian implemented a cache for code equations. Thus, a<br>
+second invocation of "value [code]" for the same term should not suffer<br>
+from preprocessing time.</p>
+</blockquote>
+<p>Note that the conversions involving code generation are built like<br>
+sandwiches on top of each other, each adding a further level of<br>
+preparation and postpolishing to the other.  For illustration, Try to<br>
+downtrack the dependencies of e.g. Code_Runtime.dynamic_value.  You<br>
+might consider plugging in some time measurements there to get an idea<br>
+what is really going on.</p>
+<p>Florian</p>
+<blockquote>
+<p>Best,<br>
+Andreas</p>
+<p>On 03/09/15 16:11, Makarius wrote:</p>
+<blockquote>
+<p>On Wed, 29 Jul 2015, Andreas Lochbihler wrote:</p>
+<blockquote>
+<p>If you really want to measure the evaluation time, you should either<br>
+make sure that your<br>
+evaluations result in small terms or use the ML interface which<br>
+avoids most of the<br>
+pretty-printing overhead.  For example,</p>
+<p>value [code]<br>
+    "let x = add_expr (fold And (map Prim [1..10]) (Prim 0)) (map Prim<br>
+    [1..1000]) in ()"</p>
+<p>is pretty fast (note that HOL's let gets compiled to ML's let, so the<br>
+let binding is<br>
+always evaluated) and so is</p>
+<p>definition "four = add_expr (fold And (map Prim [1..10]) (Prim 0))<br>
+(map<br>
+  Prim [1..1000])"<br>
+  ML ‹ @{code four} ›</p>
+<p>I do not know the details of the implementation in Isabelle/Scala, so<br>
+I cannot tell why<br>
+2 is much faster than 4 in terms of pretty printing. My guess is that<br>
+2 consists of a<br>
+long list of values, i.e., you have a fairly flat term structure and<br>
+special notation<br>
+for lists (which suppresses a lot of the auxiliary information passed<br>
+along with the<br>
+constants).</p>
+</blockquote>
+<p>I've done some ML timing here<br>
+<a href="http://isabelle.in.tum.de/repos/isabelle/file/Isabelle2015/src/HOL/Tools/value.ML#l58">http://isabelle.in.tum.de/repos/isabelle/file/Isabelle2015/src/HOL/Tools/value.ML#l58</a></p>
+<p>and here<br>
+<a href="http://isabelle.in.tum.de/repos/isabelle/file/Isabelle2015/src/HOL/Tools/value.ML#l61">http://isabelle.in.tum.de/repos/isabelle/file/Isabelle2015/src/HOL/Tools/value.ML#l61</a></p>
+<p>and here<br>
+<a href="http://isabelle.in.tum.de/repos/isabelle/file/Isabelle2015/src/HOL/Tools/value.ML#l64">http://isabelle.in.tum.de/repos/isabelle/file/Isabelle2015/src/HOL/Tools/value.ML#l64</a></p>
+<p>The timing for value_maybe_select is about the same as the pretty_term<br>
++ writeln<br>
+together.  Looking at the profile of value_maybe_select, there are a<br>
+lot of Simplifier<br>
+operations, which probably belong to the preparation stage of the<br>
+code-generator,<br>
+including preparation of the result before actual printing.</p>
+<p>So my guess is that "let x = add_expr ..." is so much faster, because<br>
+its result is so<br>
+small, independtly of printing.</p>
+<p>In the above timing experiments, Isabelle/Scala is not measured at<br>
+all. The front-end is<br>
+asynchronous.  It might burn a lot of CPU cycles on its own for<br>
+displaying big output, but<br>
+that is not directly seen here. I don't think this particularly<br>
+example is big enough to<br>
+be a big problem.  Other examples can bomb the front-end as usual.</p>
+<p>Makarius</p>
+</blockquote>
+<p><a href="/user_uploads/14278/0nEwqnGSW4i1zvOUpNAtjMMv/signature.asc">signature.asc</a></p>
+</blockquote>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

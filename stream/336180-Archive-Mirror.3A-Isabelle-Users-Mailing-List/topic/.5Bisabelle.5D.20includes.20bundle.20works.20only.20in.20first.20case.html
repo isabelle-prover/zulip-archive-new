@@ -1,0 +1,146 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] includes bundle works only in first case · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20includes.20bundle.20works.20only.20in.20first.20case.html">[isabelle] includes bundle works only in first case</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294159859"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20includes%20bundle%20works%20only%20in%20first%20case/near/294159859" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20includes.20bundle.20works.20only.20in.20first.20case.html#294159859">(Aug 18 2022 at 19:58)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@kit.edu">andreas.lochbihler@kit.edu</a>&gt;<br>
+Hi all,</p>
+<p>I stumbled across the following (unexpected) behaviour: If I do an Isar proof of <br>
+multiple goals I have refined the proof state by including a bundle prior to the <br>
+opening "proof", the "next" separator deletes the bundle.</p>
+<p>Here's an example:</p>
+<p>definition test :: "'a list =&gt; 'a list" where "test xs = []"<br>
+bundle test = test_def[simp]<br>
+lemma shows "test xs = []" and "test ys = []"<br>
+   including test<br>
+proof -<br>
+   show "test xs = []" by simp<br>
+next<br>
+   show "test ys = []" by simp (* fails *)<br>
+qed</p>
+<p>Surprisingly, it works if I nest the multiple goals inside a block:</p>
+<p>proof -<br>
+   {<br>
+     show "test xs = []" by simp<br>
+   next<br>
+     show "test ys = []" by simp (* works *)<br>
+   }<br>
+qed</p>
+<p>Is this behaviour intended?</p>
+<p>Andreas</p>
+
+
+
+<a name="294159889"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20includes%20bundle%20works%20only%20in%20first%20case/near/294159889" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20includes.20bundle.20works.20only.20in.20first.20case.html#294159889">(Aug 18 2022 at 19:58)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+It follows naturally from the true meaning of Isar commands, also from the <br>
+principle of liberality in Isar design (cf. the concluding note on "abusus <br>
+non tollit usus" in my PhD thesis).</p>
+<p>So yes, it is all within the normal parameters of Isar, despite the <br>
+potential surprise.  The above example indicates that the new 'including' <br>
+command is better not used before a proof block.  BTW, the longer existing <br>
+'using', with its later addition to affect the context, already produces <br>
+the same effect:</p>
+<p>lemma "x = x" "y = y"<br>
+   using [[show_types]]<br>
+proof<br>
+next<br>
+   show "y = y" ..<br>
+qed</p>
+<p>In some sense the above indentation provides a vague hint on the scoping <br>
+rules, although it is better not to stretch things that far.</p>
+<p>Generally, the 'next' command switches blocks, here the implicit one of <br>
+the enclosing goal statement.  So you don't delete declarations from the <br>
+context, you go back to an earlier context that does not have them.</p>
+<p>In the example above you are using 'next' as if would "separate subgoals", <br>
+but this is not really its meaning.  Plain 'show' statements do not have <br>
+to be separated.  Separate blocks are only required for goals with their <br>
+own local context.  In that case { ... show ... next ... show ... } works, <br>
+but is a bit awkward just to get a common context for what you are <br>
+proving.</p>
+<p>Here is an alternative form that includes a bundle in the context of a <br>
+toplevel statement:</p>
+<p>lemma<br>
+     includes test<br>
+     shows "test xs = []" and "test ys = []"<br>
+   proof -<br>
+     show "test xs = []" by simp<br>
+   next -- "redundant"<br>
+     show "test ys = []" by simp<br>
+   qed</p>
+<p>For local statements within a proof you can use 'include' with regular <br>
+block structure, if it is really required.</p>
+<p>Makarius</p>
+
+
+
+<a name="294159900"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20includes%20bundle%20works%20only%20in%20first%20case/near/294159900" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20includes.20bundle.20works.20only.20in.20first.20case.html#294159900">(Aug 18 2022 at 19:59)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@kit.edu">andreas.lochbihler@kit.edu</a>&gt;<br>
+Hi Makarius,</p>
+<p>thanks for the explanation.</p>
+<blockquote>
+<p>So yes, it is all within the normal parameters of Isar, despite the potential<br>
+surprise. The above example indicates that the new 'including' command is better<br>
+not used before a proof block. BTW, the longer existing 'using', with its later<br>
+addition to affect the context, already produces the same effect:</p>
+<p>lemma "x = x" "y = y"<br>
+using [[show_types]]<br>
+proof<br>
+next<br>
+show "y = y" ..<br>
+qed<br>
+I have never tried this. So far, I only used "using &lt;facts&gt;" and "unfolding <br>
+&lt;some_def&gt;". The latter always worked on all goals and the former affected all <br>
+goals if used with the right initial method (-, simp_all, auto, etc.), so I <br>
+would have expected that something similar applies to including.</p>
+</blockquote>
+<blockquote>
+<p>In the example above you are using 'next' as if would "separate subgoals", but<br>
+this is not really its meaning. Plain 'show' statements do not have to be<br>
+separated.<br>
+In my real use case, each goal had the full fix-assume-show chain, so the next <br>
+was necessary there.</p>
+</blockquote>
+<blockquote>
+<p>Here is an alternative form that includes a bundle in the context of a toplevel<br>
+statement:</p>
+<p>lemma<br>
+includes test<br>
+shows "test xs = []" and "test ys = []"<br>
+proof -<br>
+show "test xs = []" by simp<br>
+next -- "redundant"<br>
+show "test ys = []" by simp<br>
+qed<br>
+I read about that alternative, but I actually prefer "including" over <br>
+"includes", because including does not clutter the statement of the lemma with <br>
+hints to the prover.</p>
+</blockquote>
+<p>Andreas</p>
+
+
+
+<a name="294159918"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20includes%20bundle%20works%20only%20in%20first%20case/near/294159918" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20includes.20bundle.20works.20only.20in.20first.20case.html#294159918">(Aug 18 2022 at 19:59)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Yet another alternative keeps the context and the statement separate:</p>
+<p>context includes test<br>
+   begin</p>
+<p>lemma shows ...</p>
+<p>end</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

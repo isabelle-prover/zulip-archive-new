@@ -1,0 +1,111 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] &quot;Backwards&quot; Lifting · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20.22Backwards.22.20Lifting.html">[isabelle] &quot;Backwards&quot; Lifting</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294830276"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20%22Backwards%22%20Lifting/near/294830276" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20.22Backwards.22.20Lifting.html#294830276">(Aug 23 2022 at 09:18)</a>:</h4>
+<p>From: Mario Alvarez &lt;<a href="mailto:mmalvare@eng.ucsd.edu">mmalvare@eng.ucsd.edu</a>&gt;<br>
+Dear Isabelle Users,</p>
+<p>Let me apologize in advance if this question reflects some fundamental<br>
+misunderstandings about Isabelle's Lifting and Transfer facilities. I am<br>
+still new to them and, while I've read the documentation about them, I<br>
+still feel shaky about my intuitions.</p>
+<p>My mental model of the Lifting package is the following: if for some types<br>
+typeb and typea I can prove</p>
+<p>"type_definition Rep Abs A" (for Rep :: typeb =&gt; typea, Abs : typea =&gt;<br>
+typeb, A :: typea set)</p>
+<p>then I can feed this theorem to the Lifting tool to lift definitions that<br>
+talks about the concrete type A to definitions that talk about the abstract<br>
+type B. (And I can use Transfer to assist in proving theorems about the<br>
+functions I derive this way).</p>
+<p>My question is whether Isabelle contains any support for automated lifting<br>
+when the relationship is reversed. That is, suppose I have a suite of<br>
+definitions for the "abstract" type B and I want to "lower" them to<br>
+definitions on type A (where we know the same type_definition fact<br>
+indicated above).</p>
+<p>It seemed to me that there probably wasn't a way to do this in general.<br>
+Although in some concrete cases it does seem that there is something sane<br>
+you can do - for instance, we could prove "type_definition Some<br>
+(case_option undefined id) {x . ∃ y . x = Some y}". And then map_option<br>
+would seem to be the "lowering" function we'd be looking for.</p>
+<p>However, I saw the description of the "Transfer.transferred" attribute in<br>
+isar-ref, and, while I did not fully understand it, it seemed like it might<br>
+be something akin to what I was looking for. It at least made me question<br>
+whether there is something sane that can be done in the "reverse" direction<br>
+in the general case.</p>
+<p>So my question is basically</p>
+<ol>
+<li>
+<p>Is there anything sane that can be done in general when it comes to this<br>
+sort of "lowering"?</p>
+</li>
+<li>
+<p>Does Isabelle have any automation that supports such "lowering" in a<br>
+similar way to its support for Lifting?</p>
+</li>
+<li>
+<p>Regardless of the answers to 1 and 2, what exactly does<br>
+"Transfer.transferred" do?</p>
+</li>
+</ol>
+<p>Thanks,<br>
+Mario</p>
+
+
+
+<a name="294830330"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20%22Backwards%22%20Lifting/near/294830330" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20.22Backwards.22.20Lifting.html#294830330">(Aug 23 2022 at 09:18)</a>:</h4>
+<p>From: "Thiemann, René" &lt;<a href="mailto:Rene.Thiemann@uibk.ac.at">Rene.Thiemann@uibk.ac.at</a>&gt;<br>
+Dear Mario,</p>
+<p>I’m not an export on transfer on my own, but merely a user.</p>
+<p>From my experience transfer-lifting mostly works uni-directional.<br>
+However, there is an attribute “untransferred” that permits to go in<br>
+the other direction. Example:</p>
+<p>typedef large_nat = "{ x :: nat. x ≥ 5 }" by auto</p>
+<p>setup_lifting type_definition_large_nat</p>
+<p>lift_definition sq_large_nat :: "large_nat ⇒ large_nat" is "λ x. x * x"<br>
+  by (meson leD leI le_less_trans le_square)</p>
+<p>lift_definition get_nat :: "large_nat ⇒ nat" is "λ x. x" .</p>
+<p>lemma sq_20: "get_nat (sq_large_nat x) ≥ 20" <br>
+proof (transfer)<br>
+  (* this is the standard direction *)<br>
+  fix x :: nat<br>
+  assume "5 ≤ x" <br>
+  hence "5 * 5 ≤ x * x"<br>
+    using mult_le_mono by blast<br>
+  thus "20 ≤ x * x" by auto <br>
+qed</p>
+<p>(* and now we can go in the other direction *)<br>
+thm sq_20[untransferred] (* results in 5 ≤ x ⟹ 20 ≤ x * x *)</p>
+<p>Best,<br>
+René</p>
+
+
+
+<a name="294830407"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20%22Backwards%22%20Lifting/near/294830407" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20.22Backwards.22.20Lifting.html#294830407">(Aug 23 2022 at 09:19)</a>:</h4>
+<p>From: Mario Alvarez &lt;<a href="mailto:mmalvare@eng.ucsd.edu">mmalvare@eng.ucsd.edu</a>&gt;<br>
+Hi René,</p>
+<p>Thanks for your help. I guess perhaps I was confused about the difference<br>
+between "transferred" and "untransferred" (although I have to admit I'm<br>
+still not clear on what "untransferred" does, since I had thought that it<br>
+did more or less what you described "transferred" as doing in your example.)</p>
+<p>I'd still appreciate it if anyone could help me out with an intuition for<br>
+what "untransferred" does, but I think I've gotten the main thing I wanted<br>
+to know from René's reply; namely, that I can only lift definitions one way<br>
+(using Lifting) but that (at least under some circumstances) I can transfer<br>
+<em>facts</em> about my lifted constants in the reverse direction.</p>
+<p>Thanks,<br>
+Mario</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

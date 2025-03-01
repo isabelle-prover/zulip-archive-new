@@ -1,0 +1,126 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Probelm with the &quot;definition&quot; command · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Probelm.20with.20the.20.22definition.22.20command.html">[isabelle] Probelm with the &quot;definition&quot; command</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294239063"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Probelm%20with%20the%20%22definition%22%20command/near/294239063" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Probelm.20with.20the.20.22definition.22.20command.html#294239063">(Aug 19 2022 at 10:49)</a>:</h4>
+<p>From: Jesus Aransay &lt;<a href="mailto:jesus-maria.aransay@unirioja.es">jesus-maria.aransay@unirioja.es</a>&gt;<br>
+Dear all,</p>
+<p>as a different but related issue to my previous mail, when we try to<br>
+input matrices of dimension over 250 * 250 (approx) as elements of<br>
+type "iarray" (the IArray constructor is applied to lists,<br>
+<a href="http://isabelle.in.tum.de/library/HOL/HOL-Library/IArray.html">http://isabelle.in.tum.de/library/HOL/HOL-Library/IArray.html</a>) in<br>
+Isabelle (Isabelle/JEdit 2013), by means of the "definition" command,<br>
+processing time gets really slow (of the order of minutes) until the<br>
+editor crashes or we just give it up. Inputting the matrices directly<br>
+in the generated SML code works well.</p>
+<p>Is there any way to improve this behavior?</p>
+<p>Thanks for any hints,</p>
+<p>Jesus</p>
+
+
+
+<a name="294239101"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Probelm%20with%20the%20%22definition%22%20command/near/294239101" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Probelm.20with.20the.20.22definition.22.20command.html#294239101">(Aug 19 2022 at 10:49)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+Jesus, this is a known problem. If you are OK with inputting the matrix on the<br>
+ML level, just stick with it. Alternatively you can look at<br>
+<a href="http://afp.sourceforge.net/browser_info/current/HOL/HOL-Library/Flyspeck-Tame/Arch.html">http://afp.sourceforge.net/browser_info/current/HOL/HOL-Library/Flyspeck-Tame/Arch.html</a><br>
+where some constants are defined at the ML level (in "Archives/*.ML") but<br>
+imported into Isabelle (as Tri, Quad etc). This way you may not need to edit any<br>
+generated ML code by hand.</p>
+<p>Tobias</p>
+
+
+
+<a name="294240833"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Probelm%20with%20the%20%22definition%22%20command/near/294240833" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Probelm.20with.20the.20.22definition.22.20command.html#294240833">(Aug 19 2022 at 11:01)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+I have experimented with this a little, see my version of <br>
+Random_Binary_Matrix.thy that is included here.  This takes about 45s on <br>
+my cheap i7 machine.</p>
+<p>My first idea was to bypass the concrete syntax parser via the parse <br>
+translation, and turn a numeral token directly into some pre-term.  It <br>
+turned out that parsing alone takes only 30s for your example, but the <br>
+remaining "check" phase for type-reconstruction is rather slow (lots of <br>
+unification of types in several stages).  I had also some refinements of <br>
+the syntax translations, to produce less concrete constants (many bounds <br>
+with some beta redex, to simulate a local let within the term); another <br>
+refinement was to avoid polymorphism in the constants, but neither helped <br>
+very much.</p>
+<p>So the second approach uses "make_bits" with the "define" function in <br>
+Isabelle/ML.  Such plain Isabelle/ML operations are less cryptic than <br>
+syntax operations.  Its remaining slowness is due to generous <br>
+re-certification of terms in certain parts of the system for basic <br>
+definitions.  You will probably face other more serious problems when <br>
+working with the huge formal bits by other means, probably also in the <br>
+code generator.</p>
+<p>Here you see that Isabelle was not built with big data applications in <br>
+mind.  Scalability to arbitrary large input is never for free: it needs to <br>
+be addressed explicitly in the implementation, and usually involves <br>
+trade-offs concerning other things.  Isabelle is better at ridiculous <br>
+generality than ridiculous speed.</p>
+<p>Makarius<br>
+<a href="/user_uploads/14278/vOl4MphFunYDiJP5100cFDi8/Random_Binary_Matrix.thy">Random_Binary_Matrix.thy</a></p>
+
+
+
+<a name="294241905"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Probelm%20with%20the%20%22definition%22%20command/near/294241905" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Probelm.20with.20the.20.22definition.22.20command.html#294241905">(Aug 19 2022 at 11:08)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+I can say more when you show me the concrete example, to get a better idea <br>
+what is the usual "problem class" that you have here.</p>
+<p>Generally, the default inner syntax of Isabelle (for terms and types) is <br>
+made as flexible and powerful as feasible, which also means it does not <br>
+scale to arbitrarily large input. There is no fundamental problem here, <br>
+since that is only the default to get terms into the system, and there are <br>
+many other ways.  You have already figured out some regular Isabelle/ML <br>
+interfaces to do that.</p>
+<p>An alternative is to apply some tricks to import "blobs" directly into the <br>
+term language, while staying on the surface end-user syntax. This could <br>
+work via your own syntax translations, e.g. like this:</p>
+<p>term "BIG_THING ''...''"</p>
+<p>where ''...'' is an inner string token that is somehow turned into a term. <br>
+You can then apply different parser technology to operate on the given <br>
+''...'' string.  (Technically there is a limit of 64 MB size for such <br>
+strings.)</p>
+<p>In principle you could also load a file into the term, although that would <br>
+pose some questions about file-system access and file versions within the <br>
+document model that is underlying the editor.  (As first approximation one <br>
+would probably just use <a href="http://File.read">File.read</a> and say it is "unmanaged" file-system <br>
+access, i.e. assuming you don't edit that file while working with the <br>
+Prover IDE.)</p>
+<p>Makarius</p>
+
+
+
+<a name="294241968"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Probelm%20with%20the%20%22definition%22%20command/near/294241968" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Probelm.20with.20the.20.22definition.22.20command.html#294241968">(Aug 19 2022 at 11:09)</a>:</h4>
+<p>From: Jesus Aransay &lt;<a href="mailto:jesus-maria.aransay@unirioja.es">jesus-maria.aransay@unirioja.es</a>&gt;<br>
+Dear Makarius,</p>
+<p>in the attached file you can find a simple example of a list of lists<br>
+representing a 250 * 250 matrix, which takes really long time to be<br>
+processed in Isabelle 2013 (also in the repository version); actually,<br>
+I gave up after a few minutes of processing without success.</p>
+<p>We are using these kind of lists, usually with every list wrapped with<br>
+the IArray type constructor<br>
+(<a href="http://isabelle.in.tum.de/library/HOL/HOL-Library/IArray.html">http://isabelle.in.tum.de/library/HOL/HOL-Library/IArray.html</a>) in<br>
+order to use IArrays to implement vectors and matrices.</p>
+<p>Using ML definitions of this size or even greater takes almost no<br>
+time, so as an alternative solution we are directly executing the ML<br>
+code and definitions.</p>
+<p>Thanks for any hint,</p>
+<p>Jesus<br>
+<a href="/user_uploads/14278/Jzi0wH44TgVgENPpTU67zM3-/Random_Binary_Matrix.thy">Random_Binary_Matrix.thy</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

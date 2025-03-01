@@ -1,0 +1,38 @@
+[
+    {
+        "content": "<p>I'm currently trying to define two mutual recursive (partial) functions. I'm also using <code>(domintros)</code>.</p>\n<p>Everything worked out fine until I introduced the line <code>let d_new = if wn then d_old ⊔ d_new else d_old ⊓ d_new in</code> (or operators similar to <code>inf</code> and <code>sup</code>). Proving pattern completeness and pattern compatibility still works out fine. But the keyword <code>function</code>is now highlighted in red and shows the following error</p>\n<div class=\"codehilite\" data-code-language=\"Text only\"><pre><span></span><code>Tactic failed\nThe error(s) above occurred for the goal statement⌂:\n[...]\n</code></pre></div>\n<p>I tried to construct a minimal working example but didn't manage to reproduce the error in less complex definitions. And as most of the code is not mine, I can't publish the whole definition. Still hoping the error is so trivial that you guys can help me nonetheless. Is there a problem with the termination proof? Or something else?</p>\n<p>Any hints are highly appreciate. Thanks in advance :)</p>",
+        "id": 388509964,
+        "sender_full_name": "Alexandra Graß",
+        "timestamp": 1693570197
+    },
+    {
+        "content": "<p>Update: I managed to construct a minimal working example and the problem is neither with mutual recursion nor partial functions (?). Here's the code snippet:</p>\n<div class=\"codehilite\" data-code-language=\"Text only\"><pre><span></span><code>function foo :: \"nat ⇒ bool ⇒ nat\" where\n  \"foo old expand = (\n      let tmp = if old &lt; 100 then old + 1 else old in\n      let new = if expand then old ⊔ tmp else old ⊓ tmp in\n      if new = old then\n        if expand then\n          foo new False\n        else\n          new\n      else\n        foo new expand)\"\n  by pat_completeness auto\n</code></pre></div>\n<p><em>Key idea:</em> There's a monotonically increasing function (in this case <code>if old &lt; 100 then old + 1 else old</code>. <code>old+1</code> works as well, but then the example would never terminate, which is not what I'm aiming for). There's two phases. First the <code>expand</code> phase where results are always chosen by means of <code>sup</code>. As soon as a fixed point is reached, the algorithm switches to a second phase where values are now combined via <code>inf</code> (which is trivial in this example and should terminate right away as <code>new = old</code> in the first iteration).</p>\n<p>Again, keyword <code>function</code> is underlined all red and the following error ist displayed:</p>\n<div class=\"codehilite\" data-code-language=\"Text only\"><pre><span></span><code>Tactic failed\nThe error(s) above occurred for the goal statement⌂:\n⟦⋀old expand x xa.\n    ⟦x = (if old &lt; 100 then old + 1 else old);\n     xa = (if expand then old ⊔ x else old ⊓ x); xa = old;\n     expand⟧\n    ⟹ P (xa, False) (old, expand);\n ⋀old expand x xa.\n    ⟦x = (if old &lt; 100 then old + 1 else old);\n     xa = (if expand then old ⊔ x else old ⊓ x); xa ≠ old⟧\n    ⟹ P (xa, expand) (old, expand)⟧\n⟹ foo_rel ≤ P\n</code></pre></div>\n<p>What's the issue with my definition? Potential nontermination in case the algorithm is called with <code>expand</code> set to <code>False</code>? (Which is sth I never intend to do.)</p>",
+        "id": 388941577,
+        "sender_full_name": "Alexandra Graß",
+        "timestamp": 1693818357
+    },
+    {
+        "content": "<p>Here is a version that fails, but only needs Main:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">function</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">sequential</span><span class=\"o\">)</span><span class=\"w\"> </span><span class=\"n\">foo</span><span class=\"w\"> </span><span class=\"o\">::</span><span class=\"w\"> </span><span class=\"s\">\"nat set ⇒ bool ⇒ nat set\"</span><span class=\"w\"> </span><span class=\"kp\">where</span>\n<span class=\"w\">  </span><span class=\"s\">\"foo old expand = (</span>\n<span class=\"s\">      let new = old ∩ old in</span>\n<span class=\"s\">      if new = old then</span>\n<span class=\"s\">          foo new expand</span>\n<span class=\"s\">      else</span>\n<span class=\"s\">        foo new expand)\"</span>\n<span class=\"w\">  </span><span class=\"k\">by</span><span class=\"w\"> </span><span class=\"n\">pat_completeness</span><span class=\"w\"> </span><span class=\"n\">auto</span>\n</code></pre></div>",
+        "id": 388943824,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1693819120
+    },
+    {
+        "content": "<p>I think that the way forward here is to write on the mailing list (I am not sure who feels responsible for the function package, but you have a higher chance on the mailing list)</p>",
+        "id": 388943990,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1693819179
+    },
+    {
+        "content": "<p>Interesting, thanks for the example! Just realized there's no need for the 2nd param. In a nutshell:</p>\n<div class=\"codehilite\" data-code-language=\"Text only\"><pre><span></span><code>function (sequential) foo :: \"nat set ⇒ nat set\" where\n  \"foo old = (\n      let new = old ∩ old in\n      if new = old then\n          foo new\n      else\n        foo new)\"\n  by pat_completeness auto\n</code></pre></div>\n<p>does show the <code>Tactic failed</code> error, but</p>\n<div class=\"codehilite\" data-code-language=\"Text only\"><pre><span></span><code>function (sequential) foo :: \"nat set ⇒ nat set\" where\n  \"foo old = (\n      let new = old ∩ old in\n      if new = old then\n          foo old ∩ old\n      else\n        foo new)\"\n  by pat_completeness auto\n</code></pre></div>\n<p>does not. Replacing <code>new</code> in any of the other lines does not fix the problem.</p>\n<p><em>Edit:</em> Other trivial operations such as <code>old ∪ {}</code> do the job (i.e. invoking the error) as well, btw.</p>",
+        "id": 388946771,
+        "sender_full_name": "Alexandra Graß",
+        "timestamp": 1693820059
+    },
+    {
+        "content": "<p>I'll discuss this on the mailing list :)</p>",
+        "id": 388946991,
+        "sender_full_name": "Alexandra Graß",
+        "timestamp": 1693820125
+    }
+]

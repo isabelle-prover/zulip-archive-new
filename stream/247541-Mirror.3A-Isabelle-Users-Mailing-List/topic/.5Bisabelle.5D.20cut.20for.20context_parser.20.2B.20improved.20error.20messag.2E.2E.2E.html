@@ -1,0 +1,109 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] cut for context_parser + improved error messag... · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20cut.20for.20context_parser.20.2B.20improved.20error.20messag.2E.2E.2E.html">[isabelle] cut for context_parser + improved error messag...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="390729066"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20cut%20for%20context_parser%20%2B%20improved%20error%20messag.../near/390729066" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20cut.20for.20context_parser.20.2B.20improved.20error.20messag.2E.2E.2E.html#390729066">(Sep 13 2023 at 13:55)</a>:</h4>
+<p>From: Kevin Kappelmann &lt;<a href="mailto:kevin.kappelmann@tum.de">kevin.kappelmann@tum.de</a>&gt;<br>
+Hello,</p>
+<p>Unlike Parse.enum1, the definition of Parse.enum1' does not include a <br>
+cut. This causes unhelpful error messages down the road, as exemplified <br>
+in below theory (tested with Isabelle version 3032bc7d613d (i.e. latest <br>
+development version)).</p>
+<p>Would it be possible to include "!!!+" and "enum1'" from below theory in <br>
+the standard distribution (in parse.ML)?</p>
+<p>Best wishes,</p>
+<p>Kevin</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">theory</span><span class="w"> </span><span class="n">Scratch</span>
+<span class="w">   </span><span class="kp">imports</span>
+<span class="w">     </span><span class="n">Main</span>
+<span class="k">begin</span>
+
+<span class="k">ML</span><span class="s">‹</span>
+<span class="s">fun get_tokens_pos [] = " (end-of-input)"</span>
+<span class="s">   | get_tokens_pos (tok :: _) = Position.here (Token.pos_of tok);</span>
+
+<span class="s">(*generalisation of Parse.cut*)</span>
+<span class="s">fun cut get_pos kind scan =</span>
+<span class="s">   let</span>
+<span class="s">     fun err (x, NONE) = (fn () =&gt; kind ^ get_pos x)</span>
+<span class="s">       | err (x, SOME msg) =</span>
+<span class="s">           (fn () =&gt;</span>
+<span class="s">             let val s = msg () in</span>
+<span class="s">               if String.isPrefix kind s then s</span>
+<span class="s">               else kind ^ get_pos x ^ ": " ^ s</span>
+<span class="s">             end);</span>
+<span class="s">   in Scan.!! err scan end;</span>
+
+<span class="s">local</span>
+<span class="s">val error_msg = "Outer syntax error";</span>
+<span class="s">in</span>
+<span class="s">fun !!! scan = cut get_tokens_pos error_msg scan;</span>
+<span class="s">(*!!! for context parsers (currently missing in the standard distribution)*)</span>
+<span class="s">fun !!!+ scan = cut (get_tokens_pos o snd) error_msg scan;</span>
+<span class="s">end</span>
+
+<span class="s">(*same definition as Parse.enum1*)</span>
+<span class="s">fun enum1 sep scan = scan ::: Scan.repeat (Parse.$$$ sep |-- !!! scan);</span>
+<span class="s">(*now including cuts (unlike Parse.enum1')*)</span>
+<span class="s">fun enum1' sep scan = scan ::: Scan.repeat (Scan.lift (Parse.$$$ sep)</span>
+<span class="s">|-- !!!+ scan);</span>
+<span class="s">(*current definition of Parse.enum1'*)</span>
+<span class="s">(* fun enum1' sep scan = scan ::: Scan.repeat (Scan.lift ($$$ sep) |--</span>
+<span class="s">scan); *)</span>
+
+<span class="s">(*example attributes to show parsing differences*)</span>
+<span class="s">val _ =</span>
+<span class="s">   Theory.setup (</span>
+<span class="s">     Attrib.setup </span><span class="ss">\&lt;^binding&gt;</span><span class="s">‹withcut›</span>
+<span class="s">       (enum1' "and" (Scan.lift Parse.nat) |-- Scan.succeed (K (NONE,</span>
+<span class="s">NONE)))</span>
+<span class="s">       "withcut"</span>
+<span class="s">     #&gt; Attrib.setup </span><span class="ss">\&lt;^binding&gt;</span><span class="s">‹withoutcut›</span>
+<span class="s">       (Parse.enum1' "and" (Scan.lift Parse.nat) |-- Scan.succeed (K</span>
+<span class="s">(NONE, NONE)))</span>
+<span class="s">       "withoutcut"</span>
+<span class="s">   )</span>
+<span class="s">›</span>
+
+<span class="c">(*</span>
+<span class="c">error/squiggly line at "this is not a nat"; error message:</span>
+<span class="c">Outer syntax error⌂: natural number expected,</span>
+<span class="c">but quoted string "this is not a nat"⌂ was found</span>
+<span class="c">*)</span>
+<span class="k">declare</span><span class="w"> </span><span class="o">[[</span><span class="n">withcut</span><span class="w"> </span><span class="n">0</span><span class="w"> </span><span class="kp">and</span><span class="w"> </span><span class="s">"this is not a nat"</span><span class="o">]]</span>
+<span class="c">(*</span>
+<span class="c">error/squiggly line at "withoutcut"; error message:</span>
+<span class="c">Bad arguments for attribute "withoutcut"⌂:</span>
+<span class="c">   and "this is not a nat"</span>
+<span class="c">*)</span>
+<span class="k">declare</span><span class="w"> </span><span class="o">[[</span><span class="n">withoutcut</span><span class="w"> </span><span class="n">0</span><span class="w"> </span><span class="kp">and</span><span class="w"> </span><span class="s">"this is not a nat"</span><span class="o">]]</span>
+
+<span class="k">end</span>
+</code></pre></div>
+
+
+
+<a name="398074245"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20cut%20for%20context_parser%20%2B%20improved%20error%20messag.../near/398074245" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20cut.20for.20context_parser.20.2B.20improved.20error.20messag.2E.2E.2E.html#398074245">(Oct 23 2023 at 12:27)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Thanks for the hint. That omission goes back to 1998 (Isabelle/769abc29bb8e), <br>
+when the "Args" parsing was quite different from Isar output syntax ("Parse").</p>
+<p>I have now improved the situation for the next release in Isabelle/b8775a63cb35.</p>
+<p>Side-remark: "the latest development version" is already long past <br>
+3032bc7d613d. In other words: that expression is ill-defined, it falsely <br>
+assumes a real-time communication channel with synchronisation against the <br>
+repository history.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,111 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Recursion on finite, lazy lists (llists) · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Recursion.20on.20finite.2C.20lazy.20lists.20.28llists.29.html">[isabelle] Recursion on finite, lazy lists (llists)</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294062205"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Recursion%20on%20finite%2C%20lazy%20lists%20%28llists%29/near/294062205" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Recursion.20on.20finite.2C.20lazy.20lists.20.28llists.29.html#294062205">(Aug 18 2022 at 12:02)</a>:</h4>
+<p>From: Denis Bueno &lt;<a href="mailto:dbueno@gmail.com">dbueno@gmail.com</a>&gt;<br>
+[The following is all in context of the LList2 library, available from afp.]</p>
+<p>During the course of a proof I attempt to ensure that a finite llist<br>
+does not have any of a certain element.  After many unsuccessful<br>
+attempts at actual pattern matching using LNil and LCons (using fun<br>
+and primrec) I finally saw the definition of llength in LList2.thy:</p>
+<p>constdefs<br>
+    llength :: "'a llist =&gt; nat"<br>
+    "llength == finlsts_rec 0 (λ a r n. Suc n)"</p>
+<p>This uses the completely opaque (to me) `finlsts_rec' operator.  I<br>
+gather the following from its uses:</p>
+<p>- 0 is the base case; if the list is LNil, 0 is returned<br>
+    - a is the current element of the list<br>
+    - r is the rest of the list<br>
+    - n is the current "accumulator state"<br>
+    - it has some special magic for telling Isabelle it will only deal<br>
+with finite llists</p>
+<p>These observations lead me to the following definition, `noBot'<br>
+(mnemonic: "no bottom state"):</p>
+<p>constdefs<br>
+      noBot :: "state llist =&gt; bool"<br>
+      "noBot == finlsts_rec True (% s r b. b &amp; (s ~= BottomState))"</p>
+<p>As a sanity check, I try to prove that "noBot LNil = True":</p>
+<p>lemma<br>
+    "noBot LNil = True" unfolding noBot_def using finlsts_rec_LNil<br>
+(<em>here</em>) by blast</p>
+<p>When ProofGeneral has consumed everything up to "(<em>here</em>)", the<br>
+proofstate looks like:</p>
+<p>using this:<br>
+      finlsts_rec ?c ?d LNil = ?c</p>
+<p>goal (1 subgoal):</p>
+<p>1. finlsts_rec True (%s r b. b &amp; s ~= BottomState) LNil = True</p>
+<p>This looks like it can be proved directly by unification.  Consuming<br>
+the blast does not prove the theorem, even after a long time.</p>
+<p>What exactly is going on here?</p>
+
+
+
+<a name="294062243"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Recursion%20on%20finite%2C%20lazy%20lists%20%28llists%29/near/294062243" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Recursion.20on.20finite.2C.20lazy.20lists.20.28llists.29.html#294062243">(Aug 18 2022 at 12:02)</a>:</h4>
+<p>From: Lawrence Paulson &lt;<a href="mailto:lp15@cam.ac.uk">lp15@cam.ac.uk</a>&gt;<br>
+Blast doesn't look like the right tool for this problem.</p>
+<p>You can prove it like this:</p>
+<p>lemma<br>
+    "noBot LNil = True" unfolding noBot_def<br>
+      by (simp add: finlsts_rec_LNil)</p>
+<p>Larry Paulson</p>
+
+
+
+<a name="294062257"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Recursion%20on%20finite%2C%20lazy%20lists%20%28llists%29/near/294062257" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Recursion.20on.20finite.2C.20lazy.20lists.20.28llists.29.html#294062257">(Aug 18 2022 at 12:02)</a>:</h4>
+<p>From: Denis Bueno &lt;<a href="mailto:dbueno@gmail.com">dbueno@gmail.com</a>&gt;<br>
+I had the same thought, but I tried:</p>
+<p>lemma<br>
+    "noBot LNil = True" unfolding noBot_def<br>
+                        using finlsts_rec_LNil<br>
+    by simp</p>
+<p>And it failed.  I expected to be able to substitute "using" in Isar<br>
+for the "add:" argument to simp.  What is different?</p>
+
+
+
+<a name="294062295"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Recursion%20on%20finite%2C%20lazy%20lists%20%28llists%29/near/294062295" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Recursion.20on.20finite.2C.20lazy.20lists.20.28llists.29.html#294062295">(Aug 18 2022 at 12:02)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Denis,</p>
+<p>That is, in general, not the case.  Facts chained in to simp (e.g. using<br>
+"using") are not instantiated wrt. to types, where simp rules given to<br>
+simp with add: are.</p>
+<p>Hope this helps<br>
+    Florian<br>
+<a href="/user_uploads/14278/JIQS1KTkvhrJDssoSeamACGl/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294062307"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Recursion%20on%20finite%2C%20lazy%20lists%20%28llists%29/near/294062307" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Recursion.20on.20finite.2C.20lazy.20lists.20.28llists.29.html#294062307">(Aug 18 2022 at 12:02)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Automated proof methods like "simp" merely insert the facts being "used" <br>
+into the goal before doing their usual business.  This means a polymorphic <br>
+rule like using finlsts_rec_LNil essentially looses its polymorphism, it <br>
+can be instantiated at most once for logical reasons, and the Simplifier <br>
+does not instantiate even do that, but ignores it due to schematic type <br>
+variables in the goal premises.</p>
+<p>In contrast, the "add" method modifier inserts the rule into the <br>
+Simplifier context as an independented fact.  It is eventually matched <br>
+against a redex in the goal, and its types get instantiated as expected.</p>
+<p>As a rule of thumb (and a matter of style), the "using" part typically <br>
+refers to local things from the very proof, while rules from the library <br>
+are specified via extra method modifiers (simp add/del, blast <br>
+intro/elim/dest etc.).</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

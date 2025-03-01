@@ -1,0 +1,100 @@
+<html>
+<head><meta charset="utf-8"><title>Semantics of bit vector multiplication. · Beginner Questions · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/index.html">Beginner Questions</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Semantics.20of.20bit.20vector.20multiplication.2E.html">Semantics of bit vector multiplication.</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="450464613"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Semantics%20of%20bit%20vector%20multiplication./near/450464613" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Shweta <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Semantics.20of.20bit.20vector.20multiplication.2E.html#450464613">(Jul 10 2024 at 14:17)</a>:</h4>
+<p>Hi. I am working with the More_Word.thy file and am trying to understand the semantics for the bit vector multiplication it uses:<br>
+<code>class times =
+  fixes times :: "'a ⇒ 'a ⇒ 'a"  (infixl "*" 70)</code> in Groups.thy<br>
+Is there a resource I can use to find out exactly what this function does on a bit level?<br>
+From examples:<br>
+<code>value "(3::3 word)*(3::3 word)"</code> is 1::3 word <br>
+<code>value "(8::3 word)*(3::3 word)"</code> is 0::3 word (so 000*011=000), and the lemma<br>
+<code> Word.uint_word_arith_bintrs(3): uint (?a * ?b) = take_bit LENGTH(?'a) (uint ?a * uint ?b)</code><br>
+I understand that it does the multiplication modulo 2^(LENGTH('a)) and ignores the carry overs beyond length n.</p>
+
+
+
+<a name="450467430"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Semantics%20of%20bit%20vector%20multiplication./near/450467430" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Lukas Stevens <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Semantics.20of.20bit.20vector.20multiplication.2E.html#450467430">(Jul 10 2024 at 14:26)</a>:</h4>
+<p>If you look at <code>thm times_word_def</code> you see that <code>(*)</code> on words is defined by lifting <code>(*)</code> on ints. This means that the integer multiplication is performed on the the integers that are represented by the words and then the result gets truncated.</p>
+
+
+
+<a name="450473860"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Semantics%20of%20bit%20vector%20multiplication./near/450473860" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Shweta <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Semantics.20of.20bit.20vector.20multiplication.2E.html#450473860">(Jul 10 2024 at 14:47)</a>:</h4>
+<p>Thank you! As a follow up, I am trying to prove this lemma but get a counterexample:<br>
+<code>lemma bvmul_ref6_h2:
+fixes x1 :: "'a::len word" and x2 :: "'a::len word"
+shows "(1::int) &lt; int (size (x1::'a::len word)) 
+⟶ (smt_extract 2 0 ((x1*x2)::'a::len word)::'a::len word) 
+= (((smt_extract 2 0 x1)::'a::len word)
+*((smt_extract 2 0 x2)::'a::len word)::'a::len word)"</code></p>
+<p>I get this counterexample:<br>
+<code>Auto Quickcheck found a counterexample:
+  x1 = 3::Enum.finite_3 word
+  x2 = 3::Enum.finite_3 word
+Evaluated terms:
+  smt_extract (2::nat) (0::nat) ((x1::Enum.finite_3 word) * (x2::Enum.finite_3 word)) =
+    1::Enum.finite_3 word
+  smt_extract (2::nat) (0::nat) (x1::Enum.finite_3 word) *
+  smt_extract (2::nat) (0::nat) (x2::Enum.finite_3 word) =
+    9::Enum.finite_3 word</code> </p>
+<p>However,<br>
+<code>value "(smt_extract 2 0 ((3::3 word)*(3::3 word)))::3 word" 
+value "((smt_extract 2 0 (3::3 word))::3 word)
+          *((smt_extract 2 0 (3::3 word))::3 word)" </code> both return 1::3 word. <br>
+Why is 001 interpreted as 9::3 word, instead of 1::3 word in the counterexample?</p>
+
+
+
+<a name="450475023"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Semantics%20of%20bit%20vector%20multiplication./near/450475023" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Semantics.20of.20bit.20vector.20multiplication.2E.html#450475023">(Jul 10 2024 at 14:50)</a>:</h4>
+<p>quickcheck sometimes does weird things…</p>
+
+
+
+<a name="450477003"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Semantics%20of%20bit%20vector%20multiplication./near/450477003" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Semantics.20of.20bit.20vector.20multiplication.2E.html#450477003">(Jul 10 2024 at 14:58)</a>:</h4>
+<p>If you fix the type from 'a to 3, the counter examples disappears (and nitpick did not find any in the first place)</p>
+
+
+
+<a name="450664098"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Semantics%20of%20bit%20vector%20multiplication./near/450664098" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Shweta <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Semantics.20of.20bit.20vector.20multiplication.2E.html#450664098">(Jul 11 2024 at 09:43)</a>:</h4>
+<p>I see. I do need the lemma for arbitrary lengths though. Will I be able to prove it even with a quickcheck counterexample? Does a quickcheck counterexample mean that the prover believes the lemma to be untrue?</p>
+
+
+
+<a name="450667508"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Semantics%20of%20bit%20vector%20multiplication./near/450667508" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Semantics.20of.20bit.20vector.20multiplication.2E.html#450667508">(Jul 11 2024 at 10:00)</a>:</h4>
+<p>I have not tried to prove it, but the lemma looks correct</p>
+
+
+
+<a name="450668104"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Semantics%20of%20bit%20vector%20multiplication./near/450668104" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Shweta <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Semantics.20of.20bit.20vector.20multiplication.2E.html#450668104">(Jul 11 2024 at 10:02)</a>:</h4>
+<p>Got it, thanks!</p>
+
+
+
+<a name="451828372"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Semantics%20of%20bit%20vector%20multiplication./near/451828372" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Semantics.20of.20bit.20vector.20multiplication.2E.html#451828372">(Jul 16 2024 at 18:18)</a>:</h4>
+<p><span class="user-mention silent" data-user-id="732450">Shweta</span> <a href="#narrow/stream/238552-Beginner-Questions/topic/Semantics.20of.20bit.20vector.20multiplication.2E/near/450664098">said</a>:</p>
+<blockquote>
+<p>I see. I do need the lemma for arbitrary lengths though. Will I be able to prove it even with a quickcheck counterexample? Does a quickcheck counterexample mean that the prover believes the lemma to be untrue?</p>
+</blockquote>
+<p>Quickcheck and nitpick are diagnostic tools. There is a lot of extra code in their trusted code base that is not verified in any way. When they give you a counterexample, it's a good indication that your lemma might not be true in general, but it's definitely not a proof or a guarantee. Sometimes they produce spurious "counterexamples". I don't know the technical details.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

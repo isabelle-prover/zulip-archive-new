@@ -1,0 +1,82 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] &quot;also have&quot; identity proof steps · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20.22also.20have.22.20identity.20proof.20steps.html">[isabelle] &quot;also have&quot; identity proof steps</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294738862"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20%22also%20have%22%20identity%20proof%20steps/near/294738862" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20.22also.20have.22.20identity.20proof.20steps.html#294738862">(Aug 22 2022 at 17:53)</a>:</h4>
+<p>From: John Matthews &lt;<a href="mailto:john_matthews@apple.com">john_matthews@apple.com</a>&gt;<br>
+We've noticed some unintuitive Isar behavior when we have an identity proof step within a chain of “also have” calculations.</p>
+<p>For example, the proof below succeeds that has the identity proof step commented out:</p>
+<p>lemma "(1::nat)+2+3 = 6"<br>
+proof -<br>
+  have "(1::nat)+2+3 = 3+3" by arith<br>
+  (<strong>* also have "... = 3+3" .. -- "identity proof step" </strong>*)<br>
+  also have "... = 6" by arith<br>
+  finally show "(1::nat)+2+3 = 6" .<br>
+qed</p>
+<p>However with that line enabled then the "finally show” proof step fails two lines later. We were expecting either for the "finally show" proof step to succeed or else for Isar to report an error at the identity proof step itself. Note that identity proof steps may not be obvious to the user in the presence of complex term abbreviations.</p>
+<p>Thanks,<br>
+John</p>
+
+
+
+<a name="294738882"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20%22also%20have%22%20identity%20proof%20steps/near/294738882" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20.22also.20have.22.20identity.20proof.20steps.html#294738882">(Aug 22 2022 at 17:53)</a>:</h4>
+<p>From: "Eugene W. Stark" &lt;<a href="mailto:isabelle-users@starkeffect.com">isabelle-users@starkeffect.com</a>&gt;<br>
+Also mysterious to the uninitiated are situations in which the chain of terms<br>
+contains a nontrivial loop; i.e. the repeated term occurs not in the immediate<br>
+next step, but in a later one.  In that case, an "also" in the proof can loop<br>
+(visually, turns purple and stays that way).  I don't know if this always happens;<br>
+it seems that sometimes there is no visual indication of the problem.  With a<br>
+visual indication, it is usually more clear that something is wrong, but when<br>
+I first encountered this behavior I had no idea what was happening.  An explicit<br>
+check for loops in the calculation, with an error report to the user, would be<br>
+very helpful.</p>
+
+
+
+<a name="294739001"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20%22also%20have%22%20identity%20proof%20steps/near/294739001" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20.22also.20have.22.20identity.20proof.20steps.html#294739001">(Aug 22 2022 at 17:53)</a>:</h4>
+<p>From: Dominique Unruh &lt;<a href="mailto:unruh@ut.ee">unruh@ut.ee</a>&gt;<br>
+Dear John,</p>
+<p>the also-finally mechanism works as follows (in the example including the<br>
+identity proof step):</p>
+<p>- There is a variable "calculation" that contains the intermediate<br>
+   conclusion of the chain of the equations. Initially, this variable is empty.</p>
+<p>- The first "also" sets calculation := "1+2+3=3+3", because it was empty<br>
+   before, and the last proven fact was "1+2+3=3+3"</p>
+<p>- The second "also" takes the current content of calculation (1+2+3=3+3)<br>
+   and the last proven fact (3+3=3+3) and tries to apply some transitivity<br>
+   rule to it.<br>
+   The obvious choice would, of course, be the rule "a=b ==&gt; b=c ==&gt; a=c",<br>
+   and that would give us calculation := 1+2+3=3+3.</p>
+<p>- However, in this special case, there are other transitivity rules that<br>
+   also match (you get the full list with print_trans_rules):<br>
+   For example, there is the rule "a = b ⟹ P b ⟹ P a". This rule matches<br>
+   the current situation, instantiated with a:=1+2+3, b:=3+3, and P:="λx. x=x".<br>
+   The conclusion of the rule is then 1+2+3=1+2+3. This is then stored in<br>
+   calculation (you can check this in jEdit by clicking on the work also and<br>
+   looking at the output panel). (So here is where things went wrong.)</p>
+<p>- The finally command applies the same mechanism as also (except that it<br>
+   does not store the result in calculation but makes it available to the show<br>
+   command as a fact).<br>
+   But in the present case, we have "1+2+3=1+2+3" and "3+3=6", there is no<br>
+   rule that can combine those. Thus "finally" fails (not show!).</p>
+<p>I don't know if there is a way to solve this. (The only way I see would be<br>
+to have priorities on trans-rules, so that the "a=b ==&gt; b=c ==&gt; a=c" rule<br>
+is always tried first but that sounds like a bigger chance in the<br>
+mechanism.)</p>
+<p>Best wishes,<br>
+Dominique.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

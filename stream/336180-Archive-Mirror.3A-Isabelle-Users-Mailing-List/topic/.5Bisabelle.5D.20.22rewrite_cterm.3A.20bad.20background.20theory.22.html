@@ -1,0 +1,103 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] &quot;rewrite_cterm: bad background theory&quot; · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20.22rewrite_cterm.3A.20bad.20background.20theory.22.html">[isabelle] &quot;rewrite_cterm: bad background theory&quot;</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294291310"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20%22rewrite_cterm%3A%20bad%20background%20theory%22/near/294291310" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20.22rewrite_cterm.3A.20bad.20background.20theory.22.html#294291310">(Aug 19 2022 at 15:39)</a>:</h4>
+<p>From: Daniel Raggi &lt;<a href="mailto:danielraggi@gmail.com">danielraggi@gmail.com</a>&gt;<br>
+I'm experimenting with modifying theorems via attributes.<br>
+Let's say I make a function</p>
+<p>fun my_fun ctxt thm =<br>
+  Simplifier.simplify (modify_context ctxt) thm</p>
+<p>where modify_context adds a couple of simp rules via function<br>
+addsimps. I run the function at the ML level on an example theorem and<br>
+it does what I want.</p>
+<p>Then I make a function</p>
+<p>fun my_attr ctxt = Thm.rule_attribute (K (my_fun ctxt))</p>
+<p>and set it up in Isabelle:</p>
+<p>attribute_setup my_attr = {* Scan.succeed (my_attr @{context})*} " "</p>
+<p>This seems to succeed, but when I run "thm some_theorem[my_attr]" I<br>
+get an exception from the raw simplifier with message "rewrite_cterm:<br>
+bad background theory". Why would this be?</p>
+<p>Thanks.<br>
+Daniel</p>
+
+
+
+<a name="294291339"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20%22rewrite_cterm%3A%20bad%20background%20theory%22/near/294291339" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20.22rewrite_cterm.3A.20bad.20background.20theory.22.html#294291339">(Aug 19 2022 at 15:39)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Daniel,</p>
+<blockquote>
+<p>attribute_setup my_attr = {* Scan.succeed (my_attr @{context})*} " "</p>
+</blockquote>
+<p>@{context} injects the <em>static</em> context, i. e. the context at the<br>
+position you are writing your declaration.  But here you need the<br>
+<em>dynamic</em> context, e.g. via something like</p>
+<blockquote>
+<p>attribute_setup my_attr = {* Scan.peek (my_attr o Context.proof_of) *}</p>
+</blockquote>
+<p>Note that static contexts are rather seldom appropriate, mostly for<br>
+experimenting.  The system is built in a way that the appropriate<br>
+dynamic contexts is provided for nearly all crucial slots as a<br>
+functional argument.</p>
+<p>AFAIR the Isabelle implementation manual provided more detail (I did not<br>
+take a look quite now).</p>
+<p>Hope this helps,<br>
+    Florian<br>
+<a href="/user_uploads/14278/yeid1km6Re7ZjPL603CZAhYG/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294308367"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20%22rewrite_cterm%3A%20bad%20background%20theory%22/near/294308367" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20.22rewrite_cterm.3A.20bad.20background.20theory.22.html#294308367">(Aug 19 2022 at 16:03)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+This is non-canonical in various respects, and thus fails as expected.<br>
+Moreover, the terminology "the ML level" for Isabelle/ML and "Isabelle"<br>
+for Isabelle/Isar is suspicious, and probably stems from unreliably<br>
+sources of information.</p>
+<p>Here are some general principles of survival in Isabelle tool<br>
+development:</p>
+<p>* Look around what the official reference manuals say. Usually the<br>
+   "isar-ref" manual has an topmost entry point for each command,<br>
+   sometimes pointing to other manuals. The "implementation" manual is<br>
+   particularly important to understand the underlying principles of<br>
+   Isabelle/ML. It is often considered as dry, but contains a lot of<br>
+   relevant information in relatively little space.</p>
+<p>* Look around for applications that are analogous to what you are<br>
+   trying to do, and develop a sense how close they are to a standard<br>
+   approach, and what needs to be changed for your particular<br>
+   application. Stick to the Isabelle standards you see in canonical<br>
+   sources.</p>
+<p>The "looking around" is particularly easy with Isabelle/jEdit that<br>
+serves as Prover IDE and IDE for Isabelle tool development at the same<br>
+time. Just use the hover-click idiom to figure out the definitions of<br>
+well-known attributes from Isabelle/Pure or Isabelle/HOL. Or use<br>
+hyper-search for "attribute_setup" in authoritative sources: it quickly<br>
+yields some abstract examples of some rule attribute and declaration<br>
+attribute in $ISABELLE_HOME/src/Doc/Isar_Ref/Spec.thy namely:</p>
+<p>attribute_setup my_rule = {*<br>
+     Attrib.thms &gt;&gt; (fn ths =&gt;<br>
+       Thm.rule_attribute<br>
+         (fn context: Context.generic =&gt; fn th: thm =&gt;<br>
+           let val th' = th OF ths<br>
+           in th' end)) *}</p>
+<p>attribute_setup my_declaration = {*<br>
+     Attrib.thms &gt;&gt; (fn ths =&gt;<br>
+       Thm.declaration_attribute<br>
+         (fn th: thm =&gt; fn context: Context.generic =&gt;<br>
+           let val context' = context<br>
+           in context' end)) *}</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

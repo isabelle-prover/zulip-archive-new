@@ -1,0 +1,100 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] exception THM 0 raised (line 737 of &quot;thm.ML&quot;) · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20exception.20THM.200.20raised.20.28line.20737.20of.20.22thm.2EML.22.29.html">[isabelle] exception THM 0 raised (line 737 of &quot;thm.ML&quot;)</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294669233"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20exception%20THM%200%20raised%20%28line%20737%20of%20%22thm.ML%22%29/near/294669233" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20exception.20THM.200.20raised.20.28line.20737.20of.20.22thm.2EML.22.29.html#294669233">(Aug 22 2022 at 12:54)</a>:</h4>
+<p>From: Daniel Stüwe &lt;<a href="mailto:stuewe@in.tum.de">stuewe@in.tum.de</a>&gt;<br>
+Hi all,</p>
+<p>in my bachelor's thesis I was working with functions calling themselves <br>
+in a set comprehension.<br>
+But while using induction and Isar with the induction rules for these <br>
+functions I got an unexpected exception in the case of the induction <br>
+step. I guess some unnecessary fixed variables in the rule are causing <br>
+this.</p>
+<p>I created a minimal example showing the exception at last:</p>
+<p>theory Super<br>
+imports Main<br>
+begin</p>
+<p>fun super where<br>
+"super 0 = {}" |<br>
+"super (Suc n) = { x | x . x ∈ super n}"</p>
+<p>lemma "x ∈ super n ⟹ P x"<br>
+by (induction n rule: super.induct) auto</p>
+<p>lemma "x ∈ super n ⟹ P x"<br>
+proof (induction n)<br>
+case 0<br>
+   thus ?case by simp<br>
+next<br>
+   case (Suc n)<br>
+   thus ?case by auto<br>
+qed</p>
+<p>thm super.induct nat.induct<br>
+(*<br>
+   ⟦?P 0; ⋀n. (⋀x xa. ?P n) ⟹ ?P (Suc n)⟧ ⟹ ?P ?a0.0<br>
+   ⟦?P 0; ⋀nat. ?P nat ⟹ ?P (Suc nat)⟧ ⟹ ?P ?nat<br>
+*)</p>
+<p>lemma "x ∈ super n ⟹ P x"<br>
+proof (induction n rule: super.induct)<br>
+print_cases<br>
+   case 1<br>
+   thus ?case by simp<br>
+next<br>
+   case 2<br>
+   (* exception THM 0 raised (line 661 of "thm.ML") - Isabelle 2015 *)<br>
+   (* exception THM 0 raised (line 737 of "thm.ML") - Isabelle 2016 *)<br>
+oops</p>
+<p>end</p>
+<p>Greetings,<br>
+Daniel</p>
+
+
+
+<a name="294669276"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20exception%20THM%200%20raised%20%28line%20737%20of%20%22thm.ML%22%29/near/294669276" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20exception.20THM.200.20raised.20.28line.20737.20of.20.22thm.2EML.22.29.html#294669276">(Aug 22 2022 at 12:54)</a>:</h4>
+<p>From: Thomas Sewell &lt;<a href="mailto:thomas.sewell@nicta.com.au">thomas.sewell@nicta.com.au</a>&gt;<br>
+OK, here are some bits of information, none of which are a satisfactory<br>
+answer.</p>
+<p>1) It's clear the problem comes from the extra meta-quantified "x" and<br>
+"xa" in super.induct.</p>
+<p>2) You can use super.induct[simplified] as an induction rule. That gets<br>
+rid of the pointless quantification and essentially gives you<br>
+nat.induct. Then the cases can be proven.</p>
+<p>3) If you turn ML's debugging trace on, you get this explanation:</p>
+<p>Here's the full trace:<br>
+Exception trace - exception THM 0 raised (line 737 of "thm.ML"): assume:<br>
+variables<br>
+Assumption.assume_hyps(2)<br>
+Basics.fold_map(3)()<br>
+Assumption.add_assms(3)<br>
+Proof.gen_assume(8)(1)<br>
+Proof.gen_assume(8)<br>
+Proof.gen_case(5)<br>
+Library.oo(1)(1)(1)<br>
+Toplevel.gen_proofs'(2)(1)(1)(1)<br>
+exception THM 0 raised (line 737 of "thm.ML"): assume: variables</p>
+<p>So, the problem is, the "case" mechanism is trying to depend on an<br>
+assumption involving more variables. I'm guessing those variables were<br>
+invented by the "fun" package to handle the <em>two</em> binders of "x" created<br>
+by the syntax "{x | x . x : super n}". I think the package is then<br>
+getting confused, because these variables don't actually get involved in<br>
+the induction principle.</p>
+<p>I would suspect that for more involved recursive functions, the<br>
+variables involved will be connected to the induction principle for it<br>
+to be useful. But you might have to fiddle a bit to get that to be true.</p>
+<p>Cheers,<br>
+     Thomas.</p>
+<hr>
+<p>The information in this e-mail may be confidential and subject to legal professional privilege and/or copyright. National ICT Australia Limited accepts no liability for any damage caused by this email or its attachments.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,185 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Composing toplevel transitions · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Composing.20toplevel.20transitions.html">[isabelle] Composing toplevel transitions</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294709241"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Composing%20toplevel%20transitions/near/294709241" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Composing.20toplevel.20transitions.html#294709241">(Aug 22 2022 at 15:20)</a>:</h4>
+<p>From: <a href="mailto:Thomas.Sewell@data61.csiro.au">Thomas.Sewell@data61.csiro.au</a><br>
+My understanding is that the function declaration process can be split, <br>
+with definitions in one place and proofs of termination to follow.</p>
+<p>The function is fully defined in the intermediate state, but key facts <br>
+for proving anything about it are not present.</p>
+<p>If that is still the case, you can make progress on your problem by <br>
+having your package perform all definitions (with all polymorphic type <br>
+magic) and then have a collective second phase of termination requirements.</p>
+<p>You could either require multiple "termination" steps to conclude, each <br>
+provoking its own proof, or it might be possible to pack all the proof <br>
+obligations into a single proof.</p>
+<p>Cheers,<br>
+     Thomas.</p>
+
+
+
+<a name="294709274"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Composing%20toplevel%20transitions/near/294709274" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Composing.20toplevel.20transitions.html#294709274">(Aug 22 2022 at 15:20)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+Dear Thomas,</p>
+<p>I've been arguing about a scheme similar to that with Peter and Ondrej.<br>
+The theory updates in my command are function definitions. Before I can<br>
+continue defining functions, I need to prove termination and congruence<br>
+rules of the earlier ones. Especially the cong rules cannot be proven<br>
+without termination. So it's difficult to make progress without having the<br>
+theorems at hand.</p>
+<p>Another option would be to do a "trial run", where I would invoke the<br>
+function package beforehand, ignore the updated theory, but look at the<br>
+resulting proof obligations. I can collect and present those to the user<br>
+and perform the actual definitions in the "after_qed" step. This would work<br>
+but also slow down the command by a factor of two.</p>
+<p>I'm a bit reluctant to introduce two commands (let's call them "embed" and<br>
+"embed_termination"), because in principle, there could be arbitrarily many<br>
+invocations of the latter before the process is concluded. To me it seems a<br>
+little strange to require that.</p>
+<p>Cheers<br>
+Lars</p>
+
+
+
+<a name="294709310"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Composing%20toplevel%20transitions/near/294709310" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Composing.20toplevel.20transitions.html#294709310">(Aug 22 2022 at 15:20)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+My impression is that this is going into the right direction.</p>
+<p>Conceptually, a definitional package with a proof can indirectly get<br>
+hold of that via the after_qed continuation, which is part of all<br>
+relevant Isabelle/ML interfaces.</p>
+<p>The function/termination package merely needs to expose this in the<br>
+usual way, with after_qed and after_qed_termination arguments in the<br>
+initial function command.</p>
+<p>Thus a user-defined command can make a function definition in<br>
+Isabelle/ML, such that its corresponding 'termination' command produces<br>
+further function definitions, again with corresponding 'termination'<br>
+proofs by the user. Thus several 'termination' commands (each with its<br>
+own Isar proof) can be somehow chained together.</p>
+<p>There is certainly a challenge here, because of the loose coupling of<br>
+'function' and 'termination': termination commands might follow in any<br>
+order and there might be unrelated function/termination commands in<br>
+between. Additional care is required to cope with a potential change of<br>
+local_theory targets between 'function' and 'termination' parts, but<br>
+that situation can already happen in the existing package setup.</p>
+<p>Makarius</p>
+
+
+
+<a name="294709397"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Composing%20toplevel%20transitions/near/294709397" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Composing.20toplevel.20transitions.html#294709397">(Aug 22 2022 at 15:20)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;</p>
+<blockquote>
+<p>The function/termination package merely needs to expose this in the<br>
+usual way, with after_qed and after_qed_termination arguments in the<br>
+initial function command.</p>
+</blockquote>
+<p>It seems to me that implementing that wouldn't be very complicated.<br>
+There are not many occurrences of "Function.*" in the distribution/AFP,<br>
+so this might be feasible to do in a day or two. I will investigate this.</p>
+<blockquote>
+<p>There is certainly a challenge here, because of the loose coupling of<br>
+'function' and 'termination': termination commands might follow in any<br>
+order and there might be unrelated function/termination commands in<br>
+between. Additional care is required to cope with a potential change of<br>
+local_theory targets between 'function' and 'termination' parts, but<br>
+that situation can already happen in the existing package setup.</p>
+</blockquote>
+<p>That's true. In my case, I'm interacting with the code generator, which<br>
+has a global setup anyway. I don't have a good story yet about what I'd<br>
+do if the code setup changed in between.</p>
+<p>Cheers<br>
+Lars</p>
+
+
+
+<a name="294710376"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Composing%20toplevel%20transitions/near/294710376" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Composing.20toplevel.20transitions.html#294710376">(Aug 22 2022 at 15:26)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+Dear list,</p>
+<p>I'm trying to define a command that needs to emit multiple proof<br>
+obligations to the user. The catch is that these proof obligations can<br>
+only be generated after some interspersed theory updates. More concretely:</p>
+<p>I need to call the function package to define some functions. Of course,<br>
+this means that in general I have to ask the user for a proof<br>
+obligation. That by itself is not a problem – I could just use<br>
+"Outer_Syntax.local_theory_to_proof".</p>
+<p>However, I need to define multiple functions one after the other,<br>
+according to some specific ordering. In general, because of<br>
+polymorphism, I can't define them all at once and then ask the user to<br>
+proof all obligations, but I need to "open_target"/"close_target" in<br>
+between.</p>
+<p>A possible trace of my command could be:</p>
+<ul>
+<li>define polymorphic function "f"</li>
+<li>termination proof</li>
+<li>define function "g" that uses "f[nat]"</li>
+<li>define function "h" that uses "f[int]"</li>
+<li>termination proofs</li>
+</ul>
+<p>Because "Outer_Syntax.command" requires a transition transformer of type<br>
+"Toplevel.transition -&gt; Toplevel.transition", I naively tried to compose<br>
+multiple of these, like so:</p>
+<p>val multi_proof =<br>
+  Toplevel.local_theory_to_proof NONE NONE<br>
+    (Proof.theorem NONE (K I) [[(@{prop True}, [])]])<br>
+  #&gt; Toplevel.local_theory_to_proof NONE NONE<br>
+    (Proof.theorem NONE (K I) [[(@{prop "id True"}, [])]])</p>
+<p>When I execute the command, I get the initial proof obligation as<br>
+expected. After typing "done", I don't get another proof state.</p>
+<p>After studying the sources and isar-ref I have formed the understanding<br>
+that I have only constructed a single transition that may try multiple<br>
+different things (in this case: two), of which the first one succeeds.</p>
+<p>Is there any way to achieve what I want?</p>
+<p>Cheers<br>
+Lars</p>
+
+
+
+<a name="294710392"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Composing%20toplevel%20transitions/near/294710392" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Composing.20toplevel.20transitions.html#294710392">(Aug 22 2022 at 15:26)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On 03/04/17 17:01, Lars Hupel wrote:</p>
+<blockquote>
+<p>I'm trying to define a command that needs to emit multiple proof<br>
+obligations to the user. The catch is that these proof obligations can<br>
+only be generated after some interspersed theory updates.</p>
+</blockquote>
+<blockquote>
+<p>Is there any way to achieve what I want?</p>
+</blockquote>
+<p>This is not going to work. Isar commands can have 0 or 1 Isar proofs.<br>
+You need to come up with a different approach, i.e. disprove your "I<br>
+need" and "I want" statements.</p>
+<blockquote>
+<p>Because "Outer_Syntax.command" requires a transition transformer of type<br>
+"Toplevel.transition -&gt; Toplevel.transition", I naively tried to compose<br>
+multiple of these, like so:</p>
+<p>val multi_proof =<br>
+  Toplevel.local_theory_to_proof NONE NONE<br>
+    (Proof.theorem NONE (K I) [[(@{prop True}, [])]])<br>
+  #&gt; Toplevel.local_theory_to_proof NONE NONE<br>
+    (Proof.theorem NONE (K I) [[(@{prop "id True"}, [])]])</p>
+<p>When I execute the command, I get the initial proof obligation as<br>
+expected. After typing "done", I don't get another proof state.</p>
+</blockquote>
+<p>Toplevel.transition transformers compose a sequential union of<br>
+transactions; see also the "implementation" manual section 9.1.2.</p>
+<p>Also note that the canonical composition operator for transition<br>
+transformers is "o" instead of "#&gt;".</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

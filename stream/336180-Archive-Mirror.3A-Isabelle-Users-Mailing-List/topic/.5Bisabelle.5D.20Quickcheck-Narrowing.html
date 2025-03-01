@@ -1,0 +1,83 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Quickcheck-Narrowing · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Quickcheck-Narrowing.html">[isabelle] Quickcheck-Narrowing</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294267792"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Quickcheck-Narrowing/near/294267792" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Quickcheck-Narrowing.html#294267792">(Aug 19 2022 at 13:36)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Peter,</p>
+<p>You can still install custom narrowing generators for types by using the functions that <br>
+are only hidden openly. I've added narrowing generators for the Coinductive entry, but I <br>
+am unable to push. I repeat them here such that you can take some inspiration from them:</p>
+<p>instantiation llist :: (narrowing) narrowing begin<br>
+function narrowing_llist where<br>
+   "narrowing_llist n = Quickcheck_Narrowing.sum<br>
+     (Quickcheck_Narrowing.cons LNil)<br>
+     (Quickcheck_Narrowing.apply (Quickcheck_Narrowing.apply<br>
+       (Quickcheck_Narrowing.cons LCons) narrowing) narrowing_llist)<br>
+     n"<br>
+by pat_completeness simp<br>
+termination by(relation "measure nat_of_integer")(simp_all, transfer, simp)</p>
+<p>instance ..<br>
+end</p>
+<p>Regarding Native_Word, it is important to think about the generation strategy. The <br>
+narrowing engine calls the generators whenever it encounters an variable in a goal in <br>
+order to refine it. For datatypes, the generator returns a list of refined terms such as <br>
+the constructors of the datatype. The generator for ints, however, just returns the <br>
+numbers around 0. A first attempt for words could be to produce the first few values of <br>
+the word, but I would expect better results if it also generates larger word values. In <br>
+principle, one can consider a word as a list of bits of fixed length and have the <br>
+generator behave similarly to the one for list.</p>
+<p>Since Native_Word has a custom serialisation, you also have to provide the partial_term_of <br>
+instantiation. I have not yet figured out how it interacts with the generators but it <br>
+looks as if they must work together. Lukas should know more.</p>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<a name="294267882"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Quickcheck-Narrowing/near/294267882" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Quickcheck-Narrowing.html#294267882">(Aug 19 2022 at 13:36)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Peter,</p>
+<p>Here are a few more thoughts on this. Refinement works for datatypes, because the <br>
+functions on them are defined by pattern-matching. That is, when a variable is refined to <br>
+the list of possible constructors, evaluation can continue and might even report a <br>
+definitive value without examining the data structure any further. Since Native_Word maps <br>
+the word types to atomic types in the target language, and operations to built-in <br>
+operations which are usually strict, we cannot exploit incremental refinements here, <br>
+because we cannot symbolically represent such words. Therefore, it is probably best to <br>
+just enumerate values, maybe in some clever way. Narrowing in Quickcheck adapts <br>
+LazySmallCheck from Haskell (<a href="http://hackage.haskell.org/package/lazysmallcheck">http://hackage.haskell.org/package/lazysmallcheck</a>), so I had <br>
+a look there. Its generators for the primitive Haskell types also just enumerates some values.</p>
+<p>Andreas</p>
+
+
+
+<a name="294270624"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Quickcheck-Narrowing/near/294270624" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Quickcheck-Narrowing.html#294270624">(Aug 19 2022 at 13:51)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:lammich@in.tum.de">lammich@in.tum.de</a>&gt;<br>
+Hi List.</p>
+<p>Is there a way to extend quickcheck-narrowing for your own types,<br>
+for example the native-word types from the Native_Word library.</p>
+<p>In attempting so, I had trouble to even define the instantiation, as all<br>
+the required types and constants are hidden with a hide_XXX command at<br>
+the end of Quickcheck_Narrowing.thy. The proof obligation reads like</p>
+<p>instantiation<br>
+uint32 :: narrowing<br>
+narrowing_uint32 == narrowing ::<br>
+  integer \&lt;Rightarrow&gt; uint32 ??.Quickcheck_Narrowing.narrowing_cons</p>
+<p>But I cannot see the type "??.Quickcheck_Narrowing.narrowing_cons" any<br>
+more.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

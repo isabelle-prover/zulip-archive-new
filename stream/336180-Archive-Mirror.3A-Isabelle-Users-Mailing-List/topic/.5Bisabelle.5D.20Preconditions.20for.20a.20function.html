@@ -1,0 +1,93 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Preconditions for a function · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Preconditions.20for.20a.20function.html">[isabelle] Preconditions for a function</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294830559"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Preconditions%20for%20a%20function/near/294830559" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Preconditions.20for.20a.20function.html#294830559">(Aug 23 2022 at 09:20)</a>:</h4>
+<p>From: Karolis Petrauskas &lt;<a href="mailto:k.petrauskas@gmail.com">k.petrauskas@gmail.com</a>&gt;<br>
+I'm just starting with Isabelle/HOL so please excuse me for a simple question.<br>
+I'm working on an algorithm in the context of group theory and get<br>
+stuck while proving function termination.<br>
+Below is a simple example reproducing my confusion :)<br>
+In the original problem the Src variable does not decrease<br>
+monotonically, so I rely on the fact that the group G I work with is<br>
+finite and Dst is a strictly growing subset of <code>carrier G</code>.<br>
+The sets in copyRec are subsets of carrier G, although I don't find a<br>
+way to specify that.<br>
+Another precondition I would like to specify for the copyRec function<br>
+is that Src and Dst are disjoint.<br>
+How can I do that? Or maybe I should approach it in a different way?</p>
+<hr>
+<p>theory TestCopy imports Main "HOL-Algebra.Group" begin<br>
+locale loc = group + assumes Finite: "finite (carrier G)"<br>
+begin</p>
+<p>function copyRec :: "'a set ⇒ 'a set ⇒ 'a set" where<br>
+"copyRec Src Dst = (if Src = {} then Dst else (<br>
+  let e    = SOME e. e ∈ Src;<br>
+      Src' = Src - {e};<br>
+      Dst' = insert e Dst<br>
+  in copyRec Src' Dst'<br>
+))"<br>
+  by (pat_completeness, auto)<br>
+termination<br>
+proof (relation "measure (λ(Src, Dst). (card (carrier G)) - (card<br>
+Dst))", simp, simp)<br>
+  fix Src Dst x xa xb<br>
+  assume ne: "Src ≠ {}"<br>
+     and ax: "x = (SOME e. e ∈ Src)"<br>
+     and aa: "xa = Src - {SOME e. e ∈ Src}"<br>
+     and ab: "xb = insert (SOME e. e ∈ Src) Dst"<br>
+  have xs: "x ∈ Src" using ne and ax by (simp add: some_in_eq)<br>
+  have nd: "x ∉ Dst" oops (<em>here I need a fact that Src and Dst are disjoint</em>)<br>
+  have "card (insert x Dst) &gt; card Dst" using nd by (blast)<br>
+qed</p>
+<p>fun (in group) copy :: "'a set ⇒ 'a ⇒ 'a set" where<br>
+"copy H g = copyRec H {g}"</p>
+<p>end<br>
+end</p>
+<hr>
+<p>Thanks in advance,<br>
+Karolis Petrauskas</p>
+
+
+
+<a name="294830570"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Preconditions%20for%20a%20function/near/294830570" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Preconditions.20for.20a.20function.html#294830570">(Aug 23 2022 at 09:20)</a>:</h4>
+<p>From: Martin Raszyk &lt;<a href="mailto:m.raszyk@gmail.com">m.raszyk@gmail.com</a>&gt;<br>
+Dear Karolis,</p>
+<p>the easiest way to state your precondition is to put it into the<br>
+if-condition, i.e., have "if Src = {} ∨ Src ∩ Dst ≠ {} then Dst". This<br>
+way, the function is well-defined to be Dst if the precondition is not<br>
+satisfied and you can assume the precondition for the recursive call<br>
+which helps you proving the function's termination. More generally,<br>
+you can express a precondition as "if \neg P then undefined else ..."<br>
+where P expresses your precondition and "..." corresponds to the<br>
+definition assuming the precondition.</p>
+<p>To get your original definition, you can then prove a lemma which has<br>
+the precondition as an assumption and contains your original function<br>
+definition as the conclusion, i.e., after the termination proof you<br>
+could state a lemma "Src ∩ Dst ≠ {} ==&gt; copyRec Src Dst = ..." where<br>
+"..." correspond to your original definition.</p>
+<p>Best regards,<br>
+Martin</p>
+
+
+
+<a name="294830587"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Preconditions%20for%20a%20function/near/294830587" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Preconditions.20for.20a.20function.html#294830587">(Aug 23 2022 at 09:20)</a>:</h4>
+<p>From: Karolis Petrauskas &lt;<a href="mailto:k.petrauskas@gmail.com">k.petrauskas@gmail.com</a>&gt;<br>
+Thanks, Martin, it worked.</p>
+<p>Best regards,<br>
+Karolis</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

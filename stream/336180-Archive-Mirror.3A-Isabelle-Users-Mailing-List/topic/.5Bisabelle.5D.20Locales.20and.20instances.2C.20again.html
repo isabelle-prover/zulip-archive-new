@@ -1,0 +1,159 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Locales and instances, again · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Locales.20and.20instances.2C.20again.html">[isabelle] Locales and instances, again</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294762077"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Locales%20and%20instances%2C%20again/near/294762077" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Locales.20and.20instances.2C.20again.html#294762077">(Aug 22 2022 at 20:28)</a>:</h4>
+<p>From: "John F. Hughes" &lt;<a href="mailto:jfh@cs.brown.edu">jfh@cs.brown.edu</a>&gt;<br>
+My previous question about locales arose because I was trying to address a<br>
+more complicated question, and wanted a minimal case; apparently I<br>
+overshot. Here's the more complicated one. I've defined a locale, "affine<br>
+plane", with three axioms. (It has to include "affine_plane_data", because<br>
+I need the notions of parallelism and collinearity, which are defined<br>
+there; I confess that I don't understand the bit saying</p>
+<p>locale affine_plane =<br>
+    affine_plane_data meets<br>
+  for meets :: "'point ⇒ 'line ⇒ bool" +<br>
+  assumes ...</p>
+<p>and wrote it because someone helpful earlier suggested it would let me tell<br>
+ISabelle that the "meets" functions in the two different locals were one<br>
+and the same, and would still be called "meets." The three axioms are<br>
+fairly straightforward: there's a unique line through any two distinct<br>
+points; if P does not lie on a line l, then there's a line through P that's<br>
+parallel to l; there are three noncollinear points.</p>
+<p>I then build up the real affine plane (Cartesian 2-dimensional coordinate<br>
+space) by defining types for points and lines, and writing down the "meets"<br>
+function, which I've called "a2meets"; indeed, everything in this example<br>
+has "a2" as a preface, indicating "real affine 2-space".</p>
+<p>I then state three theorems, whose proofs I've omitted by using "sorry" so<br>
+that I can get to the point, which is that I want to say that the function<br>
+"a2meets" constitutes the data needs for an affine plane, the final<br>
+theorem. The three little theorem match the axiom statements as closely as<br>
+I can make them. (I used cut-and-paste, and then added 'a2' in the relevant<br>
+places.) It seems completely obvious to me that theorem "a2_is_plane" is<br>
+true, but using "try" lead to no joy. Nor does</p>
+<p>using a2_ax1 a2_ax2 a2_ax3 try</p>
+<p>which I thought might guide "try" a little bit. Is there some way to guide<br>
+Isabelle to agree with this (obvious) conclusion? I'm going to have to show<br>
+various things are affine and projective planes over the next few weeks,<br>
+and I'd like to think that each proof need not require that I ask yet<br>
+another question of this mailing list.<br>
+========</p>
+<p>theory Scratch3<br>
+  imports Complex_Main</p>
+<p>begin<br>
+  locale affine_plane_data =<br>
+    fixes meets :: "'point ⇒ 'line ⇒ bool"</p>
+<p>begin<br>
+    definition (in affine_plane_data) parallel:: "'line  ⇒ 'line ⇒ bool"<br>
+(infix "||" 50)<br>
+      where "l || m ⟷ (l = m ∨ ¬ (∃ P. meets P l  ∧ meets P m))"</p>
+<p>definition  (in affine_plane_data) collinear :: "'point  ⇒ 'point ⇒<br>
+'point ⇒ bool"<br>
+      where "collinear A B C ⟷ (∃ l. meets A l ∧ meets B l ∧ meets C l)"<br>
+  end</p>
+<p>locale affine_plane =<br>
+    affine_plane_data meets<br>
+  for meets :: "'point ⇒ 'line ⇒ bool" +<br>
+  assumes<br>
+    ax1: "P ≠ Q ⟹ ∃!l. meets P l ∧ meets Q l" and<br>
+    ax2: "¬ meets P l ⟹ ∃!m. l || m ∧ meets P m" and<br>
+    ax3: "∃P Q R. P ≠ Q ∧ P ≠ R ∧ Q ≠ R ∧ ¬ collinear P Q R"</p>
+<p>(* Now describe the real affine plane: Points are pairs (x,y); lines<br>
+are either ordinary (y = mx + b) or vertical (x = c). A point p meets<br>
+a line l if p lies on l.  *)<br>
+  datatype a2pt = A2Point "real" "real"</p>
+<p>datatype a2ln = A2Ordinary "real" "real"<br>
+                | A2Vertical "real"</p>
+<p>fun a2meets :: "a2pt ⇒ a2ln ⇒ bool" where<br>
+    "a2meets (A2Point x y) (A2Ordinary m b) = (y = m*x + b)" |<br>
+    "a2meets (A2Point x y) (A2Vertical xi) = (x = xi)"</p>
+<p>definition a2parallel:: "a2ln  ⇒ a2ln ⇒ bool" (infix "a2||" 50)<br>
+      where "l a2|| m ⟷ (l = m ∨ ¬ (∃ P. a2meets P l  ∧ a2meets P m))"</p>
+<p>definition  a2collinear :: "a2pt  ⇒ a2pt ⇒ a2pt ⇒ bool"<br>
+      where "a2collinear A B C ⟷ (∃ l. a2meets A l ∧ a2meets B l ∧ a2meets<br>
+C l)"</p>
+<p>theorem a2_ax1 : "P ≠ Q ⟹ ∃! l . a2meets P l ∧ a2meets Q l"<br>
+  sorry</p>
+<p>theorem a2_ax2: "¬ (a2meets P l) ⟹ ∃!m. l a2|| m ∧ a2meets P m"<br>
+  sorry</p>
+<p>theorem a2_ax3:  "∃P Q R . P ≠ Q ∧ P ≠ R ∧ Q ≠ R ∧  ¬ a2collinear P Q R"<br>
+  sorry</p>
+<p>theorem a2_is_plane: "affine_plane a2meets"<br>
+  try</p>
+
+
+
+<a name="294762085"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Locales%20and%20instances%2C%20again/near/294762085" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Locales.20and.20instances.2C.20again.html#294762085">(Aug 22 2022 at 20:28)</a>:</h4>
+<p>From: "Eugene W. Stark" &lt;<a href="mailto:isabelle-users@starkeffect.com">isabelle-users@starkeffect.com</a>&gt;<br>
+You need to create an interpretation of affine_plane_data in order to satisfy the<br>
+proof obligations of an an interpretation of affine_plane (cf. the "layered approach"<br>
+referred to somewhere that I remember reading in the tutorials on locales).</p>
+<p>Your affine_plane_data locale has no assumptions, so the interpretation can<br>
+be made with a trivial proof (".", see below).  Nevertheless, you need it because<br>
+"affine_plane_data a2meets" is an explicit condition of all the facts in "affine_plane".</p>
+<p>=========================<br>
+theory Scratch3<br>
+  imports Complex_Main</p>
+<p>begin<br>
+  locale affine_plane_data =<br>
+    fixes meets :: "'point ⇒ 'line ⇒ bool"</p>
+<p>begin<br>
+    definition parallel:: "'line  ⇒ 'line ⇒ bool"   (infix "||" 50)<br>
+      where "l || m ⟷ (l = m ∨ ¬ (∃ P. meets P l  ∧ meets P m))"</p>
+<p>definition collinear :: "'point  ⇒ 'point ⇒ 'point ⇒ bool"<br>
+      where "collinear A B C ⟷ (∃ l. meets A l ∧ meets B l ∧ meets C l)"<br>
+  end</p>
+<p>locale affine_plane =<br>
+    affine_plane_data meets<br>
+  for meets :: "'point ⇒ 'line ⇒ bool" +<br>
+  assumes<br>
+    ax1: "P ≠ Q ⟹ ∃!l. meets P l ∧ meets Q l" and<br>
+    ax2: "¬ meets P l ⟹ ∃!m. l || m ∧ meets P m" and<br>
+    ax3: "∃P Q R. P ≠ Q ∧ P ≠ R ∧ Q ≠ R ∧ ¬ collinear P Q R"</p>
+<p>(* Now describe the real affine plane: Points are pairs (x,y); lines<br>
+are either ordinary (y = mx + b) or vertical (x = c). A point p meets<br>
+a line l if p lies on l.  *)<br>
+  datatype a2pt = A2Point "real" "real"</p>
+<p>datatype a2ln = A2Ordinary "real" "real"<br>
+                | A2Vertical "real"</p>
+<p>fun a2meets :: "a2pt ⇒ a2ln ⇒ bool" where<br>
+    "a2meets (A2Point x y) (A2Ordinary m b) = (y = m*x + b)" |<br>
+    "a2meets (A2Point x y) (A2Vertical xi) = (x = xi)"</p>
+<p>definition a2parallel:: "a2ln  ⇒ a2ln ⇒ bool" (infix "a2||" 50)<br>
+      where "l a2|| m ⟷ (l = m ∨ ¬ (∃ P. a2meets P l  ∧ a2meets P m))"</p>
+<p>definition  a2collinear :: "a2pt  ⇒ a2pt ⇒ a2pt ⇒ bool"<br>
+      where "a2collinear A B C ⟷ (∃ l. a2meets A l ∧ a2meets B l ∧ a2meets<br>
+C l)"</p>
+<p>theorem a2_ax1 : "P ≠ Q ⟹ ∃! l . a2meets P l ∧ a2meets Q l"<br>
+    sorry</p>
+<p>theorem a2_ax2: "¬ (a2meets P l) ⟹ ∃!m. l a2|| m ∧ a2meets P m"<br>
+    sorry</p>
+<p>theorem a2_ax3:  "∃P Q R . P ≠ Q ∧ P ≠ R ∧ Q ≠ R ∧  ¬ a2collinear P Q R"<br>
+    sorry</p>
+<p>theorem a2_is_plane: "affine_plane a2meets"<br>
+  proof<br>
+    interpret affine_plane_data a2meets .<br>
+    show "⋀P Q. P ≠ Q ⟹ ∃!l. a2meets P l ∧ a2meets Q l"<br>
+      using a2_ax1 by simp<br>
+    show "⋀P l. ¬ a2meets P l ⟹ ∃!m. parallel l m ∧ a2meets P m"<br>
+      using a2_ax2<br>
+      by (simp add: a2parallel_def parallel_def)<br>
+    show "∃P Q R. P ≠ Q ∧ P ≠ R ∧ Q ≠ R ∧ ¬ collinear P Q R"<br>
+      using a2_ax3<br>
+      by (simp add: a2collinear_def collinear_def)<br>
+  qed</p>
+<p>end</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

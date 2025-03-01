@@ -1,0 +1,253 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] value [code] raises Match in code_ml.ML · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20value.20.5Bcode.5D.20raises.20Match.20in.20code_ml.2EML.html">[isabelle] value [code] raises Match in code_ml.ML</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294243207"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20value%20%5Bcode%5D%20raises%20Match%20in%20code_ml.ML/near/294243207" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20value.20.5Bcode.5D.20raises.20Match.20in.20code_ml.2EML.html#294243207">(Aug 19 2022 at 11:17)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear experts on the code generator,</p>
+<p>I want to map a HOL type to a built-in type of the target languages using code_type and <br>
+code_const. For evaluation with the simplifier, however, I want to implement the type by a <br>
+pseudo-constructor that has no analogue in the target language, i.e., there is no simple <br>
+code_const translation for the function declared with code_datatype. The following MWE <br>
+illustrates the setting:</p>
+<p>typedecl foo<br>
+consts Foo :: foo<br>
+code_datatype Foo (* constructor for value [simp] *)<br>
+definition "bar = Foo"<br>
+definition "foobar = bar"</p>
+<p>value [code] foobar</p>
+<p>code_type foo (SML "<a href="http://IntInf.int">IntInf.int</a>")<br>
+code_const bar (SML "0")</p>
+<p>export_code foobar in SML file - (* works *)<br>
+value [code] foobar (* fails with Match *)</p>
+<p>code_const Foo (SML "0")</p>
+<p>value [code] foobar</p>
+<p>Here, Foo is the constructor that value [simp] uses. After I have declared the adaptations <br>
+for the type foo and the constant bar, I can still export code for foobar, but "value <br>
+[code] foobar" now raises a Match exception in code_ml.ML  (l. 240 in Isabelle2013). If I <br>
+add any translation for the code_datatype constructor Foo (it seems as if it does not <br>
+matter what), value [code] works again. The same exception occurs if I export code for <br>
+something that uses Foo directly:</p>
+<p>definition "foo = Foo"<br>
+export_code foo in SML file - (* fails if placed between code_type and code_const Foo *)</p>
+<p>For value [code] foobar, I would have expected no error at all.<br>
+For export_code foo, I would have expected some sensible error message saying that an <br>
+adaptation for Foo is missing.</p>
+<p>My problem is now that I cannot provide a sensible code_const declaration for Foo (other <br>
+than raise an error at run-time, but I would prefer to get an error message at code <br>
+generation if my code uses Foo directly) and I am not allowed to prove a HOL code equation <br>
+for Foo either (because Foo is a code_datatype constructor), but I have to do something to <br>
+get value [code] working. What is the recommended solution here?</p>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<a name="294243575"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20value%20%5Bcode%5D%20raises%20Match%20in%20code_ml.ML/near/294243575" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20value.20.5Bcode.5D.20raises.20Match.20in.20code_ml.2EML.html#294243575">(Aug 19 2022 at 11:20)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Andreas,</p>
+<blockquote>
+<p>I want to map a HOL type to a built-in type of the target languages<br>
+using code_type and code_const. For evaluation with the simplifier,<br>
+however, I want to implement the type by a pseudo-constructor that has<br>
+no analogue in the target language, i.e., there is no simple code_const<br>
+translation for the function declared with code_datatype. The following<br>
+MWE illustrates the setting:</p>
+<p>typedecl foo<br>
+consts Foo :: foo<br>
+code_datatype Foo (* constructor for value [simp] *)<br>
+definition "bar = Foo"<br>
+definition "foobar = bar"</p>
+<p>value [code] foobar</p>
+<p>code_type foo (SML "<a href="http://IntInf.int">IntInf.int</a>")<br>
+code_const bar (SML "0")</p>
+<p>export_code foobar in SML file - (* works *)<br>
+value [code] foobar (* fails with Match *)</p>
+</blockquote>
+<p>the reason for the failure is that value [code] always involves a<br>
+suitable term_of expression.  You have to add a reasonable</p>
+<p>code_const "Code_Evaluation.term_of :: … foo …" (Eval …)</p>
+<p>to regain it.</p>
+<blockquote>
+<p>My problem is now that I cannot provide a sensible code_const<br>
+declaration for Foo (other than raise an error at run-time, but I would<br>
+prefer to get an error message at code generation if my code uses Foo<br>
+directly).</p>
+</blockquote>
+<p>Abstract datatype constructors are explicitly checked for absence.<br>
+Maybe it is possible to tweak your application accordingly.</p>
+<p>Cheers,<br>
+    Florian<br>
+<a href="/user_uploads/14278/GqDYaSd3IzJV4GxHFP8ydDCe/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294243609"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20value%20%5Bcode%5D%20raises%20Match%20in%20code_ml.ML/near/294243609" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20value.20.5Bcode.5D.20raises.20Match.20in.20code_ml.2EML.html#294243609">(Aug 19 2022 at 11:20)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Florian,</p>
+<blockquote>
+<p>the reason for the failure is that value [code] always involves a<br>
+suitable term_of expression.<br>
+Thanks for the hint with term_of.</p>
+</blockquote>
+<blockquote>
+<p>You have to add a reasonable</p>
+<p>code_const "Code_Evaluation.term_of :: … foo …" (Eval …)</p>
+<p>to regain it.<br>
+In my concrete case, it suffices to declare an appropriate code equation for term_of, <br>
+because my type foo is just a typedef foo = "UNIV :: ...", so I have a representation <br>
+function Rep_foo, i.e., my code equation looks as follows:</p>
+</blockquote>
+<p>term_of_class.term_of x =<br>
+Code_Evaluation.App<br>
+    (Code_Evaluation.Const (STR ''Scratch.Abs_foo'')<br>
+       (typerep.Typerep (STR ''fun'') [..., typerep.Typerep (STR ''<a href="http://Scratch.foo">Scratch.foo</a>'') []]))<br>
+    (term_of_class.term_of (Rep_foo x))</p>
+<p>I am not happy about writing long Isabelle constant names and type names explicity. In ML, <br>
+there are nice @{type_name} and @{const_name} to generate and check these representations. <br>
+Is there some similar mechanism for these strings. I had a look at Code_Evaluation, but I <br>
+haven't found anything.</p>
+<blockquote>
+<blockquote>
+<p>My problem is now that I cannot provide a sensible code_const<br>
+declaration for Foo (other than raise an error at run-time, but I would<br>
+prefer to get an error message at code generation if my code uses Foo<br>
+directly).</p>
+</blockquote>
+<p>Abstract datatype constructors are explicitly checked for absence.<br>
+Maybe it is possible to tweak your application accordingly.<br>
+Abstract datatypes are a good idea, and it is possible in my case. I can also get rid of <br>
+the code_const for the abstraction function (Abs_foo for the typedef, Foo in the original <br>
+example). Unfortunately, I am then stuck with the representation function Rep_foo, for example</p>
+</blockquote>
+<p>definition test where "test = Rep_foo bar"</p>
+<p>If I declare a code equation for Rep_foo, code generation works for test, but code_simp <br>
+loops. My current solution is to have another identical representation function Rep_foo' <br>
+and a code equation for the Rep_foo' and the canonical "Rep_foo (Abs_foo x) = x" for <br>
+code_simp. Functions then have to use Rep_foo' (except for equations declared as code <br>
+abstract) - if they use Rep_foo directly, I am back at the exception Match when generating <br>
+code. It would be great if there was a more informative error message.</p>
+<p>Cheers,<br>
+Andreas</p>
+
+
+
+<a name="294243630"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20value%20%5Bcode%5D%20raises%20Match%20in%20code_ml.ML/near/294243630" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20value.20.5Bcode.5D.20raises.20Match.20in.20code_ml.2EML.html#294243630">(Aug 19 2022 at 11:20)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+I am not sure whether I understand properly.  If Abs_foo is an abstract<br>
+constructor, the code equation</p>
+<p>Rep_foo (Abs_foo x) = x</p>
+<p>is implicit.  I admit the system allows, pointlessly, to override this,<br>
+but this should be considered a feature aka bug.  So what is your exact<br>
+setup?</p>
+<p>Cheers,<br>
+    Florian<br>
+<a href="/user_uploads/14278/auRgcxRjhdaxuu6QWmqWPeJS/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294243650"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20value%20%5Bcode%5D%20raises%20Match%20in%20code_ml.ML/near/294243650" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20value.20.5Bcode.5D.20raises.20Match.20in.20code_ml.2EML.html#294243650">(Aug 19 2022 at 11:20)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Florian,</p>
+<p>I have precisely tried to overwrite this code equation. Here's the simplified setup (for <br>
+Isabelle 2cfe6656d6d6, backporting the example to Isabelle2013 does not seem to be worth <br>
+the effort; I omitted a few tweaks that improve performance):</p>
+<p>typedef uint32 = "{_ :: 32 word. True}" by simp<br>
+   (* I do not use UNIV to trick setup_lifting into setting<br>
+      up code generation for an abstract datatype instead of<br>
+      using Abs_foo as the free datatype constructor *)<br>
+setup_lifting type_definition_uint32</p>
+<p>(* transfer all the type class instantiations for 32 word to uint32<br>
+    using lift_definition (neg_numeral, comm_ring, equal, bits, ...) *)</p>
+<p>code_printing<br>
+   type_constructor uint32 =&gt;<br>
+   (SML) "Word32.word" and<br>
+| constant "0 :: uint32" =&gt;<br>
+   (SML) "(Word32.fromInt 0)" and<br>
+| ...</p>
+<p>lemma [code, code del]: "term_of_class.term_of = (term_of_class.term_of :: uint32 =&gt; _)"<br>
+..</p>
+<p>definition Rep_uint32' where [simp]: "Rep_uint32' = Rep_uint32"</p>
+<p>lemma Rep_uint32'_code [code]: "Rep_uint32' x = (BITS n. x !! n)"<br>
+unfolding Rep_uint32'_def by transfer simp</p>
+<p>(* Implement term reconstruction for uint32 in terms of 32 word. *)<br>
+lemma term_of_uint32_code [code]:<br>
+   defines "TR == typerep.Typerep" and "bit0 == STR ''Numeral_Type.bit0''"<br>
+   shows<br>
+   "term_of_class.term_of x =<br>
+    Code_Evaluation.App (Code_Evaluation.Const (STR ''Uint32.Abs_uint32'') (TR (STR <br>
+''fun'') [TR (STR ''Word.word'') [TR bit0 [TR bit0 [TR bit0 [TR bit0 [TR bit0 [TR (STR <br>
+''Numeral_Type.num1'') []]]]]]], TR (STR ''Uint32.uint32'') []]))<br>
+        (term_of_class.term_of (Rep_uint32' x))"<br>
+by(simp add: term_of_anything)</p>
+<p>Note that in the last line of lemma term_of_uint32_code, I now use Rep_uint32' and not <br>
+Rep_uint32. If I use Rep_uint32 instead, I get into trouble: every value [code] command <br>
+then generates ML code that contains the definition</p>
+<p>fun rep_uint32 (... x) = x</p>
+<p>where ... is the serialisation of Abs_uint32. Without custom serialisation for Abs_uint32, <br>
+I only got various exceptions in the code generator. But I cannot give any serialisation <br>
+that would fit into that position, because there is no ML constructor to pattern match on. <br>
+So I thought I should derive my own code equation for Rep_uint32:</p>
+<p>lemma Rep_uint32_code [code]: "Rep_uint32 x = (BITS n. x !! n)" by transfer simp</p>
+<p>Then, value [code] works perfectly fine and I don't even need to give a serialisation for <br>
+Abs_uint32. :-) Unfortunately, value [simp] "Rep_uint32 5" loops, because value [simp] is <br>
+not aware of all the code_printing (code_const/code_type/...) adaptations. I have not been <br>
+able to trace the simplifier for value [simp] because [[simp_trace]] first outputs all the <br>
+code_unfold preprocessing steps and that trace alone has more than 300000 lines which <br>
+freezes jEdit and crashes PG). Do you know a way to trace value [simp]?</p>
+<p>So I thought that the following might happen (without being able to verify this):</p>
+<ul>
+<li>5 is represented as "numeral (num.Bit1 (num.Bit0 num.One))"</li>
+<li>
+<p>I have a setup that implements uint32 numerals in terms of integer<br>
+   in the generated code via a coercion function Uint32 :: integer =&gt; uint32, i.e.,<br>
+   we are evaluating the following:<br>
+   Rep_uint32 (Uint32 (numeral (num.Bit1 (num.Bit0 num.One))))</p>
+</li>
+<li>
+<p>Uint32 has a code equation of the form<br>
+   Uint32_code: "Rep_uint32 (Uint32 n) = word_of_int (int_of_integer n)"</p>
+</li>
+<li>
+<p>So the simplfier now has two options, either rewrite with Rep_uint32_code<br>
+   or with Uint32_code. Unfortunately, it seems to pick the wrong Rep_uint32_code, so we<br>
+   get<br>
+   BITS n. Uint32 ... !! n</p>
+</li>
+<li>
+<p>Now, the code equation for op !! kicks in: i !! n = Rep_uint32 i !! n</p>
+</li>
+<li>And now, there is another Rep_uint32 waiting to be rewritten to with Rep_uint32_code.<br>
+   This closes the loop.</li>
+</ul>
+<p>Is this understanding correct?</p>
+<p>The code equation Rep_uint32 has not caused any problems in the generated code (both with <br>
+export_code and value [code]), because the code generator eliminates all these Rep_uint32 <br>
+occurrences (except for the one in term_of_uint32_code, but that's fine.</p>
+<p>My solution at the moment is to define this second destructor Rep_uint32' and implement it <br>
+with BITS and keep Rep_uint32 as it is for code_simp. There's only one downside with this <br>
+so far. If I use Rep_uint32 in a position where the transformation for abstract datatypes <br>
+does not eliminate it, e.g., in value [code] "Rep_uint32 5", I get a Match exception in <br>
+code_ml.ML. If I add a serialisation for Abs_uint32, code generation succeeds, but the ML <br>
+compiler rejects it because ... in the following cannot be a constructor:</p>
+<p>fun Rep_uint32 (... n) = n</p>
+<p>I would prefer if the code generator raises a more sensible error message than Match here.</p>
+<p>What do you think of my setup? Is this going the right way?</p>
+<p>Andreas</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

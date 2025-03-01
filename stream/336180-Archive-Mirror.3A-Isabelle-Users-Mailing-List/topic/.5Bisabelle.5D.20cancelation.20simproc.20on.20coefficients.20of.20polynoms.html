@@ -1,0 +1,470 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] cancelation simproc on coefficients of polynoms · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20cancelation.20simproc.20on.20coefficients.20of.20polynoms.html">[isabelle] cancelation simproc on coefficients of polynoms</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294749703"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20cancelation%20simproc%20on%20coefficients%20of%20polynoms/near/294749703" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20cancelation.20simproc.20on.20coefficients.20of.20polynoms.html#294749703">(Aug 22 2022 at 19:02)</a>:</h4>
+<p>From: Mathias Fleury &lt;<a href="mailto:mathias.fleury12@gmail.com">mathias.fleury12@gmail.com</a>&gt;<br>
+Dear Tobias,</p>
+<blockquote>
+<p>On 4. Feb 2019, at 10:45, Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt; wrote:</p>
+<p>Dear Mathias,</p>
+<p>It took me some time to remember the key point: linarith uses Fourier-Motzkin elimnation which is complere for rationals and reals but incomplete for integers. For the latter we have Presburger, but it is too slow for the example.</p>
+<p>The idea of eliminating common factors first is interesting. I have no idea if this is always beneficial. </p>
+</blockquote>
+<p>I asked our local expert of linear arithmetics, Martin Bromberger:</p>
+<blockquote>
+<p>tl;dr: Eliminating common factors helps much more than it hurts, especially for linear integer arithmetic; but there are cases, although rare, where it might be harmful.<br>
+</p>
+</blockquote>
+<blockquote>
+<p>Detailed explanation:<br>
+</p>
+</blockquote>
+<blockquote>
+<p>Fourier-Motzkin transformation over the reals/rationals: is just a projection. And the projection does not change if we eliminate common factors because this elimination is equivalence preserving. (There is one exception... Your projection may change because your Fourier-Motzkin implementation might change the variable elimination order. Yay heuristics...) What changes, however, is the run time needed to compute the projection. Whether you are faster or worse depends on the overhead of eliminating common factors vs. the speed-up you gain by having smaller coefficients. Personally, I think you would gain a speed-up.<br>
+</p>
+</blockquote>
+<blockquote>
+<p>Fourier-Motzkin transformation over the integers: eliminating       common factors alone should not change whether a problem is solvable or unsolvable. Because the projection stays the same :-) Unless, (i) you combine it with rounding ("2 * x:int + 4 * y:int &lt;= 1" simplifies to "x:int + 2 * y:int &lt;= 0 = \floor(1/2)") or (ii) if you simplify strict inequalities over integer variables ("a:int &lt; 1" simplifies to "a:int &lt;= 0", but "2 * a:int &lt; 2" simplifies to "2 * a:int &lt;= 1"). I assume (ii) is what happened in your example (because (i) is a form of eliminating common factors) and thanks to eliminating common factors you removed some rational/real solutions and made the problem solvable. And because this is possible (i) and (ii) are also normally done for arithmetic inequalities. (Still, you might very rarely get worse results because your Fourier-Motzkin implementation changes the variable elimination order due to heuristic shenanigans…)<br>
+</p>
+</blockquote>
+<blockquote>
+<p>PS: Eliminating common factors and (i) and (ii) are not just preprocessing steps but inprocessing steps. You should apply them after every intermediate step of Fourier-Motzkin transformation…<br>
+</p>
+</blockquote>
+<blockquote>
+<p>Since the existing code is quite delicate, I also don't want to mess with it.</p>
+</blockquote>
+<p>I was more thinking of a preprocessing step, than a change to linarith itself. Which I expect to be a much bigger task.</p>
+<blockquote>
+<p>Is there a simproc for eliminating common factors? I suspect not in full generality, because the simplifier leaves "10 * (i::int) ≤ 25 * j" alone. There is one by Larry for the simple case "m * t &lt;= n * u" where m and n have a common factor. I have no idea how much work it would be to generalize it.</p>
+</blockquote>
+<p>Thanks for the pointer.</p>
+<p>Best regards,<br>
+Mathias</p>
+<blockquote>
+<p>Best regards<br>
+Tobias</p>
+<p>On 01/02/2019 18:38, Mathias Fleury wrote:</p>
+<blockquote>
+<p>Hi list,<br>
+after trying to reconstruct more veriT proofs, I found out the following lemma cannot be discharged by linarith:<br>
+lemma "¬ 0 ≤ int (size l') ∨<br>
+         ¬ 10 * int (size lr) &lt; 4 + 14 * int (size rr) ∨<br>
+         10 * int (size lr) ≤ 15 + 25 * int (size l') ∨<br>
+         ¬ 10 * int (size lr) + 10 * int (size rr) ≤ 30 + 25 * int (size l') "<br>
+  apply linarith (* fails *)<br>
+  oops<br>
+However, if I simplify the coefficients by dividing by 5, then linearity is able to prove the goal:<br>
+lemma "¬ 0 ≤ int (size l') ∨<br>
+         ¬ 5 * int (size lr) &lt; 2 + 7 * int (size rr) ∨<br>
+         2 * int (size lr) ≤ 3 + 5 * int (size l') ∨<br>
+         ¬ 2 * int (size lr) + 2 * int (size rr) ≤ 6 + 5 * int (size l') "<br>
+  apply linarith<br>
+  done<br>
+Is there any simproc able to do this simplification automatically? If there is one, is there any reason why linarith does not use it by default?<br>
+Thanks,<br>
+Mathias<br>
+</p>
+</blockquote>
+</blockquote>
+
+
+
+<a name="294749870"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20cancelation%20simproc%20on%20coefficients%20of%20polynoms/near/294749870" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20cancelation.20simproc.20on.20coefficients.20of.20polynoms.html#294749870">(Aug 22 2022 at 19:03)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+Mathias,</p>
+<p>Actually, a simproc to cancel all common factors is easy: Givem t1 &lt;= t2, where <br>
+t1 and t2 are sums, compute the common factor m of t1 and t2 and the remainders <br>
+t1' and t2'. Prove by rewriting with distributivity that (t1 &lt;= t2) = (m*t1' &lt;= <br>
+m<em>t2'). Prove by simproc that (m</em>t1' &lt;= m*t2') = (t1' &lt;= t2') - see <br>
+Tools/numeral_simprocs.ML.</p>
+<p>Tobias<br>
+<a href="/user_uploads/14278/TahsHp2D3zwr2TFvbq_-s4y6/smime.p7s">smime.p7s</a></p>
+
+
+
+<a name="294750202"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20cancelation%20simproc%20on%20coefficients%20of%20polynoms/near/294750202" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20cancelation.20simproc.20on.20coefficients.20of.20polynoms.html#294750202">(Aug 22 2022 at 19:05)</a>:</h4>
+<p>From: Mathias Fleury &lt;<a href="mailto:mathias.fleury12@gmail.com">mathias.fleury12@gmail.com</a>&gt;<br>
+Hi all,</p>
+<blockquote>
+<p>On 4. Feb 2019, at 17:20, Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt; wrote:</p>
+<p>Mathias,</p>
+<p>Actually, a simproc to cancel all common factors is easy: Givem t1 &lt;= t2, where t1 and t2 are sums, compute the common factor m of t1 and t2 and the remainders t1' and t2'. Prove by rewriting with distributivity that (t1 &lt;= t2) = (m<em>t1' &lt;= m</em>t2'). Prove by simproc that (m<em>t1' &lt;= m</em>t2') = (t1' &lt;= t2') - see Tools/numeral_simprocs.ML.<br>
+</p>
+</blockquote>
+<p>I implemented that. I followed what was already in Tools/numeral_simprocs.ML. Then I activated the <br>
+procedure as simproc on nat and 'a :: linordered_ring_strict (which includes int and reals) and run it on the (non-slow part of) AFP.</p>
+<p>When trying it out on the AFP, some proofs broke because of the reordering meaning. So if we want to activate such simproc, we would have to adapt some proofs:<br>
+  by (clarsimp simp add: cos_one_2pi) (metis mult_minus_right of_int_of_nat)<br>
+~&gt;<br>
+  by (clarsimp simp add: cos_one_2pi) (metis mult_minus_left of_int_of_nat)</p>
+<p>Nevertheless, it turns out things are a bit more complicated than I expected. They are already two different simprocs that can cancel terms, but do different things:</p>
+<p>* eq_cancel_numeral_factor: it cancels term, but on the way, it reorders terms. <br>
+     (2::int) * a * b = 2 * b' * a' ~&gt; a * b = a' * b'</p>
+<p>* eq_cancel_factor: it cancels a terms, but without reordering terms:<br>
+     (2::int) * a * b = 2 * b' * a' ~&gt; 2 = 0 ∨ a * b = b' * a'<br>
+[2 = 0 can be simplified to false later, yielding a * b = b' * a']</p>
+<p>I have a few questions:</p>
+<p>* Does anyone know why some cancelation simprocs sort terms?<br>
+  * Are simprocs supposed to be confluent, i.e., reach the same conclusion independently of the order they are applied?</p>
+<p>Best,<br>
+Mathias</p>
+<blockquote>
+<p>Tobias</p>
+<p>On 04/02/2019 15:29, Mathias Fleury wrote:</p>
+<blockquote>
+<p>Dear Tobias,</p>
+<blockquote>
+<p>On 4. Feb 2019, at 10:45, Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a> &lt;mailto:<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;&gt; wrote:</p>
+<p>Dear Mathias,</p>
+<p>It took me some time to remember the key point: linarith uses Fourier-Motzkin elimnation which is complere for rationals and reals but incomplete for integers. For the latter we have Presburger, but it is too slow for the example.</p>
+<p>The idea of eliminating common factors first is interesting. I have no idea if this is always beneficial.<br>
+I asked our local expert of linear arithmetics, Martin Bromberger:<br>
+   tl;dr: Eliminating common factors helps much more than it hurts,<br>
+   especially for linear integer arithmetic; but there are cases, although<br>
+   rare, where it might be harmful.</p>
+<p>Detailed explanation:</p>
+<p>Fourier-Motzkin transformation over the reals/rationals: is just a<br>
+   projection. And the projection does not change if we eliminate common<br>
+   factors because this elimination is equivalence preserving. (There is one<br>
+   exception... Your projection may change because your Fourier-Motzkin<br>
+   implementation might change the variable elimination order. Yay<br>
+   heuristics...) What changes, however, is the run time needed to compute<br>
+   the projection. Whether you are faster or worse depends on the overhead of<br>
+   eliminating common factors vs. the speed-up you gain by having smaller<br>
+   coefficients. Personally, I think you would gain a speed-up.</p>
+<p>Fourier-Motzkin transformation over the integers: eliminating       common<br>
+   factors alone should not change whether a problem is solvable or<br>
+   unsolvable. Because the projection stays the same :-) Unless, (i) you<br>
+   combine it with rounding ("2 * x:int + 4 * y:int &lt;= 1" simplifies to<br>
+   "x:int + 2 * y:int &lt;= 0 = \floor(1/2)") or (ii) if you simplify strict<br>
+   inequalities over integer variables ("a:int &lt; 1" simplifies to "a:int &lt;=<br>
+   0", but "2 * a:int &lt; 2" simplifies to "2 * a:int &lt;= 1"). I assume (ii) is<br>
+   what happened in your example (because (i) is a form of eliminating common<br>
+   factors) and thanks to eliminating common factors you removed some<br>
+   rational/real solutions and made the problem solvable. And because this is<br>
+   possible (i) and (ii) are also normally done for arithmetic inequalities.<br>
+   (Still, you might very rarely get worse results because your<br>
+   Fourier-Motzkin implementation changes the variable elimination order due<br>
+   to heuristic shenanigans…)</p>
+<p>PS: Eliminating common factors and (i) and (ii) are not just preprocessing<br>
+   steps but inprocessing steps. You should apply them after every<br>
+   intermediate step of Fourier-Motzkin transformation…</p>
+<p>Since the existing code is quite delicate, I also don't want to mess with it.<br>
+I was more thinking of a preprocessing step, than a change to linarith itself. Which I expect to be a much bigger task.<br>
+Is there a simproc for eliminating common factors? I suspect not in full generality, because the simplifier leaves "10 * (i::int) ≤ 25 * j" alone. There is one by Larry for the simple case "m * t &lt;= n * u" where m and n have a common factor. I have no idea how much work it would be to generalize it.<br>
+Thanks for the pointer.<br>
+Best regards,<br>
+Mathias<br>
+Best regards<br>
+Tobias<br>
+</p>
+</blockquote>
+<p>On 01/02/2019 18:38, Mathias Fleury wrote:</p>
+<blockquote>
+<blockquote>
+<p>Hi list,<br>
+after trying to reconstruct more veriT proofs, I found out the following lemma cannot be discharged by linarith:<br>
+lemma "¬ 0 ≤ int (size l') ∨<br>
+         ¬ 10 * int (size lr) &lt; 4 + 14 * int (size rr) ∨<br>
+         10 * int (size lr) ≤ 15 + 25 * int (size l') ∨<br>
+         ¬ 10 * int (size lr) + 10 * int (size rr) ≤ 30 + 25 * int (size l') "<br>
+  apply linarith (* fails *)<br>
+  oops<br>
+However, if I simplify the coefficients by dividing by 5, then linearity is able to prove the goal:<br>
+lemma "¬ 0 ≤ int (size l') ∨<br>
+         ¬ 5 * int (size lr) &lt; 2 + 7 * int (size rr) ∨<br>
+         2 * int (size lr) ≤ 3 + 5 * int (size l') ∨<br>
+         ¬ 2 * int (size lr) + 2 * int (size rr) ≤ 6 + 5 * int (size l') "<br>
+  apply linarith<br>
+  done<br>
+Is there any simproc able to do this simplification automatically? If there is one, is there any reason why linarith does not use it by default?<br>
+Thanks,<br>
+Mathias</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+
+
+
+<a name="294750293"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20cancelation%20simproc%20on%20coefficients%20of%20polynoms/near/294750293" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20cancelation.20simproc.20on.20coefficients.20of.20polynoms.html#294750293">(Aug 22 2022 at 19:06)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+I don't believe we have a master plan for arithmetic simprocs. Or only for some <br>
+of them. It is all grown historically, with sometimes odd interactions.</p>
+<p>Tobias<br>
+<a href="/user_uploads/14278/vznuZLhzozlSen520mCAy_oW/smime.p7s">smime.p7s</a></p>
+
+
+
+<a name="294750321"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20cancelation%20simproc%20on%20coefficients%20of%20polynoms/near/294750321" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20cancelation.20simproc.20on.20coefficients.20of.20polynoms.html#294750321">(Aug 22 2022 at 19:06)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:eberlm@in.tum.de">eberlm@in.tum.de</a>&gt;<br>
+I've been mentioning this issue occasionally over the last few years.<br>
+Considering how well computer algebra systems can handle equations and<br>
+inequalities, there /must/ be room for improvement in Isabelle/HOL.</p>
+<p>Unfortunately, I've had little luck finding out what exactly it is that<br>
+these systems do, and in any case it is probably a lot of work. To make<br>
+matters worse, it might well break a lot of existing proofs if we switch<br>
+it on by default, and no one will use it if we don't.</p>
+<p>Manuel</p>
+
+
+
+<a name="294750334"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20cancelation%20simproc%20on%20coefficients%20of%20polynoms/near/294750334" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20cancelation.20simproc.20on.20coefficients.20of.20polynoms.html#294750334">(Aug 22 2022 at 19:06)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:eberlm@in.tum.de">eberlm@in.tum.de</a>&gt;<br>
+I just realised that I should have read more than the first sentence of<br>
+your email; I interpreted "Master plan for arithmetic simprocs" as "plan<br>
+for the future development of arithmetic simprocs". Now I see that's not<br>
+what you meant.</p>
+<p>Still, if anyone has some opinions on what I wrote or feels inclined to<br>
+implement this, do come forward.</p>
+<p>Manuel</p>
+
+
+
+<a name="294750345"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20cancelation%20simproc%20on%20coefficients%20of%20polynoms/near/294750345" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20cancelation.20simproc.20on.20coefficients.20of.20polynoms.html#294750345">(Aug 22 2022 at 19:06)</a>:</h4>
+<p>From: Lawrence Paulson &lt;<a href="mailto:lp15@cam.ac.uk">lp15@cam.ac.uk</a>&gt;<br>
+I would love to see the following paper implemented:</p>
+<p><a href="https://tel.archives-ouvertes.fr/IMAG/hal-01505598v1">https://tel.archives-ouvertes.fr/IMAG/hal-01505598v1</a></p>
+<p>It discovers equalities and is therefore useful even when it can’t prove the goal outright. I guess it would be a medium-sized project.</p>
+<p>Larry</p>
+
+
+
+<a name="294750358"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20cancelation%20simproc%20on%20coefficients%20of%20polynoms/near/294750358" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20cancelation.20simproc.20on.20coefficients.20of.20polynoms.html#294750358">(Aug 22 2022 at 19:06)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:eberlm@in.tum.de">eberlm@in.tum.de</a>&gt;<br>
+I've seen that paper but I'm not sure how useful it would be in an<br>
+Isabelle context, at least in an Isar proof. There, the typical workflow<br>
+is that you have a fixed goal to prove and you chain in all the facts<br>
+that are needed to prove it and then you call a method that can either<br>
+solve it or it fails.</p>
+<p>The only workflow I could possibly imagine is in apply-style<br>
+exploration: You run "apply linarith2" on your goal and if it can't<br>
+solve it, it prints a list of learned inequalities, and then you<br>
+manually go through that to see if there are any interesting ones among<br>
+them and then copypaste them back into your Isar proof before that.</p>
+<p>Since this use of the method is purely diagnostic, there would be no<br>
+need to formalise the "learning new equalities" part at all.</p>
+<p>I'm not saying that it wouldn't be interesting to formalise this method<br>
+just for the sake of formalising it; it's certainly interesting from a<br>
+theoretical viewpoint in any case. I'm just not sure that it would be<br>
+/that/ useful as an Isabelle tool.</p>
+<p>By the way, since we're talking about simprocs, I'm currently offering a<br>
+student project at TUM to implement some extremely specialised simprocs<br>
+to tackle things like "ln(12) = 2*ln(2) + ln(3)", "of_nat n + 1 / 2 ∉ ℤ<br>
+= False", and "totient 1234 = 616" etc. Let's see if someone bites.</p>
+<p>Manuel</p>
+
+
+
+<a name="294750382"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20cancelation%20simproc%20on%20coefficients%20of%20polynoms/near/294750382" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20cancelation.20simproc.20on.20coefficients.20of.20polynoms.html#294750382">(Aug 22 2022 at 19:06)</a>:</h4>
+<p>From: Mathias Fleury &lt;<a href="mailto:mathias.fleury12@gmail.com">mathias.fleury12@gmail.com</a>&gt;<br>
+Hi list,</p>
+<p>after trying to reconstruct more veriT proofs, I found out the following lemma cannot be discharged by linarith:</p>
+<p>lemma "¬ 0 ≤ int (size l') ∨<br>
+         ¬ 10 * int (size lr) &lt; 4 + 14 * int (size rr) ∨<br>
+         10 * int (size lr) ≤ 15 + 25 * int (size l') ∨<br>
+         ¬ 10 * int (size lr) + 10 * int (size rr) ≤ 30 + 25 * int (size l') "<br>
+  apply linarith (* fails *)<br>
+  oops</p>
+<p>However, if I simplify the coefficients by dividing by 5, then linearity is able to prove the goal:</p>
+<p>lemma "¬ 0 ≤ int (size l') ∨<br>
+         ¬ 5 * int (size lr) &lt; 2 + 7 * int (size rr) ∨<br>
+         2 * int (size lr) ≤ 3 + 5 * int (size l') ∨<br>
+         ¬ 2 * int (size lr) + 2 * int (size rr) ≤ 6 + 5 * int (size l') "<br>
+  apply linarith<br>
+  done</p>
+<p>Is there any simproc able to do this simplification automatically? If there is one, is there any reason why linarith does not use it by default?</p>
+<p>Thanks,<br>
+Mathias</p>
+
+
+
+<a name="294750562"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20cancelation%20simproc%20on%20coefficients%20of%20polynoms/near/294750562" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20cancelation.20simproc.20on.20coefficients.20of.20polynoms.html#294750562">(Aug 22 2022 at 19:07)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+There should be no need to divide by 5, linarith should not need it. Alas, ...</p>
+<p>Tobias<br>
+<a href="/user_uploads/14278/AqpK0dfk3QbW8lmYlm8sJxiA/smime.p7s">smime.p7s</a></p>
+
+
+
+<a name="294750729"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20cancelation%20simproc%20on%20coefficients%20of%20polynoms/near/294750729" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20cancelation.20simproc.20on.20coefficients.20of.20polynoms.html#294750729">(Aug 22 2022 at 19:09)</a>:</h4>
+<p>From: Mathias Fleury &lt;<a href="mailto:mathias.fleury12@gmail.com">mathias.fleury12@gmail.com</a>&gt;<br>
+Hi all,</p>
+<p>I had a look at the trace. The problems seems to be "¬ 10 * t2 ≤ 15 + 25 * t1". </p>
+<ul>
+<li>
+<p>If not simplified, it is transformed to "16 &lt;= 10 * t2 + ~25 * t1" (in the tracing: "16 &lt;= 10, 0, ~25")</p>
+</li>
+<li>
+<p>After simplification, it becomes "¬ 2 * t2 ≤ 3 + 5 * t1", which is transformed to "4 &lt;= 2 * t2 + ~5 * t1" (in the tracing: "4 &lt;= 2, 0, ~5")</p>
+</li>
+</ul>
+<p>The latter yields an equivalent (but slightly stronger at a first glance) equality: "20 &lt;= 10 * t2 + ~25 * t1". This equality is equivalent to "16 &lt;= 10 * t2 + ~25 * t1", but linarith does not notice.</p>
+<p>If I replace "10 * t2 ≤ 15 + 25 * t1" by "10 * t2 ≤ 19 + 25 * t1", then the refutation works (and this two expressions are equivalent).</p>
+<blockquote>
+<p>On 1. Feb 2019, at 19:49, Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt; wrote:<br>
+There should be no need to divide by 5, linarith should not need it. Alas, …</p>
+</blockquote>
+<p>Or is linarith suppose to preprocess  the (in)equalities?</p>
+<p>Mathias</p>
+<p>The same example without the constants:<br>
+consts t1 :: int <br>
+consts t2 :: int<br>
+consts t3 :: int</p>
+<p>definition "eq1 ≡ ¬ 0 ≤ t1 ∨ ¬ 10 * t2 &lt; 4 + 14 * t3 ∨<br>
+         10 * t2 ≤ 15 + 25 * t1 ∨  ¬ 10 * t2 + 10 * t3 ≤ 30 + 25 * t1"</p>
+<p>definition "eq3 ≡ ¬ 0 ≤ t1 ∨ ¬ 10 * t2 &lt; 4 + 14 * t3 ∨<br>
+         2 * t2 ≤ 3 + 5 * t1 ∨ ¬ 2 * t2 + 2 * t3 ≤ 6 + 5 * t1"</p>
+<p>lemma "eq1 "<br>
+  unfolding eq1_def<br>
+  supply [[linarith_trace]]<br>
+  apply linarith<br>
+  oops</p>
+<p>(*<br>
+Trying to refute subgoal 1<br>
+¬ 0 ≤ t1 ∨<br>
+¬ 10 * t2 &lt; 4 + 14 * t3 ∨<br>
+10 * t2 ≤ 15 + 25 * t1 ∨ ¬ 10 * t2 + 10 * t3 ≤ 30 + 25 * t1 <br>
+prove: <br>
+Preprocessing yields 1 subgoal(s) total. <br>
+Splitting of inequalities yields 1 subgoal(s) total. <br>
+Refutation failed. <br>
+Trying to refute subgoal 1<br>
+0 ≤ t1 ⟹<br>
+10 * t2 &lt; 4 + 14 * t3 ⟹<br>
+¬ 10 * t2 ≤ 15 + 25 * t1 ⟹<br>
+10 * t2 + 10 * t3 ≤ 30 + 25 * t1 ⟹ False <br>
+prove: <br>
+Preprocessing yields 1 subgoal(s) total. <br>
+Splitting of inequalities yields 1 subgoal(s) total. </p>
+<p>0 &lt;= 0, 0, 1<br>
+~3 &lt;= ~10, 14, 0<br>
+16 &lt;= 10, 0, ~25<br>
+~30 &lt;= ~10, ~10, 25 </p>
+<p>0 &lt;= 0, 0, 1<br>
+16 &lt;= 10, 0, ~25<br>
+~225 &lt;= ~120, 0, 175 </p>
+<p>0 &lt;= 0, 0, 1<br>
+~33 &lt;= 0, 0, ~125 </p>
+<p>~33 &lt;= 0, 0, 0 <br>
+Refutation failed. <br>
+*)</p>
+<p>lemma "eq3 "<br>
+  unfolding eq3_def<br>
+  supply [[linarith_trace]]<br>
+  apply linarith<br>
+  done<br>
+(*<br>
+Trying to refute subgoal 1<br>
+¬ 0 ≤ t1 ∨<br>
+¬ 10 * t2 &lt; 4 + 14 * t3 ∨<br>
+2 * t2 ≤ 3 + 5 * t1 ∨ ¬ 2 * t2 + 2 * t3 ≤ 6 + 5 * t1 <br>
+prove: <br>
+Preprocessing yields 1 subgoal(s) total. <br>
+Splitting of inequalities yields 1 subgoal(s) total. <br>
+Refutation failed. <br>
+Trying to refute subgoal 1<br>
+0 ≤ t1 ⟹<br>
+10 * t2 &lt; 4 + 14 * t3 ⟹<br>
+¬ 2 * t2 ≤ 3 + 5 * t1 ⟹ 2 * t2 + 2 * t3 ≤ 6 + 5 * t1 ⟹ False <br>
+prove: <br>
+Preprocessing yields 1 subgoal(s) total. <br>
+Splitting of inequalities yields 1 subgoal(s) total. </p>
+<p>0 &lt;= 0, 0, 1<br>
+~3 &lt;= ~10, 14, 0<br>
+4 &lt;= 2, 0, ~5<br>
+~6 &lt;= ~2, ~2, 5 </p>
+<p>0 &lt;= 0, 0, 1<br>
+4 &lt;= 2, 0, ~5<br>
+~45 &lt;= ~24, 0, 35 </p>
+<p>0 &lt;= 0, 0, 1<br>
+3 &lt;= 0, 0, ~25 </p>
+<p>3 &lt;= 0, 0, 0 <br>
+Contradiction! (1) <br>
+*)</p>
+<blockquote>
+<p>On 1. Feb 2019, at 19:49, Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt; wrote:</p>
+<p>There should be no need to divide by 5, linarith should not need it. Alas, ...</p>
+<p>Tobias</p>
+<p>On 01/02/2019 18:38, Mathias Fleury wrote:</p>
+<blockquote>
+<p>Hi list,<br>
+after trying to reconstruct more veriT proofs, I found out the following lemma cannot be discharged by linarith:<br>
+lemma "¬ 0 ≤ int (size l') ∨<br>
+         ¬ 10 * int (size lr) &lt; 4 + 14 * int (size rr) ∨<br>
+         10 * int (size lr) ≤ 15 + 25 * int (size l') ∨<br>
+         ¬ 10 * int (size lr) + 10 * int (size rr) ≤ 30 + 25 * int (size l') "<br>
+  apply linarith (* fails *)<br>
+  oops<br>
+However, if I simplify the coefficients by dividing by 5, then linearity is able to prove the goal:<br>
+lemma "¬ 0 ≤ int (size l') ∨<br>
+         ¬ 5 * int (size lr) &lt; 2 + 7 * int (size rr) ∨<br>
+         2 * int (size lr) ≤ 3 + 5 * int (size l') ∨<br>
+         ¬ 2 * int (size lr) + 2 * int (size rr) ≤ 6 + 5 * int (size l') "<br>
+  apply linarith<br>
+  done<br>
+Is there any simproc able to do this simplification automatically? If there is one, is there any reason why linarith does not use it by default?<br>
+Thanks,<br>
+Mathias<br>
+</p>
+</blockquote>
+</blockquote>
+
+
+
+<a name="294751131"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20cancelation%20simproc%20on%20coefficients%20of%20polynoms/near/294751131" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20cancelation.20simproc.20on.20coefficients.20of.20polynoms.html#294751131">(Aug 22 2022 at 19:11)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+In principle a proof tool can propose to add more Isar text as <br>
+"sendback" source snippets, e.g. see recent versions of the "induct" <br>
+family of methods. The main problem is probably technical, to place <br>
+further facts in the right spot before the goal statement: that would <br>
+require new sendback properties such that the Prover IDE knows what is <br>
+intended (Isabelle/Scala understands more Isar structure and syntax than <br>
+Isabelle/ML).</p>
+<p>Makarius</p>
+
+
+
+<a name="294751243"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20cancelation%20simproc%20on%20coefficients%20of%20polynoms/near/294751243" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20cancelation.20simproc.20on.20coefficients.20of.20polynoms.html#294751243">(Aug 22 2022 at 19:12)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+Dear Mathias,</p>
+<p>It took me some time to remember the key point: linarith uses Fourier-Motzkin <br>
+elimnation which is complere for rationals and reals but incomplete for <br>
+integers. For the latter we have Presburger, but it is too slow for the example.</p>
+<p>The idea of eliminating common factors first is interesting. I have no idea if <br>
+this is always beneficial. Since the existing code is quite delicate, I also <br>
+don't want to mess with it.</p>
+<p>Is there a simproc for eliminating common factors? I suspect not in full <br>
+generality, because the simplifier leaves "10 * (i::int) ≤ 25 * j" alone. There <br>
+is one by Larry for the simple case "m * t &lt;= n * u" where m and n have a common <br>
+factor. I have no idea how much work it would be to generalize it.</p>
+<p>Best regards<br>
+Tobias<br>
+<a href="/user_uploads/14278/pWkjFTl7hpTM_BEH3AHxPues/smime.p7s">smime.p7s</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

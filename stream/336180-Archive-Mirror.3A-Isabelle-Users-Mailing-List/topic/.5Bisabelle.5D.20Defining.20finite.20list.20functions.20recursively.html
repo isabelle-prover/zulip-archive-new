@@ -1,0 +1,138 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Defining finite list functions recursively · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Defining.20finite.20list.20functions.20recursively.html">[isabelle] Defining finite list functions recursively</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294062096"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Defining%20finite%20list%20functions%20recursively/near/294062096" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Defining.20finite.20list.20functions.20recursively.html#294062096">(Aug 18 2022 at 12:01)</a>:</h4>
+<p>From: John Matthews &lt;<a href="mailto:matthews@galois.com">matthews@galois.com</a>&gt;<br>
+I'm having problems proving termination of the well-founded recursive  <br>
+function xs_strm defined below, and other functions like it.</p>
+<p>The termination measure is just less_than, and I've installed  <br>
+appropriate congruence rules. However, the function package generates  <br>
+an unprovable termination condition.</p>
+<p>On the other hand, I have been able to manually prove the identical  <br>
+function xs_strm2 below is well-founded by defining it in terms of<br>
+the wfrec combinator and manually applying the congruence rules. Below  <br>
+are the definitions and lemmas needed to show the problem.</p>
+<p>Thanks in advance,<br>
+-john</p>
+<p>section "Auxiliary function and lemma"</p>
+<p>text {*Coerces a finite prefix of an infinite stream (represented as a  <br>
+@{typ "nat \&lt;Rightarrow&gt; 'a"} function) into a finite list. *}<br>
+definition<br>
+   strm_to_list :: "nat \&lt;Rightarrow&gt; (nat \&lt;Rightarrow&gt; 'a)  <br>
+\&lt;Rightarrow&gt; 'a list" where<br>
+  "strm_to_list n f = map f [0..&lt;n]"</p>
+<p>lemma length_strm_to_list[simp]:<br>
+   "length (strm_to_list n f) = n"<br>
+by (simp add: strm_to_list_def)</p>
+<p>section {* Congruence rules for proving termination of @{term  <br>
+"xs_strm"} below. *}</p>
+<p>lemma nth_cons_cong[fundef_cong]:<br>
+   "\&lt;lbrakk&gt;i = i';<br>
+     i' = 0 \&lt;Longrightarrow&gt; x = x';<br>
+     \&lt;And&gt;j. i = Suc j \&lt;Longrightarrow&gt; xs ! j = xs' ! j\&lt;rbrakk&gt;  <br>
+\&lt;Longrightarrow&gt;<br>
+    (x # xs) ! i = (x' # xs') ! i'"<br>
+by (cases i, auto)</p>
+<p>lemma nth_out_of_bounds:<br>
+   "length xs \&lt;le&gt; n \&lt;Longrightarrow&gt; xs ! n = [] ! (n - length xs)"<br>
+apply (induct xs arbitrary: n, auto simp add: nth_list_def)<br>
+by (case_tac n, auto)</p>
+<p>lemma nth_take_cong[fundef_cong]:<br>
+   assumes "i = i'"<br>
+       and "n = n'"<br>
+       and "i' &lt; n' \&lt;Longrightarrow&gt; xs ! i' = xs' ! i'"<br>
+       and "length xs = length xs'"<br>
+   shows "(take n xs) ! i = (take n' xs') ! i'"<br>
+   (is "?lhs = ?rhs")<br>
+using prems apply (cases "i' &lt; n'", auto)<br>
+apply (subst nth_out_of_bounds, auto)<br>
+by (subst (2) nth_out_of_bounds, auto)</p>
+<p>lemma nth_strm_to_list_cong[fundef_cong]:<br>
+   "\&lt;lbrakk&gt;n = n';<br>
+     i = i';<br>
+     i &lt; n \&lt;Longrightarrow&gt; f i' = f' i'\&lt;rbrakk&gt; \&lt;Longrightarrow&gt;<br>
+    strm_to_list n f ! i = strm_to_list n' f' ! i'"<br>
+apply (simp add: strm_to_list_def)<br>
+apply (cases "i' &lt; n'", auto)<br>
+apply (subst nth_out_of_bounds, auto)<br>
+by (subst (2) nth_out_of_bounds, auto)</p>
+<p>section "An unsuccessful attempt to prove termination of the<br>
+well-founded function @{term xs_strm} below"</p>
+<p>function<br>
+    xs_strm :: "nat \&lt;Rightarrow&gt; nat" where<br>
+   "xs_strm i<br>
+    = (0 # take 2 (strm_to_list 3 xs_strm)) ! i"<br>
+by pat_completeness auto<br>
+termination<br>
+   apply (relation less_than)<br>
+   apply auto<br>
+   -- "I am left with an unprovable termination condition"<br>
+   oops</p>
+<p>section "Manually applying congruence rules to prove termination of the<br>
+identical function @{term xs_strm2}"</p>
+<p>definition<br>
+    xs_strm2 :: "nat \&lt;Rightarrow&gt; nat" where<br>
+   "xs_strm2 = wfrec less_than (\&lt;lambda&gt;R i. (0 # take 2  <br>
+(strm_to_list 3 R)) ! i)"</p>
+<p>lemma def_xs_strm2:<br>
+   "xs_strm2 i = (0 # take 2 (strm_to_list 3 xs_strm2)) ! i"<br>
+   (is "?lhs = ?rhs")<br>
+proof -<br>
+   let "?H R i" = "((0::nat) # take 2 (strm_to_list 3 R)) ! i"<br>
+   from wfrec[OF wf_less_than, where H="?H" and a=i] xs_strm2_def<br>
+   have "?lhs = ?H (cut xs_strm2 less_than i) i" by simp<br>
+   also have "\&lt;dots&gt; = ?rhs"<br>
+     -- "Manually applying congruence rules here"<br>
+     apply (subst nth_cons_cong, simp_all)<br>
+     apply (subst nth_take_cong, simp_all)<br>
+     apply (subst nth_strm_to_list_cong, simp_all)<br>
+     by (simp add: cut_apply)<br>
+   finally show ?thesis .<br>
+qed</p>
+
+
+
+<a name="294062107"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Defining%20finite%20list%20functions%20recursively/near/294062107" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Defining.20finite.20list.20functions.20recursively.html#294062107">(Aug 18 2022 at 12:01)</a>:</h4>
+<p>From: Alexander Krauss &lt;<a href="mailto:krauss@in.tum.de">krauss@in.tum.de</a>&gt;<br>
+Hi John,</p>
+<blockquote>
+<p>I'm having problems proving termination of the well-founded recursive <br>
+function xs_strm defined below, and other functions like it.</p>
+</blockquote>
+<p>Good to see that you are driving all available tools to their limits and <br>
+beyond, as usual :-) But it might actually work...</p>
+<p>The problem is that nth_take_cong has the premise about the lengths <br>
+being equal. In the function definition, a "recursive call" will be <br>
+generated by this premise because the instance occuring contains the <br>
+function being defined. But this simplifies away in your manual proof <br>
+because "length (strm_to_list n f)" does not depend on f.</p>
+<p>So you need just one more cong rule to tell function about this:</p>
+<p>lemma length_strm_to_list_cong[fundef_cong]:<br>
+   "n = n' ==&gt; length (strm_to_list n f) = length (strm_to_list n' f')"<br>
+   by simp</p>
+<p>Then it works.</p>
+<p>Alex</p>
+
+
+
+<a name="294062155"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Defining%20finite%20list%20functions%20recursively/near/294062155" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Defining.20finite.20list.20functions.20recursively.html#294062155">(Aug 18 2022 at 12:02)</a>:</h4>
+<p>From: John Matthews &lt;<a href="mailto:matthews@galois.com">matthews@galois.com</a>&gt;<br>
+Thanks Alex, that did the trick nicely. It seems to be holding up for  <br>
+defining mutually-recursive lists as well.</p>
+<p>-john</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

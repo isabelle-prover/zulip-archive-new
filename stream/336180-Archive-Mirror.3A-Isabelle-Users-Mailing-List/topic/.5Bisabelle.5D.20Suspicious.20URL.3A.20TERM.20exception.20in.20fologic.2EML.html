@@ -1,0 +1,52 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Suspicious URL: TERM exception in fologic.ML · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Suspicious.20URL.3A.20TERM.20exception.20in.20fologic.2EML.html">[isabelle] Suspicious URL: TERM exception in fologic.ML</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294323548"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Suspicious%20URL%3A%20TERM%20exception%20in%20fologic.ML/near/294323548" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Suspicious.20URL.3A.20TERM.20exception.20in.20fologic.2EML.html#294323548">(Aug 19 2022 at 16:49)</a>:</h4>
+<p>From: Thomas Sewell &lt;<a href="mailto:thomas.sewell@nicta.com.au">thomas.sewell@nicta.com.au</a>&gt;<br>
+Hello Slawomir &amp; Isabelle users.</p>
+<p>I'm sorry I missed this discussion going by. Thanks to Makarius for<br>
+bringing it to my attention.</p>
+<p>The problem can be traced to the way blast_hyp_subst_tac works, and can<br>
+be triggered like this (in HOL):</p>
+<p>theory Scratch imports main begin</p>
+<p>lemma<br>
+   "x = y ==&gt; (!!x. True) ==&gt; x : T ==&gt; S &lt;= T ==&gt; T &lt;= R ==&gt; S &lt;= R"<br>
+   apply blast</p>
+<p>This will happen when blast is called on any goal, in HOL or in ZF,<br>
+where the goal must be nontrivial, provable by blast's internal<br>
+strategy, contain a substitutable equality hypothesis, and contain some<br>
+non-atomic hypothesis (a meta-forall, meta-implication or meta-equality).</p>
+<p>This has always been the case. What has changed is that auto no longer<br>
+removes the equality hypothesis itself before calling blast.</p>
+<p>The problem is that blast_hyp_subst_tac just won't work if the<br>
+hypotheses aren't all atomic. The TERM exception comes from the "map<br>
+dest_Trueprop", but in any case the implementation won't work with<br>
+meta-operators either.</p>
+<p>The trivial fix is to extend the "handle THM _ =&gt; no_tac | EQ_VAR =&gt;<br>
+no_tac" in blast_hyp_subst_tac to also handle TERM exceptions. This will<br>
+completely solve the current problem. I recommend somebody commit this<br>
+in time for the next release, at which point [[hypsubst_thin = true]]<br>
+will no longer be needed for this auto.</p>
+<p>This leaves the problem that there are three implementations of hypsubst<br>
+in hypsubst.ML, one which doesn't work with Vars and two which don't<br>
+work with meta-operators. I don't really know what to do about this. It<br>
+doesn't help that I don't understand what constraints blast really puts<br>
+on blast_hyp_subst_tac.</p>
+<p>Cheers,<br>
+     Thomas.</p>
+<hr>
+<p>The information in this e-mail may be confidential and subject to legal professional privilege and/or copyright. National ICT Australia Limited accepts no liability for any damage caused by this email or its attachments.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

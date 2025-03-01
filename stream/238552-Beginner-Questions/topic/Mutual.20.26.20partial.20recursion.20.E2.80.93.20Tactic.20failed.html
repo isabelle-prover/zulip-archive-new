@@ -1,0 +1,115 @@
+<html>
+<head><meta charset="utf-8"><title>Mutual &amp; partial recursion – Tactic failed · Beginner Questions · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/index.html">Beginner Questions</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Mutual.20.26.20partial.20recursion.20.E2.80.93.20Tactic.20failed.html">Mutual &amp; partial recursion – Tactic failed</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="388509964"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Mutual%20%26%20partial%20recursion%20%E2%80%93%20Tactic%20failed/near/388509964" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Alexandra Graß <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Mutual.20.26.20partial.20recursion.20.E2.80.93.20Tactic.20failed.html#388509964">(Sep 01 2023 at 12:09)</a>:</h4>
+<p>I'm currently trying to define two mutual recursive (partial) functions. I'm also using <code>(domintros)</code>.</p>
+<p>Everything worked out fine until I introduced the line <code>let d_new = if wn then d_old ⊔ d_new else d_old ⊓ d_new in</code> (or operators similar to <code>inf</code> and <code>sup</code>). Proving pattern completeness and pattern compatibility still works out fine. But the keyword <code>function</code>is now highlighted in red and shows the following error</p>
+<div class="codehilite" data-code-language="Text only"><pre><span></span><code>Tactic failed
+The error(s) above occurred for the goal statement⌂:
+[...]
+</code></pre></div>
+<p>I tried to construct a minimal working example but didn't manage to reproduce the error in less complex definitions. And as most of the code is not mine, I can't publish the whole definition. Still hoping the error is so trivial that you guys can help me nonetheless. Is there a problem with the termination proof? Or something else?</p>
+<p>Any hints are highly appreciate. Thanks in advance :)</p>
+
+
+
+<a name="388941577"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Mutual%20%26%20partial%20recursion%20%E2%80%93%20Tactic%20failed/near/388941577" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Alexandra Graß <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Mutual.20.26.20partial.20recursion.20.E2.80.93.20Tactic.20failed.html#388941577">(Sep 04 2023 at 09:05)</a>:</h4>
+<p>Update: I managed to construct a minimal working example and the problem is neither with mutual recursion nor partial functions (?). Here's the code snippet:</p>
+<div class="codehilite" data-code-language="Text only"><pre><span></span><code>function foo :: "nat ⇒ bool ⇒ nat" where
+  "foo old expand = (
+      let tmp = if old &lt; 100 then old + 1 else old in
+      let new = if expand then old ⊔ tmp else old ⊓ tmp in
+      if new = old then
+        if expand then
+          foo new False
+        else
+          new
+      else
+        foo new expand)"
+  by pat_completeness auto
+</code></pre></div>
+<p><em>Key idea:</em> There's a monotonically increasing function (in this case <code>if old &lt; 100 then old + 1 else old</code>. <code>old+1</code> works as well, but then the example would never terminate, which is not what I'm aiming for). There's two phases. First the <code>expand</code> phase where results are always chosen by means of <code>sup</code>. As soon as a fixed point is reached, the algorithm switches to a second phase where values are now combined via <code>inf</code> (which is trivial in this example and should terminate right away as <code>new = old</code> in the first iteration).</p>
+<p>Again, keyword <code>function</code> is underlined all red and the following error ist displayed:</p>
+<div class="codehilite" data-code-language="Text only"><pre><span></span><code>Tactic failed
+The error(s) above occurred for the goal statement⌂:
+⟦⋀old expand x xa.
+    ⟦x = (if old &lt; 100 then old + 1 else old);
+     xa = (if expand then old ⊔ x else old ⊓ x); xa = old;
+     expand⟧
+    ⟹ P (xa, False) (old, expand);
+ ⋀old expand x xa.
+    ⟦x = (if old &lt; 100 then old + 1 else old);
+     xa = (if expand then old ⊔ x else old ⊓ x); xa ≠ old⟧
+    ⟹ P (xa, expand) (old, expand)⟧
+⟹ foo_rel ≤ P
+</code></pre></div>
+<p>What's the issue with my definition? Potential nontermination in case the algorithm is called with <code>expand</code> set to <code>False</code>? (Which is sth I never intend to do.)</p>
+
+
+
+<a name="388943824"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Mutual%20%26%20partial%20recursion%20%E2%80%93%20Tactic%20failed/near/388943824" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Mutual.20.26.20partial.20recursion.20.E2.80.93.20Tactic.20failed.html#388943824">(Sep 04 2023 at 09:18)</a>:</h4>
+<p>Here is a version that fails, but only needs Main:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">function</span><span class="w"> </span><span class="o">(</span><span class="n">sequential</span><span class="o">)</span><span class="w"> </span><span class="n">foo</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">"nat set ⇒ bool ⇒ nat set"</span><span class="w"> </span><span class="kp">where</span>
+<span class="w">  </span><span class="s">"foo old expand = (</span>
+<span class="s">      let new = old ∩ old in</span>
+<span class="s">      if new = old then</span>
+<span class="s">          foo new expand</span>
+<span class="s">      else</span>
+<span class="s">        foo new expand)"</span>
+<span class="w">  </span><span class="k">by</span><span class="w"> </span><span class="n">pat_completeness</span><span class="w"> </span><span class="n">auto</span>
+</code></pre></div>
+
+
+
+<a name="388943990"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Mutual%20%26%20partial%20recursion%20%E2%80%93%20Tactic%20failed/near/388943990" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Mutual.20.26.20partial.20recursion.20.E2.80.93.20Tactic.20failed.html#388943990">(Sep 04 2023 at 09:19)</a>:</h4>
+<p>I think that the way forward here is to write on the mailing list (I am not sure who feels responsible for the function package, but you have a higher chance on the mailing list)</p>
+
+
+
+<a name="388946771"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Mutual%20%26%20partial%20recursion%20%E2%80%93%20Tactic%20failed/near/388946771" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Alexandra Graß <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Mutual.20.26.20partial.20recursion.20.E2.80.93.20Tactic.20failed.html#388946771">(Sep 04 2023 at 09:34)</a>:</h4>
+<p>Interesting, thanks for the example! Just realized there's no need for the 2nd param. In a nutshell:</p>
+<div class="codehilite" data-code-language="Text only"><pre><span></span><code>function (sequential) foo :: "nat set ⇒ nat set" where
+  "foo old = (
+      let new = old ∩ old in
+      if new = old then
+          foo new
+      else
+        foo new)"
+  by pat_completeness auto
+</code></pre></div>
+<p>does show the <code>Tactic failed</code> error, but</p>
+<div class="codehilite" data-code-language="Text only"><pre><span></span><code>function (sequential) foo :: "nat set ⇒ nat set" where
+  "foo old = (
+      let new = old ∩ old in
+      if new = old then
+          foo old ∩ old
+      else
+        foo new)"
+  by pat_completeness auto
+</code></pre></div>
+<p>does not. Replacing <code>new</code> in any of the other lines does not fix the problem.</p>
+<p><em>Edit:</em> Other trivial operations such as <code>old ∪ {}</code> do the job (i.e. invoking the error) as well, btw.</p>
+
+
+
+<a name="388946991"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Mutual%20%26%20partial%20recursion%20%E2%80%93%20Tactic%20failed/near/388946991" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Alexandra Graß <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Mutual.20.26.20partial.20recursion.20.E2.80.93.20Tactic.20failed.html#388946991">(Sep 04 2023 at 09:35)</a>:</h4>
+<p>I'll discuss this on the mailing list :)</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

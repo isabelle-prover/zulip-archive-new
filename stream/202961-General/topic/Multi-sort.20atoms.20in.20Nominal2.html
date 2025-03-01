@@ -1,0 +1,82 @@
+<html>
+<head><meta charset="utf-8"><title>Multi-sort atoms in Nominal2 · General · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/202961-General/index.html">General</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Multi-sort.20atoms.20in.20Nominal2.html">Multi-sort atoms in Nominal2</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="323060647"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/Multi-sort%20atoms%20in%20Nominal2/near/323060647" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Javier Diaz <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Multi-sort.20atoms.20in.20Nominal2.html#323060647">(Jan 23 2023 at 16:18)</a>:</h4>
+<p>I'm experimenting with Nominal2's support for multi-sort atoms (see <a href="https://www.isa-afp.org/theories/nominal2/#Atoms.html">this example in the Nominal package</a> and the discussion in Section 5 of <a href="https://nms.kcl.ac.uk/christian.urban/Publications/nominal-atoms.pdf">this paper</a>). The idea is to define a toy typed λ-calculus in Church's style, that is, where each variable includes its type (e.g. <code>λxₒ. xₒ</code>). So, I came up with the following code:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">theory</span><span class="w"> </span><span class="n">Scratch</span><span class="w"></span>
+<span class="w">  </span><span class="kp">imports</span><span class="w"> </span><span class="s">"Nominal2.Nominal2"</span><span class="w"> </span><span class="s">"Nominal2.Atoms"</span><span class="w"></span>
+<span class="k">begin</span><span class="w"></span>
+
+<span class="c">(* In this example I'm using "var", "ty" and "Var" from Nominal2.Atoms *)</span><span class="w"></span>
+
+<span class="k">nominal_datatype</span><span class="w"> </span><span class="n">exp</span><span class="w"> </span><span class="o">=</span><span class="w"></span>
+<span class="w">    </span><span class="n">EVar</span><span class="w"> </span><span class="n">var</span><span class="w"></span>
+<span class="w">  </span><span class="o">|</span><span class="w"> </span><span class="n">EApp</span><span class="w"> </span><span class="n">exp</span><span class="w"> </span><span class="n">exp</span><span class="w"></span>
+<span class="w">  </span><span class="o">|</span><span class="w"> </span><span class="n">EAbs</span><span class="w"> </span><span class="n">x</span><span class="o">::</span><span class="n">var</span><span class="w"> </span><span class="n">M</span><span class="o">::</span><span class="n">exp</span><span class="w"> </span><span class="k">binds</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="kp">in</span><span class="w"> </span><span class="n">M</span><span class="w"></span>
+
+<span class="c">(* I want to prove that λxₒ. xₒ = λyₒ. yₒ *)</span><span class="w"></span>
+<span class="kn">lemma</span><span class="w"> </span><span class="s">"EAbs (Var x (TVar ''o'')) (EVar (Var x (TVar ''o''))) = EAbs (Var y (TVar ''o'')) (EVar (Var y (TVar ''o'')))"</span><span class="w"></span>
+<span class="w">  </span><span class="gr">sorry</span><span class="w"> </span><span class="c">(* cannot prove this! *)</span><span class="w"></span>
+
+<span class="k">end</span><span class="w"></span>
+</code></pre></div>
+<p>As shown in the code above, the problem I found is that I cannot even prove the equality of two α-equivalent terms, which, I think, should work out of the box as is the case for single-sort atoms. Having a look at the Nominal2's implementation, it seems to me that the root cause is the lacking of a simproc similar to <code>alpha_lst</code> that works on <code>at_base</code> instead of <code>at</code>. However, since I'm not an expert in the Nominal package, I may very well be missing something.</p>
+
+
+
+<a name="323070715"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/Multi-sort%20atoms%20in%20Nominal2/near/323070715" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Dmitriy Traytel <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Multi-sort.20atoms.20in.20Nominal2.html#323070715">(Jan 23 2023 at 16:59)</a>:</h4>
+<p>It is possible to prove it in a rather low-level fashion (see below). But generally, I agree with the assessment that as soon one leaves <code>at</code>, things are much more painful than they should be. For starters the various <code>Abs1_eq_iff...</code> lemmas that are available for <code>at</code> are lacking for <code>at_base</code>.</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">lemma</span><span class="w"> </span><span class="n">supp_Var</span><span class="o">:</span><span class="w"> </span><span class="s">"supp (Var x T) = {Atom (sort_of_ty T) x}"</span><span class="w"></span>
+<span class="w">  </span><span class="k">by</span><span class="w"> </span><span class="o">(</span><span class="n">simp</span><span class="w"> </span><span class="n">add</span><span class="o">:</span><span class="w"> </span><span class="n">Abs_var_inverse</span><span class="w"> </span><span class="n">Var_def</span><span class="w"> </span><span class="n">atom_var_def</span><span class="w"> </span><span class="n">supp_at_base</span><span class="o">)</span><span class="w"></span>
+
+<span class="kn">lemma</span><span class="w"> </span><span class="n">Rep_var_Var</span><span class="o">:</span><span class="w"> </span><span class="s">"Rep_var (Var x T) = Atom (sort_of_ty T) x"</span><span class="w"></span>
+<span class="w">  </span><span class="k">using</span><span class="w"> </span><span class="n">Rep_var</span><span class="o">[</span><span class="n">of</span><span class="w"> </span><span class="s">"Var x T"</span><span class="o">]</span><span class="w"></span>
+<span class="w">  </span><span class="k">by</span><span class="w"> </span><span class="o">(</span><span class="n">auto</span><span class="w"> </span><span class="n">simp</span><span class="o">:</span><span class="w"> </span><span class="n">Var_def</span><span class="w"> </span><span class="n">Abs_var_inverse</span><span class="o">)</span><span class="w"></span>
+
+<span class="c">(* I want to prove that λxₒ. xₒ = λyₒ. yₒ *)</span><span class="w"></span>
+<span class="kn">lemma</span><span class="w"> </span><span class="s">"EAbs (Var x (TVar ''o'')) (EVar (Var x (TVar ''o''))) = EAbs (Var y (TVar ''o'')) (EVar (Var y (TVar ''o'')))"</span><span class="w"></span>
+<span class="w">  </span><span class="k">by</span><span class="w"> </span><span class="o">(</span><span class="n">auto</span><span class="w"> </span><span class="n">simp</span><span class="w"> </span><span class="n">add</span><span class="o">:</span><span class="w"> </span><span class="n">Abs_eq_iff2</span><span class="w"> </span><span class="n">alpha_lst</span><span class="w"> </span><span class="n">exp.supp</span><span class="w"> </span><span class="n">supp_Var</span><span class="w"> </span><span class="n">Rep_var_Var</span><span class="w"> </span><span class="n">atom_var_def</span><span class="w"></span>
+<span class="w">    </span><span class="n">Var_def</span><span class="o">[</span><span class="n">symmetric</span><span class="o">]</span><span class="w"> </span><span class="n">supp_swap</span><span class="w"> </span><span class="n">fresh_star_def</span><span class="w"> </span><span class="n">permute_var_def</span><span class="w"></span>
+<span class="w">    </span><span class="n">intro</span><span class="o">!:</span><span class="w"> </span><span class="n">exI</span><span class="o">[</span><span class="n">of</span><span class="w"> </span><span class="o">_</span><span class="w"> </span><span class="s">"(atom (Var x (TVar ''o'')) ⇌ atom (Var y (TVar ''o'')))"</span><span class="o">]</span><span class="w"></span>
+<span class="w">    </span><span class="n">split</span><span class="o">:</span><span class="w"> </span><span class="n">if_splits</span><span class="o">)</span><span class="w"></span>
+</code></pre></div>
+
+
+
+<a name="323072441"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/202961-General/topic/Multi-sort%20atoms%20in%20Nominal2/near/323072441" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Javier Diaz <a href="http://isabelle.systems/zulip-archive/stream/202961-General/topic/Multi-sort.20atoms.20in.20Nominal2.html#323072441">(Jan 23 2023 at 17:06)</a>:</h4>
+<p><span class="user-mention silent" data-user-id="361271">Dmitriy Traytel</span> <a href="#narrow/stream/202961-General/topic/Multi-sort.20atoms.20in.20Nominal2/near/323070715">said</a>:</p>
+<blockquote>
+<p>It is possible to prove it in a rather low-level fashion (see below). But generally, I agree with the assessment that as soon one leaves <code>at</code>, things are much more painful than they should be. For starters the various <code>Abs1_eq_iff...</code> lemmas that are available for <code>at</code> are lacking for <code>at_base</code>.</p>
+<p><div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">lemma</span><span class="w"> </span><span class="n">supp_Var</span><span class="o">:</span><span class="w"> </span><span class="s">"supp (Var x T) = {Atom (sort_of_ty T) x}"</span><span class="w"></span>
+<span class="w">  </span><span class="k">by</span><span class="w"> </span><span class="o">(</span><span class="n">simp</span><span class="w"> </span><span class="n">add</span><span class="o">:</span><span class="w"> </span><span class="n">Abs_var_inverse</span><span class="w"> </span><span class="n">Var_def</span><span class="w"> </span><span class="n">atom_var_def</span><span class="w"> </span><span class="n">supp_at_base</span><span class="o">)</span><span class="w"></span>
+
+<span class="kn">lemma</span><span class="w"> </span><span class="n">Rep_var_Var</span><span class="o">:</span><span class="w"> </span><span class="s">"Rep_var (Var x T) = Atom (sort_of_ty T) x"</span><span class="w"></span>
+<span class="w">  </span><span class="k">using</span><span class="w"> </span><span class="n">Rep_var</span><span class="o">[</span><span class="n">of</span><span class="w"> </span><span class="s">"Var x T"</span><span class="o">]</span><span class="w"></span>
+<span class="w">  </span><span class="k">by</span><span class="w"> </span><span class="o">(</span><span class="n">auto</span><span class="w"> </span><span class="n">simp</span><span class="o">:</span><span class="w"> </span><span class="n">Var_def</span><span class="w"> </span><span class="n">Abs_var_inverse</span><span class="o">)</span><span class="w"></span>
+
+<span class="c">(* I want to prove that λxₒ. xₒ = λyₒ. yₒ *)</span><span class="w"></span>
+<span class="kn">lemma</span><span class="w"> </span><span class="s">"EAbs (Var x (TVar ''o'')) (EVar (Var x (TVar ''o''))) = EAbs (Var y (TVar ''o'')) (EVar (Var y (TVar ''o'')))"</span><span class="w"></span>
+<span class="w">  </span><span class="k">by</span><span class="w"> </span><span class="o">(</span><span class="n">auto</span><span class="w"> </span><span class="n">simp</span><span class="w"> </span><span class="n">add</span><span class="o">:</span><span class="w"> </span><span class="n">Abs_eq_iff2</span><span class="w"> </span><span class="n">alpha_lst</span><span class="w"> </span><span class="n">exp.supp</span><span class="w"> </span><span class="n">supp_Var</span><span class="w"> </span><span class="n">Rep_var_Var</span><span class="w"> </span><span class="n">atom_var_def</span><span class="w"></span>
+<span class="w">    </span><span class="n">Var_def</span><span class="o">[</span><span class="n">symmetric</span><span class="o">]</span><span class="w"> </span><span class="n">supp_swap</span><span class="w"> </span><span class="n">fresh_star_def</span><span class="w"> </span><span class="n">permute_var_def</span><span class="w"></span>
+<span class="w">    </span><span class="n">intro</span><span class="o">!:</span><span class="w"> </span><span class="n">exI</span><span class="o">[</span><span class="n">of</span><span class="w"> </span><span class="o">_</span><span class="w"> </span><span class="s">"(atom (Var x (TVar ''o'')) ⇌ atom (Var y (TVar ''o'')))"</span><span class="o">]</span><span class="w"></span>
+<span class="w">    </span><span class="n">split</span><span class="o">:</span><span class="w"> </span><span class="n">if_splits</span><span class="o">)</span><span class="w"></span>
+</code></pre></div><br>
+</p>
+</blockquote>
+<p>Thanks a lot, Dmitriy. Your answer is very helpful. It seems to me that the current Nominal package is not yet ready for a serious formalization using multi-sort atoms. <span aria-label="oh no" class="emoji emoji-1f615" role="img" title="oh no">:oh_no:</span></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

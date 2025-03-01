@@ -1,0 +1,266 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Difficulties with Isar proofs and fix · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Difficulties.20with.20Isar.20proofs.20and.20fix.html">[isabelle] Difficulties with Isar proofs and fix</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294057007"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Difficulties%20with%20Isar%20proofs%20and%20fix/near/294057007" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Difficulties.20with.20Isar.20proofs.20and.20fix.html#294057007">(Aug 18 2022 at 11:26)</a>:</h4>
+<p>From: Denis Bueno &lt;<a href="mailto:dbueno@gmail.com">dbueno@gmail.com</a>&gt;<br>
+Hi all,</p>
+<p>I'm having trouble with a proof skeleton that seems like it should<br>
+work (judging from what I've seen from the Isar tutorial and manual),<br>
+but I can't get it to, and I'm not sure why.</p>
+<p>Basically I have a theorem whose conclusion is of the form: ALL x. ...<br>
+(EX y. ... (ALL z. ...)).  I would like to show this by fix'ing an<br>
+arbitrary x, exhibiting a y, and fix'ing an arbitrary z, then<br>
+satisfying the respective bodies of each quantification.  Something<br>
+similar is done as the last example in section 2.4 of the Isar<br>
+tutorial, and it is this example which I'm trying to emulate.</p>
+<p>For what it's worth, I've already proved this theorem in a low-level<br>
+style with a bunch of apply's and tactics.  I'm trying to convert this<br>
+to a real Isar proof (not just one that embeds the apply-style proof).</p>
+<p>theorem proposition_1_oif:<br>
+  assumes S_Prop: "S : Prop"<br>
+  and     S_SP:   "S : SP"<br>
+  shows   lift_S_SHP: "[[S]] : SHP"<br>
+apply (unfold SHP_def, unfold shp_def)<br>
+apply (simp)<br>
+(* at this point the goal is:<br>
+ALL T. T : Prop &amp; T ~: [[ S ]] --&gt;<br>
+           (EX M. M : Obs &amp; M &lt;| T &amp; (ALL T'. T' : Prop &amp; M &lt;| T' --&gt;<br>
+T' ~: [[ S ]]))<br>
+*)<br>
+proof<br>
+  fix T :: property<br>
+  assume T_st: "T : Prop" "T ~: [[S]]"</p>
+<p>obtain M where M_st: "M : Obs" "M &lt;| T" sorry</p>
+<p>fix T' :: property<br>
+  assume T'_st: "T' : Prop" "M &lt;| T'"</p>
+<p>hence "T' ~: [[ S ]]" sorry<br>
+  with T'_st have "T' : Prop &amp; M &lt;| T' --&gt; T' ~: [[ S ]]" by blast<br>
+  hence "ALL T'. T' : Prop &amp; M &lt;| T' --&gt; T' ~: [[ S ]]" ..</p>
+<p>The last step in the proof fails.  I'm not sure why, since it seems to<br>
+me that using the T' fix'd at the beginning, along with its relevant<br>
+constraints, one should be able to show the last goal.  The informal<br>
+argument goes, "Since T' was arbitrary, we know that for *all such<br>
+T'*, such-and-such holds."</p>
+<p>What have I done wrong?</p>
+
+
+
+<a name="294057020"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Difficulties%20with%20Isar%20proofs%20and%20fix/near/294057020" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Difficulties.20with.20Isar.20proofs.20and.20fix.html#294057020">(Aug 18 2022 at 11:26)</a>:</h4>
+<p>From: Amine Chaieb &lt;<a href="mailto:chaieb@in.tum.de">chaieb@in.tum.de</a>&gt;<br>
+Hi Denis,</p>
+<p>I was not able to reproduce your example due to lack of notation (what <br>
+is the &lt;| ?).</p>
+<p>Any way, to this kind of reasoning in Isar, you should use the "{" and <br>
+"}" brackets. This is like a new sheet of paper you take and prove <br>
+something new on it.</p>
+<p>So something like<br>
+  proof<br>
+    fix T :: property<br>
+    assume T_st: "T : Prop" "T ~: [[S]]"</p>
+<p>obtain M where M_st: "M : Obs" "M &lt;| T" sorry</p>
+<p>{<br>
+    fix T' :: property<br>
+    assume T'_st: "T' : Prop" "M &lt;| T'"</p>
+<p>hence "T' ~: [[ S ]]" sorry<br>
+    with T'_st have "T' : Prop &amp; M &lt;| T' --&gt; T' ~: [[ S ]]" by blast<br>
+}<br>
+    hence "ALL T'. T' : Prop &amp; M &lt;| T' --&gt; T' ~: [[ S ]]" ..</p>
+<p>When you leave the context of the brackets, you will see that Isar <br>
+already generalizes your result, i.e. the have "T' : Prop &amp; M &lt;| T' --&gt; <br>
+T' ~: [[ S ]]" <em>inside</em> the brackets, becomes</p>
+<p>"?T' : Prop &amp; M &lt;| ?T' --&gt; ?T' ~: [[ S ]]"</p>
+<p>i.e. generalized for arbitrary T' of type property.</p>
+<p>Hope this helps.</p>
+<p>Amine.</p>
+<p>Denis Bueno wrote:</p>
+
+
+
+<a name="294057033"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Difficulties%20with%20Isar%20proofs%20and%20fix/near/294057033" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Difficulties.20with.20Isar.20proofs.20and.20fix.html#294057033">(Aug 18 2022 at 11:26)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On Mon, 25 Feb 2008, Denis Bueno wrote:</p>
+<blockquote>
+<p>Basically I have a theorem whose conclusion is of the form: ALL x. ...<br>
+(EX y. ... (ALL z. ...)).  I would like to show this by fix'ing an<br>
+arbitrary x, exhibiting a y, and fix'ing an arbitrary z, then<br>
+satisfying the respective bodies of each quantification.</p>
+</blockquote>
+<p>Here is your proof in Isar:</p>
+<p>lemma "ALL x :: 'a. EX y :: 'b. ALL z :: 'c. P x y z"<br>
+proof<br>
+  fix a :: 'a<br>
+  def b == "t :: 'b"<br>
+  have "ALL z. P a b z" <br>
+  proof<br>
+    fix c<br>
+    show "P a b c" sorry<br>
+  qed<br>
+  then show "EX y. ALL z. P a y z" ..<br>
+qed</p>
+<p>(Note that type constraints are needed here, because of the fully abstract <br>
+formulation of the problem and sub-problems.)</p>
+<p>Isar is very ``puristic'' in the sense in being ignorant of predicate <br>
+logic.  The native way of expressing statements and proofs is via the <br>
+Isabelle/Pure logical framework, which provides very powerful means to <br>
+work with higher-order Natural Deduction rules.  Maybe the paper <br>
+<a href="http://www4.in.tum.de/~wenzelm/papers/isar-framework.pdf">http://www4.in.tum.de/~wenzelm/papers/isar-framework.pdf</a> helps to <br>
+understand the basic approach.</p>
+<p>In the above text there are certain situations where single introduction <br>
+or elimination rules get involved; these are made explicit here:</p>
+<p>lemma "ALL x :: 'a. EX y :: 'b. ALL z :: 'c. P x y z"<br>
+proof (rule allI)<br>
+  fix a :: 'a<br>
+  def b == "t :: 'b"<br>
+  have "ALL z. P a b z" <br>
+  proof (rule allI)<br>
+    fix c<br>
+    show "P a b c" sorry<br>
+  qed<br>
+  then show "EX y. ALL z. P a y z" by (rule exI)<br>
+qed</p>
+<p>This is indeed a bit awkward, so one could blame Isar for not supporting <br>
+``standard'' logical connectives more directly.  On the other hand, by <br>
+making proper use of Pure principles, things work out smoothly not just <br>
+for ALL/EX, but any concept you have introduced in your application.  The <br>
+idea is to derive intro/elim rules from your definitions, or even better <br>
+let the system do it for you (using the 'inductive' package) as hinted in <br>
+section 4.6 of the above article.</p>
+<blockquote>
+<p>theorem proposition_1_oif:<br>
+  assumes S_Prop: "S : Prop"<br>
+  and     S_SP:   "S : SP"<br>
+  shows   lift_S_SHP: "[[S]] : SHP"<br>
+apply (unfold SHP_def, unfold shp_def)<br>
+apply (simp)<br>
+(* at this point the goal is:<br>
+ALL T. T : Prop &amp; T ~: [[ S ]] --&gt;<br>
+           (EX M. M : Obs &amp; M &lt;| T &amp; (ALL T'. T' : Prop &amp; M &lt;| T' --&gt;<br>
+T' ~: [[ S ]]))<br>
+*)<br>
+proof<br>
+  fix T :: property<br>
+  assume T_st: "T : Prop" "T ~: [[S]]"</p>
+<p>obtain M where M_st: "M : Obs" "M &lt;| T" sorry</p>
+<p>fix T' :: property<br>
+  assume T'_st: "T' : Prop" "M &lt;| T'"</p>
+<p>hence "T' ~: [[ S ]]" sorry<br>
+  with T'_st have "T' : Prop &amp; M &lt;| T' --&gt; T' ~: [[ S ]]" by blast<br>
+  hence "ALL T'. T' : Prop &amp; M &lt;| T' --&gt; T' ~: [[ S ]]" ..</p>
+</blockquote>
+<p>If you provide a working theory, we can play with it a little.  For the <br>
+moment here are some general hints:</p>
+<p>* The abbreviations 'hence' for 'then have' and 'thus' for 'then show' <br>
+    are better avoided, because they demand much more typing.  This <br>
+    paradox is explained by the experience that the goal prefixing often <br>
+    changes in proof development and massaging, e.g. 'then have' vs. 'from <br>
+    blah have' vs. 'with blubb have' etc.</p>
+<p>* Local facts can be referenced literally, e.g. <code>S : Prop</code> (with ASCII <br>
+    backquotes); no need to emulate the structure of statements in names <br>
+    like S_Prop.</p>
+<p>Makarius</p>
+
+
+
+<a name="294057051"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Difficulties%20with%20Isar%20proofs%20and%20fix/near/294057051" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Difficulties.20with.20Isar.20proofs.20and.20fix.html#294057051">(Aug 18 2022 at 11:26)</a>:</h4>
+<p>From: Denis Bueno &lt;<a href="mailto:dbueno@gmail.com">dbueno@gmail.com</a>&gt;<br>
+Thank you all for your replies.  While I digest them, attached is the<br>
+theory, so that you can play with it.  It requires the LList2 library<br>
+(lazy, infinite lists) available at<br>
+<a href="http://afp.sourceforge.net/entries/Lazy-Lists-II.shtml">http://afp.sourceforge.net/entries/Lazy-Lists-II.shtml</a>.  I'd<br>
+appreciate any comments on my theory.<br>
+<a href="/user_uploads/14278/mafk2ohmUfhGYw-kEnnb2Jzk/Hyper.thy">Hyper.thy</a></p>
+
+
+
+<a name="294057076"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Difficulties%20with%20Isar%20proofs%20and%20fix/near/294057076" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Difficulties.20with.20Isar.20proofs.20and.20fix.html#294057076">(Aug 18 2022 at 11:27)</a>:</h4>
+<p>From: Denis Bueno &lt;<a href="mailto:dbueno@gmail.com">dbueno@gmail.com</a>&gt;<br>
+Well, I've completed the theorem I was having trouble with.  It is<br>
+quite a bit longer than the apply-style proof, though much clearer.<br>
+Any comments that would help me improve its readability and<br>
+conciseness are welcome.  Thank you, Makarius and Amine, for your<br>
+advice.</p>
+
+
+
+<a name="294057088"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Difficulties%20with%20Isar%20proofs%20and%20fix/near/294057088" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Difficulties.20with.20Isar.20proofs.20and.20fix.html#294057088">(Aug 18 2022 at 11:27)</a>:</h4>
+<p>From: Denis Bueno &lt;<a href="mailto:dbueno@gmail.com">dbueno@gmail.com</a>&gt;<br>
+I forgot to attach the proof to the email.  Sorry about that.</p>
+<p>It's attached.<br>
+<a href="/user_uploads/14278/WpzyUpCPnoz2YTBDCbD4A1hK/Hyper.thy">Hyper.thy</a></p>
+
+
+
+<a name="294057113"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Difficulties%20with%20Isar%20proofs%20and%20fix/near/294057113" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Difficulties.20with.20Isar.20proofs.20and.20fix.html#294057113">(Aug 18 2022 at 11:27)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+I've started to look at your proofs, which are quite impressive as your <br>
+second attempt in Isar reasoning only.</p>
+<p>One reason why things turn out a bit long is the general strategy of <br>
+reducing things to predicate logic first, exposing it in the text, and <br>
+then blasting your way through the thicked of quantifiers.  Even in your <br>
+apply scripts, there have been these unfoldings of Pow_def, subset_def <br>
+etc. followed by blast.</p>
+<p>By proving derived natural deduction rules (and declaring them to the <br>
+system as intro/elim, simp/iff etc.) you can work more smoothly without <br>
+the detour through the object-logic.  This simplifies both apply scripts <br>
+and Isar texts.</p>
+<p>Moreover, in proper Isar you can usually avoid extra <code>boiler plate 
+statements'' like </code>have EX x. P x'' before continuing to ``obtain x <br>
+where P x'' --- the latter alone is usually sufficient.  Here is a <br>
+concrete example from your proof of theorem proposition_1_oif:</p>
+<p>fix T :: property<br>
+    assume T_st: "T : Prop" "T ~: [[S]]"</p>
+<p>have t_is: "EX t:T. t ~: S"<br>
+    proof -<br>
+      from T_st have T_not_under_S: "~(T &lt;= S)"<br>
+        unfolding property_lift_def by blast<br>
+      thus ?thesis unfolding subset_def by blast<br>
+    qed<br>
+    then obtain t where t_st: "t : T" "t ~: S" ..</p>
+<p>Here t_is is only ever used to obtain the subsequent t.  The above <br>
+hava/obtain part can be simplified as follows:</p>
+<p>from <code>T ~: [[S]]</code> have "~ T &lt;= S"  by (simp add: property_lift_def)<br>
+    then obtain t where t_st: "t : T" "t ~: S" by blast</p>
+<p>In fact you can also finish the obtain directly in one blow:</p>
+<p>from <code>T ~: [[S]]</code> obtain t where t_st: "t : T" "t ~: S"<br>
+      by (auto simp add: property_lift_def)</p>
+<p>(Here I've merely applied the heuristic that auto somehow combines simp <br>
+and blast.)</p>
+<p>Isar is better at exploiting the power of automated reasoning than apply <br>
+scripts, because the effect can be limited to clearly delimited <br>
+sub-problems.</p>
+<p>Readability should also be kept in mind, of course.  The challenge (and <br>
+high art) in composing good Isar proofs is to expose just the relevant <br>
+bits in the text, and manage to get it accepted by the proof tools.</p>
+<p>Makarius</p>
+
+
+
+<a name="294057123"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Difficulties%20with%20Isar%20proofs%20and%20fix/near/294057123" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Difficulties.20with.20Isar.20proofs.20and.20fix.html#294057123">(Aug 18 2022 at 11:27)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Just note that LList is based on the old HOL/ex/LList; there is also a <br>
+renovated and Isar-ized version in HOL/Library/Coinductive_List. In <br>
+particular, the proof method "coinduct" is used here for well-structured <br>
+coinduction proofs.  Ideally AFP's LList2 would be converted to make use <br>
+of the newer Coinductive_List at some point.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

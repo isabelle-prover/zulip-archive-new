@@ -1,0 +1,168 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Persisting proof data in theory · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Persisting.20proof.20data.20in.20theory.html">[isabelle] Persisting proof data in theory</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="355029943"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Persisting%20proof%20data%20in%20theory/near/355029943" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Persisting.20proof.20data.20in.20theory.html#355029943">(May 02 2023 at 05:26)</a>:</h4>
+<p>From: <a href="mailto:hannobecker@posteo.de">hannobecker@posteo.de</a><br>
+Hi all,</p>
+<p>(How) Is it possible to persist proof data in the surrounding theory?</p>
+<p>I'm logging (in ML) some dynamic data (mostly statistics) about custom <br>
+tactics, storing them in the <code>Proof_Context</code> via the <code>Proof_Data</code> <br>
+mechanism. This allows me to analyze a proof while still within its <br>
+proof block, which has been very useful. I'd now like to persist this <br>
+information in the surrounding theory to allow for multiple proofs (and <br>
+even theories) to be analyzed at once.</p>
+<p>The stored data type supports merging, but naively implementing it as <br>
+<code>Theory_Data</code> modified from within the proof does not work (or I'm doing <br>
+it wrong).</p>
+<p>Are there ways to merge back proof-data into the surrounding theory?</p>
+<p>Thanks!<br>
+Hanno</p>
+
+
+
+<a name="355130276"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Persisting%20proof%20data%20in%20theory/near/355130276" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Persisting.20proof.20data.20in.20theory.html#355130276">(May 02 2023 at 12:11)</a>:</h4>
+<p>From: Thomas Sewell &lt;<a href="mailto:tals4@cam.ac.uk">tals4@cam.ac.uk</a>&gt;<br>
+This will be a little tricky.</p>
+<p>The design is set up so that no data escapes from a proof except for the final theorem. Proofs can then be run in parallel, since all their inputs are known without waiting for other proofs to complete (the theorem is handled specially). If you want to move stats out of a proof into the main context, you'll have to break out of this design somehow, e.g. by using stateful ML references to move data from place to place.</p>
+<p>The timing panel in jEdit gathers some stats. I guess that it works by having each proof step produce output on the PIDE protocol and having the Scala side gather the statistics. You could presumably implement something similar, but extending the inter-language protocol has always seemed far more daunting than adding some ML code. Maybe others have a better idea?</p>
+<p>Good luck,<br>
+    Thomas.</p>
+
+
+
+<a name="355202721"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Persisting%20proof%20data%20in%20theory/near/355202721" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Persisting.20proof.20data.20in.20theory.html#355202721">(May 02 2023 at 16:22)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Good answer --- as first approximation of a difficult problem.</p>
+<p>Conceptually, proofs are indeed formally isolated and strictly "irrelevant".</p>
+<p>You can't "leak" information from proofs, subproofs, proof blocks, without <br>
+violating structural principles of Isabelle/Isar. In retrospect, I am rather <br>
+glad that we have such great principles, and not just an adhoc mess of <br>
+stateful commands as in ancient times.</p>
+<p>Note that within a proof context, you cannot even store anything, that is <br>
+meant to persist outside the current local block.</p>
+<p>Instead, in order to oversee and analyze what is happening in Isabelle <br>
+theories and proofs, the proper approach is to use Isabelle/Scala.</p>
+<p>The most basic mechanism to expose information from Isabelle/ML into the build <br>
+database of Isabelle/Scala is via the ML function Export.export (and some <br>
+variants of it).</p>
+<p>As usual, you will find examples via hypersearch over existing sources. This <br>
+reveals, e.g. src/HOL/Tools/Mirabelle/mirabelle.ML and the corresponding <br>
+mirabelle.scala.</p>
+<p>Here the approach is more advanced than strictly necessary, using a <br>
+user-defined PIDE protocol handler. Alternatively, it is also possible to <br>
+retrieve theory exports from the session build database, like reading a zip <br>
+file. E.g. see "isabelle export" and its Isabelle/Scala implementation in <br>
+src/Pure/Thy/export.scala</p>
+<p>Or you emit regular messages of a special form, e.g. "writeln" or "tracing" <br>
+and then use an approach like "isabelle log" to retrieve the collected <br>
+information in Isabelle/Scala.</p>
+<p>Exports and messages leave the ML world and cannot be retrieved from the <br>
+running ML session. If you need incremental access to your data within ML, the <br>
+Isabelle/Scala approach will not work.</p>
+<p>Instead, you can try to manage your own global state in Isabelle/ML, using <br>
+Synchronized.var or even weak references (together with locks). This requires <br>
+substantial understanding of threads and memory management in Isabelle/ML and <br>
+the Poly/ML runtime system. (Not necessarily at the start of such a project, <br>
+but as a consequence at the successful end of it.)</p>
+<p>Makarius</p>
+
+
+
+<a name="355586873"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Persisting%20proof%20data%20in%20theory/near/355586873" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Persisting.20proof.20data.20in.20theory.html#355586873">(May 03 2023 at 19:10)</a>:</h4>
+<p>From: <a href="mailto:hannobecker@posteo.de">hannobecker@posteo.de</a><br>
+Thank you for the replies!</p>
+<p>If possible, I'd like to go into more detail on how this can be achieved <br>
+in ML, at the cost of breaking structural principles.</p>
+<p>The problem with updating state through references is that I would like <br>
+to be able to roll back state changes when looking at the state of a <br>
+theory prior to a proof vs. after the proof. Within the proof itself, I <br>
+am currently achieving this by introducing a method-wrapper which <br>
+temporarily enables proof-local state updates through references, <br>
+performed by tactics called within the scope of this wrapper (whether <br>
+successful or not). When the wrapper concludes, the state behind the <br>
+reference is then persisted into the proof context. I'd like to play a <br>
+similar 'trick' to persist the so-gathered proof local data into the <br>
+surrounding theory when the proof concludes, but it's not clear where <br>
+exactly that should happen (without writing an adjusted 'lemma' <br>
+top-level command, at least).</p>
+<p>Any further pointers would be most welcome,<br>
+Thank you,<br>
+Hanno</p>
+
+
+
+<a name="355596126"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Persisting%20proof%20data%20in%20theory/near/355596126" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Persisting.20proof.20data.20in.20theory.html#355596126">(May 03 2023 at 19:57)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Breaking structural principles will merely lead to a broken setup --- it is <br>
+not going to work properly.</p>
+<p>It is certainly possible to go beyond the purely functional structures of <br>
+Isabelle/Isar, but it requires a lot of extra considerations about the <br>
+workings of Isabelle/ML and Poly/ML.</p>
+<p>Makarius</p>
+
+
+
+<a name="355598624"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Persisting%20proof%20data%20in%20theory/near/355598624" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Persisting.20proof.20data.20in.20theory.html#355598624">(May 03 2023 at 20:10)</a>:</h4>
+<p>From: <a href="mailto:hannobecker@posteo.de">hannobecker@posteo.de</a><br>
+Thank you Makarius, I understand that it's easy to shoot myself in the <br>
+foot here.<br>
+Yet, in the proof-local situation, things have so far worked well for me <br>
+despite<br>
+somewhat tricky/hacky handling of references, leading to useful insights <br>
+being<br>
+generated. So if, following up on</p>
+
+
+
+<a name="355602150"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Persisting%20proof%20data%20in%20theory/near/355602150" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Persisting.20proof.20data.20in.20theory.html#355602150">(May 03 2023 at 20:31)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On 03/05/2023 22:10, <a href="mailto:hannobecker@posteo.de">hannobecker@posteo.de</a> wrote:</p>
+<blockquote>
+<p>Thank you Makarius, I understand that it's easy to shoot myself in the foot here.<br>
+Yet, in the proof-local situation, things have so far worked well for me despite<br>
+somewhat tricky/hacky handling of references, leading to useful insights being<br>
+generated. So if, following up on</p>
+</blockquote>
+<p>As long as you merely shoot yourself privately, nobody will notice.</p>
+<p>Hopefully such experiments won't come back to the general public, e.g. <br>
+Isabelle/AFP.</p>
+<blockquote>
+<blockquote>
+<p>It is certainly possible to go beyond the purely functional structures<br>
+of Isabelle/Isar, but it requires a lot of extra considerations about<br>
+the workings of Isabelle/ML and Poly/ML.</p>
+</blockquote>
+<p>you had some further pointers on how a ref-based, reversible migration of<br>
+data from the proof context into the theory could work, I'd be grateful.<br>
+Otherwise, I'll likely stick with what I have.</p>
+</blockquote>
+<p>I can't say much on the spot, because I don't know anything about your <br>
+application. The usual Question 0 is: Do you really need what you have in <br>
+mind? Question 1: What do you actually have in mind?</p>
+<p>Often there is a mismatch of what is possible vs. required vs. actually done.</p>
+<p>As a starting point to get acquainted with parallel ML, you can try to work <br>
+with global Synchronized.var maybe together with weak references (to <br>
+participate in ML garbage collection properly). The latter is documented in <br>
+the source: You get to the source by C-hover-click in Isabelle/PIDE on this text:</p>
+<p>ML ‹open Weak›</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

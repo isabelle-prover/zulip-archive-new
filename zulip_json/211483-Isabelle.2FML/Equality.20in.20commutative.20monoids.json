@@ -1,0 +1,50 @@
+[
+    {
+        "content": "<p>Hi. What is the <del>best</del> fastest way of proving the equality of two permuted expressions in a commutative monoid, under the additional assumption that the underlying permutation is actually known? </p>\n<p>So far, I'm just passing the desired equality to the simplifier alongside the associativity + commutativity laws, but (a) this does not benefit from the knowledge of what the permutation is, and (b) I sometimes have schematic entries in the expression, and the simplifier will generate lots of flex-flex pairs when proving the permutation. This seems unnecessary, and has moreover led to infinite loops in other places where e.g. <code>clarify</code> would indefinitely succeed because it keeps renaming flex-flex pairs but not actually changing anything.</p>\n<p>I considered applying the permutation explicitly using conversions, but was put off somewhat by the tedious nature of doing this (the number of 'atomic' conversions one has to apply is actually pretty large...) and the comment from the cookbook that conversions are \"often much less efficient than the simplifier\"</p>\n<p>A third option which I pondered but didn't yet implement was to lift LHS and RHS to folds of multisets and then hope that there's a fast way of proving equality of two multisets. But here, too, I don't know if I should expect this to be any better than the raw simplifier approach.</p>\n<p>Any experience / expectations / suggestions? Thanks!</p>",
+        "id": 348612779,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1681275088
+    },
+    {
+        "content": "<p>Just for the schematics, doesn't using Subgoal.FOCUS fixes all the schematics avoiding all problems of possible unification?</p>",
+        "id": 348615194,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1681276279
+    },
+    {
+        "content": "<p>I am pretty sure that it only fixes the forall-bound parameters, not the schematics</p>",
+        "id": 348646651,
+        "sender_full_name": "Jan van Brügge",
+        "timestamp": 1681286670
+    },
+    {
+        "content": "<p>Maybe we are not talking about the same thing:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"c\">(*f is just for printing*)</span>\n<span class=\"k\">ML</span><span class=\"w\"> </span><span class=\"ss\">\\&lt;open&gt;</span>\n<span class=\"s\">fun f ctxt (x:Subgoal.focus) = (@{print} (x); simp_tac ctxt 0)</span><span class=\"ss\">\\&lt;close&gt;</span>\n\n<span class=\"n\">schematic_goal</span><span class=\"w\"> </span><span class=\"s\">\"2*2 = ?a\"</span><span class=\"w\"> </span><span class=\"kp\">for</span><span class=\"w\"> </span><span class=\"n\">a</span><span class=\"w\"> </span><span class=\"o\">::</span><span class=\"w\"> </span><span class=\"n\">nat</span>\n<span class=\"w\">  </span><span class=\"kp\">apply</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">tactic</span><span class=\"w\"> </span><span class=\"ss\">\\&lt;open&gt;</span><span class=\"s\">HEADGOAL (Subgoal.FOCUS_PREMS (fn _ =&gt; simp_tac @{context} 0) @{context})</span><span class=\"ss\">\\&lt;close&gt;</span><span class=\"o\">)</span>\n<span class=\"w\">   </span><span class=\"c\">(*fails to do anything and cannot instantiate ?a*)</span>\n<span class=\"w\">  </span><span class=\"kp\">apply</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">tactic</span><span class=\"w\"> </span><span class=\"ss\">\\&lt;open&gt;</span><span class=\"s\">HEADGOAL (simp_tac @{context})</span><span class=\"ss\">\\&lt;close&gt;</span><span class=\"o\">)</span>\n<span class=\"w\">   </span><span class=\"c\">(*succeeds*)</span>\n</code></pre></div>",
+        "id": 348658003,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1681289751
+    },
+    {
+        "content": "<p>Yes, I was confusing it with <code>FOCUS_PARAMS</code>, that does also not fix them. I never realized that <code>FOCUS_PREMS</code> does, I rarely use that one</p>",
+        "id": 348674261,
+        "sender_full_name": "Jan van Brügge",
+        "timestamp": 1681292890
+    },
+    {
+        "content": "<p>I don't see a difference between FOCUS and FOCUS_PREMS on this example (and in the code <code> Thm.instantiate_cterm schematics concl</code> is unconditional)</p>",
+        "id": 348683089,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1681294966
+    },
+    {
+        "content": "<p>That is weird, because this:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"n\">schematic_goal</span><span class=\"w\"> </span><span class=\"s\">\"2 * 2 = ?a\"</span><span class=\"w\"> </span><span class=\"kp\">for</span><span class=\"w\"> </span><span class=\"n\">a</span><span class=\"w\"> </span><span class=\"o\">::</span><span class=\"w\"> </span><span class=\"n\">nat</span>\n<span class=\"w\">  </span><span class=\"kp\">apply</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">tactic</span><span class=\"w\"> </span><span class=\"s\">‹HEADGOAL (Subgoal.FOCUS (fn {context=ctxt,...} =&gt;</span>\n<span class=\"s\">    resolve_tac @{context} [refl] 1</span>\n<span class=\"s\">  ) @{context})›</span><span class=\"o\">)</span>\n</code></pre></div>\n<p>does not solve the goal, while</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"n\">schematic_goal</span><span class=\"w\"> </span><span class=\"s\">\"2 * 2 = ?a\"</span><span class=\"w\"> </span><span class=\"kp\">for</span><span class=\"w\"> </span><span class=\"n\">a</span><span class=\"w\"> </span><span class=\"o\">::</span><span class=\"w\"> </span><span class=\"n\">nat</span>\n<span class=\"w\">  </span><span class=\"kp\">apply</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">tactic</span><span class=\"w\"> </span><span class=\"s\">‹HEADGOAL (Subgoal.FOCUS_PREMS (fn {context=ctxt,...} =&gt;</span>\n<span class=\"s\">    resolve_tac @{context} [refl] 1</span>\n<span class=\"s\">  ) @{context})›</span><span class=\"o\">)</span>\n</code></pre></div>\n<p>works (<code>FOCUS_PARAMS</code> also works).</p>",
+        "id": 350115309,
+        "sender_full_name": "Jan van Brügge",
+        "timestamp": 1681549419
+    },
+    {
+        "content": "<p>Hey! I went with pre-generating a bunch of equality theorems for 'picker'-permutations <code>(1,2,...,n) -&gt; (i,1,2,...,)</code>, and then building the desired permutations from those explicitly via conversions. That seems to be working OK.</p>",
+        "id": 351587624,
+        "sender_full_name": "Hanno Becker",
+        "timestamp": 1682075318
+    }
+]

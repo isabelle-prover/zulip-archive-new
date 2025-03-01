@@ -1,0 +1,115 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Code generation for sorts from locales · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20sorts.20from.20locales.html">[isabelle] Code generation for sorts from locales</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294222442"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20for%20sorts%20from%20locales/near/294222442" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20sorts.20from.20locales.html#294222442">(Aug 19 2022 at 08:36)</a>:</h4>
+<p>From: Dmitriy Traytel &lt;<a href="mailto:traytel@in.tum.de">traytel@in.tum.de</a>&gt;<br>
+Hi all,</p>
+<p>I've stumbled across a problem with the dictionary trick for sorts. I'm <br>
+generating code from locales following the guidelines in "Code <br>
+generation from Isabelle/HOL theories" (the Haftmann trick, as Lukas <br>
+calls it).</p>
+<p>Attached is a reduced example where the resulting code contains <br>
+non-linear patterns (for the sort arguments) in the generated <br>
+ML-functions (same for Isabelle2012 and e.g. ac2e29fc57a5).</p>
+<p>Am I doing something wrong?</p>
+<p>Best wishes,<br>
+Dmitriy<br>
+<a href="/user_uploads/14278/zZ2K8--YtgGSuhvUpPmp5k6b/Code.thy">Code.thy</a></p>
+
+
+
+<a name="294222496"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20for%20sorts%20from%20locales/near/294222496" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20sorts.20from.20locales.html#294222496">(Aug 19 2022 at 08:37)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Dmitriy,</p>
+<blockquote>
+<p>theory Code<br>
+imports Main<br>
+begin</p>
+<p>locale A =<br>
+fixes b :: 'b<br>
+and ba :: "'b \&lt;Rightarrow&gt; 'a :: linorder"<br>
+and baa :: "'b \&lt;Rightarrow&gt; 'a \&lt;Rightarrow&gt; 'a :: linorder"<br>
+assumes "baa b a = a"<br>
+begin</p>
+<p>definition code :: "'a \&lt;Rightarrow&gt; 'a" where<br>
+  "code a = baa b a"</p>
+<p>end</p>
+<p>definition my_code where [code del]: "my_code \&lt;equiv&gt; \&lt;lambda&gt;a. A.code a (\&lt;lambda&gt;_. id)"</p>
+<p>interpretation A as id "\&lt;lambda&gt;_. id" where "A.code as (\&lt;lambda&gt;_. id) = my_code as" sorry</p>
+<p>export_code my_code in SML</p>
+<p>end</p>
+</blockquote>
+<p>your experience boils down to the following</p>
+<blockquote>
+<p>definition foo :: "'a ⇒ 'b ⇒ 'b"<br>
+  where "foo x = id"</p>
+<p>lemma [code]:<br>
+  "foo (x :: 'a) = (id :: 'a ⇒ 'a)"<br>
+  by (simp add: foo_def)</p>
+<p>export_code foo in Haskell</p>
+</blockquote>
+<p>i.e. currently the code generator accepts code equations which violate<br>
+the precondition that the type scheme of the constant in the theorem<br>
+(here, 'a =&gt; 'a =&gt; 'a) must match to the type scheme of the constant in<br>
+the theory (here, 'a =&gt; 'b =&gt; 'b).  I will have to investigate this and<br>
+to repair the corresponding check.</p>
+<p>Note that in order for your example to work, you must generalize your<br>
+interpretation to let A.my_code have a suitable type scheme for my_code.</p>
+<p>Thanks a lot,<br>
+    Florian<br>
+<a href="/user_uploads/14278/JlziN95xm85ZFhFTUiQsFLd6/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294222503"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20for%20sorts%20from%20locales/near/294222503" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20sorts.20from.20locales.html#294222503">(Aug 19 2022 at 08:37)</a>:</h4>
+<p>From: Dmitriy Traytel &lt;<a href="mailto:traytel@in.tum.de">traytel@in.tum.de</a>&gt;<br>
+Hi Florian,</p>
+<p>On 16.09.2012 17:34, Florian Haftmann wrote:</p>
+<blockquote>
+<p>your experience boils down to the following</p>
+<blockquote>
+<p>definition foo :: "'a ⇒ 'b ⇒ 'b"<br>
+   where "foo x = id"</p>
+<p>lemma [code]:<br>
+   "foo (x :: 'a) = (id :: 'a ⇒ 'a)"<br>
+   by (simp add: foo_def)</p>
+<p>export_code foo in Haskell<br>
+i.e. currently the code generator accepts code equations which violate<br>
+the precondition that the type scheme of the constant in the theorem<br>
+(here, 'a =&gt; 'a =&gt; 'a) must match to the type scheme of the constant in<br>
+the theory (here, 'a =&gt; 'b =&gt; 'b).  I will have to investigate this and<br>
+to repair the corresponding check.<br>
+I see. At least one out of three keywords in the title of my email was <br>
+appropriate :-)<br>
+Note that in order for your example to work, you must generalize your<br>
+interpretation to let A.my_code have a suitable type scheme for my_code.<br>
+I have restricted the type of my_code instead and it works.</p>
+</blockquote>
+</blockquote>
+<p>Thanks!</p>
+<p>Dmitriy</p>
+
+
+
+<a name="294222859"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generation%20for%20sorts%20from%20locales/near/294222859" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generation.20for.20sorts.20from.20locales.html#294222859">(Aug 19 2022 at 08:40)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+See now <a href="http://isabelle.in.tum.de/reports/Isabelle/rev/791e6fc53f73">http://isabelle.in.tum.de/reports/Isabelle/rev/791e6fc53f73</a></p>
+<p>Florian<br>
+<a href="/user_uploads/14278/7sQJCbKYEfFDK-AFlM4y2sK0/signature.asc">signature.asc</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

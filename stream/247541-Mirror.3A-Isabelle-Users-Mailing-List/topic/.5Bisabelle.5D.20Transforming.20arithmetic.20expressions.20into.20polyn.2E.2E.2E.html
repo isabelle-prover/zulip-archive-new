@@ -1,0 +1,158 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Transforming arithmetic expressions into polyn... · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Transforming.20arithmetic.20expressions.20into.20polyn.2E.2E.2E.html">[isabelle] Transforming arithmetic expressions into polyn...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="396077518"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Transforming%20arithmetic%20expressions%20into%20polyn.../near/396077518" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Transforming.20arithmetic.20expressions.20into.20polyn.2E.2E.2E.html#396077518">(Oct 11 2023 at 12:23)</a>:</h4>
+<p>From: Eero Pomell &lt;<a href="mailto:eero.the.engineer@gmail.com">eero.the.engineer@gmail.com</a>&gt;<br>
+Hi, I'm trying to implement code that transforms an arithmetic expression<br>
+into a polynomial which is represented as a list of its coefficients. For<br>
+example 1 + 2x + 3x^2 would be [1,2,3], a single variable 'x' would be<br>
+[0,1] and a constant 'n' would be [n].</p>
+<p><em>The algorithm works as follows:</em></p>
+<ul>
+<li>
+<p>'coeffs' takes as input an expression and outputs the list, it works<br>
+recursively on complex expressions like 1 + 2x + 3x^2</p>
+</li>
+<li>
+<p>'addcoef' does list addition by adding the corresponding coefficients in<br>
+the two lists, for example the polynomials 1 + 2x and 3 + 4x are [1,2] and<br>
+[3,4], and their addition [1,2] + [3,4] = [4,6], since (1 + 2x) + (3 + 4x)<br>
+= 4 + 6x</p>
+</li>
+<li>
+<p>'multcoef' does list multiplication. For each coefficient in the first<br>
+list, it multiplies by every term in the second list; these lists are then<br>
+added together. For example [1,2] * [3,4] = [1<em>3,1</em>4] + 0 # [2<em>3,2</em>4]; It<br>
+works recursively and the '0' is appended to take into account the power of<br>
+the coefficients.</p>
+</li>
+</ul>
+<p><em>The code that implements the algorithm</em></p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">datatype</span><span class="w"> </span><span class="n">exp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Var</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Const</span><span class="w"> </span><span class="n">int</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Add</span><span class="w"> </span><span class="n">exp</span><span class="w"> </span><span class="n">exp</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Mult</span><span class="w"> </span><span class="n">exp</span><span class="w"> </span><span class="n">exp</span>
+
+<span class="k">fun</span><span class="w"> </span><span class="n">addcoef</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">"int list ⇒ int list ⇒ int list"</span><span class="w"> </span><span class="kp">where</span>
+<span class="w">  </span><span class="s">"addcoef xs [] = xs"</span><span class="w"> </span><span class="o">|</span>
+<span class="w">  </span><span class="s">"addcoef [] xs = xs"</span><span class="w"> </span><span class="o">|</span>
+<span class="w">  </span><span class="s">"addcoef (x#xs) (y#ys) = (x + y) # addcoef xs ys"</span>
+
+<span class="k">fun</span><span class="w"> </span><span class="n">multcoef</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">"int list ⇒ int list ⇒ int list"</span><span class="w"> </span><span class="kp">where</span>
+<span class="w">  </span><span class="s">"multcoef [] _ = []"</span><span class="w"> </span><span class="o">|</span>
+<span class="w">  </span><span class="s">"multcoef _ [] = []"</span><span class="w"> </span><span class="o">|</span>
+<span class="w">  </span><span class="s">"multcoef (x#xs) ys = addcoef (map (λy. x * y) ys) (0 # multcoef xs ys)"</span>
+
+<span class="k">primrec</span><span class="w"> </span><span class="n">coeffs</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">"exp ⇒ int list"</span><span class="w"> </span><span class="kp">where</span>
+<span class="w">  </span><span class="s">"coeffs Var = [0,1]"</span><span class="w"> </span><span class="o">|</span>
+<span class="w">  </span><span class="s">"coeffs (Const n) = [n]"</span><span class="w"> </span><span class="o">|</span>
+<span class="w">  </span><span class="s">"coeffs (Add e1 e2) = addcoef (coeffs e1) (coeffs e2)"</span><span class="w"> </span><span class="o">|</span>
+<span class="w">  </span><span class="s">"coeffs (Mult e1 e2) = multcoef (coeffs e1) (coeffs e2)"</span>
+</code></pre></div>
+<p><em>The problem</em><br>
+I have these functions for evaluating expressions and polynomials:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">primrec</span><span class="w"> </span><span class="n">eval</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">"exp ⇒ int ⇒ int"</span><span class="w"> </span><span class="kp">where</span>
+<span class="w">  </span><span class="s">"eval Var x = x"</span><span class="w"> </span><span class="o">|</span>
+<span class="w">  </span><span class="s">"eval (Const a) x = a"</span><span class="w"> </span><span class="o">|</span>
+<span class="w">  </span><span class="s">"eval (Add a b) x = eval a x + eval b x"</span><span class="w"> </span><span class="o">|</span>
+<span class="w">  </span><span class="s">"eval (Mult a b) x = eval a x * eval b x"</span>
+
+<span class="k">primrec</span><span class="w"> </span><span class="n">evalp</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">"int list ⇒ int ⇒ int"</span><span class="w"> </span><span class="kp">where</span>
+<span class="w">  </span><span class="s">"evalp [] x = 0"</span><span class="w"> </span><span class="o">|</span>
+<span class="w">  </span><span class="s">"evalp (a#as) x = a + x * evalp as x"</span>
+</code></pre></div>
+<p>I'm trying to prove that <code>coeffs</code> preserves the value of the expression by<br>
+proving: lemma "∀ x. evalp (coeffs e) x = eval e x"<br>
+I haven't been able to prove the 'multcoef' case.<br>
+Here is the code and at the end are details about remaining proof state:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="c">(* needed for addcoef_evalp *)</span>
+<span class="kn">lemma</span><span class="w"> </span><span class="o">[</span><span class="n">simp</span><span class="o">]:</span><span class="w"> </span><span class="s">"addcoef [] xs = xs"</span>
+<span class="w">  </span><span class="kp">apply</span><span class="o">(</span><span class="n">induction</span><span class="w"> </span><span class="n">xs</span><span class="o">)</span>
+<span class="w">   </span><span class="kp">apply</span><span class="o">(</span><span class="n">auto</span><span class="o">)</span>
+<span class="w">  </span><span class="k">done</span>
+
+<span class="c">(* needed for the main lemma *)</span>
+<span class="kn">lemma</span><span class="w"> </span><span class="n">addcoef_evalp</span><span class="o">[</span><span class="n">simp</span><span class="o">]:</span><span class="w"> </span><span class="s">"∀ x. evalp (addcoef xs ys) x = evalp xs x +</span>
+<span class="s">evalp ys x"</span>
+<span class="w">  </span><span class="kp">apply</span><span class="o">(</span><span class="n">induction</span><span class="w"> </span><span class="n">xs</span><span class="w"> </span><span class="n">rule</span><span class="o">:</span><span class="w"> </span><span class="n">addcoef.induct</span><span class="o">)</span>
+<span class="w">    </span><span class="kp">apply</span><span class="o">(</span><span class="n">simp_all</span><span class="w"> </span><span class="n">add</span><span class="o">:</span><span class="w"> </span><span class="n">algebra_simps</span><span class="o">)</span>
+<span class="w">  </span><span class="k">done</span>
+
+<span class="c">(* for multcoef_evalp *)</span>
+<span class="kn">lemma</span><span class="w"> </span><span class="o">[</span><span class="n">simp</span><span class="o">]:</span><span class="w"> </span><span class="s">"multcoef xs [] = []"</span>
+<span class="w">  </span><span class="kp">apply</span><span class="o">(</span><span class="n">induction</span><span class="w"> </span><span class="n">xs</span><span class="o">)</span>
+<span class="w">   </span><span class="kp">apply</span><span class="w"> </span><span class="n">auto</span>
+<span class="w">  </span><span class="k">done</span>
+
+<span class="c">(* for main lemma *)</span>
+<span class="kn">lemma</span><span class="w"> </span><span class="n">multcoef_evalp</span><span class="o">[</span><span class="n">simp</span><span class="o">]:</span><span class="w"> </span><span class="s">"∀ x. evalp (multcoef xs ys) x = evalp xs x *</span>
+<span class="s">evalp ys x"</span>
+<span class="w">  </span><span class="kp">apply</span><span class="o">(</span><span class="n">induction</span><span class="w"> </span><span class="n">xs</span><span class="w"> </span><span class="n">rule</span><span class="o">:</span><span class="w"> </span><span class="n">multcoef.induct</span><span class="o">)</span>
+<span class="w">  </span><span class="kp">apply</span><span class="o">(</span><span class="n">auto</span><span class="o">)</span>
+<span class="w">  </span><span class="gr">oops</span>
+
+<span class="kn">lemma</span><span class="w"> </span><span class="s">"∀ x. evalp (coeffs e) x = eval e x"</span>
+<span class="w">  </span><span class="kp">apply</span><span class="o">(</span><span class="n">induction</span><span class="w"> </span><span class="n">e</span><span class="o">)</span>
+<span class="w">  </span><span class="kp">apply</span><span class="o">(</span><span class="n">auto</span>
+</code></pre></div>
+<p>At the multcoef_evalp, the proof state is:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">proof</span><span class="w"> </span><span class="o">(</span><span class="n">prove</span><span class="o">)</span>
+<span class="n">goal</span><span class="w"> </span><span class="o">(</span><span class="n">1</span><span class="w"> </span><span class="n">subgoal</span><span class="o">):</span>
+<span class="w"> </span><span class="n">1.</span><span class="w"> </span><span class="n">⋀x</span><span class="w"> </span><span class="n">xs</span><span class="w"> </span><span class="n">v</span><span class="w"> </span><span class="n">va</span><span class="w"> </span><span class="n">xa.</span>
+<span class="w">       </span><span class="n">∀x.</span><span class="w"> </span><span class="n">evalp</span><span class="w"> </span><span class="o">(</span><span class="n">multcoef</span><span class="w"> </span><span class="o">(</span><span class="n">v</span><span class="w"> </span><span class="n">#</span><span class="w"> </span><span class="n">va</span><span class="o">)</span><span class="w"> </span><span class="n">xs</span><span class="o">)</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span>
+<span class="w">           </span><span class="o">(</span><span class="n">v</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="n">*</span><span class="w"> </span><span class="n">evalp</span><span class="w"> </span><span class="n">va</span><span class="w"> </span><span class="n">x</span><span class="o">)</span><span class="w"> </span><span class="n">*</span><span class="w"> </span><span class="n">evalp</span><span class="w"> </span><span class="n">xs</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="n">⟹</span>
+<span class="w">       </span><span class="n">v</span><span class="w"> </span><span class="n">*</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">+</span>
+<span class="w">       </span><span class="n">xa</span><span class="w"> </span><span class="n">*</span>
+<span class="w">       </span><span class="o">(</span><span class="n">evalp</span><span class="w"> </span><span class="o">(</span><span class="n">map</span><span class="w"> </span><span class="o">(</span><span class="c">(*) v) xs) xa +</span>
+<span class="c">        evalp (multcoef va (x # xs)) xa) =</span>
+<span class="c">       (v + xa * evalp va xa) * (x + xa * evalp xs xa)</span>
+</code></pre></div>
+<p>At the main lemma, the proof state is:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">proof</span><span class="w"> </span><span class="o">(</span><span class="n">prove</span><span class="o">)</span>
+<span class="n">goal</span><span class="w"> </span><span class="o">(</span><span class="n">1</span><span class="w"> </span><span class="n">subgoal</span><span class="o">):</span>
+<span class="w"> </span><span class="n">1.</span><span class="w"> </span><span class="n">⋀e1</span><span class="w"> </span><span class="n">e2</span><span class="w"> </span><span class="n">x.</span>
+<span class="w">       </span><span class="n">⟦∀x.</span><span class="w"> </span><span class="n">evalp</span><span class="w"> </span><span class="o">(</span><span class="n">coeffs</span><span class="w"> </span><span class="n">e1</span><span class="o">)</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">eval</span><span class="w"> </span><span class="n">e1</span><span class="w"> </span><span class="n">x;</span>
+<span class="w">        </span><span class="n">∀x.</span><span class="w"> </span><span class="n">evalp</span><span class="w"> </span><span class="o">(</span><span class="n">coeffs</span><span class="w"> </span><span class="n">e2</span><span class="o">)</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">eval</span><span class="w"> </span><span class="n">e2</span><span class="w"> </span><span class="n">x⟧</span>
+<span class="w">       </span><span class="n">⟹</span><span class="w"> </span><span class="n">evalp</span><span class="w"> </span><span class="o">(</span><span class="n">multcoef</span><span class="w"> </span><span class="o">(</span><span class="n">coeffs</span><span class="w"> </span><span class="n">e1</span><span class="o">)</span><span class="w"> </span><span class="o">(</span><span class="n">coeffs</span><span class="w"> </span><span class="n">e2</span><span class="o">))</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span>
+<span class="w">           </span><span class="n">eval</span><span class="w"> </span><span class="n">e1</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="n">*</span><span class="w"> </span><span class="n">eval</span><span class="w"> </span><span class="n">e2</span><span class="w"> </span><span class="n">x</span>
+</code></pre></div>
+<p>Therefore the only thing I have left to prove is the multcoef_evalp lemma.<br>
+How could I prove it?</p>
+
+
+
+<a name="396079440"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Transforming%20arithmetic%20expressions%20into%20polyn.../near/396079440" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Transforming.20arithmetic.20expressions.20into.20polyn.2E.2E.2E.html#396079440">(Oct 11 2023 at 12:34)</a>:</h4>
+<p>From: Wenda Li &lt;<a href="mailto:wl302@cam.ac.uk">wl302@cam.ac.uk</a>&gt;<br>
+Hi Eero,</p>
+<p>As you are working with univariate polynomials, proofs from HOL-Computational_Algebra.Polynomial (<a href="https://isabelle.in.tum.de/dist/library/HOL/HOL-Computational_Algebra/Polynomial.html">https://isabelle.in.tum.de/dist/library/HOL/HOL-Computational_Algebra/Polynomial.html</a>) might give you some hints about how to progress.</p>
+<p>Best,<br>
+Wenda</p>
+
+
+
+<a name="396867125"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Transforming%20arithmetic%20expressions%20into%20polyn.../near/396867125" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Transforming.20arithmetic.20expressions.20into.20polyn.2E.2E.2E.html#396867125">(Oct 16 2023 at 10:08)</a>:</h4>
+<p>From: Stepan Holub &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Hi,</p>
+<p>did you study<br>
+HOL/Algebra/Polynomials.thy<br>
+from the distribution?<br>
+A polynomial multiplication is defined there. It could also help you to <br>
+understand problems with your own code.<br>
+In general, before implementing anything, in particular something as <br>
+basic as polynomials, it is a good idea to look at what is already <br>
+available.<br>
+Both to use it, and to learn.</p>
+<p>Stepan</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

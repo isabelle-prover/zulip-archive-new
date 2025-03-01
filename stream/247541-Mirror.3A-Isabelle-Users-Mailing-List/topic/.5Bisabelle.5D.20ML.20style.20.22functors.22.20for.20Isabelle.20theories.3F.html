@@ -1,0 +1,194 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] ML style &quot;functors&quot; for Isabelle theories? · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20ML.20style.20.22functors.22.20for.20Isabelle.20theories.3F.html">[isabelle] ML style &quot;functors&quot; for Isabelle theories?</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="204389673"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20ML%20style%20%22functors%22%20for%20Isabelle%20theories%3F/near/204389673" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20ML.20style.20.22functors.22.20for.20Isabelle.20theories.3F.html#204389673">(Jul 20 2020 at 06:17)</a>:</h4>
+<p>From: "Dr. Brendan Patrick Mahony" &lt;<a href="mailto:mahonybp@tpg.com.au">mahonybp@tpg.com.au</a>&gt;<br>
+Isabelle’s mathematical structuring facilities, classes and locales, have well known scopes that preclude some otherwise attractive modelling approaches.</p>
+<p>For example, the AFP has three approaches to category theory that model a category’s carrier classes of objects and arrows as types.</p>
+<p><a href="https://www.isa-afp.org/browser_info/current/AFP/Category/document.pdf">https://www.isa-afp.org/browser_info/current/AFP/Category/document.pdf</a> &lt;<a href="https://www.isa-afp.org/browser_info/current/AFP/Category/document.pdf">https://www.isa-afp.org/browser_info/current/AFP/Category/document.pdf</a>&gt;<br>
+<a href="https://www.isa-afp.org/entries/Category2.html">https://www.isa-afp.org/entries/Category2.html</a> &lt;<a href="https://www.isa-afp.org/entries/Category2.html">https://www.isa-afp.org/entries/Category2.html</a>&gt;<br>
+<a href="https://www.isa-afp.org/entries/Category3.html">https://www.isa-afp.org/entries/Category3.html</a> </p>
+<p>Besides the pure mathematical constraints this places of the classes of category instances (much of which is I guess inherent to the use of HOL), this also brings a degree of applied mathematical pain in that it would frequently be convenient in a practical reasoning sense to model objects and arrows as classes of types, so as to make use of a type overloaded arrow composition operator and enjoy all the reasoning safety benefits of HOL strong typing. </p>
+<p>This can of course be done for any desired category, some examples </p>
+<p>Set:</p>
+<p>class cat_obj = small</p>
+<p>typedef<br>
+  ('a, 'b) cat_arrow = "{ f :: ('a::cat_obj) ⇒ ('b::cat_obj). True}"<br>
+  by (auto)</p>
+<p>definition<br>
+  cat_compose :: "('a::cat_obj, 'b::cat_obj) cat_arrow ⇒ ('b, 'c::cat_obj) cat_arrow ⇒ ('a, 'c) cat_arrow"<br>
+  where<br>
+    "cat_compose f g = Abs_cat_arrow ((Rep_cat_arrow g) ∘ (Rep_cat_arrow f))"</p>
+<p>definition<br>
+  cat_id :: "('a::cat_obj, 'a) cat_arrow"<br>
+  where<br>
+    "cat_id = Abs_cat_arrow id"</p>
+<p>lemma cat_left_id: <br>
+  "cat_compose cat_id a = a" <br>
+  by (auto simp add: cat_compose_def cat_id_def Abs_cat_arrow_inverse Rep_cat_arrow_inverse)</p>
+<p>lemma cat_right_id: <br>
+  "cat_compose a cat_id = a"  <br>
+  by (auto simp add: cat_compose_def cat_id_def Abs_cat_arrow_inverse Rep_cat_arrow_inverse)</p>
+<p>lemma cat_comp_assoc: <br>
+  "cat_compose (cat_compose a b) c = cat_compose a (cat_compose b c)"<br>
+  by (auto simp add: cat_compose_def cat_id_def Abs_cat_arrow_inverse Rep_cat_arrow_inverse comp_assoc)</p>
+<p>Grp:</p>
+<p>class cat_obj = group_add</p>
+<p>typedef (overloaded)<br>
+  ('a, 'b) cat_arrow = "{ f :: ('a::cat_obj) ⇒ ('b::cat_obj). (∀ a b. f (a + b) = f a + f b) }"<br>
+  apply (rule_tac x = "(λ a. 0)" in exI)<br>
+  apply (auto)<br>
+  done</p>
+<p>definition<br>
+  cat_compose :: "('a::cat_obj, 'b::cat_obj) cat_arrow ⇒ ('b, 'c::cat_obj) cat_arrow ⇒ ('a, 'c) cat_arrow"<br>
+  where<br>
+    "cat_compose f g = Abs_cat_arrow ((Rep_cat_arrow g) ∘ (Rep_cat_arrow f))"</p>
+<p>lemma cat_compose_wf:<br>
+  assumes<br>
+    a1: "f ∈ { f :: ('b::cat_obj) ⇒ ('c::cat_obj). (∀ a b. f (a + b) = f a + f b) }" and<br>
+    a2: "g ∈ { f :: ('a::cat_obj) ⇒ ('b::cat_obj). (∀ a b. f (a + b) = f a + f b) }"<br>
+  shows<br>
+    "f ∘ g ∈ { f :: ('a::cat_obj) ⇒ ('c::cat_obj). (∀ a b. f (a + b) = f a + f b) }"<br>
+  using assms<br>
+  by (auto)</p>
+<p>definition<br>
+  cat_id :: "('a::cat_obj, 'a) cat_arrow"<br>
+  where<br>
+    "cat_id = Abs_cat_arrow id"</p>
+<p>lemma cat_left_id: <br>
+  "cat_compose cat_id a = a" <br>
+  by (auto simp add: cat_compose_def cat_id_def Abs_cat_arrow_inverse Rep_cat_arrow_inverse)</p>
+<p>lemma cat_right_id: <br>
+  "cat_compose a cat_id = a"  <br>
+  by (auto simp add: cat_compose_def cat_id_def Abs_cat_arrow_inverse Rep_cat_arrow_inverse)</p>
+<p>lemma cat_comp_assoc: <br>
+  "cat_compose (cat_compose a b) c = cat_compose a (cat_compose b c)"<br>
+  by (auto simp add: cat_compose_def cat_id_def Rep_cat_arrow_inverse comp_assoc <br>
+                     Abs_cat_arrow_inverse [OF cat_compose_wf [OF Rep_cat_arrow Rep_cat_arrow]])</p>
+<p>This is nice for “using" these categories in modelling efforts, but not so nice for doing category “theory” and in particular developing a class of category operators and associated properties that are shared by all by all instances. You know, the sort of instancing power offered by classes and locales. </p>
+<p>My naive solution is to define an axiomatised “signature” theory for category theory and do all the abstract (repeatable) reasoning there.</p>
+<p>theory Category_Sig</p>
+<p>imports<br>
+  Main</p>
+<p>begin</p>
+<p>class<br>
+  cat_obj</p>
+<p>typedecl<br>
+  ('a, 'b) cat_arrow</p>
+<p>consts<br>
+  cat_compose :: "('a::cat_obj, 'b::cat_obj) cat_arrow ⇒ ('b, 'c::cat_obj) cat_arrow ⇒ ('a, 'c) cat_arrow"</p>
+<p>consts<br>
+  cat_id :: "('a::cat_obj, 'a) cat_arrow"</p>
+<p>axiomatization where<br>
+    cat_left_id: "cat_compose cat_id a = a" and<br>
+    cat_right_id: "cat_compose a cat_id = a" and<br>
+    cat_comp_assoc: "cat_compose (cat_compose a b) c = cat_compose a (cat_compose b c)"</p>
+<p>context<br>
+begin</p>
+<p>notation<br>
+  cat_compose (infixr "∘⇩♭" 55)</p>
+<p>notation<br>
+  cat_id ("ι⇩♭")</p>
+<p>qualified lemma inv_uniq:<br>
+  assumes<br>
+    a1: "f ∘⇩♭ g = cat_id" and<br>
+    a2: "h ∘⇩♭ f = cat_id"<br>
+  shows<br>
+    "g = h"<br>
+proof -<br>
+  have<br>
+    "g = ι⇩♭ ∘⇩♭ g"<br>
+    by (rule cat_left_id [symmetric])<br>
+  also have "…<br>
+    = (h ∘⇩♭ f) ∘⇩♭ g"<br>
+    by (simp add: a2)<br>
+  also have "…<br>
+    = h ∘⇩♭ (f ∘⇩♭ g)"<br>
+    by (simp add: cat_comp_assoc)<br>
+  also have "…<br>
+    = h ∘⇩♭ ι⇩♭"<br>
+    by (simp add: a1)<br>
+  also have "…<br>
+    = h"<br>
+    by (rule cat_right_id)<br>
+  finally show<br>
+   "g = h"<br>
+    by (this)<br>
+qed</p>
+<p>end</p>
+<p>end</p>
+<p>Then I can use textual replacement to make copies of the signature theory and "drop in” the appropriate definitions to replace the axiomatisations, global replace the \&lt;flat&gt; subscript, etc … to get the desired instance theories.</p>
+<p>Any pointers to more sophisticated approaches? (Should note that categories are not my actual algebraic target here, just a convenient and easily understood example)</p>
+<p>It seems to suggest to me that it would be nice to have a theory “functor” facility analogous to the structure “functor" facility of standard ML.</p>
+<p>Does anyone have any pointers to (Isabelle) work in this direction?</p>
+<p>I noted with interest an MMT/LF paper in the recent LFMTP workshop that seemed to be suggesting something similar, but I think a bit more general </p>
+<p>@inproceedings{Roux:2020a,<br>
+    Author = {Navid Roux and Florian Rabe},<br>
+    Booktitle = {Logical Frameworks and Meta Languages: Theory and Practice},<br>
+    Title = {Diagram Operators in a Logical Framework},<br>
+    Year = {2020}}</p>
+
+
+
+<a name="204599060"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20ML%20style%20%22functors%22%20for%20Isabelle%20theories%3F/near/204599060" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20ML.20style.20.22functors.22.20for.20Isabelle.20theories.3F.html#204599060">(Jul 21 2020 at 20:27)</a>:</h4>
+<p>From: Mikhail Chekhov &lt;<a href="mailto:mikhail.chekhov.w@gmail.com">mikhail.chekhov.w@gmail.com</a>&gt;<br>
+Dear Brendan Patrick Mahony/All,</p>
+<p>I would like to make a side remark for your question.</p>
+<p>At one point, I did think about developing an infrastructure for the<br>
+definition of generic 'meta-theories' by using implicit quantification over<br>
+types modelled via the use of the schematic type variables (see<br>
+<a href="https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2019-September/msg00095.html">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2019-September/msg00095.html</a><br>
+and,<br>
+more importantly, the reply). For this to work, one would need to write<br>
+Isabelle/ML infrastructure that can generate an 'instance' of (for example)<br>
+category theory on demand for a given set of constants like group,<br>
+group_hom, etc. This is certainly possible (see the screenshot and please<br>
+ignore all aspects not directly related to the software infrastructure that<br>
+the screenshot is meant to demonstrate), but, for me, the amount of effort<br>
+required seemed to be unsurmountable. The advantage of this approach is<br>
+that it does not require any new axioms to be added to Isabelle/HOL.</p>
+<p>Since then, I have converged on the idea that it is best to use an<br>
+extension of HOL (e.g. ZFC in HOL or HOTG) and allow the 'meta-theory' and<br>
+the 'object-theory' to coexist using only the standard techniques. In the<br>
+context of such extensions, this means that the 'object-theory' will be<br>
+limited to some reasonably small set (e.g. V(ω+ω)). Of course, once such<br>
+theory is developed, one might be able to develop an infrastructure for the<br>
+translation of concepts across isomorphisms, under the limitation of size<br>
+only (I am not certain how easy and well automated this could become). I<br>
+have been doing some work in this direction for a certain time. The<br>
+foundational part of my development is available here:<br>
+<a href="https://gitlab.com/user9716869/czh_foundations">https://gitlab.com/user9716869/czh_foundations</a> (more applied concepts are<br>
+still in a very transient state and not available publicly). However, most<br>
+likely, this work will be superseded by HOTG that is being developed by<br>
+Alexander Krauss, Kevin Kappelmann and Joshua Chen (see<br>
+<a href="https://bitbucket.org/cezaryka/tyset/src">https://bitbucket.org/cezaryka/tyset/src</a>).</p>
+<p>Kind Regards,<br>
+Mikhail Chekhov<br>
+<a href="/user_uploads/14278/qzeovXYKHkBcOTGZYrV9cyXu/MCATS.png">MCATS.png</a></p>
+<div class="message_inline_image"><a href="/user_uploads/14278/qzeovXYKHkBcOTGZYrV9cyXu/MCATS.png" title="MCATS.png"><img src="/user_uploads/14278/qzeovXYKHkBcOTGZYrV9cyXu/MCATS.png"></a></div>
+
+
+
+<a name="204610850"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20ML%20style%20%22functors%22%20for%20Isabelle%20theories%3F/near/204610850" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20ML.20style.20.22functors.22.20for.20Isabelle.20theories.3F.html#204610850">(Jul 21 2020 at 22:37)</a>:</h4>
+<p>From: Mikhail Chekhov &lt;<a href="mailto:mikhail.chekhov.w@gmail.com">mikhail.chekhov.w@gmail.com</a>&gt;<br>
+Dear All,</p>
+<p>I forgot to provide references for my previous post in this thread. It was<br>
+not my intention to put an emphasis on the references, as they contain<br>
+well-known foundational material, but I do feel awkward for omitting them<br>
+from my post and feel the need to correct this.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

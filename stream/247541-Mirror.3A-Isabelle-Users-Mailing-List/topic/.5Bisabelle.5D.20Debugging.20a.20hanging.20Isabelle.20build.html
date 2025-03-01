@@ -1,0 +1,212 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Debugging a hanging Isabelle build · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Debugging.20a.20hanging.20Isabelle.20build.html">[isabelle] Debugging a hanging Isabelle build</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="341693401"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Debugging%20a%20hanging%20Isabelle%20build/near/341693401" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Debugging.20a.20hanging.20Isabelle.20build.html#341693401">(Mar 14 2023 at 11:42)</a>:</h4>
+<p>From: Dominic Mulligan &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Hi,</p>
+<p>I am working with Isabelle/HOL on a fairly large development (tens of<br>
+thousands of lines of code).  As part of our build process we have a CI<br>
+setup using a Docker container and Gitlab runners.  Unfortunately, this has<br>
+suddenly started hanging after adding <code>Word_Lib</code> from the AFP as an<br>
+external dependency via the Isabelle components mechanism, as recommended<br>
+on the AFP website.</p>
+<p>Mysteriously, this development builds locally on our Apple M1 Mac Pros that<br>
+we use for development but is now hanging when it is about to complete the<br>
+checking of one of our sessions (which is the first to use <code>Word_Lib</code> as a<br>
+dependency).  There is nothing particularly complex about this session–––in<br>
+fact it is one of our simplest, as it merely consists of around five theory<br>
+files containing definitions and some modest theorems.  It should not<br>
+therefore be particularly taxing to check.  Nevertheless, CI now reliably<br>
+stalls when completing the checking of this session, as attested by running<br>
+<code>isabelle build</code> with the verbose flag option.  This shows all theories in<br>
+the session (and those relevant in <code>Word_Lib</code>) being gradually checked by<br>
+Isabelle but then fails to progress any further in the build when it is<br>
+just about to complete checking.  After one hour of stalled checking our CI<br>
+run times out–––the full development only takes approximately 30 minutes to<br>
+check locally.</p>
+<p>We have tried bumping up the resource limits on the Gitlab runner to no<br>
+avail (it is running on our largest available runner with memory resources<br>
+far in excess of what our laptops offer).  Both development and Gitlab<br>
+runner are using the same instruction set architecture (AArch64).  I've<br>
+tried reducing the maximum number of parallel jobs down to the default and<br>
+that hasn't helped either.</p>
+<p>Is there anything further that can be done to narrow down what, exactly, is<br>
+going wrong with the build?</p>
+<p>Thanks,<br>
+Dominic</p>
+
+
+
+<a name="341822318"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Debugging%20a%20hanging%20Isabelle%20build/near/341822318" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Debugging.20a.20hanging.20Isabelle.20build.html#341822318">(Mar 14 2023 at 15:06)</a>:</h4>
+<p>From: Fabian Huch &lt;<a href="mailto:huch@in.tum.de">huch@in.tum.de</a>&gt;<br>
+You can always attach a debugger to the Isabelle/Scala JVM process and <br>
+see where it pauses.</p>
+<p>Do you use the official docker image? If not, I would generally assume <br>
+that the environment in the container is misconfigured - e.g., <br>
+file-system, user permission problems, missing system packages.</p>
+<p>If you are using the official image, I would check if SElinux is <br>
+preventing files in the docker environment from being written <br>
+(temporarily disabling it may give you answers).</p>
+<p>Fabian</p>
+
+
+
+<a name="342014315"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Debugging%20a%20hanging%20Isabelle%20build/near/342014315" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Debugging.20a.20hanging.20Isabelle.20build.html#342014315">(Mar 15 2023 at 10:33)</a>:</h4>
+<p>From: Dominic Mulligan &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Hi Fabian,</p>
+<p>Thanks for the suggestions.  We are not using the official Docker image but<br>
+one that we developed ourselves.  After more experimentation I'm fairly<br>
+confident that the problem is not in the Docker container.  In the end I<br>
+managed to fix the hanging build by reconfiguring our build system to use<br>
+an AMD64 runner rather than AArch64 with no other changes.  Obviously<br>
+the fix is confounded somewhat by the need to use a different build of<br>
+Isabelle, along with a different Ubuntu build–––and its attendant<br>
+userspace–––in the two containers, but it's somewhat suggestive that<br>
+there's something potentially deeper going on to cause the apparent<br>
+deadlock...</p>
+<p>Thanks,<br>
+Dominic</p>
+
+
+
+<a name="342033301"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Debugging%20a%20hanging%20Isabelle%20build/near/342033301" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Debugging.20a.20hanging.20Isabelle.20build.html#342033301">(Mar 15 2023 at 11:56)</a>:</h4>
+<p>From: Fabian Huch &lt;<a href="mailto:huch@in.tum.de">huch@in.tum.de</a>&gt;<br>
+If that's the case, the problem is probably either a missing or broken <br>
+system package for the aarch64 environment. Generally, on an Ubuntu <br>
+container you would need something like:</p>
+<p>- m4<br>
+       - mercurial<br>
+       - curl<br>
+       - libgomp1<br>
+       - libgmp-dev<br>
+       - unzip<br>
+       - swi-prolog<br>
+       - lib32stdc++6<br>
+       - texlive-full<br>
+       - libzarith-ocaml</p>
+<p>To run all Isabelle sessions. Often minimal docker images are missing <br>
+some of those. Maybe this helps.</p>
+<p>Fabian</p>
+
+
+
+<a name="342059846"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Debugging%20a%20hanging%20Isabelle%20build/near/342059846" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Debugging.20a.20hanging.20Isabelle.20build.html#342059846">(Mar 15 2023 at 13:39)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Recall that Isabelle arm64-linux/darwin still has experimental status: some <br>
+components are just missing, others are not as stable as we are used to for <br>
+x86_64.</p>
+<p>Here are the cumulative NEWS announcements of the past releases on this topic:</p>
+<p>New in Isabelle2022 (October 2022)</p>
+<hr>
+<ul>
+<li>The system option "ML_system_apple" controls the use of native<br>
+Apple/ARM64 for Poly/ML: default "true". Like "ML_system_64" this only<br>
+works when saved in "$ISABELLE_HOME_USER/etc/preferences" (e.g. after<br>
+shutdown of Isabelle/jEdit).</li>
+</ul>
+<p>New in Isabelle2021-1 (December 2021)</p>
+<hr>
+<ul>
+<li>Almost complete support for arm64-linux platform. The reference<br>
+platform is Raspberry Pi 4 with 8 GB RAM running Pi OS (64 bit).</li>
+</ul>
+<p>New in Isabelle2021 (February 2021)</p>
+<hr>
+<ul>
+<li>
+<p>Experimental support for arm64-linux platform. The reference platform<br>
+is Raspberry Pi 4 with 8 GB RAM running Pi OS (64 bit).</p>
+</li>
+<li>
+<p>Support for Apple Silicon, using mostly x86_64-darwin runtime<br>
+translation via Rosetta 2 (e.g. Poly/ML and external provers), but also<br>
+some native arm64-darwin executables (e.g. Java).</p>
+</li>
+</ul>
+<p>The "reference platform" is very important: so far, I only managed to get hold <br>
+on Raspberry Pi 4 (approx. 120 EUR). It would be better to have something like <br>
+Apple Studio in the backyard, to be used together with Linux on Docker.</p>
+<p>The "almost complete support" still applies to Poly/ML: current repository <br>
+versions work well most of the time, but not always. A recent change by David <br>
+Matthews after the Isabelle2022 release improves the situation for really big <br>
+applications of native arm64 (instead of arm64_32), see also <br>
+<a href="https://isabelle-dev.sketis.net/rISABELLE014c3d00e0f">https://isabelle-dev.sketis.net/rISABELLE014c3d00e0f</a></p>
+<p>It might also help to upgrade Java: these guys are still in the progress to <br>
+polish ARM64 support. See also <br>
+<a href="https://isabelle-dev.sketis.net/rISABELLE39f8051f71d4">https://isabelle-dev.sketis.net/rISABELLE39f8051f71d4</a></p>
+<p>Note that there will be no "patch-releases" for Isabelle: it is a concession <br>
+to efficient use of our own resources.</p>
+<p>If you want to use alternative components for regular Isabelle releases, the <br>
+simplest way is probably to use a repository clone (for the release, not an <br>
+arbitrary "latest" one), and make minimal changes to Admin/components/main.</p>
+<p>Here is an example project to work with the Isabelle repository in such a <br>
+well-defined manner: <br>
+<a href="https://makarius.sketis.net/repos/narration/file/1c8aa0855611/README.md">https://makarius.sketis.net/repos/narration/file/1c8aa0855611/README.md</a> (it <br>
+also shows how to make your own Isabelle/Scala command-line tools.)</p>
+<p>Makarius</p>
+
+
+
+<a name="342069544"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Debugging%20a%20hanging%20Isabelle%20build/near/342069544" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Debugging.20a.20hanging.20Isabelle.20build.html#342069544">(Mar 15 2023 at 14:14)</a>:</h4>
+<p>From: Dominic Mulligan &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Yes, this was my working hypothesis when I decided to move us over to<br>
+AMD64–––namely we were seeing some potential instability owing to our use<br>
+of the relatively untested AArch64 platform.  My colleagues and I have also<br>
+observed spurious failures of SMT solvers and the PolyML runtime<br>
+occasionally raising assertion failures in the garbage collector (from<br>
+memory), and this was the final push to move us onto AMD64 until things<br>
+have settled down further with Arm.</p>
+<p>Fabian, when I come to try and move us back to Arm in the future I will<br>
+bear in mind that I need to include all of those components in the Docker<br>
+container.</p>
+<p>Thanks!<br>
+Dominic</p>
+
+
+
+<a name="342081169"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Debugging%20a%20hanging%20Isabelle%20build/near/342081169" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Debugging.20a.20hanging.20Isabelle.20build.html#342081169">(Mar 15 2023 at 14:54)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Some further side-remarks:</p>
+<p>The regular "isabelle build_docker" tool provides some Isabelle/Scala entry <br>
+points that might be useful for manual setup of foreign Linux distributions.</p>
+<p>E.g. like this via "isabelle scala":</p>
+<p>scala&gt; isabelle.Build_Docker.packages.mkString(" ")<br>
+val res1: String = curl less libfontconfig1 libgomp1 openssh-client pwgen <br>
+rsync unzip</p>
+<p>scala&gt; val res2: String = curl less libfontconfig1 libgomp1 openssh-client <br>
+pwgen rsync unzip libx11-6 libxext6 libxrender1 libxtst6 libxi6 <br>
+texlive-fonts-extra texlive-font-utils texlive-latex-extra texlive-science</p>
+<p>Mercurial is nice to have, e.g. to navigate history, but it requires Python3.</p>
+<p>Plain "curl" is de-facto sufficient to get arbitrary version. See these links <br>
+for "hg archive" running on the server:</p>
+<p>* tagged version:</p>
+<p><a href="https://isabelle.sketis.net/repos/isabelle/archive/Isabelle2022.tar.gz">https://isabelle.sketis.net/repos/isabelle/archive/Isabelle2022.tar.gz</a></p>
+<p>* arbitrary version:</p>
+<p><a href="https://isabelle.sketis.net/repos/isabelle/archive/1ac2416e8432.tar.gz">https://isabelle.sketis.net/repos/isabelle/archive/1ac2416e8432.tar.gz</a></p>
+<p>* similar for AFP:</p>
+<p><a href="https://isabelle.sketis.net/repos/afp-2022/archive/">https://isabelle.sketis.net/repos/afp-2022/archive/</a>...</p>
+<p><a href="https://isabelle.sketis.net/repos/afp-devel/archive/">https://isabelle.sketis.net/repos/afp-devel/archive/</a>...</p>
+<p>Isabelle tools like "isabelle version -i" work correctly for such repository <br>
+archive downloads. ("Rogue clones" on Github etc. don't work properly, because <br>
+formal versions are wrong.)</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,120 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Monads and fundef_cong rules · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Monads.20and.20fundef_cong.20rules.html">[isabelle] Monads and fundef_cong rules</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294712824"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Monads%20and%20fundef_cong%20rules/near/294712824" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Monads.20and.20fundef_cong.20rules.html#294712824">(Aug 22 2022 at 15:39)</a>:</h4>
+<p>From: Simon Wimmer &lt;<a href="mailto:wimmersimon@gmail.com">wimmersimon@gmail.com</a>&gt;<br>
+Dear list,</p>
+<p>a student of mine is trying to build a little utility to automatically<br>
+provide memoized versions of a class of recursively defined functions (e.g.<br>
+for dynamic programming).</p>
+<p>We are experimenting with a monadification style, which tries to lift a<br>
+function of type<br>
+  ('a =&gt; 'b) =&gt; 'c =&gt; 'd<br>
+to a function of type<br>
+  (('a =&gt; 'b m) =&gt; ('c =&gt; 'd m) m) m.</p>
+<p>This works quite nicely up to the point where we need to fundef_cong rules<br>
+for termination proofs.<br>
+Consider the following example:</p>
+<p>fun f :: "nat ⇒ int" where<br>
+  "f 0 = 0"<br>
+| "f (Suc i) = undefined (map f [0..&lt;Suc i])"</p>
+<p>If we use a lifted version of map of type<br>
+  ('a =&gt; 'b m) =&gt; 'a list =&gt; 'b list m,<br>
+then we can obtain a lifted version of f</p>
+<p>fun f' :: "nat ⇒ int m" where<br>
+  "f' 0 = return 0"<br>
+| "f' (Suc i) = undefined (map' f' [0..&lt;Suc i])"</p>
+<p>by using the following fundef_cong rule:</p>
+<p>assumes "⋀x. x ∈ set xs ⟹ f x = g x" "xs = ys"<br>
+  shows   "map' f xs = map' g ys"<br>
+.</p>
+<p>However, what we would really want is to use the combinator map'' of type<br>
+  (('a =&gt; 'b m) =&gt; ('a list =&gt; 'b list m) m) m<br>
+like this</p>
+<p>function f'' :: "nat ⇒ int m" where<br>
+  "f'' 0 = return 0"<br>
+| "f'' (Suc i) = undefined (map'' . (return f'') . (return ([0..&lt;Suc i])))"<br>
+(. is lifted application)</p>
+<p>We tried to lift the fundef_cong rule to this setting by starting like this</p>
+<p>assumes<br>
+"⋀x xs'. xs' ∈ set_state xs ⟹ x ∈ set xs' ⟹ f . (return x) = g . (return<br>
+x)" "xs = ys"<br>
+shows  "map'' . f . xs = map'' . g . ys"</p>
+<p>If we leave out the assumption, then the function package seems to be able<br>
+to apply the rule and presents us a trivial goal for termination.<br>
+However, we do not know how to phrase a correct rule that would be helpful<br>
+for the function package.<br>
+Does anyone have an idea on how this could be done?</p>
+<p>Cheers,<br>
+Simon<br>
+<a href="/user_uploads/14278/YkvYgGrXbUmAxGCxeVb5VL53/DP_Lifting.thy">DP_Lifting.thy</a><br>
+<a href="/user_uploads/14278/QqOISm4GfZqu9Fug80N2QkAo/Monad.thy">Monad.thy</a><br>
+<a href="/user_uploads/14278/kl-uuOclvBV6rq2uuSsxQddR/Test_Map.thy">Test_Map.thy</a></p>
+
+
+
+<a name="294712837"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Monads%20and%20fundef_cong%20rules/near/294712837" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Monads.20and.20fundef_cong.20rules.html#294712837">(Aug 22 2022 at 15:39)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear Simon,</p>
+<p>Here's a quick guess: In the conclusion of the premises of the fundef_cong rule, the <br>
+higher-order recursion variable still occurs as an argument to a function. In your <br>
+theories, I haven't seen any fundef_cong rule for the operator (.). So the function <br>
+package will use the congruence rule "cong" for dealing with (.), which loses the <br>
+connection between f and x. Have you tried adding a fundef congruence rule for (.), too?</p>
+<p>Hope this helps,<br>
+Andreas</p>
+
+
+
+<a name="294712852"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Monads%20and%20fundef_cong%20rules/near/294712852" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Monads.20and.20fundef_cong.20rules.html#294712852">(Aug 22 2022 at 15:39)</a>:</h4>
+<p>From: Simon Wimmer &lt;<a href="mailto:wimmersimon@gmail.com">wimmersimon@gmail.com</a>&gt;<br>
+Thank you Andreas, your suggestion at least solved part of the problem.<br>
+I can use a rule like this to get through the termination proof:</p>
+<p>assumes<br>
+    "⋀x xs'. xs' ∈ set_state xs ⟹ x ∈ set xs' ⟹ f x = g x" "xs = ys"<br>
+  shows "map⇩T . (return f) . xs = map⇩T . (return g) . ys"</p>
+<p>However, I was not able to define a fundef congruence rule for (.).<br>
+Trying something like this (not sure if this is correct), gives me an error<br>
+for COMP in the function command:</p>
+<p>assumes<br>
+    "⋀ f' g' x' y'. f' ∈ set_state f ⟹ g' ∈ set_state g ⟹ x' ∈ set_state x<br>
+⟹ y' ∈ set_state y<br>
+    ⟹ f' x' = g' y'"<br>
+  shows "f . x = g . y"</p>
+<p>Cheers,<br>
+Simon</p>
+
+
+
+<a name="294712868"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Monads%20and%20fundef_cong%20rules/near/294712868" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Monads.20and.20fundef_cong.20rules.html#294712868">(Aug 22 2022 at 15:39)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Simon,</p>
+<p>Your congruence rule for (.) has the problem that the variables in the conclusion of the <br>
+congruence rule do not show up in the conclusion of the premise. The function package uses <br>
+these rules to infer the context in which a function all occurs. When it applies your new <br>
+rule to a schematic goal like</p>
+<p>(map_T . (return f)) . xs = ?rhs</p>
+<p>then the next subgoal will look like</p>
+<p>!!f' g' x' y'. [| ... |] ==&gt; f' x' = g' y'</p>
+<p>where there are no more recursive calls in the conclusion. Thus, it thinks that it has now <br>
+found all of them, which obviously is not true and later leads to the error, because the <br>
+recursive call has moved to the assumptions of the goal state.</p>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

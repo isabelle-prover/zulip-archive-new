@@ -1,0 +1,120 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Base case in termination proof.. · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Base.20case.20in.20termination.20proof.2E.2E.html">[isabelle] Base case in termination proof..</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294671512"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Base%20case%20in%20termination%20proof../near/294671512" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Base.20case.20in.20termination.20proof.2E.2E.html#294671512">(Aug 22 2022 at 13:05)</a>:</h4>
+<p>From: Daniel Horne &lt;<a href="mailto:d.horne@danielhorne.co.uk">d.horne@danielhorne.co.uk</a>&gt;<br>
+I have the following function:</p>
+<p>function (domintros) index:: "int ⇒ int" where<br>
+"index a = (if (a&lt;0) then (index (a+5)) else (a mod 5))"</p>
+<p>and have been trying to prove the result is always &gt;=0 and &lt;= 4. Ran <br>
+into a bit of trouble and after some investigation found that it was <br>
+because Isabelle couldn't automatically prove termination..</p>
+<p>The intention is to prove that this condition is true for all ints, so I <br>
+need to prove "∀ a. index_dom a".</p>
+<p>Print_theorems gives the following:</p>
+<p>index.cases: (⋀a. ?x = a ⟹ ?P) ⟹ ?P<br>
+   index.domintros: (?a &lt; 0 ⟹ index_dom (?a + 5)) ⟹ index_dom ?a<br>
+   index.pelims: index ?x = ?y ⟹ index_dom ?x ⟹ (⋀a. ?x = a ⟹ ?y = (if a <br>
+&lt; 0 then index (a + 5) else a mod 5) ⟹ index_dom a ⟹ ?P) ⟹ ?P<br>
+   index.pinduct: index_dom ?a0.0 ⟹ (⋀a. index_dom a ⟹ (a &lt; 0 ⟹ ?P (a + <br>
+5)) ⟹ ?P a) ⟹ ?P ?a0.0<br>
+   index.psimps: index_dom ?a ⟹ index ?a = (if ?a &lt; 0 then index (?a + <br>
+5) else ?a mod 5)</p>
+<p>with which I've managed to prove this inductive rule:</p>
+<p>lemma ddda: "index_dom a ⟹ index_dom (a-5)"<br>
+apply(induction a rule:index.pinduct)<br>
+apply(simp add:index.domintros)<br>
+done</p>
+<p>Which is well and good for negative numbers as long as I have an <br>
+appropriate base case. I'd been thinking of doing<br>
+1: index_dom (a) /\ a&lt;5 /\ a&gt;=0 as a base case. Can do for each <br>
+individual value of a, as it's a small enough range<br>
+2: index_dom a ⟹ index_dom (a-5) to extend over negative numbers<br>
+3: a &gt;= 0  ==&gt; index_dom a ==&gt; index_dom a+5  to extend over positives <br>
+using cyclic nature of mod operation.</p>
+<p>The problem is that I don't see any way in the theorems that mention <br>
+index_dom that I could establish index_dom 0, for example.<br>
+I can assume it and succeed in calculating the result - which would be <br>
+sufficient to prove to a human that it terminates for that value, but I <br>
+don't know how I'd mechanise that reasoning.</p>
+<p>Any clues?</p>
+
+
+
+<a name="294671562"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Base%20case%20in%20termination%20proof../near/294671562" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Base.20case.20in.20termination.20proof.2E.2E.html#294671562">(Aug 22 2022 at 13:05)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+Hi Daniel,</p>
+<p>if you use the "function" command, Isabelle doesn't even attempt to<br>
+prove termination. Only the "fun" command performs automatic proofs<br>
+(which fail in this case, however).</p>
+<p>If your function is total (it is), you can use the "termination" command<br>
+to establish a termination proof.</p>
+<p>Here's how it works for your example:</p>
+<p>termination index<br>
+  by (relation "measure (λn. nat (- n))") auto</p>
+<p>As you can see, you just have to specify a suitable measure function<br>
+under which the function arguments decrease on each call. The rest is<br>
+automatic.</p>
+<p>You can then use the total induction rule for your lemmas:</p>
+<p>lemma "index n ≥ 0"<br>
+  by (induct n rule: index.induct) auto</p>
+<p>lemma "index n ≤ 4"<br>
+  by (induct n rule: index.induct) auto</p>
+<p>Cheers<br>
+Lars</p>
+
+
+
+<a name="294671576"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Base%20case%20in%20termination%20proof../near/294671576" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Base.20case.20in.20termination.20proof.2E.2E.html#294671576">(Aug 22 2022 at 13:05)</a>:</h4>
+<p>From: Daniel Horne &lt;<a href="mailto:d.horne@danielhorne.co.uk">d.horne@danielhorne.co.uk</a>&gt;<br>
+On 03/04/2016 22:16, Lars Hupel wrote:</p>
+<blockquote>
+<p>Hi Daniel,</p>
+<blockquote>
+<p>and have been trying to prove the result is always &gt;=0 and &lt;= 4. Ran<br>
+into a bit of trouble and after some investigation found that it was<br>
+because Isabelle couldn't automatically prove termination..<br>
+if you use the "function" command, Isabelle doesn't even attempt to<br>
+prove termination. Only the "fun" command performs automatic proofs<br>
+(which fail in this case, however).</p>
+</blockquote>
+</blockquote>
+<p>Yes. I initially tried defining it as fun, but switched it over to <br>
+function when one of the automatic proofs failed, and had auto do the <br>
+completeness proof like this:</p>
+<p>function (domintros) index:: "int ⇒ int" where<br>
+"index a = (if (a&lt;0) then (index (a+5)) else (a mod 5))"<br>
+apply(auto)<br>
+done</p>
+<blockquote>
+<p>If your function is total (it is), you can use the "termination" command<br>
+to establish a termination proof.</p>
+<p>Here's how it works for your example:</p>
+<p>termination index<br>
+   by (relation "measure (λn. nat (- n))") auto</p>
+<p>As you can see, you just have to specify a suitable measure function<br>
+under which the function arguments decrease on each call. The rest is<br>
+automatic.</p>
+</blockquote>
+<p>Ah. I did see in the "Defining Recursive Functions in Isabelle/HOL" <br>
+manual that fun is equivalent to function with "termination by <br>
+lexicographic_order".<br>
+Somehow I completely missed the section "the relation method" section <br>
+further down the same page.</p>
+<p>Thanks for the assist.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,95 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Simplifier and term order · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Simplifier.20and.20term.20order.html">[isabelle] Simplifier and term order</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294676838"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Simplifier%20and%20term%20order/near/294676838" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Simplifier.20and.20term.20order.html#294676838">(Aug 22 2022 at 13:34)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:eberlm@in.tum.de">eberlm@in.tum.de</a>&gt;<br>
+Hallo,</p>
+<p>I've been playing around with normalisation of monad expressions and <br>
+have run into a few problems.</p>
+<p>First of all, one thing I noticed is that the simplifier sometimes fails <br>
+to apply permutative rules when I thought it should, e.g. minimal example:</p>
+<p>typedecl a<br>
+typedecl b<br>
+typedecl c<br>
+typedecl d</p>
+<p>axiomatization<br>
+   a :: "(a ⇒ a ⇒ c) ⇒ d" and<br>
+   b :: "b ⇒ b ⇒ c" and<br>
+   c :: "a ⇒ a ⇒ b"<br>
+   where<br>
+     a_commute: "a (λx y. b (f x y) (g x y)) ≡ a (λx y. b (g x y) (f x y))"</p>
+<p>ML_val ‹<br>
+   let<br>
+     val ctxt = @{context} addsimps @{thms a_commute}<br>
+     val ct = @{cterm "a (λx y. b (c x y) (c y x))"}<br>
+     val ct' = @{cterm "a (λy x. b (c x y) (c y x))"}<br>
+   in<br>
+     (ct,ct') |&gt; apply2 (Raw_Simplifier.rewrite_cterm <br>
+(false,false,false) (K (K NONE)) ctxt)<br>
+   end<br>
+›</p>
+<p>I would have expected the simplifier to rewrite one of these terms to <br>
+the other – but it doesn't do anything for either of them. After adding <br>
+some tracing code, I believe that the reason is that the simplifier does <br>
+not β-normalise terms before comparing them. Is this the intended behaviour?</p>
+<p>In any case, for monad normalisation, the simplifier's idea of what <br>
+constitutes a permutative rule is too restrictive in any case, so I set <br>
+up a "TERM_ORD" dummy constant similar to the "NO_MATCH" and <br>
+"ASSUMPTION" constants. "TERM_ORD a b" gets rewritten to "True" by a <br>
+simproc iff the first argument is strictly smaller than the second. <br>
+(cong rules ensure that TERM_ORD's arguments do not get simplified <br>
+themselves) For the reasons outlined above, it also performs <br>
+β-η-reduction before comparing the terms.</p>
+<p>This works very well in most cases, but I found one pathological example <br>
+of the form</p>
+<p>t := bind A (λx. bind A (λy. bind (B x y) (λ_. bind (B y x) (λ_. e))))</p>
+<p>The commutativity rule for bind, which is</p>
+<p>bind A (λx. bind B (λy. C x y)) = bind B (λy. bind A (λx. C x y)) ,</p>
+<p>can be applied either to the whole of t (flipping the first two binds) <br>
+or to the third bind (flipping the 3rd and 4th bind). In both cases, we <br>
+get the term</p>
+<p>t' := bind A (λx. bind A (λy. bind (B y x) (λ_. bind (B x y) (λ_. e))))</p>
+<p>The problem is now that when flipping the first two binds, the arguments <br>
+of B are "Bound 1" and "Bound 0". However, when flipping the last two <br>
+binds, they are "Free ":001"" and "Free ":002"" because the simplifier <br>
+instantiates bound variables to free variables like this when passing an <br>
+abstraction. This exactly reverses the term order, since the Bounds are <br>
+counted inside-out and the Frees are counted outside-in. This means that <br>
+"TERM_ORD" will be rewritten to "True" in both cases and we get an <br>
+infinite rewriting cycle.</p>
+<p>What is the best way to solve this problem? Can the simplifier ever run <br>
+into a problem like this or is that prevented by the fact that it <br>
+doesn't do β normalisation?</p>
+<p>The most robust way would probably be to replace the Free variables with <br>
+(dangling) bound variables before performing the term order comparison, <br>
+but I don't think the necessary information is publicly available in the <br>
+context.</p>
+<p>Cheers,</p>
+<p>Manuel</p>
+
+
+
+<a name="294676989"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Simplifier%20and%20term%20order/near/294676989" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Simplifier.20and.20term.20order.html#294676989">(Aug 22 2022 at 13:34)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+The fact that the simplifier does not β-normalise terms before comparing them is <br>
+possibly a combination of the fact that I never expected it to be used in such <br>
+situations and the potential cost of the normalisation. I suspect it would break <br>
+too many proofs if we changed that behaviour, although I would of course make <br>
+sense from a logical point of view.</p>
+<p>Tobias<br>
+<a href="/user_uploads/14278/gXBOEeWojBRqduS5_rh2nrN-/smime.p7s">smime.p7s</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

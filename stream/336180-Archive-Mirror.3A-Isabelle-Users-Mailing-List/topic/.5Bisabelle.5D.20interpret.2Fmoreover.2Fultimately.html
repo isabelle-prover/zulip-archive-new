@@ -1,0 +1,97 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] interpret/moreover/ultimately · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20interpret.2Fmoreover.2Fultimately.html">[isabelle] interpret/moreover/ultimately</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294153427"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20interpret/moreover/ultimately/near/294153427" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20interpret.2Fmoreover.2Fultimately.html#294153427">(Aug 18 2022 at 19:16)</a>:</h4>
+<p>From: Christian Sternagel &lt;<a href="mailto:c-sterna@jaist.ac.jp">c-sterna@jaist.ac.jp</a>&gt;<br>
+Hi there,</p>
+<p>recently I experienced some strange behavior (Isabelle2011-1 in jedit) <br>
+which is reproduced in the small example below:</p>
+<p>notepad begin<br>
+   fix l le B<br>
+   interpret preorder l le sorry<br>
+   moreover have "B" sorry<br>
+   ultimately have "class.preorder l le &amp; B" by blast<br>
+end</p>
+<p>in the "ultimately" line but before "by blast", the current state looks <br>
+as follows:</p>
+<p>proof (prove): step 8</p>
+<p>using this:<br>
+   class.preorder l le<br>
+   B</p>
+<p>goal (1 subgoal):</p>
+<p>1. class.preorder l le &amp; B</p>
+<p>but blast (and auto, .., simp, force, best, ...) does not solve the <br>
+goal. If I write instead</p>
+<p>notepad begin<br>
+   fix l le B<br>
+   interpret preorder l le sorry<br>
+   have "B" sorry<br>
+   from <code>class.preorder l le</code> and <code>B</code><br>
+     have "class.preorder l le &amp; B" by blast<br>
+end</p>
+<p>everything works fine. The corresponding state is</p>
+<p>proof (prove): step 7</p>
+<p>using this:<br>
+   class.preorder l le<br>
+   B</p>
+<p>goal (1 subgoal):</p>
+<p>1. class.preorder l le ∧ B</p>
+<p>So the only immediately conceivable difference is "step 7" instead of <br>
+"step 8".</p>
+<p>cheers</p>
+<p>chris</p>
+
+
+
+<a name="294153440"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20interpret/moreover/ultimately/near/294153440" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20interpret.2Fmoreover.2Fultimately.html#294153440">(Aug 18 2022 at 19:16)</a>:</h4>
+<p>From: Brian Huffman &lt;<a href="mailto:huffman@in.tum.de">huffman@in.tum.de</a>&gt;<br>
+At this point in your proof script, try</p>
+<p>ML_val {* Thm.concl_of @{thm this} *}</p>
+<p>and you will see that there is a constant "prop :: prop =&gt; prop"<br>
+wrapped around the conclusion of this fact, outside the "Trueprop".</p>
+<p>Then try</p>
+<p>ML_val {* Thm.concl_of @{thm <code>class.preorder l le</code>} *}</p>
+<p>And you will see that no "prop" constant is there.</p>
+<p>Perhaps Makarius can say more about what this "prop" constant is for,<br>
+and why it appears in the theorem exported by the interpret command.</p>
+<ul>
+<li>Brian</li>
+</ul>
+
+
+
+<a name="294153774"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20interpret/moreover/ultimately/near/294153774" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20interpret.2Fmoreover.2Fultimately.html#294153774">(Aug 18 2022 at 19:18)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Locale interpretation essentially needs to discharge "hyps" from local <br>
+theorems, by establishing a suitable "witness".  To preserve the literal <br>
+structure of the same, without the usual normalization of regular results, <br>
+the internal goal statement is protected via the funny prop constant. <br>
+(This device is explained in the Isar implementation manual section 2.3.2; <br>
+it is useful for extraordinary situations in ML, but should normally never <br>
+be encountered in end-user proof documents.)</p>
+<p>The confusion above stems from the accident that 'interpret' exposes this <br>
+internal result to the Isar proof context via "this".  (I have gone <br>
+through all reachable Isabelle example and found a few more such <br>
+misunderstandings, where forward chaining was done after 'interpret' <br>
+without any effect, and eliminated them.)</p>
+<p>Note that after "interpret foobar" the context knows about the fact <br>
+"foobar_axioms" in the proven instance; the same works for any other <br>
+imported substructures, not just part that was visible in the auxiliary <br>
+goal state.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

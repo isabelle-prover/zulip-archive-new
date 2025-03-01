@@ -1,0 +1,405 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Problems with cong-rules for parser · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20cong-rules.20for.20parser.html">[isabelle] Problems with cong-rules for parser</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294110748"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20cong-rules%20for%20parser/near/294110748" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20cong-rules.20for.20parser.html#294110748">(Aug 18 2022 at 15:32)</a>:</h4>
+<p>From: René Thiemann &lt;<a href="mailto:rene.thiemann@uibk.ac.at">rene.thiemann@uibk.ac.at</a>&gt;<br>
+Dear all,</p>
+<p>we currently have problems setting up the right cong-rules for our<br>
+parser such termination is provable.</p>
+<p>Here, the major problems are parsers which call themselves twice in a  <br>
+row.</p>
+<p>Consider the following theory:</p>
+<p>theory Test imports Main<br>
+begin</p>
+<p>types<br>
+   ('t, 'a) parser = "'t list =&gt; string + ('a x 't list)"</p>
+<p>take a token list and produce a string error-message or a pair of  <br>
+result and remaining token list</p>
+<p>(state-monad with errors)</p>
+<p>now we can define the standard return and bind operations</p>
+<p>abbreviation<br>
+   return :: "'a =&gt; ('t, 'a)parser"<br>
+where<br>
+   "return x = (%ts. Inr (x, ts))"</p>
+<p>definition<br>
+   bind :: "('t, 'a) parser =&gt; ('a =&gt; ('t, 'b) parser) =&gt; ('t, 'b)  <br>
+parser"<br>
+where<br>
+   "bind m f ts = (case m ts of<br>
+       Inl e =&gt; Inl e<br>
+     | Inr (x,ts') =&gt; f x ts')"</p>
+<p>consuming one character</p>
+<p>fun consume :: "('t,'t)parser"<br>
+where "consume [] = Inl ''error''"<br>
+    |  "consume (t # ts) = Inr (t, ts)"</p>
+<p>now, here is the difficult function:</p>
+<p>function foo :: "('t, 't list)parser"<br>
+where "foo ts = (bind consume<br>
+                    (% t. bind foo<br>
+                    (% us. bind foo<br>
+                    (% vs. return (t # us @ vs))))) ts"<br>
+by pat_completeness auto<br>
+termination<br>
+proof<br>
+(*  impossible, since there is no link between input ts and the list<br>
+     of tokens that is used for recursive foo-calls *)<br>
+oops</p>
+<p>so, let us add some congruence rule:</p>
+<p>lemma bind_cong[fundef_cong]:<br>
+   fixes m1 :: "('t,'a)parser"<br>
+   assumes "m1 ts1 = m2 ts1" and "!! y ts. m1 ts1 = Inr (y,ts) ==&gt; f1  <br>
+y ts = f2 y ts" and "ts1 = ts2"<br>
+   shows "((bind m1 f1) ts1) = ((bind m2 f2) ts2)"<br>
+using assms unfolding bind_def by (cases "m1 ts1", auto)</p>
+<p>now, indeed a simplied version of foo can be proven to be terminating  <br>
+(if there is only one recursive call)</p>
+<p>function foo' :: "('t, 't list)parser"<br>
+where "foo' ts = (bind consume<br>
+                    (% t. bind foo'<br>
+                    (% vs. return (t # vs)))) ts"<br>
+by pat_completeness auto<br>
+termination by ... tedious reasoning</p>
+<p>but, if we want to have the full version which two recursive calls,  <br>
+then not even the function<br>
+definition is accepted:</p>
+<p>function foo'' :: "('t, 't list)parser"<br>
+where "foo'' ts = (bind consume<br>
+                    (% t. bind foo''<br>
+                    (% us. bind foo''<br>
+                    (% vs. return (t # us @ vs))))) ts"<br>
+(*<br>
+exception THM 0 raised (line 709 of "thm.ML"): implies_elim: major  <br>
+premise<br>
+*)</p>
+<p>Does someone have an idea, what went wrong in this case?</p>
+<p>Best regards,<br>
+René</p>
+<p>PS: The small theory file is attached.<br>
+<a href="/user_uploads/14278/k1ELn1MEI9X0wFtg2utoE0L_/Test.thy">Test.thy</a></p>
+
+
+
+<a name="294110820"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20cong-rules%20for%20parser/near/294110820" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20cong-rules.20for.20parser.html#294110820">(Aug 18 2022 at 15:32)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+Not an answer but a thought: maybe result checking can simplify your<br>
+life? Maybe you can write your parser directly in ML and verify each run<br>
+of the parser by unparsing and comparison with the input?</p>
+<p>Tobias</p>
+<p>René Thiemann schrieb:</p>
+
+
+
+<a name="294110837"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20cong-rules%20for%20parser/near/294110837" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20cong-rules.20for.20parser.html#294110837">(Aug 18 2022 at 15:32)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+René Thiemann schrieb:</p>
+<blockquote>
+<blockquote>
+<p>Not an answer but a thought: maybe result checking can simplify your<br>
+life? Maybe you can write your parser directly in ML and verify each run<br>
+of the parser by unparsing and comparison with the input?</p>
+</blockquote>
+<p>Yes and no: We do unparsing and comparison in any way, however, we<br>
+cannot write<br>
+our parser in ML as we want to have the parser also in the<br>
+target-language from<br>
+the code-generator (as the generated verifier has to parse), or can the<br>
+code-generator<br>
+generate (Haskell)-code from ML (in the new release)?</p>
+</blockquote>
+<p>I see. No, Haskell code from ML code is not possible.</p>
+<p>Tobias</p>
+<blockquote>
+<p>Hence, we need a parser in HOL which does not have to satisfy any<br>
+properties since<br>
+comparison against the input is performed. However, for the<br>
+code-generator we need<br>
+termination of all functions we would like to export (including the<br>
+parser).<br>
+And since termination of the parser is currently the only axiom we use,<br>
+we would<br>
+like to get rid of this axiom by actually proving termination.</p>
+<p>Best,<br>
+René</p>
+<blockquote>
+<blockquote>
+<p>Dear all,</p>
+<p>we currently have problems setting up the right cong-rules for our<br>
+parser such termination is provable.</p>
+<p>Here, the major problems are parsers which call themselves twice in a<br>
+row.</p>
+<p>Consider the following theory:</p>
+<p>theory Test imports Main<br>
+begin</p>
+<p>types<br>
+ ('t, 'a) parser = "'t list =&gt; string + ('a x 't list)"</p>
+<p>take a token list and produce a string error-message or a pair of result<br>
+and remaining token list</p>
+<p>(state-monad with errors)</p>
+<p>now we can define the standard return and bind operations</p>
+<p>abbreviation<br>
+ return :: "'a =&gt; ('t, 'a)parser"<br>
+where<br>
+ "return x = (%ts. Inr (x, ts))"</p>
+<p>definition<br>
+ bind :: "('t, 'a) parser =&gt; ('a =&gt; ('t, 'b) parser) =&gt; ('t, 'b) parser"<br>
+where<br>
+ "bind m f ts = (case m ts of<br>
+     Inl e =&gt; Inl e<br>
+   | Inr (x,ts') =&gt; f x ts')"</p>
+<p>consuming one character</p>
+<p>fun consume :: "('t,'t)parser"<br>
+where "consume [] = Inl ''error''"<br>
+  |  "consume (t # ts) = Inr (t, ts)"</p>
+<p>now, here is the difficult function:</p>
+<p>function foo :: "('t, 't list)parser"<br>
+where "foo ts = (bind consume<br>
+                  (% t. bind foo<br>
+                  (% us. bind foo<br>
+                  (% vs. return (t # us @ vs))))) ts"<br>
+by pat_completeness auto<br>
+termination<br>
+proof<br>
+(*  impossible, since there is no link between input ts and the list<br>
+   of tokens that is used for recursive foo-calls *)<br>
+oops</p>
+<p>so, let us add some congruence rule:</p>
+<p>lemma bind_cong[fundef_cong]:<br>
+ fixes m1 :: "('t,'a)parser"<br>
+ assumes "m1 ts1 = m2 ts1" and "!! y ts. m1 ts1 = Inr (y,ts) ==&gt; f1 y<br>
+ts = f2 y ts" and "ts1 = ts2"<br>
+ shows "((bind m1 f1) ts1) = ((bind m2 f2) ts2)"<br>
+using assms unfolding bind_def by (cases "m1 ts1", auto)</p>
+<p>now, indeed a simplied version of foo can be proven to be terminating<br>
+(if there is only one recursive call)</p>
+<p>function foo' :: "('t, 't list)parser"<br>
+where "foo' ts = (bind consume<br>
+                  (% t. bind foo'<br>
+                  (% vs. return (t # vs)))) ts"<br>
+by pat_completeness auto<br>
+termination by ... tedious reasoning</p>
+<p>but, if we want to have the full version which two recursive calls, then<br>
+not even the function<br>
+definition is accepted:</p>
+<p>function foo'' :: "('t, 't list)parser"<br>
+where "foo'' ts = (bind consume<br>
+                  (% t. bind foo''<br>
+                  (% us. bind foo''<br>
+                  (% vs. return (t # us @ vs))))) ts"<br>
+(*<br>
+exception THM 0 raised (line 709 of "thm.ML"): implies_elim: major<br>
+premise<br>
+*)</p>
+<p>Does someone have an idea, what went wrong in this case?</p>
+<p>Best regards,<br>
+René</p>
+<p>PS: The small theory file is attached.</p>
+</blockquote>
+</blockquote>
+</blockquote>
+
+
+
+<a name="294110863"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20cong-rules%20for%20parser/near/294110863" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20cong-rules.20for.20parser.html#294110863">(Aug 18 2022 at 15:32)</a>:</h4>
+<p>From: Alexander Krauss &lt;<a href="mailto:krauss@in.tum.de">krauss@in.tum.de</a>&gt;<br>
+Hi René,</p>
+<blockquote>
+<p>we currently have problems setting up the right cong-rules for our<br>
+parser such termination is provable.<br>
+[...]</p>
+</blockquote>
+<blockquote>
+<p>Does someone have an idea, what went wrong in this case?</p>
+</blockquote>
+<p>I think your cong rule is slightly wrong. When I change it to</p>
+<p>lemma bind_cong[fundef_cong]:<br>
+   fixes m1 :: "('t,'a)parser"<br>
+   assumes "m1 ts2 = m2 ts2"<br>
+   and "\&lt;And&gt; y ts. m2 ts2 = Inr (y,ts) ==&gt; f1 y ts = f2 y ts"<br>
+   and "ts1 = ts2"<br>
+   shows "((bind m1 f1) ts1) = ((bind m2 f2) ts2)"</p>
+<p>then the function definition works for me. (I haven't attempted a <br>
+termination proof, but the proof obligation looks reasonable.)</p>
+<p>The difference is that you have to refer to the "2"-variables in the <br>
+assumptions of the branches, cf. eg. if_cong.</p>
+<p>It would be nice if there was a helpful error at the time where you <br>
+declare the rule, but I do not know what the general check would have to <br>
+be... The format of cong-rules isn't really well-defined, except for the <br>
+way they are used internally.</p>
+<p>Since you are working with a state-exception monad, the termination <br>
+proof isn't actually crucial: I recently prototyped a function <br>
+definition facility for monadic functions of this kind which needs no <br>
+termination proof at all. You may be interested in this, since it fits <br>
+perfectly to your problem (the Ceta-Parser is actually mentioned in the <br>
+paper as an application):<br>
+<a href="http://www4.in.tum.de/~krauss/mrec/">http://www4.in.tum.de/~krauss/mrec/</a><br>
+However, the tool is not quite ready for integration yet, but if you are <br>
+not in a hurry, the problem might solve itself in a few months :-)</p>
+<p>Alex</p>
+
+
+
+<a name="294110894"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20cong-rules%20for%20parser/near/294110894" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20cong-rules.20for.20parser.html#294110894">(Aug 18 2022 at 15:33)</a>:</h4>
+<p>From: René Thiemann &lt;<a href="mailto:rene.thiemann@uibk.ac.at">rene.thiemann@uibk.ac.at</a>&gt;</p>
+<blockquote>
+<p>Not an answer but a thought: maybe result checking can simplify your<br>
+life? Maybe you can write your parser directly in ML and verify each  <br>
+run<br>
+of the parser by unparsing and comparison with the input?</p>
+</blockquote>
+<p>Yes and no: We do unparsing and comparison in any way, however, we  <br>
+cannot write<br>
+our parser in ML as we want to have the parser also in the target- <br>
+language from<br>
+the code-generator (as the generated verifier has to parse), or can  <br>
+the code-generator<br>
+generate (Haskell)-code from ML (in the new release)?</p>
+<p>Hence, we need a parser in HOL which does not have to satisfy any  <br>
+properties since<br>
+comparison against the input is performed. However, for the code- <br>
+generator we need<br>
+termination of all functions we would like to export (including the  <br>
+parser).<br>
+And since termination of the parser is currently the only axiom we  <br>
+use, we would<br>
+like to get rid of this axiom by actually proving termination.</p>
+<p>Best,<br>
+René</p>
+<blockquote>
+<blockquote>
+<p>Dear all,</p>
+<p>we currently have problems setting up the right cong-rules for our<br>
+parser such termination is provable.</p>
+<p>Here, the major problems are parsers which call themselves twice in  <br>
+a row.</p>
+<p>Consider the following theory:</p>
+<p>theory Test imports Main<br>
+begin</p>
+<p>types<br>
+ ('t, 'a) parser = "'t list =&gt; string + ('a x 't list)"</p>
+<p>take a token list and produce a string error-message or a pair of  <br>
+result<br>
+and remaining token list</p>
+<p>(state-monad with errors)</p>
+<p>now we can define the standard return and bind operations</p>
+<p>abbreviation<br>
+ return :: "'a =&gt; ('t, 'a)parser"<br>
+where<br>
+ "return x = (%ts. Inr (x, ts))"</p>
+<p>definition<br>
+ bind :: "('t, 'a) parser =&gt; ('a =&gt; ('t, 'b) parser) =&gt; ('t, 'b)  <br>
+parser"<br>
+where<br>
+ "bind m f ts = (case m ts of<br>
+     Inl e =&gt; Inl e<br>
+   | Inr (x,ts') =&gt; f x ts')"</p>
+<p>consuming one character</p>
+<p>fun consume :: "('t,'t)parser"<br>
+where "consume [] = Inl ''error''"<br>
+  |  "consume (t # ts) = Inr (t, ts)"</p>
+<p>now, here is the difficult function:</p>
+<p>function foo :: "('t, 't list)parser"<br>
+where "foo ts = (bind consume<br>
+                  (% t. bind foo<br>
+                  (% us. bind foo<br>
+                  (% vs. return (t # us @ vs))))) ts"<br>
+by pat_completeness auto<br>
+termination<br>
+proof<br>
+(*  impossible, since there is no link between input ts and the list<br>
+   of tokens that is used for recursive foo-calls *)<br>
+oops</p>
+<p>so, let us add some congruence rule:</p>
+<p>lemma bind_cong[fundef_cong]:<br>
+ fixes m1 :: "('t,'a)parser"<br>
+ assumes "m1 ts1 = m2 ts1" and "!! y ts. m1 ts1 = Inr (y,ts) ==&gt; f1 y<br>
+ts = f2 y ts" and "ts1 = ts2"<br>
+ shows "((bind m1 f1) ts1) = ((bind m2 f2) ts2)"<br>
+using assms unfolding bind_def by (cases "m1 ts1", auto)</p>
+<p>now, indeed a simplied version of foo can be proven to be terminating<br>
+(if there is only one recursive call)</p>
+<p>function foo' :: "('t, 't list)parser"<br>
+where "foo' ts = (bind consume<br>
+                  (% t. bind foo'<br>
+                  (% vs. return (t # vs)))) ts"<br>
+by pat_completeness auto<br>
+termination by ... tedious reasoning</p>
+<p>but, if we want to have the full version which two recursive calls,  <br>
+then<br>
+not even the function<br>
+definition is accepted:</p>
+<p>function foo'' :: "('t, 't list)parser"<br>
+where "foo'' ts = (bind consume<br>
+                  (% t. bind foo''<br>
+                  (% us. bind foo''<br>
+                  (% vs. return (t # us @ vs))))) ts"<br>
+(*<br>
+exception THM 0 raised (line 709 of "thm.ML"): implies_elim: major  <br>
+premise<br>
+*)</p>
+<p>Does someone have an idea, what went wrong in this case?</p>
+<p>Best regards,<br>
+René</p>
+<p>PS: The small theory file is attached.</p>
+</blockquote>
+</blockquote>
+
+
+
+<a name="294110966"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20cong-rules%20for%20parser/near/294110966" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20cong-rules.20for.20parser.html#294110966">(Aug 18 2022 at 15:33)</a>:</h4>
+<p>From: René Thiemann &lt;<a href="mailto:rene.thiemann@uibk.ac.at">rene.thiemann@uibk.ac.at</a>&gt;<br>
+Hi Alex,</p>
+<blockquote>
+<p>I think your cong rule is slightly wrong. When I change it to</p>
+<p>lemma bind_cong[fundef_cong]:<br>
+ fixes m1 :: "('t,'a)parser"<br>
+ assumes "m1 ts2 = m2 ts2"<br>
+ and "\&lt;And&gt; y ts. m2 ts2 = Inr (y,ts) ==&gt; f1 y ts = f2 y ts"<br>
+ and "ts1 = ts2"<br>
+ shows "((bind m1 f1) ts1) = ((bind m2 f2) ts2)"</p>
+<p>then the function definition works for me. (I haven't attempted a  <br>
+termination proof, but the proof obligation looks reasonable.)</p>
+<p>The difference is that you have to refer to the "2"-variables in the  <br>
+assumptions of the branches, cf. eg. if_cong.</p>
+</blockquote>
+<p>thanks, that was it. Now termination of the XML-parser is proven.</p>
+<blockquote>
+<p>It would be nice if there was a helpful error at the time where you  <br>
+declare the rule, but I do not know what the general check would  <br>
+have to be... The format of cong-rules isn't really well-defined,  <br>
+except for the way they are used internally.</p>
+</blockquote>
+<p>:-) I never would have seen from the error message, that I just would  <br>
+have to swap the 1's and 2's.</p>
+<blockquote>
+<p>Since you are working with a state-exception monad, the termination  <br>
+proof isn't actually crucial: I recently prototyped a function  <br>
+definition facility for monadic functions of this kind which needs  <br>
+no termination proof at all. You may be interested in this, since it  <br>
+fits perfectly to your problem (the Ceta-Parser is actually  <br>
+mentioned in the paper as an application):<br>
+<a href="http://www4.in.tum.de/~krauss/mrec/">http://www4.in.tum.de/~krauss/mrec/</a><br>
+However, the tool is not quite ready for integration yet, but if you  <br>
+are not in a hurry, the problem might solve itself in a few months :-)</p>
+</blockquote>
+<p>okay, nice to know. Perhaps we'll wait a bit before proving  <br>
+termination of the full CPF-parser.</p>
+<p>René</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

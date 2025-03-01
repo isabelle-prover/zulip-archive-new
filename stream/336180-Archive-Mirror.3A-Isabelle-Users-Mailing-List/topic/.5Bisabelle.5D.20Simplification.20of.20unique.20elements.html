@@ -1,0 +1,82 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Simplification of unique elements · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Simplification.20of.20unique.20elements.html">[isabelle] Simplification of unique elements</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294093456"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Simplification%20of%20unique%20elements/near/294093456" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Simplification.20of.20unique.20elements.html#294093456">(Aug 18 2022 at 14:23)</a>:</h4>
+<p>From: Juan Antonio Navarro Pérez &lt;<a href="mailto:juannavarroperez@gmail.com">juannavarroperez@gmail.com</a>&gt;<br>
+Hi all!</p>
+<p>Suppose I have some unary predicate P, and I have proved that it has a<br>
+unique satisfying solution. That is, I prove the theorem:</p>
+<p>theorem unique [simp]: "[| P a; P b |] ==&gt; a = b"</p>
+<p>It seems that, even after declaring the rule as a simplification, the<br>
+rule is not always applied by Isabelle. As an example, the following<br>
+proof attempt fails.</p>
+<p>theorem foo: "[| P a; P b |] ==&gt; f a = f b"<br>
+apply (simp)</p>
+<p>Alternatively, I've been doing something like</p>
+<p>theorem foo: "[| P a; P b |] ==&gt; f a = f b"<br>
+by (drule unique, assumption, simp)</p>
+<p>I can see why the simplification rule wont always be applied by<br>
+Isabelle, as it would easily loop forever.</p>
+<p>Still, what would be the best way to deal with this kind of<br>
+predicates? So that most of the deductions with them, and simple<br>
+examples such as theorem "foo", could be proved automatically?</p>
+<p>Thanks!</p>
+<p>Juan</p>
+
+
+
+<a name="294093472"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Simplification%20of%20unique%20elements/near/294093472" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Simplification.20of.20unique.20elements.html#294093472">(Aug 18 2022 at 14:23)</a>:</h4>
+<p>From: Brian Huffman &lt;<a href="mailto:brianh@cs.pdx.edu">brianh@cs.pdx.edu</a>&gt;<br>
+Hi Juan,</p>
+<p>When you declare "unique" as a simp rule, Isabelle's simplifier<br>
+immediately notices that it would cause looping in its original form.<br>
+Instead, it uses this rule for simplification:</p>
+<p>"[| P a; P b |] ==&gt; (a = b) == True"</p>
+<p>(I determined this by doing "simp add: unique" with "Trace Simplifier" enabled.)<br>
+This modified form won't loop, but it is not sufficient to prove your<br>
+theorem "foo".</p>
+<p>One possibility is to use "unique" with auto, as a dest rule:</p>
+<p>theorem foo: "[| P a; P b |] ==&gt; f a = f b"<br>
+by (auto dest: unique)</p>
+<p>The effect of "dest: unique" is that when auto finds "P a" and "P b"<br>
+in the assumptions, it will remove "P a" and replace it by "a = b".</p>
+<p>Another possibility is to do some trickery with Isabelle's<br>
+definite-choice operator. This method works using only ordinary simp<br>
+rules, but you will need to prove existence as well as uniqueness, and<br>
+it also requires the definition of an extra constant.</p>
+<p>lemma exists: "EX x. P x"<br>
+sorry</p>
+<p>lemma exists1: "EX! x. P x"<br>
+using exists unique by (rule ex_ex1I)</p>
+<p>definition "theP = (THE x. P x)"</p>
+<p>lemma P_iff: "P a = (a = theP)"<br>
+unfolding theP_def<br>
+apply safe<br>
+apply (rule the1_equality [symmetric])<br>
+apply (rule exists1)<br>
+apply assumption<br>
+apply (rule theI')<br>
+apply (rule exists1)<br>
+done</p>
+<p>Unlike "unique", lemma "P_iff" is a well-behaved simp rule.</p>
+<p>theorem foo: "[| P a; P b |] ==&gt; f a = f b"<br>
+by (simp add: P_iff)</p>
+<p>Hope this helps,</p>
+<ul>
+<li>Brian</li>
+</ul>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

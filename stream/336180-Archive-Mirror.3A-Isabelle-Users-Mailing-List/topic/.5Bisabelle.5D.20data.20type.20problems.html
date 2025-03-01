@@ -1,0 +1,111 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] data type problems · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20data.20type.20problems.html">[isabelle] data type problems</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294049832"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20data%20type%20problems/near/294049832" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20data.20type.20problems.html#294049832">(Aug 18 2022 at 10:36)</a>:</h4>
+<p>From: Carsten Varming &lt;<a href="mailto:varming@cmu.edu">varming@cmu.edu</a>&gt;<br>
+Hi,</p>
+<p>Working with Isabelle data types I have come across some odd behavior.</p>
+<p>In the 21_Jun_2007 edition I get the following when stepping through the<br>
+code below. Some of the behavior, but not all, is the same in the 2005<br>
+edition.</p>
+<p>The  data type declaration results in:</p>
+<h3>Theorem database already contains a copy of "test.D.arity_size_*"</h3>
+<p>The primitive recursive function definition results in:</p>
+<h3>No function definition for datatype "List.list"</h3>
+<h3>No function definition for datatype "*"</h3>
+<h3>No function definition for datatype "*"</h3>
+<p>And the case NE results in:<br>
+*** Illegal schematic variable(s) in case "NE"<br>
+*** At command "case".</p>
+<p>What am I experiencing here? Is this how it is suppose to be?</p>
+<p>theory test imports Main<br>
+begin</p>
+<p>types 'a EE = "nat  'a  nat"</p>
+<p>datatype D =<br>
+      B<br>
+   |  Elem "D EE"<br>
+   |  NE "(D list)"</p>
+<p>consts E :: "D  nat"<br>
+primrec<br>
+"E B = 1"<br>
+"E (Elem e) = 2"<br>
+"E (NE e) = 3"</p>
+<p>lemma "E d &gt; 0"<br>
+proof (induct d)<br>
+case B thus ?case by auto next<br>
+case NE</p>
+<p>Carsten</p>
+
+
+
+<a name="294049877"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20data%20type%20problems/near/294049877" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20data.20type.20problems.html#294049877">(Aug 18 2022 at 10:36)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On Sat, 23 Jun 2007, Carsten Varming wrote:</p>
+<blockquote>
+<p>Working with Isabelle data types I have come across some odd behavior.</p>
+<p>In the 21_Jun_2007 edition I get the following when stepping through the<br>
+code below.</p>
+</blockquote>
+<blockquote>
+<p>types 'a EE = "nat ? 'a ? nat"</p>
+<p>datatype D =<br>
+     B<br>
+  |  Elem "D EE"<br>
+  |  NE "(D list)"</p>
+<p>consts E :: "D ? nat"<br>
+primrec<br>
+"E B = 1"<br>
+"E (Elem e) = 2"<br>
+"E (NE e) = 3"</p>
+<p>lemma "E d &gt; 0"<br>
+proof (induct d)<br>
+case B thus ?case by auto next<br>
+case NE</p>
+</blockquote>
+<blockquote>
+<p>And the case NE results in:<br>
+*** Illegal schematic variable(s) in case "NE"<br>
+*** At command "case".</p>
+<p>What am I experiencing here? Is this how it is suppose to be?</p>
+</blockquote>
+<p>Since D is a nested datatype, the induction principle works via several <br>
+predicates simultaneaously.  Just inspect the theorem list D.inducts to <br>
+see how this looks internally.  An induction proof needs to follow that <br>
+structure, by stating multiple goals and invoking theses rules properly <br>
+(which can be a bit tricky).  E.g. see the simple example in <br>
+HOL/Induct/Term.thy</p>
+<p>As your primrec function is not recursive anyhow, but uses plain case <br>
+analyis only, you may finish the proof like this:</p>
+<p>lemma "E d &gt; 0"<br>
+  proof (cases d)<br>
+    case B then show ?thesis by simp<br>
+  next <br>
+    case Elem then show ?thesis by simp<br>
+  next<br>
+    case NE then show ?thesis by simp<br>
+  qed</p>
+<p>or even like this:</p>
+<p>lemma "E d &gt; 0"<br>
+    by (cases d) simp_all</p>
+<blockquote>
+<p>Some of the behavior, but not all, is the same in the 2005 edition.</p>
+</blockquote>
+<p>There have been some changes here concerning the "induct" method and <br>
+corresponding rules produced by nested/mutual datatypes etc.  The NEWS <br>
+file provides some further clues.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,128 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Tips to make a simplification simpler? · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Tips.20to.20make.20a.20simplification.20simpler.3F.html">[isabelle] Tips to make a simplification simpler?</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294218400"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Tips%20to%20make%20a%20simplification%20simpler%3F/near/294218400" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Tips.20to.20make.20a.20simplification.20simpler.3F.html#294218400">(Aug 19 2022 at 08:02)</a>:</h4>
+<p>From: "Yannick Duchêne (Hibou57 )" &lt;<a href="mailto:yannick_duchene@yahoo.fr">yannick_duchene@yahoo.fr</a>&gt;<br>
+Hi all again,</p>
+<p>I have a question from part of “prog-prove.pdf”</p>
+<p>On page 34, “prog-prove.pdf”, propose a inductive definition:</p>
+<p>inductive star :: "('a ⇒ 'a ⇒ bool) ⇒ ('a ⇒ 'a ⇒ bool)"<br>
+     for r<br>
+     where<br>
+       refl: "((star r) x x)"<br>
+     | step: "(r x y) ⟹ ((star r) y z) ⟹ ((star r) x z)"</p>
+<p>Then it suggest that “star r” is transitive and invite the reader to prove  <br>
+it. As the transitivity looked not obvious to me, I was afraid the proof  <br>
+may be not that simple, but it was.</p>
+<p>The e‑book suggest to prove it this way:</p>
+<p>lemma star_trans: "((star r) x y) ⟹ ((star r) y z) ⟹ ((star r) x z)"<br>
+     apply (induction rule: star.induct)<br>
+     apply (assumption)<br>
+     apply (metis step)<br>
+     done</p>
+<p>But I did it this way:</p>
+<p>lemma star_trans: "((star r) x y) ⟹ ((star r) y z) ⟹ ((star r) x z)"<br>
+     apply (induction x y rule: star.induct)<br>
+     apply (assumption)<br>
+     apply (simp)<br>
+     apply (simp add: step)<br>
+     done</p>
+<p>The two first steps are obvious, and the e‑books used the same. After the  <br>
+first two steps, remains a single goal:</p>
+<p>1. ⋀x y za.<br>
+        r x y ⟹<br>
+        star r y za ⟹<br>
+        (star r za z ⟹ star r y z) ⟹ star r za z ⟹ star r x z</p>
+<p>My first “simp” is because “star r za z” appears as a supposedly True  <br>
+hypothesis, so that “(star r za z ⟹ star r y z)” can be simplified to  <br>
+“star r y z” and the goal then become:</p>
+<p>1. ⋀x y za.<br>
+        r x y ⟹<br>
+        star r y za ⟹<br>
+        star r y z ⟹ star r za z ⟹ star r x z</p>
+<p>Then, I noticed “r x y” and “star r y z” and “star r x z”, present in the  <br>
+hypothesis covers all of “star.step”, so that “star.step” is a more  <br>
+general case of the goal to prove.</p>
+<p>As the simplifier is able to prove something like “(A⟹B⟹Z)⟹(A⟹B⟹C⟹Z)”, I  <br>
+supposed it should be able to prove the less general goal by the more  <br>
+general “star.step”.</p>
+<p>Looked quite straightforward, but the simplifier trace tells me *five  <br>
+times*:</p>
+<p>simp_trace_depth_limit exceeded!</p>
+<p>Amazingly, it was still able to prove the goal by simplification.</p>
+<p>My question is: how to make similar simplification more simple? By the  <br>
+way, should I really see it as an issue?</p>
+<p>Thanks for any pointers and feeling on the topic.</p>
+
+
+
+<a name="294218449"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Tips%20to%20make%20a%20simplification%20simpler%3F/near/294218449" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Tips.20to.20make.20a.20simplification.20simpler.3F.html#294218449">(Aug 19 2022 at 08:02)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+The message "simp_trace_depth_limit exceeded!" merely tells you that the <em>trace</em><br>
+depth has been exceeded. The behaviour of the simplifier is not affected, merely<br>
+its tracing is stopped until it emerges from its recursive invocations. This is<br>
+a very simpled-minded way of getting a abstract view of the trace. If you want<br>
+more tracing info, you can always increase the limit - in ProofGeneral there is<br>
+a menue item Trace Simplifier Depth for it.</p>
+<p>We expect to provide better tracing facilities in the future.</p>
+<p>Tobias</p>
+
+
+
+<a name="294218545"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Tips%20to%20make%20a%20simplification%20simpler%3F/near/294218545" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Tips.20to.20make.20a.20simplification.20simpler.3F.html#294218545">(Aug 19 2022 at 08:03)</a>:</h4>
+<p>From: "Yannick Duchêne (Hibou57 )" &lt;<a href="mailto:yannick_duchene@yahoo.fr">yannick_duchene@yahoo.fr</a>&gt;<br>
+Le Tue, 31 Jul 2012 08:08:31 +0200, Tobias Nipkow  <br>
+&lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt; a écrit:</p>
+<blockquote>
+<p>The message "simp_trace_depth_limit exceeded!" merely tells you that the  <br>
+<em>trace</em><br>
+depth has been exceeded. The behaviour of the simplifier is not affected,<br>
+That's what I guessed too, while was still surprised a limit was exceeded  <br>
+with what looked simple to me. On the other hand, I understand  <br>
+simplification is the most important and tedious part of proof assistance  <br>
+and that it easily requires more steps than what a human believe in his  <br>
+mind.</p>
+</blockquote>
+<blockquote>
+<p>merely<br>
+its tracing is stopped until it emerges from its recursive invocations.  <br>
+This is<br>
+a very simpled-minded way of getting a abstract view of the trace. If  <br>
+you want<br>
+more tracing info, you can always increase the limit - in ProofGeneral  <br>
+there is<br>
+a menue item Trace Simplifier Depth for it.</p>
+</blockquote>
+<p>I searched for a way to have the same with jEdit. That's the opportunity  <br>
+of another topic.</p>
+<blockquote>
+<p>We expect to provide better tracing facilities in the future.</p>
+<p>Tobias</p>
+</blockquote>
+<p>May be a simple text filter would be enough. But I did not go into these  <br>
+internals for now.</p>
+<p>Thanks for your comments and explanations.</p>
+
+
+
+<a name="294221354"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Tips%20to%20make%20a%20simplification%20simpler%3F/near/294221354" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Tips.20to.20make.20a.20simplification.20simpler.3F.html#294221354">(Aug 19 2022 at 08:27)</a>:</h4>
+<p>From: Lars Noschinski &lt;<a href="mailto:noschinl@in.tum.de">noschinl@in.tum.de</a>&gt;<br>
+You can do this by "using [[simp_trace_depth_limit=x]]"</p>
+<p>-- Lars</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

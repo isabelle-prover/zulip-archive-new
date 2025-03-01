@@ -1,0 +1,181 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Isabelle2015-RC1: Rule instantiation in Eisbach · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2015-RC1.3A.20Rule.20instantiation.20in.20Eisbach.html">[isabelle] Isabelle2015-RC1: Rule instantiation in Eisbach</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294635341"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2015-RC1%3A%20Rule%20instantiation%20in%20Eisbach/near/294635341" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2015-RC1.3A.20Rule.20instantiation.20in.20Eisbach.html#294635341">(Aug 22 2022 at 09:18)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear Eisbach developers,</p>
+<p>First of all, thanks for designing and implementing Eisbach. Unfortunately, I am <br>
+struggling with instantiating variables in rules when I write my own proof methods in Eisbach.</p>
+<p>Abstractly,</p>
+<ol>
+<li>I select a rule R by matching a list L of theorems against a term, and</li>
+<li>then instantiate a variable in R with a term obtained by matching the conclusion <br>
+against a pattern.</li>
+</ol>
+<p>Unfortunately, I always get the error "More instantiations than variables in theorem" <br>
+although all the theorems in the list L contain at least one variable. I do not know where <br>
+this error comes from. Below is a small example:</p>
+<p>theory Scratch imports Main "~~/src/HOL/Eisbach/Eisbach_Tools" begin</p>
+<p>consts foo :: "'a ⇒ 'a ⇒ 'a ⇒ bool"<br>
+lemma my_thms: "foo x y z ⟹ z ∧ y" "foo x y y ⟹ x ∧ z" sorry</p>
+<p>lemma "⋀z. A z ∧ B"<br>
+apply(<br>
+   match concl in "f x y" for f x y ⇒ ‹<br>
+     match my_thms in R:"PROP P ⟹ f u v" for P u v ⇒ ‹<br>
+       rule R[of x]<br>
+     ›<br>
+   ›<br>
+)<br>
+oops</p>
+<p>end</p>
+<p>Thanks for any help,<br>
+Andreas</p>
+<p>PS: I am trying to build something similar to the apply_split method in the Eisbach paper <br>
+presented at ITP2014.</p>
+
+
+
+<a name="294636080"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2015-RC1%3A%20Rule%20instantiation%20in%20Eisbach/near/294636080" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2015-RC1.3A.20Rule.20instantiation.20in.20Eisbach.html#294636080">(Aug 22 2022 at 09:23)</a>:</h4>
+<p>From: Daniel Matichuk &lt;<a href="mailto:daniel.matichuk@nicta.com.au">daniel.matichuk@nicta.com.au</a>&gt;<br>
+Hi Andreas,</p>
+<p>Unfortunately the ITP paper is slightly out of date, specifically regarding rule instantiation. The "match" method is now meant to guard rule instantiation at run-time by ensuring that the matched theorem(s) has<br>
+the correct slots available. This is done by using meta-quantifiers in your patterns. Specifically the semantics of a match are that a "for-fixed" variable may match anything, whereas a meta-quantified variable<br>
+must match against a schematic. So in your example, assuming you wish to instantiate "P", your pattern should be "!!P. PROP P ==&gt; f u v" for u v". This statically ensures that any matched rule can be instantiated appropriately (so the failure occurs in the match, rather than the rule instantiation).<br>
+The motivation for this requirement is perhaps more clear when using match to define an Eisbach method, rather than when used in-place.</p>
+<p>It's also worth noting that a pattern like "f x y" for f x y will produce a large set of possible matches, due to "match" using the unifier internally. The usual best-practice approach is to add type annotations to your pattern to restrict the matches.<br>
+There is some argument for extending the match pattern language to support more precise term deconstruction, but I'm waiting to see more use cases before adding more complexity.</p>
+<hr>
+<p>The information in this e-mail may be confidential and subject to legal professional privilege and/or copyright. National ICT Australia Limited accepts no liability for any damage caused by this email or its attachments.</p>
+
+
+
+<a name="294636102"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2015-RC1%3A%20Rule%20instantiation%20in%20Eisbach/near/294636102" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2015-RC1.3A.20Rule.20instantiation.20in.20Eisbach.html#294636102">(Aug 22 2022 at 09:23)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+It would be interesting to explore the question if/how the new "rewrite" <br>
+method facilities could be re-used here.</p>
+<p>Makarius</p>
+
+
+
+<a name="294636133"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2015-RC1%3A%20Rule%20instantiation%20in%20Eisbach/near/294636133" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2015-RC1.3A.20Rule.20instantiation.20in.20Eisbach.html#294636133">(Aug 22 2022 at 09:23)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Daniel,</p>
+<p>Thanks for the reply. Unfortunately, I cannot get this to work at all. Your suggested <br>
+pattern "!!P. PROP P ==&gt; f u v" raises a type error. After several failed attempts, I am <br>
+now stuck at the following where something really strange happens.</p>
+<p>lemma "⋀z. A z ∧ B"<br>
+apply(<br>
+  match concl in "f x y" for f x y ⇒ ‹<br>
+    match my_thms in R:"⋀x :: _ :: type. P x ⟹ f u v" for P u v ⇒ ‹<br>
+      print_fact R,<br>
+      print_fact R[of undefined],<br>
+      rule R[of undefined]<br>
+    ›<br>
+  ›<br>
+)</p>
+<p>If I name the bound variable to be matched by a schematic, print_fact R outputs something <br>
+like foo ?x ?y ?x ⟹ ?x ∧ ?y whereas the matched rule is "foo x y z ⟹ z ∧ y", i.e., it <br>
+unifies x with z. If I rename the bound variable !!x to !!z, the rule stays in its general <br>
+form. Still, the method still fails, because the variable instantiations are done in a <br>
+strange order (not in the order in which they occur in the theorem).</p>
+<p>I do not know the form of the assumption of my matched theorem in my real use case, I just <br>
+know that there is a variable in the assumptions and that I want to instantiate the first <br>
+one. How can I express this in Eisbach? I tried to play with "!!x :: _ :: type. PROP P x <br>
+==&gt; PROP Q" but this did not match anything I tried.</p>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<a name="294636294"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2015-RC1%3A%20Rule%20instantiation%20in%20Eisbach/near/294636294" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2015-RC1.3A.20Rule.20instantiation.20in.20Eisbach.html#294636294">(Aug 22 2022 at 09:24)</a>:</h4>
+<p>From: Daniel Matichuk &lt;<a href="mailto:daniel.matichuk@nicta.com.au">daniel.matichuk@nicta.com.au</a>&gt;<br>
+Hi Andreas,</p>
+<blockquote>
+<p>On 24 Apr 2015, at 2:03 am, Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt; wrote:</p>
+<p>Hi Daniel,</p>
+<p>Thanks for the reply. Unfortunately, I cannot get this to work at all. Your suggested pattern "!!P. PROP P ==&gt; f u v" raises a type error. After several failed attempts, I am now stuck at the following where something really strange happens.</p>
+<p>lemma "⋀z. A z ∧ B"<br>
+apply(<br>
+match concl in "f x y" for f x y ⇒ ‹<br>
+  match my_thms in R:"⋀x :: _ :: type. P x ⟹ f u v" for P u v ⇒ ‹<br>
+    print_fact R,<br>
+    print_fact R[of undefined],<br>
+    rule R[of undefined]<br>
+  ›<br>
+›<br>
+)</p>
+<p>If I name the bound variable to be matched by a schematic, print_fact R outputs something like foo ?x ?y ?x ⟹ ?x ∧ ?y whereas the matched rule is "foo x y z ⟹ z ∧ y", i.e., it unifies x with z. If I rename the bound variable !!x to !!z, the rule stays in its general form.</p>
+</blockquote>
+<p>It's likely you've uncovered an issue with variable clashes here, picking a fresh name for the bound variable seems to result in the expected behaviour. I imagine I've overlooked some schematic index management somewhere, I'll look into it ASAP.</p>
+<blockquote>
+<p>Still, the method still fails, because the variable instantiations are done in a strange order (not in the order in which they occur in the theorem).</p>
+</blockquote>
+<p>The method instantiations are done in the order that they are declared in the match. So in your example "undefined" will be bound to whatever x matches against, regardless of the form of the actual rule.<br>
+It is precisely equivalent to writing "R[where x=undefined]".</p>
+<blockquote>
+<p>I do not know the form of the assumption of my matched theorem in my real use case, I just know that there is a variable in the assumptions and that I want to instantiate the first one. How can I express this in Eisbach? I tried to play with "!!x :: _ :: type. PROP P x ==&gt; PROP Q" but this did not match anything I tried.</p>
+</blockquote>
+<p>The notion of the "first" schematic is not something that can be described with a match pattern. Again, this is perhaps some indication that a more expressive pattern language is needed.<br>
+Your pattern should backtrack over all possible ways some "P" can be bound such that "x" is bound to a schematic from the theorem, within these backtracking options will be the one that happens to be first.</p>
+<p>However I believe this backtracking is not happening in your specific example, and I think it's actually a related issue to the other one. Bear with me while I investigate.</p>
+<blockquote>
+<p>Best,<br>
+Andreas</p>
+<p>On 23/04/15 03:48, Daniel Matichuk wrote:</p>
+<blockquote>
+<p>Hi Andreas,</p>
+<p>Unfortunately the ITP paper is slightly out of date, specifically regarding rule instantiation. The "match" method is now meant to guard rule instantiation at run-time by ensuring that the matched theorem(s) has<br>
+the correct slots available. This is done by using meta-quantifiers in your patterns. Specifically the semantics of a match are that a "for-fixed" variable may match anything, whereas a meta-quantified variable<br>
+must match against a schematic. So in your example, assuming you wish to instantiate "P", your pattern should be "!!P. PROP P ==&gt; f u v" for u v". This statically ensures that any matched rule can be instantiated appropriately (so the failure occurs in the match, rather than the rule instantiation).<br>
+The motivation for this requirement is perhaps more clear when using match to define an Eisbach method, rather than when used in-place.</p>
+<p>It's also worth noting that a pattern like "f x y" for f x y will produce a large set of possible matches, due to "match" using the unifier internally. The usual best-practice approach is to add type annotations to your pattern to restrict the matches.<br>
+There is some argument for extending the match pattern language to support more precise term deconstruction, but I'm waiting to see more use cases before adding more complexity.</p>
+<p>On 20 Apr 2015, at 10:49 pm, Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt; wrote:</p>
+<blockquote>
+<p>Dear Eisbach developers,</p>
+<p>First of all, thanks for designing and implementing Eisbach. Unfortunately, I am struggling with instantiating variables in rules when I write my own proof methods in Eisbach.</p>
+<p>Abstractly,<br>
+1. I select a rule R by matching a list L of theorems against a term, and<br>
+2. then instantiate a variable in R with a term obtained by matching the conclusion against a pattern.</p>
+<p>Unfortunately, I always get the error "More instantiations than variables in theorem" although all the theorems in the list L contain at least one variable. I do not know where this error comes from. Below is a small example:</p>
+<p>theory Scratch imports Main "~~/src/HOL/Eisbach/Eisbach_Tools" begin</p>
+<p>consts foo :: "'a ⇒ 'a ⇒ 'a ⇒ bool"<br>
+lemma my_thms: "foo x y z ⟹ z ∧ y" "foo x y y ⟹ x ∧ z" sorry</p>
+<p>lemma "⋀z. A z ∧ B"<br>
+apply(<br>
+ match concl in "f x y" for f x y ⇒ ‹<br>
+   match my_thms in R:"PROP P ⟹ f u v" for P u v ⇒ ‹<br>
+     rule R[of x]<br>
+   ›<br>
+ ›<br>
+)<br>
+oops</p>
+<p>end</p>
+<p>Thanks for any help,<br>
+Andreas</p>
+<p>PS: I am trying to build something similar to the apply_split method in the Eisbach paper presented at ITP2014.<br>
+</p>
+</blockquote>
+<hr>
+<p>The information in this e-mail may be confidential and subject to legal professional privilege and/or copyright. National ICT Australia Limited accepts no liability for any damage caused by this email or its attachments.<br>
+</p>
+</blockquote>
+</blockquote>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

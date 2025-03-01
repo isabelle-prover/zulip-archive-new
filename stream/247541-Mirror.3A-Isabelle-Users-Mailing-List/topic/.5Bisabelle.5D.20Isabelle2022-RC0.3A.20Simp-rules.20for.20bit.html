@@ -1,0 +1,235 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Isabelle2022-RC0: Simp-rules for bit · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2022-RC0.3A.20Simp-rules.20for.20bit.html">[isabelle] Isabelle2022-RC0: Simp-rules for bit</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294854958"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2022-RC0%3A%20Simp-rules%20for%20bit/near/294854958" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2022-RC0.3A.20Simp-rules.20for.20bit.html#294854958">(Aug 23 2022 at 12:28)</a>:</h4>
+<p>From: Dominique Unruh &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Dear all,</p>
+<p>I already sent this to the mailing list last year when 2021-1 came out <br>
+but there was no answer, it probably got lost in the excitement of the <br>
+RC-process.</p>
+<p>Personally, I think this is a confusing problem and should be changed. <br>
+However, if this is intended behavior, I would be happy if someone who <br>
+feels responsible for the "bit" type (in Z2) can confirm this.</p>
+<p>In Isabelle2021-1, the simplification rules for the type bit (from <br>
+HOL-Library.Z2) have changed.</p>
+<p>Besides other rules, we have the following simp rules:</p>
+<p>* xor ?b ?c = of_bool (odd ?b ≠ odd ?c)<br>
+  * of_bool (¬ ?P) = 1 - of_bool ?P<br>
+  * (-) = (+)<br>
+  * (+) = xor</p>
+<p>These rules can give us a rewrite-cycle: xor is rewritten in terms of <br>
+"of_bool (... ~= ...)" which goes to "1 - of_bool ..." which goes to "1 </p>
+<ul>
+<li>of_bool ..." which goes to "xor 1 (of_bool ...)". And we have xor back!</li>
+</ul>
+<p>Whether this actually happens depends on the concrete case (sometimes <br>
+the a case distinction splitter rule on the arguments of the xor happens <br>
+instead, I think).</p>
+<p>But I have found that it can be quite easily triggered nonetheless.</p>
+<p>For example, ‹xor b c = of_bool (b ≠ c)› makes the simplifier loop.</p>
+<p>And if we add the (quite useful, imho) simp rule "((a=x) = (b=x)) = <br>
+(a=b)" for bits, then even something as natural as ‹a + b + b = a› loops.</p>
+<p>An example theory is attached.</p>
+<p>Of course, I don't know if there are any important reasons for those <br>
+xor-related simp-rules, but personally I feel that removing them (at <br>
+least the "xor ?b ?c = of_bool (odd ?b ≠ odd ?c)" rule) would make the <br>
+simplifier much less fragile in the presence of bit-related arithmetic.</p>
+<p>(Also, as an aside: why is there "odd" in the definition of xor? <br>
+Wouldn't "xor ?b ?c = of_bool (?b ≠ ?c)" be simpler and equivalent?)</p>
+<p>Best wishes,<br>
+Dominique.<br>
+<a href="/user_uploads/14278/x0ndK9MwYlF9Q1ZA9L47BRyG/Scratch.thy">Scratch.thy</a></p>
+
+
+
+<a name="294894599"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2022-RC0%3A%20Simp-rules%20for%20bit/near/294894599" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2022-RC0.3A.20Simp-rules.20for.20bit.html#294894599">(Aug 23 2022 at 15:42)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Dominique,</p>
+<p>thanks for reporting this.</p>
+<p>a) The evil simp rule clearly is ‹of_bool (¬ ?P) = 1 - of_bool ?P›, I am<br>
+working on getting rid of it.  (As often, the problem does not reside in<br>
+the theory which exposed it).</p>
+<p>b) Concerning the deeper rationale, the history of theory Z2 is relevant.</p>
+<p>Before 2013/14, the type bit = 0 | 1 was heavily used to represent<br>
+single bit values e. g. in what is nowadays HOL/Bit_Operations.thy and<br>
+HOL-Library/Word.thy – but not in all consequence, in some places bool<br>
+was used for the same purpose.</p>
+<p>Andreas Lochbihler then suggested to reconcile this, and from that time<br>
+bool has been used consistently, the of_bool embedding stemming from<br>
+that time.  The »bit« type has been kept for backward compatibility.</p>
+<p>When starting re-working bit operations and word operations from 2019<br>
+on, I did not dare to cut of that backward compatibility strain but<br>
+asked myself for which applications »bit« could be preferable to »bool«<br>
+and came to the conclusion that it is a complete model of the field with<br>
+two elements, hence re-shaping it into theory Z2.</p>
+<p>At that time I did not know of any applications but appreciated it as a<br>
+nice example how to introduce a data type with overloaded constructor<br>
+symbols.  Also I tried to provide automation to reduce problems on type<br>
+»bit« to »bool«, hence using existing automation on »bool« to prove<br>
+problems on »bit«, which explains the rather aggressive default simp rules.</p>
+<blockquote>
+<p>(Also, as an aside: why is there "odd" in the definition of xor?<br>
+Wouldn't "xor ?b ?c = of_bool (?b ≠ ?c)" be simpler and equivalent?)</p>
+</blockquote>
+<p>You are clearly right that those RHSs could be formulated in a logically<br>
+simpler way, but then the expression of the primary idea would get lost:<br>
+reduce expressions on »bit« to expressions on »bool« with simple<br>
+straightforward correspondences.</p>
+<p>Your proposal would essentially loose the rewriting the »bool«.</p>
+<p>Cheers,<br>
+    Florian<br>
+<a href="/user_uploads/14278/_AVL7lZRxp8Oiptm4iSgN6jA/OpenPGP_signature">OpenPGP_signature</a></p>
+
+
+
+<a name="294921642"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2022-RC0%3A%20Simp-rules%20for%20bit/near/294921642" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2022-RC0.3A.20Simp-rules.20for.20bit.html#294921642">(Aug 23 2022 at 18:12)</a>:</h4>
+<p>From: Dominique Unruh &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Hi,</p>
+<p>I wonder whether "xor ?b ?c = of_bool (odd ?b ≠ odd ?c)" shouldn't <br>
+removed from the simp-set instead (or in addition to) "of_bool (¬ ?P) = <br>
+1 - of_bool ?P". And then of course add enough simp-rules for xor to <br>
+compensate for this (such as "xor a a = 0" etc). (I would assume not too <br>
+many are needed.) One advantage would be that it leads to more readable <br>
+simplifications. Or alternatively rewrite xor to plus, that fits best <br>
+with the Z2-view and also leads to readable simplification results.</p>
+<p>But that would of course not fit with the idea of rewriting everything <br>
+to bool.</p>
+<p>Another possibility would be to make bit a type synonym for bool and <br>
+define 1 := true, 0 := false. (While still possibly instantiating the <br>
+field typeclass.)</p>
+<blockquote>
+<p>At that time I did not know of any applications<br>
+I can explain where I use it. In cryptography, we often have an <br>
+adversary with a one-bit output (and we look at how the probability <br>
+distribution of that output changes). Now we could, of course, say the <br>
+output is of type bool, but there are two stylistic arguments against <br>
+it: (a) We get farther away from the established notation in crypto <br>
+(where we'd write Pr[x=1 : x&lt;-A] and not Pr[x : x&lt;-A]). (b) Using type <br>
+bool implies a certain meaning of the bit values (truth) but the outputs <br>
+0/1 of the adversary do not represent a yes/no answer per se, but just <br>
+two choices.</p>
+</blockquote>
+<p>These arguments are of course a bit subjective, and technically there is <br>
+nothing that stops us from using bool here.</p>
+<blockquote>
+<p>You are clearly right that those RHSs could be formulated in a logically<br>
+simpler way, but then the expression of the primary idea would get lost:<br>
+reduce expressions on »bit« to expressions on »bool« with simple<br>
+straightforward correspondences.<br>
+Ah, I understand now. "odd" is kind of "to_bool", and then it makes <br>
+sense intuitively!</p>
+</blockquote>
+<p>Best wishes,<br>
+Dominique.</p>
+<p>On 8/23/22 18:41, Florian Haftmann wrote:</p>
+<blockquote>
+<p>Hi Dominique,</p>
+<p>thanks for reporting this.</p>
+<p>a) The evil simp rule clearly is ‹of_bool (¬ ?P) = 1 - of_bool ?P›, I am<br>
+working on getting rid of it.  (As often, the problem does not reside in<br>
+the theory which exposed it).</p>
+<p>b) Concerning the deeper rationale, the history of theory Z2 is relevant.</p>
+<p>Before 2013/14, the type bit = 0 | 1 was heavily used to represent<br>
+single bit values e. g. in what is nowadays HOL/Bit_Operations.thy and<br>
+HOL-Library/Word.thy – but not in all consequence, in some places bool<br>
+was used for the same purpose.</p>
+<p>Andreas Lochbihler then suggested to reconcile this, and from that time<br>
+bool has been used consistently, the of_bool embedding stemming from<br>
+that time.  The »bit« type has been kept for backward compatibility.</p>
+<p>When starting re-working bit operations and word operations from 2019<br>
+on, I did not dare to cut of that backward compatibility strain but<br>
+asked myself for which applications »bit« could be preferable to »bool«<br>
+and came to the conclusion that it is a complete model of the field with<br>
+two elements, hence re-shaping it into theory Z2.</p>
+<p>At that time I did not know of any applications but appreciated it as a<br>
+nice example how to introduce a data type with overloaded constructor<br>
+symbols.  Also I tried to provide automation to reduce problems on type<br>
+»bit« to »bool«, hence using existing automation on »bool« to prove<br>
+problems on »bit«, which explains the rather aggressive default simp rules.</p>
+<blockquote>
+<p>(Also, as an aside: why is there "odd" in the definition of xor?<br>
+Wouldn't "xor ?b ?c = of_bool (?b ≠ ?c)" be simpler and equivalent?)<br>
+You are clearly right that those RHSs could be formulated in a logically<br>
+simpler way, but then the expression of the primary idea would get lost:<br>
+reduce expressions on »bit« to expressions on »bool« with simple<br>
+straightforward correspondences.</p>
+</blockquote>
+<p>Your proposal would essentially loose the rewriting the »bool«.</p>
+<p>Cheers,<br>
+  Florian</p>
+</blockquote>
+
+
+
+<a name="295168766"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2022-RC0%3A%20Simp-rules%20for%20bit/near/295168766" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2022-RC0.3A.20Simp-rules.20for.20bit.html#295168766">(Aug 25 2022 at 06:22)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Dominique,</p>
+<p>see now <a href="https://isabelle.sketis.net/repos/isabelle/rev/c530cb79ccbc">https://isabelle.sketis.net/repos/isabelle/rev/c530cb79ccbc</a> and<br>
+<a href="https://isabelle.sketis.net/repos/afp-devel/rev/cf809a286330">https://isabelle.sketis.net/repos/afp-devel/rev/cf809a286330</a> where the<br>
+rule »of_bool (Not P) = …« is removed.</p>
+<blockquote>
+<p>I wonder whether "xor ?b ?c = of_bool (odd ?b ≠ odd ?c)" shouldn't<br>
+removed from the simp-set instead (or in addition to) "of_bool (¬ ?P) =<br>
+1 - of_bool ?P". And then of course add enough simp-rules for xor to<br>
+compensate for this (such as "xor a a = 0" etc). (I would assume not too<br>
+many are needed.) One advantage would be that it leads to more readable<br>
+simplifications. Or alternatively rewrite xor to plus, that fits best<br>
+with the Z2-view and also leads to readable simplification results.</p>
+<p>But that would of course not fit with the idea of rewriting everything<br>
+to bool.</p>
+</blockquote>
+<p>There might be reasons that the global rewriting to bool should be<br>
+removed entirely,<br>
+but then it should be done consequently for all operations, not just xor.</p>
+<blockquote>
+<p>Another possibility would be to make bit a type synonym for bool and<br>
+define 1 := true, 0 := false. (While still possibly instantiating the<br>
+field typeclass.)</p>
+</blockquote>
+<p>That could be worth a try.</p>
+<blockquote>
+<p>At that time I did not know of any applications<br>
+I can explain where I use it. In cryptography, we often have an<br>
+adversary with a one-bit output (and we look at how the probability<br>
+distribution of that output changes). Now we could, of course, say the<br>
+output is of type bool, but there are two stylistic arguments against<br>
+it: (a) We get farther away from the established notation in crypto<br>
+(where we'd write Pr[x=1 : x&lt;-A] and not Pr[x : x&lt;-A]). (b) Using type<br>
+bool implies a certain meaning of the bit values (truth) but the outputs<br>
+0/1 of the adversary do not represent a yes/no answer per se, but just<br>
+two choices.</p>
+<p>These arguments are of course a bit subjective, and technically there is<br>
+nothing that stops us from using bool here.</p>
+</blockquote>
+<p>If your applications demands a very particular binary type, it could be best<br>
+to construct your own copy of bool.</p>
+<p>Cheers,<br>
+    Florian<br>
+<a href="/user_uploads/14278/uOPCmIQQipeWlCjXQUmh0Skj/OpenPGP_signature">OpenPGP_signature</a></p>
+
+
+
+<a name="299529289"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2022-RC0%3A%20Simp-rules%20for%20bit/near/299529289" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2022-RC0.3A.20Simp-rules.20for.20bit.html#299529289">(Sep 19 2022 at 09:22)</a>:</h4>
+<p>From: Dominique Unruh &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Hi,</p>
+<p>I can confirm that it works well for me now in Isabelle2022-RC2.</p>
+<p>Best wishes,<br>
+Dominique.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

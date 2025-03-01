@@ -1,0 +1,101 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] simulating term-level abstraction using locales · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20simulating.20term-level.20abstraction.20using.20locales.html">[isabelle] simulating term-level abstraction using locales</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294097490"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20simulating%20term-level%20abstraction%20using%20locales/near/294097490" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20simulating.20term-level.20abstraction.20using.20locales.html#294097490">(Aug 18 2022 at 14:25)</a>:</h4>
+<p>From: Peter Gammie &lt;<a href="mailto:peteg42@gmail.com">peteg42@gmail.com</a>&gt;<br>
+Hello,</p>
+<p>I want to make a bunch of definitions using a fairly large context, and then turn those definitions into a function of one of the parameters for use in later definitions/lemmas.</p>
+<p>Here is a sketch of what I've tried:</p>
+<p>(*</p>
+<p>Attempt to simulate lambda abstraction at the locale level.</p>
+<p>Locale L is a large context. Locale A just adds a fixed-but-arbitrary<br>
+parameter 'a' to it, then a series of definitions are made using 'a' and L,<br>
+and a lemma or two shown.</p>
+<p>We later want to use the lemmas of A in the context of L for arbitrary<br>
+values of 'a'. The complication is we want 'a' to be lambda-abstractable<br>
+in later terms.</p>
+<p>We need the "for" clause in A otherwise the type variables are renamed.</p>
+<p>*)</p>
+<p>theory t<br>
+imports Main<br>
+begin</p>
+<p>locale L =<br>
+  fixes x :: "'a"<br>
+    and X :: "'a set"<br>
+  assumes x: "x ∈ X"</p>
+<p>print_locale L</p>
+<p>lemma (in L) P: "x ∈ X ⟹ P x"<br>
+  sorry</p>
+<p>locale A = L x X for x and X :: "'a set" +<br>
+  fixes a :: "'a"</p>
+<p>print_locale A</p>
+<p>definition (in A)<br>
+  "f y ≡ {a}"</p>
+<p>definition (in A)<br>
+  "g y ≡ X - {a}"</p>
+<p>lemma (in A) Q: "Q (f y) (g y) x ⟹ x ∈ X"<br>
+  sorry</p>
+<p>(* Propagate def's and Q and into locale L. Trivial as A has no axioms. *)</p>
+<p>sublocale L ⊆ A by (unfold_locales)</p>
+<p>print_locale! A<br>
+print_locale! L</p>
+<p>(* How do we give 'a' a value here? *)</p>
+<p>lemma (in L) "(λy. Q (f y) (g y) x) 1 ⟹ P x"<br>
+proof -<br>
+  from Q have "⋀y. Q (f y) (g y) x"<br>
+    unfolding f_def g_def<br>
+      (* wheels have fallen off *)</p>
+<p>I have a feeling I'm doing it wrong. I could do this at the term level, but it gets unreadable quite quickly.</p>
+<p>BTW I saw Brian Huffman's post:</p>
+<p><a href="https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2008-June/msg00045.html">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2008-June/msg00045.html</a></p>
+<p>that looked like it might be a step towards solving my problem. The ML code has rotted wrt Isabelle-2009-1, and the implementation manual has a big FIXME for the section on attributes. Any chance of a pointer or fix?</p>
+<p>cheers<br>
+peter</p>
+
+
+
+<a name="294097498"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20simulating%20term-level%20abstraction%20using%20locales/near/294097498" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20simulating.20term-level.20abstraction.20using.20locales.html#294097498">(Aug 18 2022 at 14:25)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Peter,</p>
+<blockquote>
+<p>sublocale L ⊆ A by (unfold_locales)</p>
+</blockquote>
+<p>if you want to instantiate the 'a' parameter in locale 'A', this is your<br>
+"only chance", e.g.</p>
+<p>sublocale L ⊆ A x X x</p>
+<p>Then you also should add a namespace prefix, e.g.</p>
+<p>sublocale L ⊆ A: A x X x</p>
+<p>If this is not what you intend to do, do not hesitate to ask further<br>
+questions with some hints what you plan to model.  Locales are a<br>
+powerful abstraction mechanisms, but their application sometimes<br>
+requires some care and inadvertently comes with some restrictions.</p>
+<p>Hope this helps<br>
+    Florian<br>
+<a href="/user_uploads/14278/cuK7R-ChdqAGXDId9GNGqAxp/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294097580"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20simulating%20term-level%20abstraction%20using%20locales/near/294097580" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20simulating.20term-level.20abstraction.20using.20locales.html#294097580">(Aug 18 2022 at 14:26)</a>:</h4>
+<p>From: Peter Gammie &lt;<a href="mailto:peteg42@gmail.com">peteg42@gmail.com</a>&gt;<br>
+Florian:</p>
+<p>Thanks for your comments.</p>
+<p>I came to understand that I was asking for too much: at the very least, Isabelle has no syntax for (lambda-) abstracting a free variable from several definitions (like what happens in the example I posted).</p>
+<p>So I gave up on these locales and went back to the tried and true record + predicate approach. I'm not so happy with that as I lose the syntactic niceties (e.g. a pleasant introduction mechanism) but it is not so bad.</p>
+<p>cheers<br>
+peter</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

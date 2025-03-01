@@ -1,0 +1,168 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Unify.matchers and term representation · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Unify.2Ematchers.20and.20term.20representation.html">[isabelle] Unify.matchers and term representation</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294143370"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Unify.matchers%20and%20term%20representation/near/294143370" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Unify.2Ematchers.20and.20term.20representation.html#294143370">(Aug 18 2022 at 18:17)</a>:</h4>
+<p>From: John Munroe &lt;<a href="mailto:munddr@gmail.com">munddr@gmail.com</a>&gt;<br>
+Hello,</p>
+<p>I see that the instantiations Unify.matchers finds may not necessarily<br>
+have the simplest internal representation. For example:</p>
+<p>ML {*<br>
+  val trm = @{term "(bar::nat set) = bar"};<br>
+  val pat = @{cpat "(?foo::(?'a =&gt; ?'b) =&gt; ?'c) (bar::(?'a =&gt; ?'b))"}<br>
+|&gt; term_of;<br>
+  val mtchsq = Unify.matchers @{theory} [(pat,trm)];<br>
+  val mtchs = Seq.list_of mtchsq;<br>
+*}</p>
+<p>The first match gives this instantiation for ?foo:</p>
+<p>[?foo::(nat =&gt; bool) =&gt; ?'c := %a::nat =&gt; bool. a = a]</p>
+<p>Now, if we look at the internal representation of the term, it actually is:</p>
+<p>Abs ("", "Nat.nat =&gt; HOL.bool",<br>
+     Const ("HOL.eq", "(Nat.nat =&gt; HOL.bool) =&gt; (Nat.nat =&gt; HOL.bool)<br>
+=&gt; HOL.bool") $<br>
+       Abs ("", "Nat.nat", Bound 1 $ Bound 0) $ Abs ("", "Nat.nat",<br>
+Bound 1 $ Bound 0))</p>
+<p>It is unnecessarily large. A simpler representation would be:</p>
+<p>Abs ("", "Nat.nat  =&gt; HOL.bool",<br>
+     Const ("HOL.eq", "(Nat.nat =&gt; HOL.bool) =&gt; (Nat.nat =&gt; HOL.bool)<br>
+=&gt; HOL.bool") $ Bound 0 $<br>
+       Bound 0)</p>
+<p>My question is: Is there a way to reduce the internal representation<br>
+of a term from one that contains "reducible" lambda expressions (like<br>
+in the first) to one that is leaner (like in the second) in general?<br>
+Or, is there a simple way to make the matcher algorithm spit out<br>
+leaner internal representations?</p>
+<p>Thank you for the help in advance.</p>
+<p>John</p>
+
+
+
+<a name="294143385"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Unify.matchers%20and%20term%20representation/near/294143385" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Unify.2Ematchers.20and.20term.20representation.html#294143385">(Aug 18 2022 at 18:17)</a>:</h4>
+<p>From: Lawrence Paulson &lt;<a href="mailto:lp15@cam.ac.uk">lp15@cam.ac.uk</a>&gt;<br>
+The unification algorithm operates on eta-expanded terms. Is there any compelling reason why you need them to be eta-contracted?<br>
+Larry Paulson</p>
+
+
+
+<a name="294143430"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Unify.matchers%20and%20term%20representation/near/294143430" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Unify.2Ematchers.20and.20term.20representation.html#294143430">(Aug 18 2022 at 18:17)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Larry is right that according to the natural order of things it is better <br>
+to leave things as they are produced, and work conceptually with arbitrary <br>
+representatives of the alpha/beta/eta equivalence classes.</p>
+<p>In some boundary cases this might fails, because certain tools do not <br>
+observe this equivalence.  Here you can contract or expand manually to <br>
+achieve a certain standard form, e.g. via Envir.eta_contract, <br>
+Envir.beta_eta_contract, Patter.eta_long.  The Thm module also provides <br>
+some variants for actual theorems.</p>
+<p>Makarius</p>
+
+
+
+<a name="294143586"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Unify.matchers%20and%20term%20representation/near/294143586" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Unify.2Ematchers.20and.20term.20representation.html#294143586">(Aug 18 2022 at 18:18)</a>:</h4>
+<p>From: Brian Huffman &lt;<a href="mailto:brianh@cs.pdx.edu">brianh@cs.pdx.edu</a>&gt;<br>
+On Tue, Aug 30, 2011 at 5:12 AM, Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt; wrote:</p>
+<blockquote>
+<p>Larry is right that according to the natural order of things it is better to<br>
+leave things as they are produced, and work conceptually with arbitrary<br>
+representatives of the alpha/beta/eta equivalence classes.</p>
+<p>In some boundary cases this might fails, because certain tools do not<br>
+observe this equivalence.</p>
+</blockquote>
+<p>I want to point out that the <em>simplifier</em> is one of those "certain<br>
+tools" whose behavior depends on whether or not terms are<br>
+eta-expanded. (This includes not only the "simp" method, but also<br>
+"unfold", "auto", "fastsimp", etc.)</p>
+<p>Many simplification rules, such as "id x = x" or "(f o g) x = f (g<br>
+x)", are intended to unfold a definition of a constant <em>only</em> when it<br>
+is applied to an argument. Eta expansion can cause the simplifier to<br>
+apply these rules in unexpected situations. (When users have the "eta<br>
+contract" pretty printing option enabled, as is the default,<br>
+replacements like "f o g" -&gt; "%x. f (g x)" can appear to happen at<br>
+random.)</p>
+<p>Eta-expansion can cause some confusion with congruence rules in the<br>
+simplifier, since a congruence rule only applies when the given<br>
+constant is applied to a sufficient number of arguments.</p>
+<p><a href="https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2010-May/msg00032.html">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2010-May/msg00032.html</a><br>
+<a href="https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2010-May/msg00046.html">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2010-May/msg00046.html</a></p>
+<p>Eta expansion also interferes with the feature of the "rule" tactic<br>
+where it tries to preserve bound variable names:</p>
+<p><a href="https://mailmanbroy.informatik.tu-muenchen.de/pipermail/isabelle-dev/2011-August/001803.html">https://mailmanbroy.informatik.tu-muenchen.de/pipermail/isabelle-dev/2011-August/001803.html</a></p>
+<p>With type "'a set" being an abbreviation for "'a =&gt; bool",<br>
+eta-expansion can happen to set expressions, which causes other<br>
+problems. For example, "A \&lt;inter&gt; B" might get expanded to "%a. (A<br>
+\&lt;inter&gt; B) a". Because of this, the otherwise-entirely-reasonable<br>
+simp rule "inf f g x = inf (f x) (g x)" would cause  "%a. (A \&lt;inter&gt;<br>
+B) a" (which pretty-prints as "A \&lt;inter&gt; B") to simplify to "%x. A x<br>
+&amp; B x", violating the set/predicate discipline and messing up a lot of<br>
+proofs.</p>
+<p><a href="https://mailmanbroy.informatik.tu-muenchen.de/pipermail/isabelle-dev/2011-August/001687.html">https://mailmanbroy.informatik.tu-muenchen.de/pipermail/isabelle-dev/2011-August/001687.html</a><br>
+<a href="https://mailmanbroy.informatik.tu-muenchen.de/pipermail/isabelle-dev/2011-August/001733.html">https://mailmanbroy.informatik.tu-muenchen.de/pipermail/isabelle-dev/2011-August/001733.html</a></p>
+<blockquote>
+<p>On Tue, 30 Aug 2011, Lawrence Paulson wrote:</p>
+<blockquote>
+<p>The unification algorithm operates on eta-expanded terms. Is there any<br>
+compelling reason why you need them to be eta-contracted?</p>
+</blockquote>
+</blockquote>
+<p>For reasons including (but not limited to) the ones listed above, I<br>
+would greatly prefer to have a unification algorithm that preserves<br>
+terms as much as possible, performing NO unnecessary eta-expansions OR<br>
+eta-contractions.</p>
+<p>(Implementation idea: When eta-expanding, mark all of the<br>
+newly-introduced bound variables in some way; then do an<br>
+eta-contraction at the end, contracting <em>only</em> newly-introduced<br>
+variables.)</p>
+<p>A unification algorithm with this property would allow us to simplify<br>
+Isabelle's pretty printer quite a bit: The ridiculous "eta contract"<br>
+pretty-printing option would no longer be needed, and we could also<br>
+get rid of a lot of ML code used for preventing or reversing<br>
+eta-contraction with binders (e.g. the print translations for "split"<br>
+in Product_Type.thy).</p>
+<ul>
+<li>Brian</li>
+</ul>
+
+
+
+<a name="294143983"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Unify.matchers%20and%20term%20representation/near/294143983" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Unify.2Ematchers.20and.20term.20representation.html#294143983">(Aug 18 2022 at 18:20)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Tobias (and maybe Stefan Berghofer) should be able to explain how the <br>
+simplifier works concerning eta contraction.  (I have my own collection of <br>
+boundary cases and surprises, sometimes even with plain beta redexes.)</p>
+<p>Nonetheless, the situation has been rather "stable" in the past 10 years <br>
+or so, in the sense that there are now known soundness holes (there used <br>
+to be several in ancient times).  Any serious reforms deep down there, <br>
+which is below the inference kernel, has always been beyond my <br>
+imagination.  This does not mean someone could not do a convincing formal <br>
+model in HOL-Nominal, say, that explains convicingly how evertything could <br>
+fit together nicely (and still correctly).</p>
+<p>The "unfold" method and 'unfolding' command is a bit different, and in my <br>
+area of responsibility.  Historically I have merely imitated Larry's <br>
+traditional rewrite_goals_tac suite, and was a bit too slow to turn it <br>
+into something more close to the idea of actual unfolding of simple <br>
+definitions: "c == %x y z. b" instead of rewriting with "c x y z == ...".</p>
+<p>Last time I've tried this small reform (maybe around 2006), I ran into <br>
+various oddities in the library, theories depending on the odd behaviour <br>
+wrt. beta/eta conversion.  Later the situation became much worse, e.g. in <br>
+Multivariate_Analysis which often emulated tactical rewriting in the <br>
+middle of Isar proofs, using 'unfolding' for this.</p>
+<p>Since you have cleaned up a lot of Multivariate_Analysis recently, what <br>
+was your impression?</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

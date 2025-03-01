@@ -1,0 +1,78 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] rule then simp in apply style proofs · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20rule.20then.20simp.20in.20apply.20style.20proofs.html">[isabelle] rule then simp in apply style proofs</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294321665"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20rule%20then%20simp%20in%20apply%20style%20proofs/near/294321665" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20rule.20then.20simp.20in.20apply.20style.20proofs.html#294321665">(Aug 19 2022 at 16:38)</a>:</h4>
+<p>From: Amarin Phaosawasdi &lt;<a href="mailto:phaosaw2@illinois.edu">phaosaw2@illinois.edu</a>&gt;<br>
+Hi,</p>
+<p>Based on the Concrete Semantics book, I want to prove that after <br>
+assigning 1 to x, the state is updated with x being 1.</p>
+<p>To do this informally, I would use the semantics of assignmentfollowed <br>
+by simplification.</p>
+<p>Is there a one-liner proof that can do this?</p>
+<p>Below are the definitions and the Isar style proof.</p>
+<p>What are the other simpler ways to prove this lemma using Isar (e.g., do <br>
+I really need to spell out the intermediate state to match the <br>
+assignment rule)?</p>
+<p>Thank you,<br>
+Amarin</p>
+<p>=============================<br>
+theory Question imports Main begin</p>
+<p>type_synonym state = "string ⇒ int"</p>
+<p>datatype aexp = N int<br>
+fun aval :: "aexp ⇒ state ⇒ int" where<br>
+"aval (N n) s = n"</p>
+<p>datatype<br>
+   com = Assign string aexp ("_ ::= _" [1000, 61] 61)</p>
+<p>inductive<br>
+   big_step :: "com × state ⇒ state ⇒ bool" (infix "⇒" 55)<br>
+where<br>
+Assign: "(x ::= a,s) ⇒ (s(x := aval a s))"</p>
+<p>lemma "(''x'' ::= N 1,λx.0) ⇒ (λx.0)(''x'':=1)"<br>
+proof -<br>
+   let ?s="λx.0"<br>
+   have "(''x'' ::= N 1,λx.0) ⇒ (λx.0)(''x'':=aval (N 1) ?s)" by (rule <br>
+Assign)<br>
+   thus ?thesis by simp<br>
+qed</p>
+<p>end</p>
+
+
+
+<a name="294321687"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20rule%20then%20simp%20in%20apply%20style%20proofs/near/294321687" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20rule.20then.20simp.20in.20apply.20style.20proofs.html#294321687">(Aug 19 2022 at 16:38)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:lammich@in.tum.de">lammich@in.tum.de</a>&gt;<br>
+Hi Amarin,</p>
+<p>The problem is that, for the introduction rule Assign, auto, blast, etc.<br>
+must see the pattern "x:=aval ...". However, you could use metis:<br>
+  by (metis Assign aval.simps)</p>
+<p>or you could use the simplification rules generated for the big_step<br>
+predicate:<br>
+  by (simp add: big_step.simps)</p>
+<p>Yet another option may be to prove a lemma of the form<br>
+  [| ...; s'=aval e s |] ==&gt; (Assign x e,s) =&gt; s'</p>
+<p>or define the assign-rule like this in first place.</p>
+
+
+
+<a name="294321698"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20rule%20then%20simp%20in%20apply%20style%20proofs/near/294321698" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20rule.20then.20simp.20in.20apply.20style.20proofs.html#294321698">(Aug 19 2022 at 16:38)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+Yet another variation:</p>
+<p>lemma "(''x'' ::= N 1,λx.0) ⇒ (λx.0)(''x'':=1)"<br>
+using Assign[of "''x''" "N 1" "λx. 0"] by simp</p>
+<p>Tobias<br>
+<a href="/user_uploads/14278/j8Kzx1zx_l_86FoHBOgHZKF0/smime.p7s">smime.p7s</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

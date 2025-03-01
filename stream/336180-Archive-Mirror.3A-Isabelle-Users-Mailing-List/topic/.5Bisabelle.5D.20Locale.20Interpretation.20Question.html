@@ -1,0 +1,89 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Locale Interpretation Question · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Locale.20Interpretation.20Question.html">[isabelle] Locale Interpretation Question</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294145705"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Locale%20Interpretation%20Question/near/294145705" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Locale.20Interpretation.20Question.html#294145705">(Aug 18 2022 at 18:30)</a>:</h4>
+<p>From: Ashley Yakeley &lt;<a href="mailto:ashleyy@microsoft.com">ashleyy@microsoft.com</a>&gt;<br>
+Hi, how do I express "if V is a vector space, then V is an affine space on <br>
+V" given this locale for affine spaces? Note that vector_space is also a <br>
+locale. I know how to show something is an interpretation of my affine_space <br>
+locale if that something is a class instead of a locale.</p>
+<p>theory Affine<br>
+imports RealVector<br>
+begin</p>
+<p>locale affine_space =<br>
+  vector_space scale for scale ::"'a::field ⇒ 'b::ab_group_add ⇒ 'b" +<br>
+  fixes affplus :: "'b ⇒ 'f ⇒ 'f"<br>
+  fixes affminus :: "'f ⇒ 'f ⇒ 'b"<br>
+  assumes affine_zero [simp]: "affplus 0 p = p"<br>
+  and  affine_assoc [simp]: "affplus v (affplus w p) = affplus (v + w) p"<br>
+  and  affine_invert_1 [simp]: "affplus (affminus q p) p = q"<br>
+  and  affine_invert_2 [simp]: "affminus (affplus v p) p = v"</p>
+<p>end</p>
+
+
+
+<a name="294145724"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Locale%20Interpretation%20Question/near/294145724" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Locale.20Interpretation.20Question.html#294145724">(Aug 18 2022 at 18:30)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@kit.edu">andreas.lochbihler@kit.edu</a>&gt;<br>
+Hi Ashley,</p>
+<p>there are in several ways to do that.</p>
+<ol>
+<li>"sublocale" for locales is the analogue of "subclass" for type classes, see <br>
+the tutorial on locales, section 4. Thus, you could write</li>
+</ol>
+<p>sublocale vector_space &lt; affine_space<br>
+     "space"<br>
+     "implementation for affplus"<br>
+     "implementation for affminus"</p>
+<p>followed by a proof that your implementations for affplus and affminus satisfy <br>
+the assumptions. Although this is the standard way, it does not work in your <br>
+case because affine_space is already a sublocale of vector_space, as the former <br>
+inherits from the latter. Therefore, after this declaration, the context <br>
+vector_space may no longer be opened.</p>
+<ol start="2">
+<li>Instead, section 7.1 of the locale tutorial applies. Declare a new locale <br>
+that collects all facts about vector spaces viewed as affine spaces.</li>
+</ol>
+<p>locale vector_space_as_affine_space = vector_space<br>
+sublocale vector_space_as_affine_space &lt; affine_space<br>
+     "space"<br>
+     "implementation_for_affplus"<br>
+     "implementation_for_affminus"</p>
+<ol start="3">
+<li>If you only seldomly need to refer to vector spaces as affine spaces, it <br>
+might be a good idea (for performance reasons) not to declare the sublocale <br>
+relation. In that case, you want to prove a lemma in vector_space that allows <br>
+you to quickly interpret affine_space whenever needed:</li>
+</ol>
+<p>lemma (in vector_space) affine_space:<br>
+   "affine_space space<br>
+      (implementation_for_affplus) (implementation_for_affminus)"</p>
+<p>Then, whenever you need a fact F from affine_space in a proof of vector_space, <br>
+either locally interpret affine_space</p>
+<p>lemma ...<br>
+proof<br>
+   interpret affine_space<br>
+     "space"<br>
+     "implementation for affplus"<br>
+     "implementation for affminus"<br>
+     by(rule affine_space)<br>
+   note F<br>
+qed</p>
+<p>or bypass the locale mechanism and work on the foundational layer directly, i.e.</p>
+<p>note affine_space.F[OF affine_space]</p>
+<p>Hope this helps,<br>
+Andreas</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

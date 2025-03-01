@@ -1,0 +1,72 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] beginner question: why isn&#x27;t my lemma applied? · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20beginner.20question.3A.20why.20isn.27t.20my.20lemma.20applied.3F.html">[isabelle] beginner question: why isn&#x27;t my lemma applied?</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="293896455"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20beginner%20question%3A%20why%20isn%27t%20my%20lemma%20applied%3F/near/293896455" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20beginner.20question.3A.20why.20isn.27t.20my.20lemma.20applied.3F.html#293896455">(Aug 17 2022 at 13:27)</a>:</h4>
+<p>From: Tjark Weber &lt;<a href="mailto:tjark.weber@gmx.de">tjark.weber@gmx.de</a>&gt;<br>
+Andrew,</p>
+<p>maybe someone else is going to write more about the simplifier, but the <br>
+following proof should solve your goal:</p>
+<p>apply (subst samekeys)<br>
+  apply auto<br>
+done</p>
+<p>Best regards,<br>
+Tjark</p>
+
+
+
+<a name="293896473"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20beginner%20question%3A%20why%20isn%27t%20my%20lemma%20applied%3F/near/293896473" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20beginner.20question.3A.20why.20isn.27t.20my.20lemma.20applied.3F.html#293896473">(Aug 17 2022 at 13:27)</a>:</h4>
+<p>From: Rafal Kolanski &lt;<a href="mailto:rafalk@cse.unsw.edu.au">rafalk@cse.unsw.edu.au</a>&gt;<br>
+Hi,</p>
+<p>I don't really know what's gotten into simp ... it doesn't feel happy <br>
+with add:samekeys or only:samekeys even though it's obvious. Wild guess: <br>
+perhaps the fact that samekeys doesn't make things shorter prevents simp <br>
+from using it?</p>
+<p>If you just want it to work while we await the Isabelle experts to <br>
+enlighten us, try this:</p>
+<p>theory Assoc = Main:</p>
+<p>consts haskey :: "('key * 'val)list =&gt; 'key =&gt; bool"</p>
+<p>primrec<br>
+"haskey [] k = False"<br>
+"haskey (p#ps) k = (let (k',v') = p in k=k' | haskey ps k)"</p>
+<p>lemma samekeys: "haskey (ps @ (k,v) # qs) k' = haskey (ps @ (k,v') # qs) k'"<br>
+by (induct_tac ps, auto)</p>
+<p>lemma "haskey (ps @ (k, v) # qs) k' --&gt; haskey (ps @ (k, v') # qs) k'"<br>
+by (subst samekeys, blast)</p>
+<p>Cheers,</p>
+<p>Rafal Kolanski.</p>
+<p>Andrew Pimlott wrote:</p>
+
+
+
+<a name="293896504"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20beginner%20question%3A%20why%20isn%27t%20my%20lemma%20applied%3F/near/293896504" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20beginner.20question.3A.20why.20isn.27t.20my.20lemma.20applied.3F.html#293896504">(Aug 17 2022 at 13:27)</a>:</h4>
+<p>From: <a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a><br>
+The simplifier cannot guess what v' is supposed to be. Hence it cannot be<br>
+used as a rewrite rule. Only the more restrictive version<br>
+"(haskey (ps @ (k,v) # qs) k' = haskey (ps @ (k,v') # qs) k') = True";<br>
+is used, which doesn't help here.</p>
+<p>lemma<br>
+      "haskey (ps @ (k, v) # qs) k' --&gt; haskey (ps @ (k, v') # qs) k'";</p>
+<p>This one can be used by the simplifier: although it is equally unclear what v<br>
+is supposed to be when the simplifier starts proving the precondition of the<br>
+rule, this is a special case: if the precondition is directly present as an<br>
+assumption, v is found by matching with that assumption. This is the case in<br>
+your example. There is no danger of infinite descent here, because the<br>
+simplifier will not attempt to prove a precondition with an unknown (v)<br>
+again by rewriting but only by direct instantiation with an assumption.</p>
+<p>Tobias</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

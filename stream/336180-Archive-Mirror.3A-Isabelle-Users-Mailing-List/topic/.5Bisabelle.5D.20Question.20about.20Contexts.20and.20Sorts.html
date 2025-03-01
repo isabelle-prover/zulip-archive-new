@@ -1,0 +1,100 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Question about Contexts and Sorts · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Question.20about.20Contexts.20and.20Sorts.html">[isabelle] Question about Contexts and Sorts</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294125898"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Question%20about%20Contexts%20and%20Sorts/near/294125898" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Question.20about.20Contexts.20and.20Sorts.html#294125898">(Aug 18 2022 at 16:48)</a>:</h4>
+<p>From: Tjark Weber &lt;<a href="mailto:webertj@in.tum.de">webertj@in.tum.de</a>&gt;<br>
+Hi,</p>
+<p>Could someone who understands Isabelle's contexts, classes and sorts<br>
+better than I do perhaps enlighten me why the second proof in the<br>
+example theory below fails?  (I guess it fails because b_def is<br>
+expecting sort HOL.type, while the actual sort is {Scratch.B,Scratch.C}.<br>
+However, I don't quite understand the reason for this.  Is it a bug?  Is<br>
+there a workaround?)</p>
+<p>Many thanks in advance!</p>
+<p>Kind regards,<br>
+Tjark</p>
+<p>========== 8&lt; ==========</p>
+<p>theory Scratch imports Main<br>
+begin</p>
+<p>class A =<br>
+  fixes a :: 'a</p>
+<p>class B = A<br>
+begin<br>
+  definition "b = a"<br>
+end</p>
+<p>class C = A<br>
+begin<br>
+  definition "c = a"<br>
+end</p>
+<p>lemma bc: "b = c" by (simp only: b_def c_def)</p>
+<p>lemma (in B) "b = c" by (simp only: b_def c_def)<br>
+  -- {* fails because b_def is expecting sort HOL.type *}</p>
+<p>end</p>
+
+
+
+<a name="294125915"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Question%20about%20Contexts%20and%20Sorts/near/294125915" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Question.20about.20Contexts.20and.20Sorts.html#294125915">(Aug 18 2022 at 16:48)</a>:</h4>
+<p>From: Brian Huffman &lt;<a href="mailto:brianh@cs.pdx.edu">brianh@cs.pdx.edu</a>&gt;<br>
+Hi Tjark,</p>
+<p>You can get an idea of what is going on by printing a few raw terms<br>
+within the context of the proof.</p>
+<p>lemma (in B) "b = c"<br>
+ML_val {* concl_of @{thm c_def} *}<br>
+ML_val {* concl_of @{thm b_def} *}<br>
+ML_val {* concl_of @{thm B_class.b_def} *}</p>
+<p>You will notice that in the "B" context, theorem c_def states<br>
+"Scratch.C_class.c = Scratch.A_class.a", and is polymorphic, having a<br>
+schematic type variable "?'a::Scratch.C". This is the same as its<br>
+usual meaning in the top-level context.</p>
+<p>On the other hand, in the "B" context, theorem b_def is not the same<br>
+polymorphic theorem that you would get at the top-level. It states<br>
+that "Scratch.B.b a = a", where "a" is a free variable of type<br>
+"'a::HOL.type". The variable "a" and type variable 'a are both fixed<br>
+by the context. In the "B" context, the top-level polymorphic version<br>
+of b_def must be referred to by its qualified name "B_class.b_def".</p>
+<p>Now let's look at the raw representation of what you are trying to prove:</p>
+<p>ML_val {* @{term "?thesis"} *}</p>
+<p>This reveals that you are trying to show "Scratch.B_class.b =<br>
+Scratch.C_class.c". The theorem referred to by the name "b_def" in<br>
+this context is not helpful here. The proof will succeed if you use<br>
+"B_class.b_def", though.</p>
+<blockquote>
+<p>lemma (in B) "b = c" by (simp only: B_class.b_def c_def)</p>
+</blockquote>
+<p>I guess the confusion comes from the fact that in context "B", the<br>
+term "b" can have two completely different meanings, depending on its<br>
+type. I wonder if there is a way to configure the pretty-printer so<br>
+that it would be easier to distinguish the two?</p>
+<ul>
+<li>Brian</li>
+</ul>
+
+
+
+<a name="294125927"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Question%20about%20Contexts%20and%20Sorts/near/294125927" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Question.20about.20Contexts.20and.20Sorts.html#294125927">(Aug 18 2022 at 16:48)</a>:</h4>
+<p>From: Tjark Weber &lt;<a href="mailto:webertj@in.tum.de">webertj@in.tum.de</a>&gt;<br>
+Brian,</p>
+<p>Indeed.  Try</p>
+<p>lemma (in B) "b = c"<br>
+  apply (cut_tac b_def)</p>
+<p>(with Long Names switched on for greater effect).  No wonder I was<br>
+confused.</p>
+<p>Thanks for your quick reply!</p>
+<p>Kind regards,<br>
+Tjark</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

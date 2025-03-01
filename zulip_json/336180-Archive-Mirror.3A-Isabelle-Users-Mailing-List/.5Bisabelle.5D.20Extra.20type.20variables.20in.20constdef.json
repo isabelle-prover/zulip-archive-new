@@ -1,0 +1,44 @@
+[
+    {
+        "content": "<p>From: Nicole Rauch &lt;<a href=\"mailto:rauch@informatik.uni-kl.de\">rauch@informatik.uni-kl.de</a>&gt;<br>\nDear all,</p>\n<p>I'm having trouble getting rid of extra type variables that appear on  <br>\nthe right-hand side of a constant definition. This is my setting:</p>\n<p>axclass someAxClass &lt; type</p>\n<p>consts<br>\na :: \"int =&gt; ('a::someAxClass)\"<br>\nb :: \"('a::someAxClass) =&gt; bool\"</p>\n<p>Now if I define a constant that groups together these two consts, say</p>\n<p>constdefs<br>\nc :: \"int =&gt; bool\"<br>\n\"c x == b (a x)\"</p>\n<p>I get the error message</p>\n<p>*** Specification depends on extra type variables: \"'a\"</p>\n<p>Is there any way to work around this, e.g. can c depend on 'a  <br>\n(similar to polymorphic datatype declarations) ?<br>\nOr is my attempt generally considered bad design and should be  <br>\nformalized differently?</p>\n<p>Thanks for any insights</p>\n<p>Nicole Rauch</p>",
+        "id": 294051674,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660819752
+    },
+    {
+        "content": "<p>From: Tobias Nipkow &lt;<a href=\"mailto:nipkow@in.tum.de\">nipkow@in.tum.de</a>&gt;<br>\nThis is a well-known problem with type classes. The point is that your c <br>\nmight depend on the choice of the intermediate 'a. One way around this <br>\nis to annotate \"b (a x)\" with some specific type.</p>\n<p>Tobias</p>\n<p>Nicole Rauch wrote:</p>",
+        "id": 294051685,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660819759
+    },
+    {
+        "content": "<p>From: Florian Haftmann &lt;<a href=\"mailto:florian.haftmann@informatik.tu-muenchen.de\">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>\nYou can make your definition explicitly dependent on 'a using the<br>\n\"itself\" type:</p>\n<p>constsdefs<br>\n  c :: \"'a itself =&gt; int =&gt; bool\"<br>\n  \"c (T::'a itself) (x::'a) == b (a x)\"</p>\n<p>Hope this helps<br>\nFlorian<br>\n<a href=\"/user_uploads/14278/8azOEaP0HKphDybQhil9e5dT/florian.haftmann.vcf\">florian.haftmann.vcf</a></p>",
+        "id": 294051727,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660819775
+    },
+    {
+        "content": "<p>From: Florian Haftmann &lt;<a href=\"mailto:florian.haftmann@informatik.tu-muenchen.de\">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>\nOops, the type annotation was wrong; better try:</p>\n<p>constsdefs<br>\n  c :: \"'a itself =&gt; int =&gt; bool\"<br>\n  \"c (T::'a itself) x == b (a x :: 'a)\"</p>\n<p>Florian<br>\n<a href=\"/user_uploads/14278/3OoBSPaksCiPLZIBUjV15ojC/florian.haftmann.vcf\">florian.haftmann.vcf</a></p>",
+        "id": 294051731,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660819777
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nJust note that there is no need to invent a dummy argument T here, because <br>\nthe canonical term TYPE('a) of type 'a itself will do the trick.</p>\n<p>Makarius</p>",
+        "id": 294051766,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660819795
+    },
+    {
+        "content": "<p>From: Gerwin Klein &lt;<a href=\"mailto:gerwin.klein@nicta.com.au\">gerwin.klein@nicta.com.au</a>&gt;<br>\nHi Nicole,</p>\n<blockquote>\n<p>*** Type unification failed: No type arity itself :: type<br>\n*** Type error in application: Incompatible operand type<br>\n[..]<br>\nWhat is wrong here? Is there any way to add extra type variables to the <br>\nset specification?</p>\n</blockquote>\n<p>You need to declare somewhere:</p>\n<p>arities itself :: (type) type</p>\n<p>This probably should be done in HOL.thy in the distribution already, but <br>\ncurrently isn't.</p>\n<p>Cheers,<br>\nGerwin</p>",
+        "id": 294052109,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660819924
+    },
+    {
+        "content": "<p>From: Nicole Rauch &lt;<a href=\"mailto:rauch@informatik.uni-kl.de\">rauch@informatik.uni-kl.de</a>&gt;<br>\nDear all,</p>\n<p>many thanks for the input, it has solved my problem!  But now I ran  <br>\ninto another problem:</p>\n<p>Suppose I have some axiomatic type classes and some constants defined  <br>\nover them:</p>\n<p>axclass A &lt; type<br>\naxclass B &lt; type</p>\n<p>consts<br>\nf :: \"'a::A =&gt; bool\"<br>\ng :: \"'a::A =&gt; 'b::B\"<br>\nh :: \"'b::B =&gt; bool\"</p>\n<p>Now I want to declare a set inductively like this:</p>\n<p>consts<br>\nx :: \"('a::A) set\"</p>\n<p>inductive x<br>\nintros</p>\n<p>xf: \"f (a::'a::A) ==&gt; a : x\"</p>\n<p>xg: \"h ((g (a::'a::A))::'b::B) ==&gt; a : x\"</p>\n<p>The second intro rule fails because of an extra type variable.</p>\n<p>I tried the same trick as above, declaring the set x like this:</p>\n<p>consts<br>\nx :: \"('a::A * 'b::B itself) set\"</p>\n<p>inductive x<br>\nintros</p>\n<p>xf: \"f (a::'a::A) ==&gt; (a, TYPE('b::B) ) : x\"</p>\n<p>xg: \"h ((g (a::'a::A))::'b::B) ==&gt; (a, TYPE('b)) : x\"</p>\n<p>But now, not even the first intro rule is accepted. The error message is</p>\n<p>*** Type unification failed: No type arity itself :: type<br>\n*** Type error in application: Incompatible operand type</p>\n<hr>\n<p>*** Operator: (Pair (a::'a)) :: ??'a =&gt; 'a x ??'a<br>\n*** Operand: TYPE('b) :: 'b itself</p>\n<hr>\n<p>*** The error(s) above occurred for f (a::'a::A) ==&gt; (a, TYPE <br>\n('b::B) ) : x<br>\n*** At command \"inductive\".</p>\n<p>What is wrong here? Is there any way to add extra type variables to  <br>\nthe set specification?</p>\n<p>Thanks a lot in advance</p>\n<p>Nicole Rauch</p>",
+        "id": 294052702,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660820237
+    }
+]

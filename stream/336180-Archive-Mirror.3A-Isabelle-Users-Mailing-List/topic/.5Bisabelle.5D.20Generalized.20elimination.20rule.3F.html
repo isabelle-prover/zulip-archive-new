@@ -1,0 +1,338 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Generalized elimination rule? · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Generalized.20elimination.20rule.3F.html">[isabelle] Generalized elimination rule?</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294100238"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Generalized%20elimination%20rule%3F/near/294100238" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Generalized.20elimination.20rule.3F.html#294100238">(Aug 18 2022 at 14:38)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:peter.lammich@uni-muenster.de">peter.lammich@uni-muenster.de</a>&gt;<br>
+Hi all,</p>
+<p>I'm curious whether it is (easily) possible to apply elimination rules <br>
+in Isabelle that<br>
+eliminate more than one premise.</p>
+<p>There is a consumes-flag for cases rules, however, simply doing:</p>
+<p>lemma AB_elim[consumes 2]: "[| A; B; Foo =&gt; thesis |] ==&gt; thesis"</p>
+<p>lemma  "[| A; B; C |] ==&gt; Foo"<br>
+  apply (cases rule: AB_elim)</p>
+<p>does not work, and leaves me with three subgoals, the last one being:<br>
+  [|A; B; C; Foo |] ==&gt;  Foo</p>
+<p>apply (erule (1) AB_elim) leaves me with one subgoal being:<br>
+     [| B; C; Foo |] ==&gt;  Foo</p>
+<p>However, I want something that yields the subgoal:<br>
+     [| C; Foo |] ==&gt;  Foo</p>
+<p>and that also works if the A and B are not in order, i.e. for<br>
+  [| ...; B; ...; A; ... |] ==&gt; Foo<br>
+apply (?? AB_elim) shall yield:<br>
+  [| ...; ...; ...; Foo |] ==&gt; Foo<br>
+i.e. removing the matching A and B from the premises.</p>
+<p>(I need this for termination and proper behavior of a set of elimination <br>
+rules that I apply exhaustively with apply (...)+ ):</p>
+<p>Regards and thanks for any hints,<br>
+  Peter</p>
+
+
+
+<a name="294100257"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Generalized%20elimination%20rule%3F/near/294100257" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Generalized.20elimination.20rule.3F.html#294100257">(Aug 18 2022 at 14:38)</a>:</h4>
+<p>From: Brian Huffman &lt;<a href="mailto:brianh@cs.pdx.edu">brianh@cs.pdx.edu</a>&gt;<br>
+On Thu, Feb 25, 2010 at 10:04 AM, Peter Lammich<br>
+&lt;<a href="mailto:peter.lammich@uni-muenster.de">peter.lammich@uni-muenster.de</a>&gt; wrote:</p>
+<blockquote>
+<p>Hi all,</p>
+<p>I'm curious whether it is (easily) possible to apply elimination rules in<br>
+Isabelle that<br>
+eliminate more than one premise.</p>
+<p>There is a consumes-flag for cases rules, however, simply doing:</p>
+<p>lemma AB_elim[consumes 2]: "[| A; B; Foo =&gt; thesis |] ==&gt; thesis"</p>
+<p>lemma  "[| A; B; C |] ==&gt; Foo"<br>
+ apply (cases rule: AB_elim)</p>
+<p>does not work, and leaves me with three subgoals, the last one being:<br>
+ [|A; B; C; Foo |] ==&gt;  Foo</p>
+<p>apply (erule (1) AB_elim) leaves me with one subgoal being:<br>
+   [| B; C; Foo |] ==&gt;  Foo</p>
+<p>However, I want something that yields the subgoal:<br>
+   [| C; Foo |] ==&gt;  Foo</p>
+</blockquote>
+<p>Hi Peter,</p>
+<p>The "consumes" attribute only has an effect when you are in an<br>
+Isar-style proof with chained facts. Here's a situation where it works<br>
+as you expect:</p>
+<p>lemma "[|A; B; C|] ==&gt; Foo"<br>
+proof -<br>
+  assume "A" and "B" and "C"<br>
+  then show "Foo"<br>
+   (* there are now 3 chained facts: "A", "B", "C" *)<br>
+  apply (cases rule: AB_elim)</p>
+<p>Now the first 2 chained facts are matched with rule AB_elim and<br>
+disappear. The remaining fact "C" stays in the remaining subgoal,<br>
+leaving "[| C; Foo |] ==&gt;  Foo".</p>
+<blockquote>
+<p>and that also works if the A and B are not in order, i.e. for<br>
+ [| ...; B; ...; A; ... |] ==&gt; Foo<br>
+apply (?? AB_elim) shall yield:<br>
+ [| ...; ...; ...; Foo |] ==&gt; Foo<br>
+i.e. removing the matching A and B from the premises.</p>
+</blockquote>
+<p>Unfortunately, chained facts can only be matched in the given order<br>
+(for efficiency reasons, I believe), so this doesn't really do what<br>
+you want.</p>
+<blockquote>
+<p>(I need this for termination and proper behavior of a set of elimination<br>
+rules that I apply exhaustively with apply (...)+ ):</p>
+<p>Regards and thanks for any hints,<br>
+ Peter</p>
+</blockquote>
+<p>I don't think there is any easy way to accomplish what you want to<br>
+do---at least, I don't know of any already-implemented tactic in<br>
+Isabelle that does this. I do think such a tactic would be useful,<br>
+though; I've wished for it a few times myself.</p>
+<p>It might be possible to implement such a tactic in ML. The obvious<br>
+approach of trying to generalize eresolve_tac probably won't work,<br>
+because eresolve_tac is implemented in terms of Thm.biresolution,<br>
+which is part of Isabelle's trusted kernel.</p>
+<p>You could probably define this tactic on top of eresolve_tac:<br>
+Basically you would do "erule (n)" (which is basically "erule" then<br>
+"assumption" n times) followed by n calls to "thin_tac" to eliminate<br>
+the extra assumptions from the final proof state. The tricky bit would<br>
+be to figure out how to record which assumptions were matched by<br>
+"assumption", so you can tell "thin_tac" which ones to get rid of<br>
+later.</p>
+<p>Unfortunately, most of the development effort now is focused on<br>
+Isar-style proofs with chained facts, and not so much on tactics for<br>
+apply-style proofs. So I'd say it is unlikely that this feature will<br>
+be implemented by the main Isabelle development team. But be sure to<br>
+report back if you try to implement this yourself; I'm sure plenty of<br>
+people would find it useful.</p>
+<ul>
+<li>Brian</li>
+</ul>
+
+
+
+<a name="294100302"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Generalized%20elimination%20rule%3F/near/294100302" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Generalized.20elimination.20rule.3F.html#294100302">(Aug 18 2022 at 14:39)</a>:</h4>
+<p>From: Jeremy Dawson &lt;<a href="mailto:jeremy@rsise.anu.edu.au">jeremy@rsise.anu.edu.au</a>&gt;<br>
+Brian Huffman wrote:</p>
+<blockquote>
+<p>On Thu, Feb 25, 2010 at 10:04 AM, Peter Lammich<br>
+&lt;<a href="mailto:peter.lammich@uni-muenster.de">peter.lammich@uni-muenster.de</a>&gt; wrote:</p>
+<blockquote>
+<p>Hi all,</p>
+<p>I'm curious whether it is (easily) possible to apply elimination rules in<br>
+Isabelle that<br>
+eliminate more than one premise.</p>
+<p>[...]<br>
+</p>
+</blockquote>
+</blockquote>
+<blockquote>
+<p>I don't think there is any easy way to accomplish what you want to<br>
+do---at least, I don't know of any already-implemented tactic in<br>
+Isabelle that does this. I do think such a tactic would be useful,<br>
+though; I've wished for it a few times myself.</p>
+<p>It might be possible to implement such a tactic in ML. The obvious<br>
+approach of trying to generalize eresolve_tac probably won't work,<br>
+because eresolve_tac is implemented in terms of Thm.biresolution,<br>
+which is part of Isabelle's trusted kernel.</p>
+<p>You could probably define this tactic on top of eresolve_tac:<br>
+Basically you would do "erule (n)" (which is basically "erule" then<br>
+"assumption" n times) followed by n calls to "thin_tac" to eliminate<br>
+the extra assumptions from the final proof state. The tricky bit would<br>
+be to figure out how to record which assumptions were matched by<br>
+"assumption", so you can tell "thin_tac" which ones to get rid of<br>
+later.</p>
+<p>Brian, Peter, et al,</p>
+</blockquote>
+<p>My solution of this "tricky bit" depends on an idea presented by Konrad <br>
+Slind<br>
+for HOL at TPHOLs 2002, which was to annotate selected goals (or, more <br>
+generally, subterms) _within_ the logic.</p>
+<p>Thus for a long time I have used<br>
+  forget        :: "'a =&gt; 'a"<br>
+  forget_def : "forget f == f"<br>
+to stop a particular hypothesis being used in asm_simp_tac and <br>
+asm_full_simp_tac</p>
+<p>For this problem I defined</p>
+<p>keep_def : "keep b f == f"<br>
+  keep          :: "bool =&gt; 'a =&gt; 'a"</p>
+<p>val _ = <a href="http://ListPair.app">ListPair.app</a> bind_thm (["keepD", "keepI"], [keep_def] RL defDs) ;<br>
+val _ = bind_thm ("keepTD", read_instantiate [("b", "True")] keepD) ;<br>
+val _ = bind_thm ("keepFD", read_instantiate [("b", "False")] keepD) ;<br>
+val _ = bind_thm ("keepF_thin", keepFD RS thin_rl) ;</p>
+<blockquote>
+<p>keepTD ;<br>
+val it = "keep True ?P ==&gt; ?P" : Thm.thm</p>
+</blockquote>
+<blockquote>
+<p>keepFD ;<br>
+val it = "keep False ?P ==&gt; ?P" : Thm.thm</p>
+</blockquote>
+<blockquote>
+<p>keepF_thin ;<br>
+val it = "[| keep False ?P; PROP ?W |] ==&gt; PROP ?W" : Thm.thm</p>
+</blockquote>
+<p>(You should change the uses of bind_thm if you're using Isar).</p>
+<p>Then the tactic is as follows - it is no doubt rather inefficient, but <br>
+seems to work OK.<br>
+I've done the analogue of fatac which deletes all matched premises from <br>
+remaining subgoals because it's simpler to follow (datac already deleted <br>
+the first matched premise, and eatac also matches the conclusion, which <br>
+I think is here an additional irrelevant complication).</p>
+<p>(* fetac : thm -&gt; int -&gt; int -&gt; tactic<br>
+  like fatac n but also deletes hypotheses matched *)<br>
+fun fetac th n sg st =<br>
+  let val fth = thin_rl RS (replicate n keepFD MRS th) : thm ;<br>
+    val subgoal = List.nth (prems_of st, sg - 1) : term ;<br>
+    (* turn all subgoal hypotheses H into keep ?b H *)<br>
+    val nhyps = length (Logic.strip_assums_hyp subgoal) ;<br>
+    val ktac = EVERY' (replicate nhyps (dtac keepI)) : int -&gt; tactic ;<br>
+    (* then apply ftac fth - see later *)<br>
+    (* then apply atac n times,<br>
+      which marks the hypotheses to be deleted with keep False *)<br>
+    val atacs = EVERY' (replicate n atac) ;<br>
+    (* treat other instances of keep ?b as keep True, and erase them *)<br>
+    val ekttac = REPEAT o dtac keepTD : int -&gt; tactic ;<br>
+    (* delete hypotheses which are (keep False ...) *)<br>
+    val ekftac = REPEAT o etac keepF_thin : int -&gt; tactic ;<br>
+    (* combine all the above *)<br>
+    val ctac = EVERY' [ktac, ftac fth, atacs] THEN_ALL_NEW    <br>
+      (ekttac THEN' ekftac) : int -&gt; tactic ;<br>
+  in ctac sg st end ;</p>
+<blockquote>
+<p>Unfortunately, most of the development effort now is focused on<br>
+Isar-style proofs with chained facts, and not so much on tactics for<br>
+apply-style proofs. So I'd say it is unlikely that this feature will<br>
+be implemented by the main Isabelle development team. But be sure to<br>
+report back if you try to implement this yourself; I'm sure plenty of<br>
+people would find it useful.</p>
+<p>I hope so.  Incidentally, on a related topic  - sometimes using etac I <br>
+_don't_ want the matched premise deleted from the resulting subgoals <br>
+(which is why all_dupE is given as an alternative to allE). </p>
+</blockquote>
+<p>To achieve this for any elimination rule, I have</p>
+<p>fun mk_dupE thE = zero_var_indexes (rotate_prems ~1<br>
+  (tacsthm [PRIMITIVE (fn th =&gt; th RS cut_rl), atac 1] thE)) ;</p>
+<p>thus mk_dupE allE is approximately all_dupE</p>
+<p>Regards,</p>
+<p>Jeremy</p>
+<blockquote>
+<ul>
+<li>Brian</li>
+</ul>
+</blockquote>
+
+
+
+<a name="294100379"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Generalized%20elimination%20rule%3F/near/294100379" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Generalized.20elimination.20rule.3F.html#294100379">(Aug 18 2022 at 14:39)</a>:</h4>
+<p>From: Stephan Merz &lt;<a href="mailto:Stephan.Merz@loria.fr">Stephan.Merz@loria.fr</a>&gt;<br>
+I second this request. More precisely, I'd like to be able to annotate a rule such that it is applied by the automatic proof methods only if the first n hypotheses are present in the current proof state. As a simple example, consider bspec, which would make a perfect elimination rule when its two assumptions can be proved by assumption. As others have pointed out, it is not hard to write a tactic that applies a rule only if the first n hypotheses can be proved by assumption, however, I don't know how to make such a tactic work inside auto and friends.</p>
+<p>Thanks,<br>
+Stephan</p>
+
+
+
+<a name="294100435"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Generalized%20elimination%20rule%3F/near/294100435" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Generalized.20elimination.20rule.3F.html#294100435">(Aug 18 2022 at 14:39)</a>:</h4>
+<p>From: Jeremy Dawson &lt;<a href="mailto:jeremy@rsise.anu.edu.au">jeremy@rsise.anu.edu.au</a>&gt;<br>
+Stephan Merz wrote:<br>
+Stephan,</p>
+<p>This is described in Section 10.4 of the Reference Manual.  (NOT the <br>
+Isar reference manual, the Isabelle Reference Manual). </p>
+<p>For bspec, addSD2 is exactly what you want.  (or maybe addD2). </p>
+<p>Modifying the current claset (or creating a new one) is used by all the <br>
+tactics involving the classical reasoning set, eg safe_tac, clarify_tac, <br>
+auto_tac, force_tac</p>
+<p>Jeremy</p>
+
+
+
+<a name="294103006"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Generalized%20elimination%20rule%3F/near/294103006" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Generalized.20elimination.20rule.3F.html#294103006">(Aug 18 2022 at 14:52)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:peter.lammich@uni-muenster.de">peter.lammich@uni-muenster.de</a>&gt;<br>
+Hi Brian,</p>
+<p>Many thanks you for your answer.</p>
+<p>I adopted your proposal for my needs. However, I ran into a problem that <br>
+should also be imminent in your proposal (?).<br>
+If there are premises of the form !!x. _==&gt;_, they are counted in nhyps, <br>
+however dtac keepI will not unify against them, thus<br>
+   val ktac = EVERY' (replicate nhyps (dtac keepI)) : int -&gt; tactic ;<br>
+produces premises that are doubly-wrapped into keep.</p>
+<p>What's the best way around?<br>
+  Only counting "plain" premises? (How?)<br>
+  Can keepI be defined to also wrap higher-order premises?</p>
+<p>Best,<br>
+  Peter</p>
+<p>Jeremy Dawson schrieb:</p>
+
+
+
+<a name="294103088"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Generalized%20elimination%20rule%3F/near/294103088" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Generalized.20elimination.20rule.3F.html#294103088">(Aug 18 2022 at 14:52)</a>:</h4>
+<p>From: Jeremy Dawson &lt;<a href="mailto:jeremy@rsise.anu.edu.au">jeremy@rsise.anu.edu.au</a>&gt;<br>
+Peter Lammich wrote:<br>
+Dear Peter,</p>
+<p>I'm not quite sure if I understand you correctly.</p>
+<p>Are you talking about the situation where there is a premise (among the <br>
+list of premises of a subgoal) of the form !!x. _==&gt;_ ? </p>
+<p>(Isn't this rather unusual - could I see an example of how this arises ?)</p>
+<p>Certainly, keep, as I defined it, won't wrap around a premise of the form<br>
+!!x. _==&gt;_ because such a premise is of type prop, not bool. </p>
+<p>Isabelle generally - I think - wasn't intended to work very much with <br>
+meta-level stuff, and previously I have found that playing around with <br>
+meta-level props instead of object level bools doesn't seem to work as <br>
+expected.  However to my surprise the attached does seem to work - try <br>
+it out and see if it works on your problem example.</p>
+<p>Regards,</p>
+<p>Jeremy<br>
+<a href="/user_uploads/14278/FJ_kQ1ggFs21GSH3ZfvI2t_S/x">x</a></p>
+
+
+
+<a name="294103178"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Generalized%20elimination%20rule%3F/near/294103178" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Generalized.20elimination.20rule.3F.html#294103178">(Aug 18 2022 at 14:53)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:peter.lammich@uni-muenster.de">peter.lammich@uni-muenster.de</a>&gt;</p>
+<blockquote>
+<p>Dear Peter,</p>
+<p>I'm not quite sure if I understand you correctly.</p>
+<p>Are you talking about the situation where there is a premise (among <br>
+the list of premises of a subgoal) of the form !!x. _==&gt;_ ?<br>
+(Isn't this rather unusual - could I see an example of how this arises ?)<br>
+Exactly. I ran into this situation, when proving elimination rules <br>
+(e.g., on Isar, containing "obtains").</p>
+</blockquote>
+<p>lemma foo:<br>
+  assumes bla<br>
+  obtains x where "bar x"<br>
+  apply -<br>
+  ** You end up with a subgoal something like [| bla; !!x. bar x ==&gt; <br>
+thesis |] ==&gt; thesis</p>
+<blockquote>
+<p>Certainly, keep, as I defined it, won't wrap around a premise of the form<br>
+!!x. _==&gt;_ because such a premise is of type prop, not bool.<br>
+Isabelle generally - I think - wasn't intended to work very much with <br>
+meta-level stuff, and previously I have found that playing around with <br>
+meta-level props instead of object level bools doesn't seem to work as <br>
+expected.  However to my surprise the attached does seem to work - try <br>
+it out and see if it works on your problem example.<br>
+Thank you very much.<br>
+I certainly will try it. (For now, I modified the val nhyps=... to only <br>
+count plain premises).</p>
+</blockquote>
+<p>Best,<br>
+  Peter</p>
+<blockquote>
+<p>Regards,</p>
+<p>Jeremy</p>
+</blockquote>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

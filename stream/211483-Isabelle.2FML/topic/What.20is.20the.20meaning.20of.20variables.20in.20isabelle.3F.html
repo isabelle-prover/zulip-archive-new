@@ -1,0 +1,209 @@
+<html>
+<head><meta charset="utf-8"><title>What is the meaning of variables in isabelle? · Isabelle/ML · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/index.html">Isabelle/ML</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/What.20is.20the.20meaning.20of.20variables.20in.20isabelle.3F.html">What is the meaning of variables in isabelle?</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="463629201"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/What%20is%20the%20meaning%20of%20variables%20in%20isabelle%3F/near/463629201" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mario Carneiro <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/What.20is.20the.20meaning.20of.20variables.20in.20isabelle.3F.html#463629201">(Aug 20 2024 at 08:22)</a>:</h4>
+<p>There are two variable kinds in types: <code>TFree (a, S)</code> and <code>TVar ((a, i), S)</code>, and similarly for terms there are <code>Free (a, T)</code> and <code>Var ((a, i), T)</code>, and additionally there is <code>Bound i</code> as a third kind of variable. What is the role of each of these variable kinds?</p>
+<p>Here's what I've determined so far:</p>
+<ul>
+<li><code>Bound i</code> are de bruijn bound variables, these are normally used to construct lambda terms. A <code>Abs</code> constructor will bind <code>Bound 0</code> in the body of the abstraction.</li>
+<li>Bound variables are not allowed at the top level of a <code>cterm</code>, so most functions in <code>thm.ML</code> never see a bound variable at the top level.</li>
+<li><code>Var</code> and <code>TVar</code> variables are not allowed in hypotheses.</li>
+<li>The <code>instantiate</code> function replaces variables <code>Var ((a, i), _)</code> by terms. So a theorem is effectively implicitly universally quantified over the <code>Var</code> variables in it.</li>
+<li>The <code>varify</code> function turns <code>Free</code> variables into <code>Var</code>, but only if they don't appear in the hypotheses. So <code>Free</code> and <code>Var</code> variables seem somewhat interchangeable at the logical level.</li>
+<li>The <code>lift</code> function manipulates the <code>i</code> in <code>Var ((a, i), _)</code> variables, incrementing them all uniformly by some constant. I don't yet understand the specific meaning of this index but it seems to form part of the "name" of the variable. <code>lift</code> also replaces some variables by <code>(Var _) $ (Bound 0) $ ... $ (Bound n)</code> expressions, where the bound variables refer to some forall quantifiers in the outer spine of the expression. I don't understand why this operation is legal since it seems to imply that <code>Var</code> expressions can capture variables in scope even though they aren't represented in the type. I guess these are what <span class="user-mention" data-user-id="233154">@Kevin Kappelmann</span> calls schematic variables?</li>
+<li>Flex-flex pairs are pairs of expressions which we think of as being equated. Is this just the same as an equality hypothesis? Are there constraints on what kind of variables show up here?</li>
+</ul>
+
+
+
+<a name="463630953"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/What%20is%20the%20meaning%20of%20variables%20in%20isabelle%3F/near/463630953" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jan van Brügge <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/What.20is.20the.20meaning.20of.20variables.20in.20isabelle.3F.html#463630953">(Aug 20 2024 at 08:34)</a>:</h4>
+<p><code>Var</code> and <code>TVar</code> are schematic variables. In goals you would write them as <code>?x</code>. Bound variables are represented by <code>Bound</code> and need a corresponding binder, while (fixed) free variables are <code>Free</code> or <code>TFree</code> (in goals that is just <code>x</code>).</p>
+<p>Flex-flex pairs are equalities of higher order schematic variables, you want to avoid those.</p>
+
+
+
+<a name="463631273"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/What%20is%20the%20meaning%20of%20variables%20in%20isabelle%3F/near/463631273" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mario Carneiro <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/What.20is.20the.20meaning.20of.20variables.20in.20isabelle.3F.html#463631273">(Aug 20 2024 at 08:35)</a>:</h4>
+<p>I am trying to write an external processor for isabelle theorems, so I would like to understand what the semantic content of those things are, I can't avoid them as long as isabelle makes use of them</p>
+
+
+
+<a name="463631393"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/What%20is%20the%20meaning%20of%20variables%20in%20isabelle%3F/near/463631393" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jan van Brügge <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/What.20is.20the.20meaning.20of.20variables.20in.20isabelle.3F.html#463631393">(Aug 20 2024 at 08:36)</a>:</h4>
+<p>What you usually do is define the goal using <code>Free</code> and <code>Bound</code> (however usually it is easiest to use <code>Term.absfree</code> to construct <code>Abs</code> because that converts the now bound <code>Free</code> into <code>Bound</code>). Then you prove that goal using a tactic. Then Isabelle generalizes your theorem from arbitrary but fixed variables to schematic variables.</p>
+
+
+
+<a name="463631501"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/What%20is%20the%20meaning%20of%20variables%20in%20isabelle%3F/near/463631501" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mario Carneiro <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/What.20is.20the.20meaning.20of.20variables.20in.20isabelle.3F.html#463631501">(Aug 20 2024 at 08:37)</a>:</h4>
+<p>so users "prefer" to see the theorem with schematic variables?</p>
+
+
+
+<a name="463631527"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/What%20is%20the%20meaning%20of%20variables%20in%20isabelle%3F/near/463631527" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jan van Brügge <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/What.20is.20the.20meaning.20of.20variables.20in.20isabelle.3F.html#463631527">(Aug 20 2024 at 08:37)</a>:</h4>
+<p><code>Free</code> corresponds to meta-variables, <code>Var</code> is something that can be replaced by any well typed and well formed term (so a cterm)</p>
+
+
+
+<a name="463631598"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/What%20is%20the%20meaning%20of%20variables%20in%20isabelle%3F/near/463631598" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mario Carneiro <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/What.20is.20the.20meaning.20of.20variables.20in.20isabelle.3F.html#463631598">(Aug 20 2024 at 08:37)</a>:</h4>
+<p>Is there a metavariable context somewhere?</p>
+
+
+
+<a name="463631622"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/What%20is%20the%20meaning%20of%20variables%20in%20isabelle%3F/near/463631622" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mario Carneiro <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/What.20is.20the.20meaning.20of.20variables.20in.20isabelle.3F.html#463631622">(Aug 20 2024 at 08:37)</a>:</h4>
+<p>or are these metavariables just hanging</p>
+
+
+
+<a name="463631899"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/What%20is%20the%20meaning%20of%20variables%20in%20isabelle%3F/near/463631899" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jan van Brügge <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/What.20is.20the.20meaning.20of.20variables.20in.20isabelle.3F.html#463631899">(Aug 20 2024 at 08:39)</a>:</h4>
+<p>A theorem that uses fixed variables can only be applied to exactly those variables, so it would be pretty useless to the user. There is no way to instantiate fixed variables.</p>
+<blockquote>
+<p>Is there a metavariable context somewhere?</p>
+</blockquote>
+<p>No, the variables carry their own types directly</p>
+
+
+
+<a name="463631978"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/What%20is%20the%20meaning%20of%20variables%20in%20isabelle%3F/near/463631978" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mario Carneiro <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/What.20is.20the.20meaning.20of.20variables.20in.20isabelle.3F.html#463631978">(Aug 20 2024 at 08:39)</a>:</h4>
+<p>fixed variables meaning <code>Free</code>?</p>
+
+
+
+<a name="463632037"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/What%20is%20the%20meaning%20of%20variables%20in%20isabelle%3F/near/463632037" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jan van Brügge <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/What.20is.20the.20meaning.20of.20variables.20in.20isabelle.3F.html#463632037">(Aug 20 2024 at 08:40)</a>:</h4>
+<p>yes</p>
+
+
+
+<a name="463632179"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/What%20is%20the%20meaning%20of%20variables%20in%20isabelle%3F/near/463632179" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mario Carneiro <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/What.20is.20the.20meaning.20of.20variables.20in.20isabelle.3F.html#463632179">(Aug 20 2024 at 08:41)</a>:</h4>
+<p>so the usual idea is that you state the theorem with <code>Free</code> variables, then prove it, then use <code>varify</code> to turn everything into <code>Var</code> variables for use in the next theorem?</p>
+
+
+
+<a name="463632311"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/What%20is%20the%20meaning%20of%20variables%20in%20isabelle%3F/near/463632311" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jan van Brügge <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/What.20is.20the.20meaning.20of.20variables.20in.20isabelle.3F.html#463632311">(Aug 20 2024 at 08:41)</a>:</h4>
+<p>Varify only works on terms (so terms that are not checked yet). For theorems isabelle will do this automatically after the proof is done. But conceptually yes.</p>
+
+
+
+<a name="463632522"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/What%20is%20the%20meaning%20of%20variables%20in%20isabelle%3F/near/463632522" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mario Carneiro <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/What.20is.20the.20meaning.20of.20variables.20in.20isabelle.3F.html#463632522">(Aug 20 2024 at 08:42)</a>:</h4>
+<p>I had to deal with this more specifically using the function <code>varifyT_global</code> in thm.ML</p>
+
+
+
+<a name="463632585"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/What%20is%20the%20meaning%20of%20variables%20in%20isabelle%3F/near/463632585" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mario Carneiro <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/What.20is.20the.20meaning.20of.20variables.20in.20isabelle.3F.html#463632585">(Aug 20 2024 at 08:43)</a>:</h4>
+<p>with the comment</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="c">(*Replace all TFrees not fixed or in the hyps by new TVars*)</span>
+</code></pre></div>
+
+
+
+<a name="463632637"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/What%20is%20the%20meaning%20of%20variables%20in%20isabelle%3F/near/463632637" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mario Carneiro <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/What.20is.20the.20meaning.20of.20variables.20in.20isabelle.3F.html#463632637">(Aug 20 2024 at 08:43)</a>:</h4>
+<p>which I'm hoping is an adequate description of the operation implemented</p>
+
+
+
+<a name="463675935"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/What%20is%20the%20meaning%20of%20variables%20in%20isabelle%3F/near/463675935" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Kevin Kappelmann <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/What.20is.20the.20meaning.20of.20variables.20in.20isabelle.3F.html#463675935">(Aug 20 2024 at 11:59)</a>:</h4>
+<p><span class="user-mention silent" data-user-id="740109">Mario Carneiro</span> <a href="#narrow/stream/211483-Isabelle.2FML/topic/What.20is.20the.20meaning.20of.20variables.20in.20isabelle.3F/near/463629201">said</a>:</p>
+<blockquote>
+<p>...<br>
+The <code>lift</code> function manipulates the <code>i</code> in <code>Var ((a, i), _)</code> variables, incrementing them all uniformly by some constant. I don't yet understand the specific meaning of this index but it seems to form part of the "name" of the variable.</p>
+</blockquote>
+<p>Yes, it is part of the variable's name. These indexes are there to facilitate the generation of fresh meta variables: the maximum index of all variables of certain data structures is tracked as separate data, e.g. in  <code>thm</code> and <code>cterm</code>. So if you need a fresh variable with respect to some<code>thm</code> or <code>cterm</code>, you may just use any variable with a higher index.</p>
+<blockquote>
+<p><code>lift</code> also replaces some variables by <code>(Var _) $ (Bound 0) $ ... $ (Bound n)</code> expressions, where the bound variables refer to some forall quantifiers in the outer spine of the expression. I don't understand why this operation is legal since it seems to imply that <code>Var</code> expressions can capture variables in scope even though they aren't represented in the type. I guess these are what @Kevin Kappelmann calls schematic variables?</p>
+</blockquote>
+<p>The section about <a href="https://isabelle.in.tum.de/doc/implementation.pdf">rule composition in the implementation manual</a> explains the lifting operation. Let me know if it is still unclear after having read it.</p>
+<blockquote>
+<p>Flex-flex pairs are pairs of expressions which we think of as being equated. Is this just the same as an equality hypothesis? </p>
+</blockquote>
+<p>Logically, flex-flex pairs are like equality hypotheses, yes. Unfortunately(?) there's no rule in the kernel to move flex-flex pairs from <code>tpairs</code> in <code>thm</code> to <code>hyps</code> or add them as premises to <code>prop</code>.</p>
+<blockquote>
+<p>Are there constraints on what kind of variables show up here?</p>
+</blockquote>
+<p>No, because after having generated a flex-flex pair, you may later instantiate some of the involved meta variables by an arbitrary (type correct) term.</p>
+
+
+
+<a name="463677060"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/What%20is%20the%20meaning%20of%20variables%20in%20isabelle%3F/near/463677060" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Kevin Kappelmann <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/What.20is.20the.20meaning.20of.20variables.20in.20isabelle.3F.html#463677060">(Aug 20 2024 at 12:04)</a>:</h4>
+<p>BTW. there may be some other surprising things when you deal with the <a href="#narrow/stream/238552-Beginner-Questions/topic/Certified.20terms/near/207260332">identification of variables</a> (free variables with the same name but different type)</p>
+
+
+
+<a name="463884091"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/What%20is%20the%20meaning%20of%20variables%20in%20isabelle%3F/near/463884091" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mario Carneiro <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/What.20is.20the.20meaning.20of.20variables.20in.20isabelle.3F.html#463884091">(Aug 20 2024 at 22:35)</a>:</h4>
+<p>Oh... I was hoping that isabelle fixed that <span aria-label="see no evil" class="emoji emoji-1f648" role="img" title="see no evil">:see_no_evil:</span>  That's the same bug that hol light had</p>
+
+
+
+<a name="463959806"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/What%20is%20the%20meaning%20of%20variables%20in%20isabelle%3F/near/463959806" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Kevin Kappelmann <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/What.20is.20the.20meaning.20of.20variables.20in.20isabelle.3F.html#463959806">(Aug 21 2024 at 06:47)</a>:</h4>
+<p>I'm not sure everyone would call this a bug, but I think it is surprising at least :)</p>
+
+
+
+<a name="463960297"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/What%20is%20the%20meaning%20of%20variables%20in%20isabelle%3F/near/463960297" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/What.20is.20the.20meaning.20of.20variables.20in.20isabelle.3F.html#463960297">(Aug 21 2024 at 06:50)</a>:</h4>
+<p>I think the fancy name is Pollack-consistency and as far as I know, it was solved in very few proof assistants</p>
+
+
+
+<a name="463960420"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/What%20is%20the%20meaning%20of%20variables%20in%20isabelle%3F/near/463960420" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/What.20is.20the.20meaning.20of.20variables.20in.20isabelle.3F.html#463960420">(Aug 21 2024 at 06:51)</a>:</h4>
+<p>(Pollack-consistency is a stronger I think, but it forbids that)</p>
+
+
+
+<a name="463960506"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/What%20is%20the%20meaning%20of%20variables%20in%20isabelle%3F/near/463960506" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mario Carneiro <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/What.20is.20the.20meaning.20of.20variables.20in.20isabelle.3F.html#463960506">(Aug 21 2024 at 06:52)</a>:</h4>
+<p>I don't think this is the same thing as pollack consistency, this is about variable identity being stable under type instantiation</p>
+
+
+
+<a name="463960567"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/What%20is%20the%20meaning%20of%20variables%20in%20isabelle%3F/near/463960567" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mario Carneiro <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/What.20is.20the.20meaning.20of.20variables.20in.20isabelle.3F.html#463960567">(Aug 21 2024 at 06:52)</a>:</h4>
+<p>pollack consistency is broken by most attempts at hiding types</p>
+
+
+
+<a name="463968432"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/What%20is%20the%20meaning%20of%20variables%20in%20isabelle%3F/near/463968432" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mario Carneiro <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/What.20is.20the.20meaning.20of.20variables.20in.20isabelle.3F.html#463968432">(Aug 21 2024 at 07:30)</a>:</h4>
+<p>Regarding identification of variables: If the sort of a type variable matters for variable identification, then why is it okay to strip all the sorts and convert them to hypotheses when unconstraining a theorem statement?</p>
+
+
+
+<a name="463969578"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/What%20is%20the%20meaning%20of%20variables%20in%20isabelle%3F/near/463969578" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Kevin Kappelmann <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/What.20is.20the.20meaning.20of.20variables.20in.20isabelle.3F.html#463969578">(Aug 21 2024 at 07:36)</a>:</h4>
+<p>I guess it all depends on how the unconstraining is done in such cases - but here I need to pass. Maybe <span class="user-mention" data-user-id="302181">@Simon Roßkopf</span> can help...?</p>
+
+
+
+<a name="463975019"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/What%20is%20the%20meaning%20of%20variables%20in%20isabelle%3F/near/463975019" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Simon Roßkopf <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/What.20is.20the.20meaning.20of.20variables.20in.20isabelle.3F.html#463975019">(Aug 21 2024 at 08:00)</a>:</h4>
+<p>It's been a while, but as far as I remember the unconstrain operation does not simply strip all the sorts, but renames type variables if they would coincide.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

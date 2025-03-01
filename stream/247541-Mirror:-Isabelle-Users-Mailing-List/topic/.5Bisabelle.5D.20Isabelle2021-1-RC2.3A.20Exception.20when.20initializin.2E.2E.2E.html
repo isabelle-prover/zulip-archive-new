@@ -1,0 +1,121 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Isabelle2021-1-RC2: Exception when initializin... · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2021-1-RC2.3A.20Exception.20when.20initializin.2E.2E.2E.html">[isabelle] Isabelle2021-1-RC2: Exception when initializin...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="260765752"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2021-1-RC2%3A%20Exception%20when%20initializin.../near/260765752" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2021-1-RC2.3A.20Exception.20when.20initializin.2E.2E.2E.html#260765752">(Nov 09 2021 at 08:15)</a>:</h4>
+<p>From: Dominique Unruh &lt;<a href="mailto:unruh@ut.ee">unruh@ut.ee</a>&gt;<br>
+Hi,</p>
+<p>when initializing Isabelle in a situation where the classpath contains a <br>
+directory (not only jars), and exception is thrown. (This can happen, <br>
+for example, if Isabelle is initialized via Isabelle/Scala in a project <br>
+that does not have a pure JAR classpath.)</p>
+<p>java.io.FileNotFoundException:<br>
+    /home/unruh/svn/qrhl-tool/scala-isabelle/target/scala-2.13/test-classes<br>
+    (Is a directory)<br>
+         at java.base/java.io.RandomAccessFile.open0(Native Method)<br>
+         at<br>
+    java.base/java.io.RandomAccessFile.open(RandomAccessFile.java:343)<br>
+         at<br>
+    java.base/java.io.RandomAccessFile.&lt;init&gt;(RandomAccessFile.java:258)<br>
+         at<br>
+    java.base/java.io.RandomAccessFile.&lt;init&gt;(RandomAccessFile.java:213)<br>
+         at java.base/java.util.zip.ZipFile$Source.&lt;init&gt;(ZipFile.java:1260)<br>
+         at java.base/java.util.zip.ZipFile$Source.get(ZipFile.java:1225)<br>
+         at<br>
+    java.base/java.util.zip.ZipFile$CleanableResource.&lt;init&gt;(ZipFile.java:706)<br>
+         at java.base/java.util.zip.ZipFile.&lt;init&gt;(ZipFile.java:240)<br>
+         at java.base/java.util.zip.ZipFile.&lt;init&gt;(ZipFile.java:171)<br>
+         at java.base/java.util.jar.JarFile.&lt;init&gt;(JarFile.java:349)<br>
+         at java.base/java.util.jar.JarFile.&lt;init&gt;(JarFile.java:320)<br>
+         at java.base/java.util.jar.JarFile.&lt;init&gt;(JarFile.java:286)<br>
+         at PIDEWrapper@1//isabelle.setup.Build.get_services(Build.java:342)<br>
+         at<br>
+    PIDEWrapper@1//isabelle.Isabelle_System$.from_jar$1(isabelle_system.scala:81)<br>
+         at<br>
+    PIDEWrapper@1//isabelle.Isabelle_System$.$anonfun$make_services$4(isabelle_system.scala:83)<br>
+         at<br>
+    PIDEWrapper@1//scala.collection.immutable.List.flatMap(List.scala:293)<br>
+         at<br>
+    PIDEWrapper@1//isabelle.Isabelle_System$.make_services(isabelle_system.scala:83)<br>
+         at<br>
+    PIDEWrapper@1//isabelle.Isabelle_System$.init(isabelle_system.scala:89)</p>
+<p>The reason is the following:</p>
+<p>Isabelle_System.make_services calls isabelle.setup.Build.get_services <br>
+with every classpath element. get_services calls new JarFile if that <br>
+classpath element exists in the filesystem. However, if the classpath <br>
+element exists but is a directory, then new JarFile raises an exception.</p>
+<p>I assume the easiest fix would be to invoke new JarFile only on regular <br>
+files (i.e., replace Files.exists(jar_path) by <br>
+Files.isRegularFile(jar_path) in get_services). This would simply ignore <br>
+directory-classpath-elements (i.e., services can only be loaded from <br>
+jars but Isabelle does not fail in the presence of <br>
+directory-classpath-elements).</p>
+<p>Best wishes,<br>
+Dominique.</p>
+
+
+
+<a name="260780855"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2021-1-RC2%3A%20Exception%20when%20initializin.../near/260780855" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2021-1-RC2.3A.20Exception.20when.20initializin.2E.2E.2E.html#260780855">(Nov 09 2021 at 10:52)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+OK, I have made this more robust via Files.isRegularFile here:<br>
+<a href="https://isabelle-dev.sketis.net/rISABELLEcba1da393958ac15a155abaadf5d3472705d83ff">https://isabelle-dev.sketis.net/rISABELLEcba1da393958ac15a155abaadf5d3472705d83ff</a></p>
+<p>Can you say where the directory in the your classpath is coming from?</p>
+<p>Note that the isabelle.setup module is a step towards better integration (or<br>
+assimilation) of Java/Scala into Isabelle (not Isabelle into Java/Scala).<br>
+There will be further steps after the coming release, e.g. jars as exports<br>
+within the session database --- e.g. for services that build the document.</p>
+<p>The current state is documented in the "system" manual, see "isabelle<br>
+scala_project" and "isabelle scala_build". The "build.props" file is where<br>
+everything comes together.</p>
+<p>Makarius</p>
+
+
+
+<a name="260785722"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2021-1-RC2%3A%20Exception%20when%20initializin.../near/260785722" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2021-1-RC2.3A.20Exception.20when.20initializin.2E.2E.2E.html#260785722">(Nov 09 2021 at 11:42)</a>:</h4>
+<p>From: Dominique Unruh &lt;<a href="mailto:unruh@ut.ee">unruh@ut.ee</a>&gt;</p>
+<blockquote>
+<p>Yes, we've had long discussions about the obsolete scala-isabelle <br>
+library already.</p>
+</blockquote>
+<p>I would disagree that it is obsolete.</p>
+<p>At least not in the sense that there is a different approach that covers <br>
+the same needs, to my knowledge.</p>
+<p>The core Isabelle framework, as far as I can tell, covers the following <br>
+use cases well:</p>
+<p>* Invoking Scala code from a standalone Isabelle process (e.g.,<br>
+    Isabelle services)</p>
+<p>* Invoking Isabelle from other tools as a more-or-less standalone<br>
+    process with coarse operations (such as building a session)</p>
+<p>What is not supported (as far as I can tell) is:</p>
+<p>* Running an Isabelle process as a slave to an existing application<br>
+    (where the application has its own toplevel interface, be it GUI,<br>
+    command line, or REPL).</p>
+<p>* Invoking fine grained operation (e.g., constructing a term, proving<br>
+    a theorem).</p>
+<p>If there is a mechanism that covers those things, then I'd be happy to <br>
+use that mechanism. (Ideally, scala-isabelle would be nothing than a <br>
+simpler to use helper library that just passes through everything to <br>
+Isabelle/Scala.)</p>
+<p>I'm also happy to use the "proper way" of invoking Isabelle inside the <br>
+library.</p>
+<p>(Note that, if I wouldn't use the library, I would still have exactly <br>
+the same problems because in the qrhl-tool theorem prover, I need to <br>
+invoke Isabelle, and if I do it by calling Isabelle/Scala directly, I <br>
+will still have exactly the same questions.)</p>
+<p>Best wishes,<br>
+Dominique.</p>
+
+
+
+<hr><p>Last updated: Jul 15 2022 at 23:21 UTC</p>
+</html>

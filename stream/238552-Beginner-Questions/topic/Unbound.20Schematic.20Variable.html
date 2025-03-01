@@ -1,0 +1,217 @@
+<html>
+<head><meta charset="utf-8"><title>Unbound Schematic Variable · Beginner Questions · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/index.html">Beginner Questions</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Unbound.20Schematic.20Variable.html">Unbound Schematic Variable</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="236357790"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Unbound%20Schematic%20Variable/near/236357790" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Ahmed B <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Unbound.20Schematic.20Variable.html#236357790">(Apr 27 2021 at 15:23)</a>:</h4>
+<p>I am attempting to prove the strong normalisation of combinatory logic. I have run into an unexpected "Unbound Schematic Variable <code>?thesis</code>" error. The code is below (I have attempted to minimise as far as possible and am using Isabelle 2020). Most likely missing something obvious as I am pretty new to Isabelle. The error occurs in the last <code>sorried</code> proof at both instance of <code>?thesis</code>.</p>
+<div class="codehilite"><pre><span></span><code>section ‹Strong_Normalisation›
+
+theory Strong_Normalisation
+  imports Main
+  abbrevs &quot;⟶w&quot; = &quot;⟶⇩w&quot;
+      and &quot;→p&quot; = &quot;→⇩p&quot;
+      and &quot;⟶b&quot; = &quot;⟶⇩β&quot;
+begin
+
+(* definition of types for combinatory terms *)
+
+datatype tp = is_At:  TAtt &quot;nat&quot; | TArr &quot;tp&quot; &quot;tp&quot; (infixr &quot;→⇩p&quot; 200)
+
+abbreviation is_Arr :: &quot;tp ⇒ bool&quot; where
+  &quot;is_Arr τ ≡ ¬ (is_At τ)&quot;
+
+(* head of a combinatory term *)
+
+datatype (plugins del: size) hd =
+  is_Var: Var (var: string)(type: tp) (&quot;_:_&quot; [100,100] 100)
+| is_S : S (type: tp)  (&quot;S:_&quot; 100)
+| is_K : K (type: tp)  (&quot;K:_&quot; 100)
+| is_Sym: Sym (sym: string)(type: tp) (&quot;_:_&quot; [100,100] 100)
+
+abbreviation is_Comb :: &quot; hd ⇒ bool&quot; where
+  &quot;is_Comb ζ ≡ (is_S ζ) ∨  (is_K ζ)&quot;
+
+subsection ‹Terms›
+
+consts head0 :: &#39;a
+
+(* combinatory term *)
+
+datatype  tm =
+  is_Hd: Hd &quot;hd&quot;
+| App (&quot;fun&quot;:  &quot;tm&quot;) (arg: &quot; tm&quot;)
+where
+  &quot;head (App s _) = head0 s&quot;
+| &quot;fun (Hd ζ) = Hd ζ&quot;
+| &quot;arg (Hd ζ) = Hd ζ&quot;
+
+overloading head0 ≡ &quot;head0 :: tm ⇒ hd&quot;
+begin
+
+primrec head0 :: &quot;tm ⇒ hd&quot; where
+  &quot;head0 (Hd ζ) = ζ&quot;
+| &quot;head0 (App s _) = head0 s&quot;
+
+end
+
+subsection ‹Definition of types and combinators›
+
+fun args :: &quot;tm ⇒ tm list&quot; where
+  &quot;args (Hd _) = []&quot;
+| &quot;args (App s t) = args s @ [t]&quot;
+
+(* type of head symbol *)
+definition type_hd :: &quot;hd ⇒ tp&quot; where
+  &quot;type_hd t = type(t)&quot;
+
+(* type of term *)
+fun type :: &quot;tm ⇒ tp&quot; where
+&quot;type (Hd h) = type_hd h&quot; |
+&quot;type (App s t) = (case (type s) of
+                    TAtt τ ⇒ TAtt τ |
+                    (α →⇩p γ) ⇒ γ)&quot;
+
+fun size_tp :: &quot;tp ⇒ nat&quot; where
+ &quot;size_tp (TAtt τ) = 0&quot; |
+ &quot;size_tp (α →⇩p γ) = 1 + size_tp α + size_tp γ&quot;
+
+(* inductive predicate that holds if term is well-typed *)
+inductive typed :: &quot;tm ⇒ bool&quot; where
+&quot;typed (Hd (Var _ _))&quot; |
+&quot;typed (Hd (Sym _ _))&quot; |
+&quot;typed (Hd (K (σ →⇩p γ →⇩p σ)))&quot; |
+&quot;typed (Hd (S ((σ →⇩p τ →⇩p γ) →⇩p (σ →⇩p τ) →⇩p σ →⇩p γ)))&quot; |
+&quot;typed t1 ⟹ (type t1 = (σ →⇩p γ)) ⟹ typed t2 ⟹ (type t1 = σ) ⟹ typed (App t1 t2)&quot;
+
+
+(* inductive definition of combinatory (weak) reduction *)
+inductive
+  weak_reduce :: &quot;tm ⇒ tm ⇒ bool&quot; (&quot; _ ⟶⇩w _&quot; [80,80] 80)
+where
+  w1[intro!]: &quot;t1 ⟶⇩w t2 ⟹ App t1 t ⟶⇩w App t2 t&quot;
+| w2[intro!]: &quot;t1 ⟶⇩w t2 ⟹ App t t1 ⟶⇩w App t t2&quot;
+| w4[intro!]: &quot;App (App (Hd (K _)) t1) t2 ⟶⇩w t1&quot;
+| w7[intro!]: &quot;App (App (App (Hd (S _)) t1) t2 ) t3 ⟶⇩w App (App t1 t3) (App t2 t3)&quot;
+
+inductive
+ weak_star :: &quot;tm ⇒ tm ⇒ nat ⇒ bool&quot;  (&quot; _ ⟶⇩w* _ _&quot; [80,80] 80)
+where
+ ws1[intro!] : &quot;t ⟶⇩w* t 0&quot;
+|ws2[intro!] : &quot;⟦(t ⟶⇩w t&#39;); (t&#39; ⟶⇩w* t&#39;&#39; n)⟧ ⟹ (t ⟶⇩w* t&#39;&#39; (n+1))&quot;
+
+definition normal_form :: &quot;tm ⇒ bool&quot; where
+ &quot;normal_form t1 = (∀ x. ¬(t1 ⟶⇩w x))&quot;
+
+definition normalizable :: &quot;tm ⇒ bool&quot; where
+ &quot;normalizable t1 = (∃ x n. ((t1 ⟶⇩w* x n) ∧ (normal_form x)))&quot;
+
+definition bounded_sn :: &quot;nat ⇒ tm ⇒ bool&quot; where
+  &quot;bounded_sn n t1 ⟷ (∀m. ∀ t. (t1 ⟶⇩w* t m) ⟶ m ≤ n)&quot;
+
+definition sn :: &quot;tm ⇒ bool&quot; where
+ &quot;sn t1 = (∃n. bounded_sn n t1)&quot;
+
+function sc :: &quot;tm ⇒ bool&quot; where
+ &quot;sc t1 = (case (type t1) of
+            TAtt τ ⇒ sn t1 |
+            (α →⇩p γ) ⇒ (∀ t2. (type t2 = α) ⟶ (sc t2 ⟶  sc (App t1 t2) ) ))&quot;
+  by auto
+  termination
+    by (relation &quot;measure (λ(t). size_tp (type t))&quot;) auto
+
+lemma a3_10 :
+  fixes τ :: &quot;tp&quot; and
+        t :: &quot;tm&quot;
+  assumes &quot;typed t&quot; and
+          &quot;type t = τ&quot; and
+          &quot; ¬ (is_Comb (head t))&quot;
+  shows  &quot;∀s ∈ (set (args t)). sn s ⟹ sc t&quot; and
+         &quot;sc t ⟹ sn t&quot;
+  using assms
+proof(induction &quot;size_tp τ&quot;)
+  case 0
+  then show ?thesis sorry
+next
+  case (Suc x)
+  then show ?thesis sorry
+qed
+</code></pre></div>
+
+
+
+<a name="236358507"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Unbound%20Schematic%20Variable/near/236358507" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Unbound.20Schematic.20Variable.html#236358507">(Apr 27 2021 at 15:27)</a>:</h4>
+<p><code>?thesis</code> is the last explicitly stated goal; you can't normally use that in an induction anyway because the induction changes the goal. You should use <code>?case</code> instead.</p>
+<p>The reason why <code>?case</code> does not work here either is probably because each of the two cases has two goals. I guess the <code>induction</code>method does not define <code>?case</code> when there is more than one. You can either write down the goals in <code>show</code> explicitly, or you could change your lemma statement so that you use HOL implication and connect the two goals with a HOL conjunction (i.e. <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>∧</mo></mrow><annotation encoding="application/x-tex">\wedge</annotation></semantics></math></span><span aria-hidden="true" class="katex-html"><span class="base"><span class="strut" style="height:0.55556em;vertical-align:0em;"></span><span class="mord">∧</span></span></span></span>) so that you only have one goal.</p>
+
+
+
+<a name="236359497"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Unbound%20Schematic%20Variable/near/236359497" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Ahmed B <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Unbound.20Schematic.20Variable.html#236359497">(Apr 27 2021 at 15:31)</a>:</h4>
+<p>Thanks for your swift response!</p>
+
+
+
+<a name="236362273"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Unbound%20Schematic%20Variable/near/236362273" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Unbound.20Schematic.20Variable.html#236362273">(Apr 27 2021 at 15:48)</a>:</h4>
+<p>Other solution:<br>
+(I don't understand why the <code>next</code> between the cases are necessary…)</p>
+<div class="codehilite"><pre><span></span><code>proof(induction &quot;size_tp τ&quot;)
+  case 0
+  case 1
+  show ?case
+    sorry
+next
+  case 0
+  case 2
+  show ?case
+    sorry
+next
+  case (Suc x)
+  case 1
+  show ?case
+    sorry
+next
+  case (Suc x)
+  case 2
+  show ?case
+    sorry
+qed
+</code></pre></div>
+
+
+
+<a name="236362469"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Unbound%20Schematic%20Variable/near/236362469" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Unbound.20Schematic.20Variable.html#236362469">(Apr 27 2021 at 15:50)</a>:</h4>
+<p>What!?! 🤯</p>
+
+
+
+<a name="236362596"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Unbound%20Schematic%20Variable/near/236362596" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Unbound.20Schematic.20Variable.html#236362596">(Apr 27 2021 at 15:50)</a>:</h4>
+<p>TIL</p>
+
+
+
+<a name="236367571"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Unbound%20Schematic%20Variable/near/236367571" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Unbound.20Schematic.20Variable.html#236367571">(Apr 27 2021 at 16:22)</a>:</h4>
+<p>The slight problem with this idiom is that I have never seen any documentation on it. So I don't really know if I should search longer or of it accidentally works.</p>
+
+
+
+<a name="236367610"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Unbound%20Schematic%20Variable/near/236367610" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Unbound.20Schematic.20Variable.html#236367610">(Apr 27 2021 at 16:22)</a>:</h4>
+<p>(I think I stumbled by accident on it…)</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

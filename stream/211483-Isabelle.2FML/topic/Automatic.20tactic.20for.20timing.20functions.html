@@ -1,0 +1,119 @@
+<html>
+<head><meta charset="utf-8"><title>Automatic tactic for timing functions · Isabelle/ML · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/index.html">Isabelle/ML</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Automatic.20tactic.20for.20timing.20functions.html">Automatic tactic for timing functions</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="400946133"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Automatic%20tactic%20for%20timing%20functions/near/400946133" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jonas Stahl <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Automatic.20tactic.20for.20timing.20functions.html#400946133">(Nov 08 2023 at 13:39)</a>:</h4>
+<p>Hi all,<br>
+first some context about my project: I'm adding a command to Isabelle which should transform a function into its running time function. So far I have only proved termination by pattern completeness and auto, same approach as fun is doing it. Now  I also want to support functions which are not covered by fun. Thanks to <span class="user-mention" data-user-id="233154">@Kevin Kappelmann</span>  and <span class="user-mention" data-user-id="433149">@Maximilian Schäffeler</span> I now got a schema which is able to recycle the proof of the original function.<br>
+Kevin already sent a demo implementation for the tactic, which works well for some functions, here f. (So far everything restricted to 1 arguement functions) On many other functions it sadly has the weird behavior to work if used with <code>apply (tactic ...)</code> but in the ML code variant on a goal, example: h. Apparently apply/tactic does some magic in the background I'm not able to determine. Does someone know what's going wrong?</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">declare</span><span class="w"> </span><span class="n">One_nat_def</span><span class="o">[</span><span class="n">simp</span><span class="w"> </span><span class="n">del</span><span class="o">]</span>
+
+<span class="c">(*simple function*)</span>
+<span class="kn">function</span><span class="w"> </span><span class="n">f</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">‹nat ⇒ bool›</span><span class="w"> </span><span class="kp">where</span>
+<span class="s">‹f n = (if n ≤ 1 then True else if 2 dvd n then f (n div 2) else f (3 * n + 1))›</span>
+<span class="w">  </span><span class="k">by</span><span class="w"> </span><span class="n">auto</span>
+<span class="kn">termination</span><span class="w"> </span><span class="gr">sorry</span>
+
+<span class="kn">function</span><span class="w"> </span><span class="o">(</span><span class="n">domintros</span><span class="o">)</span><span class="w"> </span><span class="n">f_time</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">‹nat ⇒ nat›</span><span class="w"> </span><span class="kp">where</span>
+<span class="s">‹f_time n = 1 + (if n ≤ 1 then 1 else 1 + (if 2 dvd n then 1 + f_time (n div 2) else 1 + f_time (3 * n + 1)))›</span>
+<span class="w">  </span><span class="k">by</span><span class="w"> </span><span class="n">auto</span>
+
+<span class="k">fun</span><span class="w"> </span><span class="n">h</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">"'a list ⇒ nat"</span><span class="w"> </span><span class="kp">where</span>
+<span class="w">  </span><span class="s">"h [] = 1"</span>
+<span class="o">|</span><span class="w"> </span><span class="s">"h (_#xs) = h xs"</span>
+<span class="kn">function</span><span class="w"> </span><span class="o">(</span><span class="n">domintros</span><span class="o">)</span><span class="w"> </span><span class="n">T_h</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">"'a list ⇒ nat"</span><span class="w"> </span><span class="kp">where</span>
+<span class="w">  </span><span class="s">"T_h [] = 1"</span>
+<span class="o">|</span><span class="w"> </span><span class="s">"T_h (uu # xs) = 1 + T_h xs"</span>
+<span class="w">  </span><span class="k">by</span><span class="w"> </span><span class="n">pat_completeness</span><span class="w"> </span><span class="n">auto</span>
+
+<span class="k">ML</span><span class="s">‹</span>
+<span class="s">(*Note: "&lt;function_name&gt;_time" is just an abbreviation for Wellfounded.accp &lt;function_name&gt;_time*)</span>
+<span class="s">val dest_wf_accp = </span><span class="ss">\&lt;^Const_fn&gt;</span><span class="s">‹Wellfounded.accp _ for f x =&gt; ‹(f, x)››</span>
+
+<span class="s">fun time_dom_tac induct_rule domintros =</span>
+<span class="s">  let fun focused_tac {context = ctxt,...} subgoal =</span>
+<span class="s">    let</span>
+<span class="s">      (*TODO: this only works for functions with one argument. You have to extend it</span>
+<span class="s">        to make it work with multiple arguments*)</span>
+<span class="s">      val (f_time, args) = Logic.strip_imp_concl subgoal |&gt; HOLogic.dest_Trueprop |&gt; dest_wf_accp</span>
+<span class="s">      val instantiations = map (fn t =&gt; SOME (NONE, (t, false))) [args]</span>
+<span class="s">      val arbitrary = []</span>
+<span class="s">      val induct_rules = SOME [induct_rule]</span>
+<span class="s">      (*TODO: find domintros from context rather than passing it explicitly*)</span>
+<span class="s">      val domintros = domintros</span>
+<span class="s">    in</span>
+<span class="s">      (*TODO: for multiple arguments, you first need to apply cases, rewrite the goal,</span>
+<span class="s">        and delete the unnecessary assumption as shown in the more complex examples</span>
+<span class="s">        we sent to you*)</span>
+<span class="s">      Induction.induction_tac ctxt true [instantiations] [arbitrary] [] induct_rules []</span>
+<span class="s">      THEN_ALL_NEW (Metis_Tactic.metis_tac [] ATP_Problem_Generate.combsN ctxt domintros)</span>
+<span class="s">    end</span>
+<span class="s">  (*first fixes the parameters of the goal, then retrieves the subgoal as a term*)</span>
+<span class="s">  in Subgoal.FOCUS_PARAMS (focused_tac #&gt; uncurry #&gt; SUBGOAL #&gt; HEADGOAL) end</span>
+<span class="s">›</span>
+
+<span class="kn">lemma</span><span class="w"> </span><span class="n">f_time_dom</span><span class="o">:</span><span class="w"> </span><span class="s">‹f_time_dom n›</span>
+<span class="w">  </span><span class="k">by</span><span class="w"> </span><span class="o">(</span><span class="n">tactic</span><span class="w"> </span><span class="s">‹time_dom_tac @{thm f.induct} @{thms f_time.domintros} @{context} 1›</span><span class="o">)</span>
+
+<span class="k">ML</span><span class="s">‹</span>
+<span class="s">  (*setup and prove a goal*)</span>
+<span class="s">  val my_goal = Goal.init @{cprop "f_time_dom n"}</span>
+<span class="s">    |&gt; time_dom_tac @{thm f.induct} @{thms f_time.domintros} @{context} 1</span>
+<span class="s">    |&gt; Seq.pull</span>
+<span class="s">    |&gt; Option.map (fst #&gt; Goal.finish @{context})</span>
+<span class="s">›</span>
+
+<span class="kn">lemma</span><span class="w"> </span><span class="s">"T_h_dom x"</span>
+<span class="w">  </span><span class="kp">apply</span><span class="w"> </span><span class="o">(</span><span class="n">tactic</span><span class="w"> </span><span class="s">‹time_dom_tac @{thm h.induct} @{thms T_h.domintros} @{context} 1›</span><span class="o">)</span>
+<span class="w">  </span><span class="k">done</span>
+
+<span class="k">ML</span><span class="s">‹</span>
+<span class="s">  (*setup and prove a goal*)</span>
+<span class="s">  val my_goal = Goal.init @{cprop "T_h_dom n"}</span>
+<span class="s">    |&gt; time_dom_tac @{thm h.induct} @{thms T_h.domintros} @{context} 1</span>
+<span class="s">    |&gt; Seq.pull</span>
+<span class="s">    |&gt; Option.map (fst #&gt; Goal.finish @{context})</span>
+<span class="s">  (* in the real code I'm using the following instead of the cprop antiquotation</span>
+<span class="s">    leading to the same result: *)</span>
+<span class="s">val lthy = @{context}</span>
+<span class="s">val _ = ("T_h" ^ "_dom n")</span>
+<span class="s">      |&gt; Syntax.read_prop lthy</span>
+<span class="s">      |&gt; Thm.cterm_of lthy</span>
+<span class="s">›</span>
+</code></pre></div>
+
+
+
+<a name="400952547"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Automatic%20tactic%20for%20timing%20functions/near/400952547" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Automatic.20tactic.20for.20timing.20functions.html#400952547">(Nov 08 2023 at 14:13)</a>:</h4>
+<p>I can't say I know what's going on there, but Ι for one never used <code>Goal.init</code> etc. by hand. I use <code>Goal.prove</code>, and that works:</p>
+<div class="codehilite" data-code-language="Standard ML"><pre><span></span><code>  <span class="kr">val</span> <span class="nv">my_goal</span> <span class="p">=</span>
+    <span class="nn">Goal</span><span class="p">.</span><span class="n">prove</span> <span class="n">@</span><span class="p">{</span><span class="n">context</span><span class="p">}</span> <span class="p">[]</span> <span class="p">[]</span> <span class="n">@</span><span class="p">{</span><span class="n">prop</span> <span class="s2">"T_h_dom n"</span><span class="p">}</span>
+    <span class="p">(</span><span class="kr">fn</span> <span class="p">{</span><span class="n">context</span><span class="p">,</span> <span class="p">...}</span> <span class="p">=&gt;</span> <span class="n">HEADGOAL</span> <span class="p">(</span><span class="n">time_dom_tac</span> <span class="n">@</span><span class="p">{</span><span class="n">thm</span> <span class="nn">h</span><span class="p">.</span><span class="n">induct</span><span class="p">}</span> <span class="n">@</span><span class="p">{</span><span class="n">thms</span> <span class="nn">T_h</span><span class="p">.</span><span class="n">domintros</span><span class="p">}</span> <span class="n">context</span><span class="p">))</span>
+</code></pre></div>
+
+
+
+<a name="400964469"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Automatic%20tactic%20for%20timing%20functions/near/400964469" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Kevin Kappelmann <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Automatic.20tactic.20for.20timing.20functions.html#400964469">(Nov 08 2023 at 15:12)</a>:</h4>
+<p>There are type variables in your goal that you need to declare to the context (otherwise metis seems to fail):</p>
+<div class="codehilite" data-code-language="Standard ML"><pre><span></span><code><span class="kr">val</span> <span class="nv">cgoal</span> <span class="p">=</span> <span class="n">@</span><span class="p">{</span><span class="n">cprop</span> <span class="s2">"T_h_dom n"</span><span class="p">}</span>
+<span class="kr">val</span> <span class="nv">ctxt</span> <span class="p">=</span> <span class="nn">Variable</span><span class="p">.</span><span class="n">declare_term</span> <span class="p">(</span><span class="nn">Thm</span><span class="p">.</span><span class="n">term_of</span> <span class="n">cgoal</span><span class="p">)</span> <span class="n">@</span><span class="p">{</span><span class="n">context</span><span class="p">}</span>
+<span class="kr">val</span> <span class="nv">my_goal</span> <span class="p">=</span> <span class="nn">Goal</span><span class="p">.</span><span class="n">init</span> <span class="n">cgoal</span>
+  <span class="n">|&gt;</span> <span class="n">time_dom_tac</span> <span class="n">@</span><span class="p">{</span><span class="n">thm</span> <span class="nn">h</span><span class="p">.</span><span class="n">induct</span><span class="p">}</span> <span class="n">@</span><span class="p">{</span><span class="n">thms</span> <span class="nn">T_h</span><span class="p">.</span><span class="n">domintros</span><span class="p">}</span> <span class="n">ctxt</span> <span class="mi">1</span>
+  <span class="n">|&gt;</span> <span class="nn">Seq</span><span class="p">.</span><span class="n">pull</span>
+  <span class="n">|&gt;</span> <span class="nn">Option</span><span class="p">.</span><span class="n">map</span> <span class="p">(</span><span class="n">fst</span> <span class="n">#&gt;</span> <span class="nn">Goal</span><span class="p">.</span><span class="n">finish</span> <span class="n">ctxt</span><span class="p">)</span>
+</code></pre></div>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

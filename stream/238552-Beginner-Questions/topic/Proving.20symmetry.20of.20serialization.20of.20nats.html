@@ -1,0 +1,148 @@
+<html>
+<head><meta charset="utf-8"><title>Proving symmetry of serialization of nats · Beginner Questions · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/index.html">Beginner Questions</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Proving.20symmetry.20of.20serialization.20of.20nats.html">Proving symmetry of serialization of nats</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="262536283"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Proving%20symmetry%20of%20serialization%20of%20nats/near/262536283" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Alex Weisberger <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Proving.20symmetry.20of.20serialization.20of.20nats.html#262536283">(Nov 24 2021 at 01:18)</a>:</h4>
+<p>Hi everyone,</p>
+<p>I'm making progress on this, but I thought it would be a good example to analyze.</p>
+<p>I am trying to show that serializing a number to bytes and then deserializing it results in the original number. Here are the function definitions:</p>
+<div class="codehilite"><pre><span></span><code>fun digit_list :: &quot;nat ⇒ nat list ⇒ nat list&quot; where
+&quot;digit_list 0 s = s&quot; |
+&quot;digit_list n s = digit_list (n div 10) (n mod 10 # s)&quot;
+
+fun string_of_nat :: &quot;nat ⇒ string&quot; where
+&quot;string_of_nat n = map char_of (digit_list n &#39;&#39;&#39;&#39;)&quot;
+
+fun multiply_digit :: &quot;nat ⇒ nat ⇒ nat&quot; where
+&quot;multiply_digit a digit = a * 10 + digit&quot;
+
+fun nat_of_string :: &quot;string ⇒ nat&quot; where
+&quot;nat_of_string s = foldl multiply_digit 0 (map of_char s)&quot;
+</code></pre></div>
+<p><code>string_of_nat</code> produces a string given a <code>nat</code>, i.e. <code>value string_of_nat 123 = ''123''</code>, and <br>
+<code>nat_of_string</code> produces a <code>nat</code> given a <code>string</code>, i.e. <code>value nat_of_string ''123'' = 123</code>.</p>
+<p>I know there's a <code>show</code> implementation for <code>nat</code>, but I couldn't find the inverse, so I just implemented them both. I figure it's good practice.</p>
+<p>The theorem I'm trying to prove is then:</p>
+<p><code>nat_of_string (string_of_nat n) = n</code>,</p>
+<p>And here is my attempted proof:</p>
+<div class="codehilite"><pre><span></span><code>theorem
+  shows &quot;nat_of_string (string_of_nat n) = n&quot;
+proof (induction n)
+  case 0
+  show ?case by auto
+next
+  case (Suc n)
+  then show ?case
+    apply(auto simp add: foldl_map)
+qed
+</code></pre></div>
+<p>I added the <code>foldl_map</code> simplification rule as an attempt to leverage the fact that there are already simplification rules for <code>of_char (char_of c)</code>, and this did simplify the proof goals. Here's the goal that I'm left with (in the <code>Suc n</code> case):</p>
+<p><code>foldl (λa x. a * 10 + x mod 256) 0 (digit_list (Suc n div 10) [Suc n mod 10]) = Suc n</code></p>
+<p>I imagine that I need an intermediate lemma to aid in further simplification, but I've been unable to think of any that result in a discharged goal. I think one complication is that <code>digit_list</code> is guaranteed to create a list of <code>nats</code> that are each between 0-9, since the idea is to serialize individual digits. I could prove a lemma related to that, but I don't see how that will actually help in simplification.</p>
+<p>I appreciate any thoughts on this.</p>
+
+
+
+<a name="262686040"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Proving%20symmetry%20of%20serialization%20of%20nats/near/262686040" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Proving.20symmetry.20of.20serialization.20of.20nats.html#262686040">(Nov 25 2021 at 09:58)</a>:</h4>
+<p>Oof, you've made your life pretty difficult there. Basically, the more additional parameters (such as accumulators) you have, the more difficult the induction proofs will be because you have to generalise.</p>
+
+
+
+<a name="262686118"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Proving%20symmetry%20of%20serialization%20of%20nats/near/262686118" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Proving.20symmetry.20of.20serialization.20of.20nats.html#262686118">(Nov 25 2021 at 09:59)</a>:</h4>
+<p>If you do a straightforward induction on that statement, you will run into trouble, because in the statement you call <code>digit_list n []</code>, but in every recursion step of <code>digit_list</code>, it modifies the accumulator, so you won't be able to apply the induction hypothesis.</p>
+
+
+
+<a name="262686144"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Proving%20symmetry%20of%20serialization%20of%20nats/near/262686144" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Proving.20symmetry.20of.20serialization.20of.20nats.html#262686144">(Nov 25 2021 at 09:59)</a>:</h4>
+<p>So the first thing you need is a way to get rid of the accumulator, i.e. relate the behaviour of <code>digit_list n acc</code> to the behaviour of <code>digit_list n []</code></p>
+
+
+
+<a name="262686159"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Proving%20symmetry%20of%20serialization%20of%20nats/near/262686159" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Proving.20symmetry.20of.20serialization.20of.20nats.html#262686159">(Nov 25 2021 at 09:59)</a>:</h4>
+<p>Something like this:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">lemma</span> <span class="n">digit_list_to_Nil</span><span class="o">:</span> <span class="s">"digit_list n acc = digit_list n [] @ acc"</span>
+</code></pre></div>
+
+
+
+<a name="262686285"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Proving%20symmetry%20of%20serialization%20of%20nats/near/262686285" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Proving.20symmetry.20of.20serialization.20of.20nats.html#262686285">(Nov 25 2021 at 10:00)</a>:</h4>
+<p>You will also need to prove <code>map (of_char ∘ char_of) (digit_list n []) = digit_list n []</code>, which only holds because all the numbers in <code>digit_list</code> are less than 10 (in particular less than 256).</p>
+
+
+
+<a name="262686324"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Proving%20symmetry%20of%20serialization%20of%20nats/near/262686324" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Proving.20symmetry.20of.20serialization.20of.20nats.html#262686324">(Nov 25 2021 at 10:00)</a>:</h4>
+<p>For this, the rule <code>map_idI</code> may be useful, e.g.</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">lemma</span> <span class="n">set_digit_list</span><span class="o">:</span> <span class="s">"set (digit_list xs acc) ⊆ {0..9} ∪ set acc"</span>
+  <span class="k">by</span> <span class="o">(</span><span class="n">induction</span> <span class="n">xs</span> <span class="n">acc</span> <span class="n">rule</span><span class="o">:</span> <span class="n">digit_list.induct</span><span class="o">)</span> <span class="n">auto</span>
+<span class="o">[</span><span class="ow">...</span><span class="o">]</span>
+  <span class="k">have</span> <span class="s">"map (of_char ∘ char_of) (digit_list n []) = digit_list n []"</span>
+    <span class="k">by</span> <span class="o">(</span><span class="n">intro</span> <span class="n">map_idI</span><span class="o">)</span> <span class="o">(</span><span class="n">use</span> <span class="n">set_digit_list</span><span class="o">[</span><span class="n">of</span> <span class="n">n</span> <span class="s">"[]"</span><span class="o">]</span> <span class="kp">in</span> <span class="n">auto</span><span class="o">)</span>
+</code></pre></div>
+
+
+
+<a name="262686471"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Proving%20symmetry%20of%20serialization%20of%20nats/near/262686471" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Proving.20symmetry.20of.20serialization.20of.20nats.html#262686471">(Nov 25 2021 at 10:02)</a>:</h4>
+<p>With all of that, you should be able to prove <code>foldl multiply_digit 0 (digit_list n []) = n</code> via induction on <code>n</code>. But you're going to have to use an induction rule like <code>less_induct</code> to make it work, or a prove a custom one that allows you to go from <code>n</code> to <code>n div 10</code>.</p>
+
+
+
+<a name="262686608"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Proving%20symmetry%20of%20serialization%20of%20nats/near/262686608" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Proving.20symmetry.20of.20serialization.20of.20nats.html#262686608">(Nov 25 2021 at 10:04)</a>:</h4>
+<p>Such a rule could e.g. look like this:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">lemma</span> <span class="n">nat_div10_induct</span><span class="o">[</span><span class="n">case_names</span> <span class="n">0</span> <span class="n">div10</span><span class="o">]:</span>
+  <span class="kp">assumes</span> <span class="s">"P (0 :: nat)"</span> <span class="s">"⋀n. n &gt; 0 ⟹ P (n div 10) ⟹ P n"</span>
+  <span class="kp">shows</span>   <span class="s">"P n"</span>
+  <span class="k">using</span> <span class="n">assms</span>
+  <span class="kp">apply</span> <span class="n">induction_schema</span>
+    <span class="kp">apply</span> <span class="n">force</span>
+   <span class="kp">apply</span> <span class="o">(</span><span class="n">rule</span> <span class="n">wf_measure</span><span class="o">[</span><span class="n">of</span> <span class="n">id</span><span class="o">])</span>
+  <span class="kp">apply</span> <span class="n">auto</span>
+  <span class="k">done</span>
+</code></pre></div>
+
+
+
+<a name="262686665"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Proving%20symmetry%20of%20serialization%20of%20nats/near/262686665" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Proving.20symmetry.20of.20serialization.20of.20nats.html#262686665">(Nov 25 2021 at 10:04)</a>:</h4>
+<p>So this is how to solve your problem. However, I would have started out quite a bit differently: keep your functions as simple as possible. Don't introduce accumulators if you can avoid it.</p>
+
+
+
+<a name="262686877"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Proving%20symmetry%20of%20serialization%20of%20nats/near/262686877" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Proving.20symmetry.20of.20serialization.20of.20nats.html#262686877">(Nov 25 2021 at 10:07)</a>:</h4>
+<p>You could have defined <code>digit_list</code> so that it returns the reverse list of digits instead:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">fun</span> <span class="n">rev_digit_list</span> <span class="o">::</span> <span class="s">"nat ⇒ nat list"</span> <span class="kp">where</span>
+  <span class="s">"rev_digit_list n = (if n = 0 then [] else n mod 10 # rev_digit_list (n div 10))"</span>
+</code></pre></div>
+<p>and similarly for the inverse of <code>rev_digit_list</code>:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">fun</span> <span class="n">nat_of_rev_digit_list</span> <span class="o">::</span> <span class="s">"nat list ⇒ nat"</span> <span class="kp">where</span>
+  <span class="s">"nat_of_rev_digit_list [] = 0"</span>
+<span class="o">|</span> <span class="s">"nat_of_rev_digit_list (x # xs) = x + 10 * nat_of_rev_digit_list xs"</span>
+</code></pre></div>
+<p>It should be very easy to show that these two commute, and then you can define your <code>nat_of_string</code> etc. in terms of these just by reversing. And you can still show correspondence to your more complicated (and presumably more efficient, although it probably hardly matters in practice) definitions above afterwards.</p>
+
+
+
+<a name="262687020"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Proving%20symmetry%20of%20serialization%20of%20nats/near/262687020" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Proving.20symmetry.20of.20serialization.20of.20nats.html#262687020">(Nov 25 2021 at 10:08)</a>:</h4>
+<p>So TLDR: Always keep your definitions as simple as possible. It will make proofs easier. Any additional optimisations can still be introduced afterwards in a modular fashion.</p>
+
+
+
+<hr><p>Last updated: Jul 15 2022 at 23:21 UTC</p>
+</html>

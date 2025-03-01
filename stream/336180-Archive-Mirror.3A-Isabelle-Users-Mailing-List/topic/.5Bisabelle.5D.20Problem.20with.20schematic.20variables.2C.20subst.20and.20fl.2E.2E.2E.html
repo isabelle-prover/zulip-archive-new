@@ -1,0 +1,122 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Problem with schematic variables, subst and fl... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problem.20with.20schematic.20variables.2C.20subst.20and.20fl.2E.2E.2E.html">[isabelle] Problem with schematic variables, subst and fl...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294066260"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problem%20with%20schematic%20variables%2C%20subst%20and%20fl.../near/294066260" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problem.20with.20schematic.20variables.2C.20subst.20and.20fl.2E.2E.2E.html#294066260">(Aug 18 2022 at 12:25)</a>:</h4>
+<p>From: Lucas Dixon &lt;<a href="mailto:ldixon@inf.ed.ac.uk">ldixon@inf.ed.ac.uk</a>&gt;<br>
+Hi Peter,</p>
+<p>Peter Lammich wrote:</p>
+<blockquote>
+<p>Consider the following subgoal</p>
+<ol>
+<li>"!!x y a b. f ((x = y) = (a = b)) = ?P x y a b" now, I do: apply<br>
+(subst (1 3) eq_commute)</li>
+</ol>
+<p>and get: goal (1 subgoal): 1. !!x y a b. f ((y = x) = (b = a)) = ?P6<br>
+x x x y y y a a a b b b flex-flex pairs: %x y a b. ?P6 x x x y y y a<br>
+a a b b b =?= %x y a b. ?P4 x x y y a a b b</p>
+<p>In my concrete proof, ?P also occurs in other subgoals, it is the<br>
+result of applying exI to a goal of the form EX P. a1=P &amp; a2=P. The<br>
+list of flex-flex pairs and newly introduced schematics with <br>
+duplicate parameters gets very long until Isabelle only spits out<br>
+tons of trace output and does not terminate any more.</p>
+<p>What happens here?</p>
+</blockquote>
+<p>I think this is caused by Isabelle doing gratuitous lifting of<br>
+parameters as it applies substitution. Lifting is necessary if some part <br>
+of the proof state not under the bound parameters also contains the <br>
+meta-variable (also called schematic variables) - which is the general <br>
+assumption when Isabelle performs resolution.</p>
+<p>If you do fix your parameters to free variables, then you get something<br>
+more reasonable:</p>
+<p>lemma "(A ?P) ==&gt; f ((x = y) = (a = b)) = ?P x"<br>
+apply (subst (1 3) eq_commute)<br>
+...<br>
+fixed variables: A, f, x, y, a, b<br>
+goal (lemma, 1 subgoal):</p>
+<p>1. A ?P ==&gt; f ((y = x) = (b = a)) = ?P2 x<br>
+flex-flex pairs:<br>
+   ?P2 x =?= ?P1 x<br>
+   ?P1 x =?= ?P x</p>
+<p>But, depending on your context (other subgoals, assumptions etc), that<br>
+may give incorrect results as it allows meta-variables to capture the<br>
+bounds (which are being represented as Frees) - if the meta-variable<br>
+also occurs outside of the scope of the parameters and is instantiated<br>
+to a term containing the bound variable, you end up with a badly formed<br>
+instantiation w.r.t. the context.</p>
+<p>However, I think something funny is going on in the substitution tactic <br>
+here: there seems to be an extra flex-flex pair, and I didn't think that<br>
+was necessary, and is probably also the reason for the duplication of<br>
+the bound variables... I remember doing lifting by hand very carefully, <br>
+but it seems the code has changed slightly... I also vaguely recall not <br>
+being sure if I could get rid of extra lifting in the tactic without <br>
+doing something very different... actually I think I remember discussing <br>
+it in 2004... I'll look through my old email and I'll have a think about <br>
+it again... thanks for reminding me of the issue :)</p>
+<blockquote>
+<p>Is there a way to get rid of introducing new schematics during subst,<br>
+and get the desired subgoal: 1. !!x y a b. f ((y = x) = (b = a)) = ?P<br>
+x y a b</p>
+<p>Something that simplifies the subgoal after each substitution step<br>
+would also be ok.</p>
+</blockquote>
+<p>In the meantime, if you can't just fix the parameters, a horrible hack <br>
+is to instantiate your meta-variables to lambda terms that throw away <br>
+duplicated arguments. You then simply apply this after substitution.</p>
+<p>best,<br>
+lucas</p>
+
+
+
+<a name="294066277"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problem%20with%20schematic%20variables%2C%20subst%20and%20fl.../near/294066277" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problem.20with.20schematic.20variables.2C.20subst.20and.20fl.2E.2E.2E.html#294066277">(Aug 18 2022 at 12:25)</a>:</h4>
+<p>From: Jeremy Dawson &lt;<a href="mailto:jeremy@rsise.anu.edu.au">jeremy@rsise.anu.edu.au</a>&gt;<br>
+Peter Lammich wrote:<br>
+Some years ago I wrote some code based on the "conversionals" of HOL, to <br>
+do this sort of thing more easily.  Thus, for example,</p>
+<p>Goal "!!x y a b. f ((x = y) = (a = b)) = P x y a b" ;<br>
+by ((Conv.CONV_TAC o Conv.TDSTOP_CONV) (eqc eq_commute)) ;<br>
+(applies conversions top-down, but stopping (ie, not descending into a <br>
+resulting term upon success)</p>
+<ol>
+<li>
+<p>!!x y a b. P x y a b = f ((x = y) = (a = b))<br>
+by ((Conv.CONV_TAC o Conv.TOPDN_CONV) (eqc eq_commute)) ;<br>
+(applies conversions top down)</p>
+</li>
+<li>
+<p>!!x y a b. f ((b = a) = (y = x)) = P x y a b<br>
+by ((Conv.CONV_TAC o Conv.BUSTOP_CONV) (eqc eq_commute)) ;<br>
+(applies conversions bottom up, stopping upon any success)</p>
+</li>
+<li>
+<p>!!x y a b. f ((a = b) = (x = y)) = P x y a b</p>
+</li>
+</ol>
+<p>With these, I usually don't need the following, which makes a conversion <br>
+succeed only the first and third times it would otherwise have succeeded).<br>
+by ((Conv.CONV_TAC o Conv.TOPDN_CONV o Conv.NTH_CONV [1,3]) (eqc <br>
+eq_commute)) ;</p>
+<ol>
+<li>!!x y a b. P x y a b = f ((b = a) = (x = y))</li>
+</ol>
+<p>Incidentally, I found my code doesn't work with schematic variables (I <br>
+don't know why), so to use it you'd have to wrap your goal in <br>
+freeze_thaw.  Which would presumably solve your problem anyway.</p>
+<p>But if you're interested in my code, it's at<br>
+<a href="http://users.rsise.anu.edu.au/~jeremy/isabelle/2005/gen/{conv.ML,eq_conv.ML}">http://users.rsise.anu.edu.au/~jeremy/isabelle/2005/gen/{conv.ML,eq_conv.ML}</a></p>
+<p>Regards,</p>
+<p>Jeremy</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

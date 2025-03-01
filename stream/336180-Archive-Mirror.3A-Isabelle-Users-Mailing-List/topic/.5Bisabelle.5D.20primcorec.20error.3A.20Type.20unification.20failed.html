@@ -1,0 +1,75 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] primcorec error: Type unification failed · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20primcorec.20error.3A.20Type.20unification.20failed.html">[isabelle] primcorec error: Type unification failed</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294321768"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20primcorec%20error%3A%20Type%20unification%20failed/near/294321768" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20primcorec.20error.3A.20Type.20unification.20failed.html#294321768">(Aug 19 2022 at 16:38)</a>:</h4>
+<p>From: Joachim Breitner &lt;<a href="mailto:breitner@kit.edu">breitner@kit.edu</a>&gt;<br>
+Hi,</p>
+<p>I’m doing my first steps with coinductive data type, and I’m struggling<br>
+with primcorec (probably due to a lack of understanding of the syntactic<br>
+requirements and the usual ways to work around them).</p>
+<p>I created a data type for possibly infinite labeled trees:</p>
+<p>codatatype (lset: 'a) ltree = Node (lnext : "'a ⇒ 'a ltree option")</p>
+<p>With help of Andreas¹ I managed to define an „or“ operation: A path in<br>
+the resulting tree is a path in either one or the other:</p>
+<p>primcorec lor :: "'a ltree ⇒ 'a ltree ⇒ 'a ltree"<br>
+  where "lnext (lor t1 t2) = (λ x.<br>
+           case (lnext t1 x) of Some t1' ⇒ (case lnext t2 x of Some t2' ⇒ Some (lor t1' t2') | None ⇒ Some t1')<br>
+                              | None     ⇒ lnext t2 x)"</p>
+<p>Now I try to define an "and" operation: A path in the resulting tree is<br>
+an interleaving of paths in one or the other tree. I tried it like this:</p>
+<p>primcorec land :: "'a ltree ⇒ 'a ltree ⇒ 'a ltree"<br>
+   where "lnext (land t1 t2) = (λ x.<br>
+      case (lnext t1 x) of Some t1' ⇒ (case lnext t2 x of Some t2' ⇒ Some (lor (land t1' t2) (land t1 t2')) | None ⇒ Some (land t1' t2))<br>
+                         | None     ⇒ (case lnext t2 x of Some t2' ⇒ Some (land t1 t2')                     | None ⇒ None))"</p>
+<p>but it does not like the recursion via lor and gives this error message:</p>
+<p>primcorec error:<br>
+  Type unification failed: Clash of types "_ + _" and "_ ltree"</p>
+<p>Type error in application: incompatible operand type</p>
+<p>Operator:  lor :: 'a ltree ⇒ 'a ltree ⇒ 'a ltree<br>
+Operand:   Inr (t1', t2) :: 'a ltree + 'a ltree × 'a ltree</p>
+<p>It seems that primcorec likes definitions of the form</p>
+<p>primcorec land :: "'a ltree ⇒ 'a ltree ⇒ 'a ltree"<br>
+   where "lnext (land t1 t2) = map_option (λ (x,y). land x y) o (λ x. ...)</p>
+<p>better, but I couldn’t figure out how to use that here, where in once<br>
+case I need to invoke land twice and pass the result to lor.</p>
+<p>Can I rewrite the definition in a way that primcorec likes it?</p>
+<p>Greetings,<br>
+Joachim</p>
+<p>¹ <a href="http://stackoverflow.com/questions/26883229/invalid-map-function-when-defining-a-corecursive-tree">http://stackoverflow.com/questions/26883229/invalid-map-function-when-defining-a-corecursive-tree</a><br>
+<a href="/user_uploads/14278/vQ3jo-U2IPTuFEZ6aNt0_yga/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294321787"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20primcorec%20error%3A%20Type%20unification%20failed/near/294321787" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20primcorec.20error.3A.20Type.20unification.20failed.html#294321787">(Aug 19 2022 at 16:38)</a>:</h4>
+<p>From: Dmitriy Traytel &lt;<a href="mailto:traytel@in.tum.de">traytel@in.tum.de</a>&gt;<br>
+Dear Joachim,</p>
+<p>your land is not primitively corecursive. Primitive means that the <br>
+corecursive call appears directly or via a map function as an argument <br>
+the constructor, but without any other function in between. In your case <br>
+there is a function in between: lor.</p>
+<p>In my Coinductive_Languages AFP entry I show how to circumvent the <br>
+syntactic criterion in an ad-hoc fashion. The Times-function from there <br>
+has exactly the flavour of your land. A more systematic approach is <br>
+described in an unpublished draft [1] (however no package is yet <br>
+available for this). If you decide to go the systematic route, we could <br>
+still provide some guidance through the material that is formalized in <br>
+the context of [1], and you might become a first tester of the <br>
+forthcoming package.</p>
+<p>Hope that helps,<br>
+Dmitriy</p>
+<p>[1] <a href="http://www21.in.tum.de/~traytel/papers/fouco/fouco.pdf">http://www21.in.tum.de/~traytel/papers/fouco/fouco.pdf</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

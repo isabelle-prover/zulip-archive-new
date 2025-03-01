@@ -1,0 +1,617 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Questions about &quot;transfer&quot; · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Questions.20about.20.22transfer.22.html">[isabelle] Questions about &quot;transfer&quot;</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="221641577"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Questions%20about%20%22transfer%22/near/221641577" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Questions.20about.20.22transfer.22.html#221641577">(Jan 05 2021 at 12:41)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:eberlm@in.tum.de">eberlm@in.tum.de</a>&gt;<br>
+Hello,</p>
+<p>I recently did some experiments with the "transfer" command, but there<br>
+are a few things that I don't quite understand, so here are a few questions:</p>
+<ol>
+<li>
+<p>It seems to me that "transfer" always transfers theorems<br>
+"left-to-right". For the "transferred" attribute, there is<br>
+"untransferred" – is there a similar thing for "transfer" as well?</p>
+</li>
+<li>
+<p>Relatedly, is there an easy idiomatic way to use "flipped" relators?<br>
+The following does not work:</p>
+</li>
+</ol>
+<p>lemma<br>
+  assumes [transfer_rule]: "rel_set r X Y"<br>
+  shows   "rel_set (λy x. r x y) Y X"<br>
+  by transfer_prover</p>
+<ol start="3">
+<li>Sometimes, it is more convenient to prove transfer rules for<br>
+functions following the pattern</li>
+</ol>
+<p>lemma<br>
+  assumes [transfer_rule]: "r1 a b" "r2 c d"<br>
+  shows   "r3 (f a c) (f' b d)"</p>
+<p>but if I declare that lemmas as a transfer_rule, it is not used. I have<br>
+to explicitly prove "(r1 ===&gt; r2 ===&gt; r3) f f'" from this for it to be<br>
+used. Is there some way around this?</p>
+<ol start="4">
+<li>There is currently no relator for measures. I came up with the<br>
+following one, which works well for my purposes, but I think it is not a<br>
+good relator because it only makes sense for bi-unique relators on the<br>
+values.</li>
+</ol>
+<p>definition rel_measure :: "('a ⇒ 'b ⇒ bool) ⇒ ('a measure ⇒ 'b measure ⇒<br>
+bool)" where<br>
+  "rel_measure r M1 M2 ⟷<br>
+     rel_set r (space M1) (space M2) ∧<br>
+     rel_set (rel_set r) (sets M1) (sets M2) ∧<br>
+     (rel_set r ===&gt; (=)) (emeasure M1) (emeasure M2)"</p>
+<p>The definition of rel_pmf suggests something involving product measures<br>
+would be the right way to go.</p>
+<p>On a related note: suppose I defined my simple relator and then later on<br>
+someone else defines another relator for measures. Would the rules then<br>
+clash? Would one have to remove all the rules for my relator for things<br>
+to still work smoothly?</p>
+<ol start="5">
+<li>
+<p>Is there any trick for proving transfer rules for constants defined<br>
+by "inductive" or "fun" that I am unaware of? Doing the induction proofs<br>
+manually is very tedious.</p>
+</li>
+<li>
+<p>The constant "has_derivative" is not parametric (I think) because<br>
+e.g. for "(f has_derivative D) at_top" you get "Lim (λx. x)", which<br>
+equal to "THE x. False". However, in practice, F is always of the form<br>
+"at x within A" and then has_derivative is parametric. But if I prove<br>
+the transfer rule</p>
+<p>(r ===&gt; r) ===&gt; (r ===&gt; r) ===&gt; r ===&gt; rel_set r ===&gt; (=))<br>
+(λf D x A. (f has_derivative D) (at x within A))<br>
+(λf D x A. (f has_derivative D) (at x within A))</p>
+</li>
+</ol>
+<p>for some suitable relator r, it does not get used. The transfer package<br>
+insists on a relator for "has_derivative". Of course, if I do an<br>
+auxiliary definition for this and fold it before applying transfer, it<br>
+works, but then I have a useless auxiliary function cluttering the<br>
+namespace.</p>
+<ol start="7">
+<li>
+<p>In measure theory, there is the definition</p>
+<p>nn_integral :: 'a measure ⇒ ('a ⇒ ennreal) ⇒ ennreal<br>
+nn_integral M f =<br>
+  Sup (simple_integral M `<br>
+  {g. simple_function M g ∧ g ≤ f})</p>
+</li>
+</ol>
+<p>I was able to prove</p>
+<p>lemma transfer_nn_integral [transfer_rule]:<br>
+  assumes [transfer_rule]: "bi_unique r"<br>
+  shows "(rel_measure r ===&gt; (r ===&gt; (=)) ===&gt; (=))<br>
+         nn_integral nn_integral"</p>
+<p>but I needed some trickery to avoid "bi_total r" due to the use of<br>
+"Collect". The reason why it works is that "simple_integral" only<br>
+evaluates the function on values from "space M", so we can replace the<br>
+set in question by</p>
+<p>{g. simple_function M g ∧ (∀x. x ∉ space M ⟶ f x = 0) ∧<br>
+      ∀x∈space M. g x ≤ f x}</p>
+<p>which can be shown (with quite a bit of pain!) to be parametric.</p>
+<p>Is there some trick to make any of this easier?</p>
+<ol start="8">
+<li>Is there any way of telling the transfer package that some rules have<br>
+higher priority than others?</li>
+</ol>
+<p>Cheers,</p>
+<p>Manuel<br>
+<a href="/user_uploads/14278/hKPuCIz1IRTHQ_hjbu1gZaD0/smime.p7s">smime.p7s</a></p>
+
+
+
+<a name="221715334"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Questions%20about%20%22transfer%22/near/221715334" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Questions.20about.20.22transfer.22.html#221715334">(Jan 05 2021 at 23:21)</a>:</h4>
+<p>From: Mikhail Chekhov &lt;<a href="mailto:mikhail.chekhov.w@gmail.com">mikhail.chekhov.w@gmail.com</a>&gt;<br>
+Dear Manuel Eberl/All,</p>
+<p>I will allow myself to provide a few remarks as a regular user of the<br>
+transfer infrastructure. Certainly, my own understanding of the framework<br>
+is still somewhat limited. However, hopefully, my advice will help to get<br>
+rid of the questions that are less difficult.</p>
+<blockquote>
+<ol>
+<li>It seems to me that "transfer" always transfers theorems<br>
+"left-to-right". For the "transferred" attribute, there is<br>
+"untransferred" – is there a similar thing for "transfer" as well?</li>
+</ol>
+<p>Similar questions have been asked before and the answer seems to be<br>
+negative (<br>
+<a href="https://lists.cam.ac.uk/mailman/htdig/cl-isabelle-users/2019-July/msg00013.html">https://lists.cam.ac.uk/mailman/htdig/cl-isabelle-users/2019-July/msg00013.html</a><br>
+).</p>
+</blockquote>
+<blockquote>
+<ol start="3">
+<li>Sometimes, it is more convenient to prove transfer rules for<br>
+functions following the pattern<br>
+lemma<br>
+  assumes [transfer_rule]: "r1 a b" "r2 c d"<br>
+  shows   "r3 (f a c) (f' b d)"<br>
+but if I declare that lemmas as a transfer_rule, it is not used. I have<br>
+to explicitly prove "(r1 ===&gt; r2 ===&gt; r3) f f'" from this for it to be<br>
+used. Is there some way around this?</li>
+</ol>
+<p>In certain circumstances, the rules stated in a similar format can be used.<br>
+For example,</p>
+</blockquote>
+<p>context<br>
+  includes lifting_syntax<br>
+  fixes r1 r2 r3 :: "'a ⇒ 'b ⇒ bool"<br>
+    and f :: "'a ⇒ 'a ⇒ 'a" and f' :: "'b ⇒ 'b ⇒ 'b"<br>
+  assumes [transfer_rule]: "bi_unique r3"<br>
+    and [transfer_rule]: "r1 a b ⟹ r2 c d ⟹ r3 (f a c) (f' b d)"<br>
+begin</p>
+<p>lemma<br>
+  assumes [transfer_rule]: "r1 a b" "r2 c d"<br>
+  shows "f' b d = f' b d"<br>
+  by transfer (rule refl)</p>
+<p>end</p>
+<p>In this case, "r1 a b" and "r2 c d" are treated as side conditions, and the<br>
+transfer infrastructure has some limited support for such unconventional<br>
+side conditions (however, I am not certain as to what is the extent of such<br>
+support).</p>
+<p>If it is more convenient to prove a transfer rule in the form that you have<br>
+stated, then you can always use (intro rel_funI) to perform the conversion,<br>
+e.g.</p>
+<p>lemma<br>
+  includes lifting_syntax<br>
+  shows "(r1 ===&gt; r2 ===&gt; r3) f f'"<br>
+  apply(intro rel_funI)<br>
+  (<em>⋀x y xa ya. r1 x y ⟹ r2 xa ya ⟹ r3 (f x xa) (f' y ya)</em>)</p>
+<blockquote>
+<ol start="5">
+<li>Is there any trick for proving transfer rules for constants defined<br>
+by "inductive" or "fun" that I am unaware of? Doing the induction proofs<br>
+manually is very tedious.</li>
+</ol>
+<p>Yes, there is: see<br>
+<a href="https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2019-January/msg00072.html">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2019-January/msg00072.html</a>.<br>
+I would like to add to the suggestion in the post that, technically, there<br>
+is little that is stopping one from recovering the original definitional<br>
+axiom in Isabelle/ML using Thm.axiom (e.g. see the implementation of UD in<br>
+<a href="https://gitlab.com/user9716869/Isabelle-Complement-Library">https://gitlab.com/user9716869/Isabelle-Complement-Library</a>, but keep in<br>
+mind that it is still in a reasonably rough experimental state) instead of<br>
+using the collection of theorems associated with nitpick. Providing further<br>
+automation for this is on my own "to do" list, but it has a very low<br>
+priority. If you decide to make an attempt to generalize/automate this<br>
+idea, I would highly appreciate it if you could let me know about this to<br>
+avoid possible duplication of efforts.</p>
+</blockquote>
+<blockquote>
+<ol start="7">
+<li>In measure theory, there is the definition<br>
+  nn_integral :: 'a measure ⇒ ('a ⇒ ennreal) ⇒ ennreal<br>
+  nn_integral M f =<br>
+    Sup (simple_integral M `<br>
+    {g. simple_function M g ∧ g ≤ f})<br>
+I was able to prove<br>
+lemma transfer_nn_integral [transfer_rule]:<br>
+  assumes [transfer_rule]: "bi_unique r"<br>
+  shows "(rel_measure r ===&gt; (r ===&gt; (=)) ===&gt; (=))<br>
+         nn_integral nn_integral"<br>
+but I needed some trickery to avoid "bi_total r" due to the use of<br>
+"Collect". The reason why it works is that "simple_integral" only<br>
+evaluates the function on values from "space M", so we can replace the<br>
+set in question by<br>
+  {g. simple_function M g ∧ (∀x. x ∉ space M ⟶ f x = 0) ∧<br>
+      ∀x∈space M. g x ≤ f x}<br>
+which can be shown (with quite a bit of pain!) to be parametric.<br>
+Is there some trick to make any of this easier?</li>
+</ol>
+<p>I cannot be certain, but it appears that a pattern similar to the one that<br>
+you suggest was used in published work by those whom I would consider to be<br>
+well-versed in the functionality of transfer (e.g. see the code associated<br>
+with [1]). Thus, it is likely that the problem does not have a generic<br>
+solution. However, I would be happy to be wrong about this, as my own work<br>
+would benefit from having such a solution.</p>
+</blockquote>
+<p>In this context, I wonder if the types of algorithms used in the work of<br>
+Peter Lammich (e.g. [2] and other related articles) would handle this<br>
+scenario. I would certainly appreciate any comments from him.</p>
+<blockquote>
+<ol start="8">
+<li>Is there any way of telling the transfer package that some rules have<br>
+higher priority than others?</li>
+</ol>
+<p>A slightly hacky way would be to simply rearrange the transfer_raw<br>
+programmatically, as you need. Practically, in most circumstances, this<br>
+should not be needed. One can always write lemmas [transfer_rule] =<br>
+(<em>relevant rules that need to have a higher priority</em>). The duplicates will<br>
+not be produced: the theorems in transfer_raw will simply be rearranged<br>
+with the restated rules at the top of the list.</p>
+</blockquote>
+<p>Kind Regards,<br>
+Mikhail Chekhov</p>
+<p>[1]. Immler F, Zhan B. Smooth Manifolds and Types to Sets for Linear<br>
+Algebra in Isabelle/HOL. In: 8th ACM SIGPLAN International Conference on<br>
+Certified Programs and Proofs. New York: ACM; 2019. p. 65–77. (CPP 2019).<br>
+[2]. Lammich P. Automatic Data Refinement. In: Blazy S, Paulin-Mohring C,<br>
+Pichardie D, editors. Interactive Theorem Proving. Heidelberg: Springer;<br>
+2013. p. 84–99.</p>
+
+
+
+<a name="221821047"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Questions%20about%20%22transfer%22/near/221821047" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Questions.20about.20.22transfer.22.html#221821047">(Jan 06 2021 at 20:46)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:mail@andreas-lochbihler.de">mail@andreas-lochbihler.de</a>&gt;<br>
+Hi Manuel,</p>
+<blockquote>
+<ol>
+<li>It seems to me that "transfer" always transfers theorems<br>
+"left-to-right". For the "transferred" attribute, there is<br>
+"untransferred" – is there a similar thing for "transfer" as well?</li>
+</ol>
+<p>Not that I know of. Going from right to left is problematic with rules that have compound <br>
+terms on the right-hand side (see below).</p>
+</blockquote>
+<blockquote>
+<ol start="2">
+<li>Relatedly, is there an easy idiomatic way to use "flipped" relators?<br>
+No. The capabilities of "transfer" are very much tailored to the needs of the lifting <br>
+package. And there, you normally just go one way.</li>
+</ol>
+</blockquote>
+<blockquote>
+<ol start="3">
+<li>Sometimes, it is more convenient to prove transfer rules for<br>
+functions following the pattern</li>
+</ol>
+<p>lemma<br>
+   assumes [transfer_rule]: "r1 a b" "r2 c d"<br>
+   shows   "r3 (f a c) (f' b d)"</p>
+<p>but if I declare that lemmas as a transfer_rule, it is not used. I have<br>
+to explicitly prove "(r1 ===&gt; r2 ===&gt; r3) f f'" from this for it to be<br>
+used. Is there some way around this?</p>
+<p>Again, nothing that I'm aware of. But it shouldn't be too hard to write an attribute that <br>
+does the preprocessing.</p>
+</blockquote>
+<blockquote>
+<ol start="4">
+<li>There is currently no relator for measures. I came up with the<br>
+following one, which works well for my purposes, but I think it is not a<br>
+good relator because it only makes sense for bi-unique relators on the<br>
+values.</li>
+</ol>
+<p>definition rel_measure :: "('a ⇒ 'b ⇒ bool) ⇒ ('a measure ⇒ 'b measure ⇒<br>
+bool)" where<br>
+   "rel_measure r M1 M2 ⟷<br>
+      rel_set r (space M1) (space M2) ∧<br>
+      rel_set (rel_set r) (sets M1) (sets M2) ∧<br>
+      (rel_set r ===&gt; (=)) (emeasure M1) (emeasure M2)"</p>
+<p>The definition of rel_pmf suggests something involving product measures<br>
+would be the right way to go.</p>
+</blockquote>
+<p>Yours doesn't look right. The relators coming out of the BNF package are all defined via <br>
+the product, namely find a value z over pairs whose projections are the original two <br>
+values x and y to be related such that the elements in z are contained in the relation r. <br>
+While these definitions are canonical, they are hardly intuitive for custom type <br>
+constructors and usually unwieldy to work with. For probability spaces, this product is <br>
+commonly called a probabilistic coupling and I believe this would also be the right <br>
+relator definition for general measures.</p>
+<p>For rel_pmf, you find the characterization theorem in the AFP in <br>
+MFMC_Countable.Rel_PMF_Characterization. Essentially, it says that rel_pmf R p q iff <br>
+measure p A &lt;= measure q (R `` A) for all A. I'm pretty sure that such a characterization <br>
+can be generalized to arbitrary measures. Strassen has proven a number of theorems in that <br>
+direction (<a href="https://www.jstor.org/stable/2238148">https://www.jstor.org/stable/2238148</a>).</p>
+<blockquote>
+<p>On a related note: suppose I defined my simple relator and then later on<br>
+someone else defines another relator for measures. Would the rules then<br>
+clash? Would one have to remove all the rules for my relator for things<br>
+to still work smoothly?</p>
+<p>You'd get a clash for some things. In general, you want to register a few theorems for a <br>
+relator (e.g., [relator_eq], [relator_mono], [quot_map]) and some of these attributes <br>
+allow only one theorem per type constructor. So you can't register theorems for both <br>
+relators. The plain transfer machinery can cope with several relators for the same type <br>
+constructor (except for the function type) and I've used that occasionally. However, you <br>
+have to be very careful to not end up with an exponentially large search space for transfer.</p>
+</blockquote>
+<blockquote>
+<ol start="5">
+<li>Is there any trick for proving transfer rules for constants defined<br>
+by "inductive" or "fun" that I am unaware of? Doing the induction proofs<br>
+manually is very tedious.</li>
+</ol>
+<p>I have looked into this previously. For inductive, I had a few ideas but eventually <br>
+realized that it doesn't play well together with the current architecture of transfer. The <br>
+problem is that like for the predicate compiler, an inductive definition may have <br>
+different computational interpretations (modes in logic programming speak) and those <br>
+interpretations lead to different relators in the resulting transfer rule (predicates vs. <br>
+sets). While it's possible to convert between predicates and sets, this requires <br>
+additional assumptions about the relations (typically bi_totality). However, as transfer <br>
+does not really support multiple relators for the same type constructor, such a solution <br>
+would be problematic. Moreover, there may be exponentially many transfer rules for an <br>
+inductive predicate, in particular if you do a higher-order mode analysis similar to <br>
+Lukas' work for the predicate compiler, so we'd end up creating an exponential number of <br>
+transfer rules.</p>
+</blockquote>
+<blockquote>
+<ol start="6">
+<li>
+<p>The constant "has_derivative" is not parametric (I think) because<br>
+e.g. for "(f has_derivative D) at_top" you get "Lim (λx. x)", which<br>
+equal to "THE x. False". However, in practice, F is always of the form<br>
+"at x within A" and then has_derivative is parametric. But if I prove<br>
+the transfer rule</p>
+<p>(r ===&gt; r) ===&gt; (r ===&gt; r) ===&gt; r ===&gt; rel_set r ===&gt; (=))<br>
+ (λf D x A. (f has_derivative D) (at x within A))<br>
+ (λf D x A. (f has_derivative D) (at x within A))</p>
+</li>
+</ol>
+<p>for some suitable relator r, it does not get used. The transfer package<br>
+insists on a relator for "has_derivative". Of course, if I do an<br>
+auxiliary definition for this and fold it before applying transfer, it<br>
+works, but then I have a useless auxiliary function cluttering the<br>
+namespace.</p>
+<p>The transfer package's algorithm assumes that the transferred term preserves function <br>
+applications and abstractions, i.e., those are always transferred with rel_funI and <br>
+rel_funD. Therefore, you cannot have a compound term on the left-hand side of a transfer <br>
+rule; it will virtually never trigger. (The exception is if you have a constant on the <br>
+right-hand side and use the untransferred attribute.) So your only chance here is to <br>
+introduce an auxiliary constant and fold the definition before applying transfer.</p>
+</blockquote>
+<p>There are other algorithms that one could use to support such compound terms. For example, <br>
+Peter Lammich's Autoref tool supports compound terms in transfer rules, but that's not <br>
+integrated with transfer.</p>
+<blockquote>
+<ol start="7">
+<li>
+<p>In measure theory, there is the definition</p>
+<p>nn_integral :: 'a measure ⇒ ('a ⇒ ennreal) ⇒ ennreal<br>
+ nn_integral M f =<br>
+   Sup (simple_integral M `<br>
+   {g. simple_function M g ∧ g ≤ f})</p>
+</li>
+</ol>
+<p>I was able to prove</p>
+<p>lemma transfer_nn_integral [transfer_rule]:<br>
+   assumes [transfer_rule]: "bi_unique r"<br>
+   shows "(rel_measure r ===&gt; (r ===&gt; (=)) ===&gt; (=))<br>
+          nn_integral nn_integral"</p>
+<p>but I needed some trickery to avoid "bi_total r" due to the use of<br>
+"Collect". The reason why it works is that "simple_integral" only<br>
+evaluates the function on values from "space M", so we can replace the<br>
+set in question by</p>
+<p>{g. simple_function M g ∧ (∀x. x ∉ space M ⟶ f x = 0) ∧<br>
+       ∀x∈space M. g x ≤ f x}</p>
+<p>which can be shown (with quite a bit of pain!) to be parametric.</p>
+<p>Is there some trick to make any of this easier?</p>
+</blockquote>
+<p>I don't think so. These complications are very typical of proving transfer rules. More <br>
+precisely, they just show how many shortcuts we're taking in our definitions in HOL <br>
+because HOL is a logic of total functions. In ordinary mathematics, we'd say that <code>f</code> and <br>
+<code>g</code> are only defined on <code>space M</code>. So the universal quantifier that's implicit in the <br>
+original definition's <code>g &lt;= f</code> would range only over <code>space M</code> anyway.</p>
+<blockquote>
+<ol start="8">
+<li>Is there any way of telling the transfer package that some rules have<br>
+higher priority than others?</li>
+</ol>
+<p>Finally something that I can answer positively. "transfer" uses the [transfer_rule]s in <br>
+inverse order, i.e., theorems that are declared as [transfer_rule] later have higher priority.</p>
+</blockquote>
+<p>Hope this helps,<br>
+Andreas</p>
+
+
+
+<a name="221838197"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Questions%20about%20%22transfer%22/near/221838197" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Questions.20about.20.22transfer.22.html#221838197">(Jan 06 2021 at 23:31)</a>:</h4>
+<p>From: Mikhail Chekhov &lt;<a href="mailto:mikhail.chekhov.w@gmail.com">mikhail.chekhov.w@gmail.com</a>&gt;<br>
+Dear All,</p>
+<p>I would like to thank Andreas Lochbihler for providing a more elaborate<br>
+answer in the following post:<br>
+<a href="https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2021-January/msg00038.html">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2021-January/msg00038.html</a>.<br>
+I believe that there is one notable difference in our answers. More<br>
+specifically, the answer that was given by Andreas Lochbihler to question 5</p>
+<blockquote>
+<p>Is there any trick for proving transfer rules for constants defined<br>
+by "inductive" or "fun" that I am unaware of? Doing the induction proofs<br>
+manually is very tedious.</p>
+<p>is as follows:</p>
+</blockquote>
+<blockquote>
+<p>I have looked into this previously. For inductive, I had a few ideas but<br>
+eventually<br>
+realized that it doesn't play well together with the current architecture<br>
+of transfer. The<br>
+problem is that like for the predicate compiler, an inductive definition<br>
+may have<br>
+different computational interpretations (modes in logic programming speak)<br>
+and those<br>
+interpretations lead to different relators in the resulting transfer rule<br>
+(predicates vs.<br>
+sets). While it's possible to convert between predicates and sets, this<br>
+requires<br>
+additional assumptions about the relations (typically bi_totality).<br>
+However, as transfer<br>
+does not really support multiple relators for the same type constructor,<br>
+such a solution<br>
+would be problematic. Moreover, there may be exponentially many transfer<br>
+rules for an<br>
+inductive predicate, in particular if you do a higher-order mode analysis<br>
+similar to<br>
+Lukas' work for the predicate compiler, so we'd end up creating an<br>
+exponential number of<br>
+transfer rules.</p>
+<p>My own answer is also provided for reference:</p>
+</blockquote>
+<blockquote>
+<p>Yes, there is: see<br>
+<a href="https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2019-January/msg00072.html">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2019-January/msg00072.html</a>.<br>
+I would like to add to the suggestion in the post that, technically, there<br>
+is little that is stopping one from recovering the original definitional<br>
+axiom in Isabelle/ML using Thm.axiom (e.g. see the implementation of UD in<br>
+<a href="https://gitlab.com/user9716869/Isabelle-Complement-Library">https://gitlab.com/user9716869/Isabelle-Complement-Library</a>, but keep in<br>
+mind that it is still in a reasonably rough experimental state) instead of<br>
+using the collection of theorems associated with nitpick. Providing further<br>
+automation for this is on my own "to do" list, but it has a very low<br>
+priority. If you decide to make an attempt to generalize/automate this<br>
+idea, I would highly appreciate it if you could let me know about this to<br>
+avoid possible duplication of efforts.</p>
+<p>I would like to make an attempt to resolve any confusion that this<br>
+discrepancy may have caused. The scope of my answer was significantly more<br>
+narrow. More specifically, my answer assumes that, given a constant c<br>
+(defined as an inductive predicate), there is a term t (normally, also<br>
+defined with the help of an inductive predicate), a parametricity relation<br>
+R for the type of c, constructed under the assumption that the relators for<br>
+every non-nullary type constructor are known in advance and some side<br>
+conditions on the involved relations, also known in advance. Then, if the<br>
+transfer rule R t c exists under the aforementioned side conditions, then<br>
+its proof can often be automated using the transfer prover, assuming the<br>
+existence of the transfer rules for the constant lfp under compatible side<br>
+conditions, as showcased in<br>
+<a href="https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2019-January/msg00072.html">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2019-January/msg00072.html</a>.<br>
+The transfer rules for the lfp can often cover a significant number of<br>
+similar applications, possibly allowing for some degree of proof<br>
+automation. However, of course, as can be inferred from the answer given by<br>
+Andreas Lochbihler, it is hardly a fundamental solution. After all, the OP<br>
+asked for a 'trick' that could help to reduce the size of the proof, and I<br>
+tried to oblige by providing a trick :-).</p>
+</blockquote>
+<p>Kind Regards,<br>
+Mikhail Chekhov</p>
+<p>On Wed, Jan 6, 2021 at 1:20 AM Mikhail Chekhov &lt;<a href="mailto:mikhail.chekhov.w@gmail.com">mikhail.chekhov.w@gmail.com</a>&gt;<br>
+wrote:</p>
+<blockquote>
+<p>Dear Manuel Eberl/All,</p>
+<p>I will allow myself to provide a few remarks as a regular user of the<br>
+transfer infrastructure. Certainly, my own understanding of the framework<br>
+is still somewhat limited. However, hopefully, my advice will help to get<br>
+rid of the questions that are less difficult.</p>
+<blockquote>
+<ol>
+<li>It seems to me that "transfer" always transfers theorems<br>
+"left-to-right". For the "transferred" attribute, there is<br>
+"untransferred" – is there a similar thing for "transfer" as well?</li>
+</ol>
+<p>Similar questions have been asked before and the answer seems to be<br>
+negative (<br>
+<a href="https://lists.cam.ac.uk/mailman/htdig/cl-isabelle-users/2019-July/msg00013.html">https://lists.cam.ac.uk/mailman/htdig/cl-isabelle-users/2019-July/msg00013.html</a><br>
+).</p>
+</blockquote>
+<blockquote>
+<ol start="3">
+<li>Sometimes, it is more convenient to prove transfer rules for<br>
+functions following the pattern<br>
+lemma<br>
+  assumes [transfer_rule]: "r1 a b" "r2 c d"<br>
+  shows   "r3 (f a c) (f' b d)"<br>
+but if I declare that lemmas as a transfer_rule, it is not used. I have<br>
+to explicitly prove "(r1 ===&gt; r2 ===&gt; r3) f f'" from this for it to be<br>
+used. Is there some way around this?</li>
+</ol>
+<p>In certain circumstances, the rules stated in a similar format can be<br>
+used. For example,</p>
+</blockquote>
+<p>context<br>
+  includes lifting_syntax<br>
+  fixes r1 r2 r3 :: "'a ⇒ 'b ⇒ bool"<br>
+    and f :: "'a ⇒ 'a ⇒ 'a" and f' :: "'b ⇒ 'b ⇒ 'b"<br>
+  assumes [transfer_rule]: "bi_unique r3"<br>
+    and [transfer_rule]: "r1 a b ⟹ r2 c d ⟹ r3 (f a c) (f' b d)"<br>
+begin</p>
+<p>lemma<br>
+  assumes [transfer_rule]: "r1 a b" "r2 c d"<br>
+  shows "f' b d = f' b d"<br>
+  by transfer (rule refl)</p>
+<p>end</p>
+<p>In this case, "r1 a b" and "r2 c d" are treated as side conditions, and<br>
+the transfer infrastructure has some limited support for such<br>
+unconventional side conditions (however, I am not certain as to what is the<br>
+extent of such support).</p>
+<p>If it is more convenient to prove a transfer rule in the form that you<br>
+have stated, then you can always use (intro rel_funI) to perform the<br>
+conversion, e.g.</p>
+<p>lemma<br>
+  includes lifting_syntax<br>
+  shows "(r1 ===&gt; r2 ===&gt; r3) f f'"<br>
+  apply(intro rel_funI)<br>
+  (<em>⋀x y xa ya. r1 x y ⟹ r2 xa ya ⟹ r3 (f x xa) (f' y ya)</em>)</p>
+<blockquote>
+<ol start="5">
+<li>Is there any trick for proving transfer rules for constants defined<br>
+by "inductive" or "fun" that I am unaware of? Doing the induction proofs<br>
+manually is very tedious.</li>
+</ol>
+<p>Yes, there is: see<br>
+<a href="https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2019-January/msg00072.html">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2019-January/msg00072.html</a>.<br>
+I would like to add to the suggestion in the post that, technically, there<br>
+is little that is stopping one from recovering the original definitional<br>
+axiom in Isabelle/ML using Thm.axiom (e.g. see the implementation of UD in<br>
+<a href="https://gitlab.com/user9716869/Isabelle-Complement-Library">https://gitlab.com/user9716869/Isabelle-Complement-Library</a>, but keep in<br>
+mind that it is still in a reasonably rough experimental state) instead of<br>
+using the collection of theorems associated with nitpick. Providing further<br>
+automation for this is on my own "to do" list, but it has a very low<br>
+priority. If you decide to make an attempt to generalize/automate this<br>
+idea, I would highly appreciate it if you could let me know about this to<br>
+avoid possible duplication of efforts.</p>
+</blockquote>
+<blockquote>
+<ol start="7">
+<li>In measure theory, there is the definition<br>
+  nn_integral :: 'a measure ⇒ ('a ⇒ ennreal) ⇒ ennreal<br>
+  nn_integral M f =<br>
+    Sup (simple_integral M `<br>
+    {g. simple_function M g ∧ g ≤ f})<br>
+I was able to prove<br>
+lemma transfer_nn_integral [transfer_rule]:<br>
+  assumes [transfer_rule]: "bi_unique r"<br>
+  shows "(rel_measure r ===&gt; (r ===&gt; (=)) ===&gt; (=))<br>
+         nn_integral nn_integral"<br>
+but I needed some trickery to avoid "bi_total r" due to the use of<br>
+"Collect". The reason why it works is that "simple_integral" only<br>
+evaluates the function on values from "space M", so we can replace the<br>
+set in question by<br>
+  {g. simple_function M g ∧ (∀x. x ∉ space M ⟶ f x = 0) ∧<br>
+      ∀x∈space M. g x ≤ f x}<br>
+which can be shown (with quite a bit of pain!) to be parametric.<br>
+Is there some trick to make any of this easier?</li>
+</ol>
+<p>I cannot be certain, but it appears that a pattern similar to the one that<br>
+you suggest was used in published work by those whom I would consider to be<br>
+well-versed in the functionality of transfer (e.g. see the code associated<br>
+with [1]). Thus, it is likely that the problem does not have a generic<br>
+solution. However, I would be happy to be wrong about this, as my own work<br>
+would benefit from having such a solution.</p>
+</blockquote>
+<p>In this context, I wonder if the types of algorithms used in the work of<br>
+Peter Lammich (e.g. [2] and other related articles) would handle this<br>
+scenario. I would certainly appreciate any comments from him.</p>
+<blockquote>
+<ol start="8">
+<li>Is there any way of telling the transfer package that some rules have<br>
+higher priority than others?</li>
+</ol>
+<p>A slightly hacky way would be to simply rearrange the transfer_raw<br>
+programmatically, as you need. Practically, in most circumstances, this<br>
+should not be needed. One can always write lemmas [transfer_rule] =<br>
+(<em>relevant rules that need to have a higher priority</em>). The duplicates will<br>
+not be produced: the theorems in transfer_raw will simply be rearranged<br>
+with the restated rules at the top of the list.</p>
+</blockquote>
+<p>Kind Regards,<br>
+Mikhail Chekhov</p>
+<p>[1]. Immler F, Zhan B. Smooth Manifolds and Types to Sets for Linear<br>
+Algebra in Isabelle/HOL. In: 8th ACM SIGPLAN International Conference on<br>
+Certified Programs and Proofs. New York: ACM; 2019. p. 65–77. (CPP 2019).<br>
+[2]. Lammich P. Automatic Data Refinement. In: Blazy S, Paulin-Mohring C,<br>
+Pichardie D, editors. Interactive Theorem Proving. Heidelberg: Springer;<br>
+2013. p. 84–99.<br>
+</p>
+</blockquote>
+
+
+
+<hr><p>Last updated: Jul 15 2022 at 23:21 UTC</p>
+</html>

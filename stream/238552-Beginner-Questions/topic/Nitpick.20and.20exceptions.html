@@ -1,0 +1,61 @@
+<html>
+<head><meta charset="utf-8"><title>Nitpick and exceptions · Beginner Questions · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/index.html">Beginner Questions</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Nitpick.20and.20exceptions.html">Nitpick and exceptions</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="293511716"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Nitpick%20and%20exceptions/near/293511716" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Adrián Doña Mateo <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Nitpick.20and.20exceptions.html#293511716">(Aug 15 2022 at 12:31)</a>:</h4>
+<p>I've defined a basic rooted tree datatype and a function that, given a list of indices, recovers a subtree from a larger tree.</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">datatype</span> <span class="n">tree</span> <span class="o">=</span> <span class="n">Node</span> <span class="o">(</span><span class="n">subtrees</span><span class="o">:</span> <span class="s">"tree list"</span><span class="o">)</span>
+
+<span class="k">abbreviation</span> <span class="n">Leaf</span> <span class="o">::</span> <span class="n">tree</span> <span class="kp">where</span>
+<span class="s">"Leaf ≡ Node []"</span>
+
+<span class="k">fun</span> <span class="n">subtree</span> <span class="o">::</span> <span class="s">"tree ⇒ nat list ⇒ tree"</span> <span class="o">(</span><span class="s">"_ !t _"</span> <span class="o">[</span><span class="n">59</span><span class="o">,</span><span class="n">60</span><span class="o">]</span><span class="n">59</span><span class="o">)</span> <span class="kp">where</span>
+<span class="s">"t !t [] = t"</span> <span class="o">|</span>
+<span class="s">"t !t (i#xs) = subtrees (t !t xs) ! i"</span>
+
+<span class="kt">value</span> <span class="s">"Leaf !t []"</span> <span class="c">(* Leaf *)</span>
+<span class="kt">value</span> <span class="s">"Node [Node [Leaf, Leaf, Leaf], Leaf, Node [Leaf]] !t [0]"</span>    <span class="c">(* Node [Leaf, Leaf, Leaf] *)</span>
+<span class="kt">value</span> <span class="s">"Node [Node [Leaf, Leaf, Leaf], Leaf, Node [Leaf]] !t [2,0]"</span>  <span class="c">(* Leaf *)</span>
+<span class="kt">value</span> <span class="s">"Node [Node [Leaf, Leaf, Leaf], Leaf, Node [Leaf]] !t [1]"</span>    <span class="c">(* Leaf *)</span>
+<span class="kt">value</span> <span class="s">"Node [Node [Leaf, Leaf, Leaf], Leaf, Node [Leaf]] !t [0,2]"</span>  <span class="c">(* Leaf *)</span>
+
+<span class="kn">lemma</span> <span class="n">subtree_exists_imp</span><span class="o">:</span> <span class="s">"Node ts !t xs @ [i] = Node us ⟹ i &lt; length ts"</span>
+  <span class="kt">try</span>
+</code></pre></div>
+<p>The function <code>subtree</code> raises an exception whenever the list of indices is not valid within the given tree. I would like to prove the lemma at the bottom, essentially saying that if <code>!t</code> doesn't raise an exception then at least the last index is within the limits of the tree. However, Nitpick somehow thinks that the following is a counterexample:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code>  <span class="n">Free</span> <span class="n">variables</span><span class="o">:</span>
+    <span class="n">i</span> <span class="o">=</span> <span class="n">1</span>
+    <span class="n">ts</span> <span class="o">=</span> <span class="o">[</span><span class="n">Leaf</span><span class="o">]</span>
+    <span class="n">us</span> <span class="o">=</span> <span class="o">[</span><span class="n">Leaf</span><span class="o">]</span>
+    <span class="n">xs</span> <span class="o">=</span> <span class="o">[]</span>
+</code></pre></div>
+<p>when in fact <code>Node [Leaf] !t [] @ [1]</code> raises an exception and so cannot be equal to <code>Node [Leaf]</code>.<br>
+Is there a way of rephrasing the lemma or the definition of <code>subtree</code> that would make this work?</p>
+
+
+
+<a name="294995634"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Nitpick%20and%20exceptions/near/294995634" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Nitpick.20and.20exceptions.html#294995634">(Aug 24 2022 at 07:51)</a>:</h4>
+<p>I believe that the issue is that nitpick works with total functions. In your case "[] ! 0" is undefined, so it can take any value. The only way I can think of is making the function total for example by making it return Some/None</p>
+
+
+
+<a name="295322145"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Nitpick%20and%20exceptions/near/295322145" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Wolfgang Jeltsch <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Nitpick.20and.20exceptions.html#295322145">(Aug 25 2022 at 22:45)</a>:</h4>
+<blockquote>
+<p>In your case "[] ! 0" is undefined, so it can take any value.</p>
+</blockquote>
+<p>That’s not just an issue with Nitpick, but a fundamental feature of Isabelle. Every Isabelle function is total, and the morally partial ones just aren’t specified for those arguments that lie outside their moral domains.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

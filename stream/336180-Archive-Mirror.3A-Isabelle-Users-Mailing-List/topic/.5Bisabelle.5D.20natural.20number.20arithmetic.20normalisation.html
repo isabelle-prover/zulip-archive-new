@@ -1,0 +1,95 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] natural number arithmetic normalisation · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20natural.20number.20arithmetic.20normalisation.html">[isabelle] natural number arithmetic normalisation</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294148116"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20natural%20number%20arithmetic%20normalisation/near/294148116" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20natural.20number.20arithmetic.20normalisation.html#294148116">(Aug 18 2022 at 18:44)</a>:</h4>
+<p>From: Michael Norrish &lt;<a href="mailto:Michael.Norrish@nicta.com.au">Michael.Norrish@nicta.com.au</a>&gt;<br>
+The following term arose inside a side-condition that the simplifier was attempting to discharge:</p>
+<p>(2::nat) ^ (2 * (2 * (2 * (2 * (2 * 1)))))</p>
+<p>The simp tactic being used included field_simps as a rewrite.</p>
+<p>The result was an apparent "hang" as Isabelle attempted to calculate 2 ^ 32 in unary arithmetic. </p>
+<p>You can see the behaviour by doing</p>
+<p>lemma "(2::nat) ^ (2 * (2 * (2 * (2 * (2 * 1))))) = X"<br>
+  apply (simp add: field_simps)</p>
+<p>It seems to me that this is yet more evidence that using 1 = Suc 0 as a rewrite is a bad idea.</p>
+<p>That aside, it would be nice if the simp technology could allow the use of an innocuous rewrite (field_simps), one that doesn't even mention Suc, alongside perfectly reasonable terms such as the one above.</p>
+<p>Michael<br>
+<a href="/user_uploads/14278/K1NoHLNFtd0okFzhsUAhAJgu/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294148173"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20natural%20number%20arithmetic%20normalisation/near/294148173" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20natural.20number.20arithmetic.20normalisation.html#294148173">(Aug 18 2022 at 18:44)</a>:</h4>
+<p>From: Brian Huffman &lt;<a href="mailto:brianh@cs.pdx.edu">brianh@cs.pdx.edu</a>&gt;<br>
+On Mon, Nov 14, 2011 at 12:34 AM, Michael Norrish<br>
+&lt;<a href="mailto:Michael.Norrish@nicta.com.au">Michael.Norrish@nicta.com.au</a>&gt; wrote:</p>
+<blockquote>
+<p>The following term arose inside a side-condition that the simplifier was attempting to discharge:</p>
+<p>(2::nat) ^ (2 * (2 * (2 * (2 * (2 * 1)))))</p>
+<p>The simp tactic being used included field_simps as a rewrite.</p>
+<p>The result was an apparent "hang" as Isabelle attempted to calculate 2 ^ 32 in unary arithmetic.</p>
+<p>You can see the behaviour by doing</p>
+<p>lemma "(2::nat) ^ (2 * (2 * (2 * (2 * (2 * 1))))) = X"<br>
+ apply (simp add: field_simps)</p>
+</blockquote>
+<p>This is a very interesting puzzle, especially since, as you say,<br>
+field_simps doesn't even mention Suc!</p>
+<p>After looking at the simp trace to see which rules were involved I<br>
+realized that you can get the same blowup using "simp only" with a<br>
+small set of rules, none of which are in field_simps, and all of which<br>
+are in the default simpset:</p>
+<p>lemma "(2::nat) ^ (2 * (2 * (2 * (2 * (2 * 1))))) = X"<br>
+apply (simp only: One_nat_def mult_Suc_right mult_0_right add_2_eq_Suc)</p>
+<p>Yet simply writing "apply simp" on the same goal reduces everything to<br>
+just a numeral.</p>
+<p>The weirdness involves these rewrite rules:</p>
+<p>lemma add_2_eq_Suc [simp]: "2 + n = Suc (Suc n)"<br>
+lemma add_2_eq_Suc' [simp]: "n + 2 = Suc (Suc n)"</p>
+<p>These rules originate quite a while ago:<br>
+<a href="http://isabelle.in.tum.de/repos/isabelle/rev/9d6514fcd584">http://isabelle.in.tum.de/repos/isabelle/rev/9d6514fcd584</a></p>
+<p>Now, what happens if we simplify a term like "2 + 0" or "0 + 2", where<br>
+more than one possible simp rule can apply? It turns out that the<br>
+simplifier will rewrite "2 + 0" to "2" (using the additive zero law),<br>
+but in the other order, "0 + 2" rewrites to "Suc (Suc 0)" (using rule<br>
+add_2_eq_Suc'). So the presence of the add_commute rule really makes a<br>
+difference here:</p>
+<p>lemma "(2::nat) ^ (2 * (2 * (2 * (2 * (2 * 1))))) = X"<br>
+apply (simp add: add_commute) (* blows up with Suc *)</p>
+<blockquote>
+<p>It seems to me that this is yet more evidence that using 1 = Suc 0 as a rewrite is a bad idea.</p>
+</blockquote>
+<p>I agree. I think that a good guideline for the Isabelle simpset should<br>
+be that no simp rule should ever insert a Suc into a subgoal that<br>
+didn't already contain one.</p>
+<p>We have discussed removing "1 = Suc 0" as a simp rule on the dev<br>
+mailing list before:<br>
+<a href="https://mailmanbroy.informatik.tu-muenchen.de/pipermail/isabelle-dev/2009-February/000484.html">https://mailmanbroy.informatik.tu-muenchen.de/pipermail/isabelle-dev/2009-February/000484.html</a></p>
+<p>My conclusion back then was that the only reason we have "1 = Suc 0"<br>
+[simp] is historical, since "1" used to be a mere abbreviation for<br>
+"Suc 0". It would be nice to finally get rid of it (along with<br>
+add_2_eq_Suc and friends).</p>
+<ul>
+<li>Brian</li>
+</ul>
+
+
+
+<a name="294148186"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20natural%20number%20arithmetic%20normalisation/near/294148186" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20natural.20number.20arithmetic.20normalisation.html#294148186">(Aug 18 2022 at 18:44)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+It would certainly be nice to get rid of these rewrites, but the task is<br>
+daunting.</p>
+<p>Tobias</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

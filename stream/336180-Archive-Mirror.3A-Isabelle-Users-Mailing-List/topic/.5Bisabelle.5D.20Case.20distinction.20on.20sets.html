@@ -1,0 +1,84 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Case distinction on sets · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Case.20distinction.20on.20sets.html">[isabelle] Case distinction on sets</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294648756"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Case%20distinction%20on%20sets/near/294648756" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Case.20distinction.20on.20sets.html#294648756">(Aug 22 2022 at 10:47)</a>:</h4>
+<p>From: "C. Diekmann" &lt;<a href="mailto:diekmann@in.tum.de">diekmann@in.tum.de</a>&gt;<br>
+Hi everyone,</p>
+<p>with lists, I can do case distinctions, which I cannot do with sets.<br>
+Is there any good advice to express case distinctions on sets?</p>
+<p>Here is my example. With lists, I can write the following:</p>
+<p>case [x←xs. P x] of [] =&gt; None<br>
+                            | [y] =&gt; Some y<br>
+                            | _ =&gt; undefined</p>
+<p>I would like to write this down for xs being a set. To prove<br>
+equivalence, I will use "set xs". Unfortunately, I cannot use "case"<br>
+with a set. The best I could come up with is the following:</p>
+<p>let matching_entries = {x ∈ set xs. P x} in<br>
+    if matching_entries = {} then None else<br>
+    if ∃y. matching_entries = {y} then Some (the_elem matching_entries) else<br>
+       undefined</p>
+<p>Is there a nicer and better way to express this?</p>
+<p>If xs is distinct, both versions are equivalent (though the proof was<br>
+horrible). For the proof I needed some helper lemmas, for example the<br>
+following:</p>
+<p>lemma "distinct xs ⟹ {x. x ∈ set xs ∧ P x} = {x} ⟹<br>
+       [x←xs . P x] = [x]"<br>
+apply(induction xs)<br>
+ apply(simp)<br>
+apply(simp)<br>
+apply(case_tac "x=a")<br>
+ apply simp_all<br>
+ apply (smt DiffD2 Diff_insert_absorb filter_False insert_compr mem_Collect_eq)<br>
+by (smt Collect_cong ball_empty insert_iff mem_Collect_eq)</p>
+<p>The lemma seems pretty obvious to me so I didn't want to invest much<br>
+time into it. This was the best proof I could come up with. Why can't<br>
+the built-in tools such as blast solve this lemma instantly? I could<br>
+not replace those two smt calls with other one-line methods. What is<br>
+it that makes this lemma so hard for Isabelle?</p>
+<p>Thanks for your advice,<br>
+  Cornelius</p>
+
+
+
+<a name="294648769"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Case%20distinction%20on%20sets/near/294648769" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Case.20distinction.20on.20sets.html#294648769">(Aug 22 2022 at 10:47)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Cornelius,</p>
+<p>You can simplify your definitions if you split the filtering from the section of the <br>
+elements. It looks as if you are trying to lift the operation "pick the unique element in <br>
+a set" into the option monad. So just lift this operaton:</p>
+<p>definition the_elem_option :: "'a set =&gt; 'a option"<br>
+where "the_elem_option A = (if EX1 x. x : A then Some (the_elem A) else None)"</p>
+<p>Note that this specification is tighter than yours as the result is None if there are <br>
+several elements in the set. If you wanted the function to be undefined in a mathematical <br>
+sense, then this approach is likely to make your life hard anyway, because working with <br>
+underspecified functions usually causes quite some pain.</p>
+<p>Moreover, I've replaces EX x. A = {x} with EX1 x. x : A, because the latter involves more <br>
+primitive operations on sets than the former. Intuitively, I'd expect better automation <br>
+for the latter, but I have not tested it.</p>
+<p>In general, I recommend that you work only at the level of abstraction that fits your <br>
+needs. If you want sets (without order on the elements), then stick to the type set (or <br>
+fset, if you need finiteness) and never talk about lists. If you need the order of the <br>
+elements in the list, then work with lists and convert them to sets when needed, but do <br>
+not try to lift the operations from lists to sets when they rely on the order---this <br>
+normally directly leads to ugly, messy, tedious proofs.</p>
+<p>Picking an element from a set is hard for the automated tools, because it involves a <br>
+tricky mix of rewriting and resolution. Blast can only deal with resolution, but not <br>
+rewriting, so blast usually does not work well for proofs involving equality. Conversely, <br>
+the simplifier cannot deal well with underspecified functions (like the_elem).</p>
+<p>Hope this helps,<br>
+Andreas</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,98 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] More strange locale behavior · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20More.20strange.20locale.20behavior.html">[isabelle] More strange locale behavior</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294330822"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20More%20strange%20locale%20behavior/near/294330822" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20More.20strange.20locale.20behavior.html#294330822">(Aug 19 2022 at 17:29)</a>:</h4>
+<p>From: "Eugene W. Stark" &lt;<a href="mailto:stark@cs.stonybrook.edu">stark@cs.stonybrook.edu</a>&gt;<br>
+It seems like with almost anything I try to do with locales,<br>
+I run up against behavior that I have no way to comprehend from<br>
+the documentation that comes with the Isabelle2014 system.</p>
+<p>Here is my latest example (below and also attached).<br>
+The interpretation of partial_order inside the sup_semilattice<br>
+locale context block succeeds, but an attempt to declare<br>
+sup_semilattice as a sublocale of partial_order fails.</p>
+<p>Even though the "locale tutorial" says that the final sublocale<br>
+proof will take place in the context of the sup_semilattice locale,<br>
+apparently the connection between the parameter sup of that<br>
+locale and the derived notion le is not retained.<br>
+What is also strange is that the identifier le is not completely free:<br>
+if I enter a dummy lemma like <code>have "le = le"</code> and CTRL-mouse<br>
+over the "le", it shows not a completely generic type but actually<br>
+the type inherited from the sup_semilattice locale.</p>
+<p>Can anyone explain how I should understand this?  Thanks.</p>
+<p>- Gene Stark</p>
+<p>theory Strange<br>
+imports Main<br>
+begin</p>
+<p>locale partial_order =<br>
+  fixes le :: "'a ⇒ 'a ⇒ bool"<br>
+  assumes le_refl: "le x x"<br>
+  and le_antisym: "le x y ∧ le y x ⟶ x = y"<br>
+  and le_trans: "le x y ∧ le y z ⟶ le x z"</p>
+<p>locale sup_semilattice =<br>
+  fixes I :: 'a and sup :: "'a ⇒ 'a ⇒ 'a"<br>
+  assumes sup_unit_left: "sup I x = x"<br>
+  and sup_unit_right: "sup x I = x"<br>
+  and sup_commute: "sup x y = sup y x"<br>
+  and sup_assoc: "sup x (sup y z) = sup (sup x y) z"<br>
+  and sup_idem: "sup x x = x"<br>
+  begin<br>
+    definition le where "le x y = (sup x y = y)"<br>
+    lemma le_refl: "le x x" using le_def sup_idem by blast<br>
+    lemma le_antisym: "⟦ le x y; le y x ⟧ ⟹ x = y" using le_def sup_commute by auto<br>
+    lemma le_trans: "⟦ le x y; le y z ⟧ ⟹ le x z" using le_def sup_assoc by metis</p>
+<p>lemma le_po: "partial_order le"<br>
+    proof<br>
+      fix x y z<br>
+      show "le x x" using le_refl by auto<br>
+      show "le x y ∧ le y x ⟶ x = y" using le_antisym by auto<br>
+      show "le x y ∧ le y z ⟶ le x z" using le_trans by blast<br>
+    qed</p>
+<p>interpretation partial_order le using le_po by auto<br>
+  end</p>
+<p>sublocale sup_semilattice ⊆ partial_order<br>
+  proof<br>
+    fix x y z<br>
+    show "le x x" using le_refl by auto  (* Fails!  Nitpick gives a counterexample. *)<br>
+    show "le x y ∧ le y x ⟶ x = y" using le_antisym by auto<br>
+    show "le x y ∧ le y z ⟶ le x z" using le_trans by blast<br>
+  qed</p>
+<p>end<br>
+<a href="/user_uploads/14278/X51F18B7H9pMDwMX-W2qpLk5/Strange.thy">Strange.thy</a></p>
+
+
+
+<a name="294331146"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20More%20strange%20locale%20behavior/near/294331146" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20More.20strange.20locale.20behavior.html#294331146">(Aug 19 2022 at 17:31)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Gene,</p>
+<blockquote>
+<p>Can anyone explain how I should understand this?  Thanks.</p>
+</blockquote>
+<p>there is actually nothing strange here:</p>
+<blockquote>
+<p>sublocale sup_semilattice ⊆ partial_order</p>
+</blockquote>
+<p>Note that on the right on side of »⊆« there is a locale expression, not<br>
+a locale name.  To establish the desired correspondence, you have to<br>
+give an explicit instantiation for the parameter(s) of partial_order:</p>
+<blockquote>
+<p>sublocale sup_semilattice ⊆ partial_order le</p>
+</blockquote>
+<p>Otherwise just default names for fresh variables are instantiated.</p>
+<p>Hope this helps,<br>
+    Florian<br>
+<a href="/user_uploads/14278/hMV5KauxhWZ78pLlrJSlAh6X/signature.asc">signature.asc</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

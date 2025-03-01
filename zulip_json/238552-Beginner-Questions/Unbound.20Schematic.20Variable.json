@@ -1,0 +1,50 @@
+[
+    {
+        "content": "<p>I am attempting to prove the strong normalisation of combinatory logic. I have run into an unexpected \"Unbound Schematic Variable <code>?thesis</code>\" error. The code is below (I have attempted to minimise as far as possible and am using Isabelle 2020). Most likely missing something obvious as I am pretty new to Isabelle. The error occurs in the last <code>sorried</code> proof at both instance of <code>?thesis</code>.</p>\n<div class=\"codehilite\"><pre><span></span><code>section ‹Strong_Normalisation›\n\ntheory Strong_Normalisation\n  imports Main\n  abbrevs &quot;⟶w&quot; = &quot;⟶⇩w&quot;\n      and &quot;→p&quot; = &quot;→⇩p&quot;\n      and &quot;⟶b&quot; = &quot;⟶⇩β&quot;\nbegin\n\n(* definition of types for combinatory terms *)\n\ndatatype tp = is_At:  TAtt &quot;nat&quot; | TArr &quot;tp&quot; &quot;tp&quot; (infixr &quot;→⇩p&quot; 200)\n\nabbreviation is_Arr :: &quot;tp ⇒ bool&quot; where\n  &quot;is_Arr τ ≡ ¬ (is_At τ)&quot;\n\n(* head of a combinatory term *)\n\ndatatype (plugins del: size) hd =\n  is_Var: Var (var: string)(type: tp) (&quot;_:_&quot; [100,100] 100)\n| is_S : S (type: tp)  (&quot;S:_&quot; 100)\n| is_K : K (type: tp)  (&quot;K:_&quot; 100)\n| is_Sym: Sym (sym: string)(type: tp) (&quot;_:_&quot; [100,100] 100)\n\nabbreviation is_Comb :: &quot; hd ⇒ bool&quot; where\n  &quot;is_Comb ζ ≡ (is_S ζ) ∨  (is_K ζ)&quot;\n\nsubsection ‹Terms›\n\nconsts head0 :: &#39;a\n\n(* combinatory term *)\n\ndatatype  tm =\n  is_Hd: Hd &quot;hd&quot;\n| App (&quot;fun&quot;:  &quot;tm&quot;) (arg: &quot; tm&quot;)\nwhere\n  &quot;head (App s _) = head0 s&quot;\n| &quot;fun (Hd ζ) = Hd ζ&quot;\n| &quot;arg (Hd ζ) = Hd ζ&quot;\n\noverloading head0 ≡ &quot;head0 :: tm ⇒ hd&quot;\nbegin\n\nprimrec head0 :: &quot;tm ⇒ hd&quot; where\n  &quot;head0 (Hd ζ) = ζ&quot;\n| &quot;head0 (App s _) = head0 s&quot;\n\nend\n\nsubsection ‹Definition of types and combinators›\n\nfun args :: &quot;tm ⇒ tm list&quot; where\n  &quot;args (Hd _) = []&quot;\n| &quot;args (App s t) = args s @ [t]&quot;\n\n(* type of head symbol *)\ndefinition type_hd :: &quot;hd ⇒ tp&quot; where\n  &quot;type_hd t = type(t)&quot;\n\n(* type of term *)\nfun type :: &quot;tm ⇒ tp&quot; where\n&quot;type (Hd h) = type_hd h&quot; |\n&quot;type (App s t) = (case (type s) of\n                    TAtt τ ⇒ TAtt τ |\n                    (α →⇩p γ) ⇒ γ)&quot;\n\nfun size_tp :: &quot;tp ⇒ nat&quot; where\n &quot;size_tp (TAtt τ) = 0&quot; |\n &quot;size_tp (α →⇩p γ) = 1 + size_tp α + size_tp γ&quot;\n\n(* inductive predicate that holds if term is well-typed *)\ninductive typed :: &quot;tm ⇒ bool&quot; where\n&quot;typed (Hd (Var _ _))&quot; |\n&quot;typed (Hd (Sym _ _))&quot; |\n&quot;typed (Hd (K (σ →⇩p γ →⇩p σ)))&quot; |\n&quot;typed (Hd (S ((σ →⇩p τ →⇩p γ) →⇩p (σ →⇩p τ) →⇩p σ →⇩p γ)))&quot; |\n&quot;typed t1 ⟹ (type t1 = (σ →⇩p γ)) ⟹ typed t2 ⟹ (type t1 = σ) ⟹ typed (App t1 t2)&quot;\n\n\n(* inductive definition of combinatory (weak) reduction *)\ninductive\n  weak_reduce :: &quot;tm ⇒ tm ⇒ bool&quot; (&quot; _ ⟶⇩w _&quot; [80,80] 80)\nwhere\n  w1[intro!]: &quot;t1 ⟶⇩w t2 ⟹ App t1 t ⟶⇩w App t2 t&quot;\n| w2[intro!]: &quot;t1 ⟶⇩w t2 ⟹ App t t1 ⟶⇩w App t t2&quot;\n| w4[intro!]: &quot;App (App (Hd (K _)) t1) t2 ⟶⇩w t1&quot;\n| w7[intro!]: &quot;App (App (App (Hd (S _)) t1) t2 ) t3 ⟶⇩w App (App t1 t3) (App t2 t3)&quot;\n\ninductive\n weak_star :: &quot;tm ⇒ tm ⇒ nat ⇒ bool&quot;  (&quot; _ ⟶⇩w* _ _&quot; [80,80] 80)\nwhere\n ws1[intro!] : &quot;t ⟶⇩w* t 0&quot;\n|ws2[intro!] : &quot;⟦(t ⟶⇩w t&#39;); (t&#39; ⟶⇩w* t&#39;&#39; n)⟧ ⟹ (t ⟶⇩w* t&#39;&#39; (n+1))&quot;\n\ndefinition normal_form :: &quot;tm ⇒ bool&quot; where\n &quot;normal_form t1 = (∀ x. ¬(t1 ⟶⇩w x))&quot;\n\ndefinition normalizable :: &quot;tm ⇒ bool&quot; where\n &quot;normalizable t1 = (∃ x n. ((t1 ⟶⇩w* x n) ∧ (normal_form x)))&quot;\n\ndefinition bounded_sn :: &quot;nat ⇒ tm ⇒ bool&quot; where\n  &quot;bounded_sn n t1 ⟷ (∀m. ∀ t. (t1 ⟶⇩w* t m) ⟶ m ≤ n)&quot;\n\ndefinition sn :: &quot;tm ⇒ bool&quot; where\n &quot;sn t1 = (∃n. bounded_sn n t1)&quot;\n\nfunction sc :: &quot;tm ⇒ bool&quot; where\n &quot;sc t1 = (case (type t1) of\n            TAtt τ ⇒ sn t1 |\n            (α →⇩p γ) ⇒ (∀ t2. (type t2 = α) ⟶ (sc t2 ⟶  sc (App t1 t2) ) ))&quot;\n  by auto\n  termination\n    by (relation &quot;measure (λ(t). size_tp (type t))&quot;) auto\n\nlemma a3_10 :\n  fixes τ :: &quot;tp&quot; and\n        t :: &quot;tm&quot;\n  assumes &quot;typed t&quot; and\n          &quot;type t = τ&quot; and\n          &quot; ¬ (is_Comb (head t))&quot;\n  shows  &quot;∀s ∈ (set (args t)). sn s ⟹ sc t&quot; and\n         &quot;sc t ⟹ sn t&quot;\n  using assms\nproof(induction &quot;size_tp τ&quot;)\n  case 0\n  then show ?thesis sorry\nnext\n  case (Suc x)\n  then show ?thesis sorry\nqed\n</code></pre></div>",
+        "id": 236357790,
+        "sender_full_name": "Ahmed B",
+        "timestamp": 1619537036
+    },
+    {
+        "content": "<p><code>?thesis</code> is the last explicitly stated goal; you can't normally use that in an induction anyway because the induction changes the goal. You should use <code>?case</code> instead.</p>\n<p>The reason why <code>?case</code> does not work here either is probably because each of the two cases has two goals. I guess the <code>induction</code>method does not define <code>?case</code> when there is more than one. You can either write down the goals in <code>show</code> explicitly, or you could change your lemma statement so that you use HOL implication and connect the two goals with a HOL conjunction (i.e. <span class=\"katex\"><span class=\"katex-mathml\"><math xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow><mo>∧</mo></mrow><annotation encoding=\"application/x-tex\">\\wedge</annotation></semantics></math></span><span aria-hidden=\"true\" class=\"katex-html\"><span class=\"base\"><span class=\"strut\" style=\"height:0.55556em;vertical-align:0em;\"></span><span class=\"mord\">∧</span></span></span></span>) so that you only have one goal.</p>",
+        "id": 236358507,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1619537271
+    },
+    {
+        "content": "<p>Thanks for your swift response!</p>",
+        "id": 236359497,
+        "sender_full_name": "Ahmed B",
+        "timestamp": 1619537507
+    },
+    {
+        "content": "<p>Other solution:<br>\n(I don't understand why the <code>next</code> between the cases are necessary…)</p>\n<div class=\"codehilite\"><pre><span></span><code>proof(induction &quot;size_tp τ&quot;)\n  case 0\n  case 1\n  show ?case\n    sorry\nnext\n  case 0\n  case 2\n  show ?case\n    sorry\nnext\n  case (Suc x)\n  case 1\n  show ?case\n    sorry\nnext\n  case (Suc x)\n  case 2\n  show ?case\n    sorry\nqed\n</code></pre></div>",
+        "id": 236362273,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1619538530
+    },
+    {
+        "content": "<p>What!?! 🤯</p>",
+        "id": 236362469,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1619538604
+    },
+    {
+        "content": "<p>TIL</p>",
+        "id": 236362596,
+        "sender_full_name": "Manuel Eberl",
+        "timestamp": 1619538638
+    },
+    {
+        "content": "<p>The slight problem with this idiom is that I have never seen any documentation on it. So I don't really know if I should search longer or of it accidentally works.</p>",
+        "id": 236367571,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1619540534
+    },
+    {
+        "content": "<p>(I think I stumbled by accident on it…)</p>",
+        "id": 236367610,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1619540556
+    }
+]

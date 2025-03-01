@@ -1,0 +1,786 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Using Types_To_Sets · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Using.20Types_To_Sets.html">[isabelle] Using Types_To_Sets</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="310479416"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Using%20Types_To_Sets/near/310479416" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Using.20Types_To_Sets.html#310479416">(Nov 16 2022 at 19:08)</a>:</h4>
+<p>From: Dominique Unruh &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Hello,</p>
+<p>[tl;dr: I have worked with Types_To_Sets and am shortly reporting my <br>
+experience and asking for feedback whether there are easier mechanisms <br>
+for these kinds of tasks.]</p>
+<p>I have just used Types_To_Sets to translate a theorem stated on Hilbert <br>
+spaces on the whole type to one stated on a subspace on that type.</p>
+<p>Specifically, I'm translating this (the existence of an orthonormal basis):</p>
+<p>[source]<br>
+    &lt;<a href="https://github.com/dominique-unruh/afp/blob/5ceb065bd5f9f4469717a11a73d894b0711b44f0/thys/Complex_Bounded_Operators/Complex_Inner_Product.thy#L1905">https://github.com/dominique-unruh/afp/blob/5ceb065bd5f9f4469717a11a73d894b0711b44f0/thys/Complex_Bounded_Operators/Complex_Inner_Product.thy#L1905</a>&gt;</p>
+<p>into this:</p>
+<p>[source]<br>
+    &lt;<a href="https://github.com/dominique-unruh/afp/blob/5ceb065bd5f9f4469717a11a73d894b0711b44f0/thys/Registers/Tmp_Move.thy#L758">https://github.com/dominique-unruh/afp/blob/5ceb065bd5f9f4469717a11a73d894b0711b44f0/thys/Registers/Tmp_Move.thy#L758</a>&gt;</p>
+<p>It turns out that this is <em>a lot</em> of effort. I needed to do the <br>
+following things before I could even start translating the theorem:</p>
+<p>* I had to make unoverloaded definitions//(e.g., /closure.with/<br>
+    &lt;<a href="https://github.com/dominique-unruh/afp/blob/5ceb065bd5f9f4469717a11a73d894b0711b44f0/thys/Registers/Tmp_Move.thy#L695">https://github.com/dominique-unruh/afp/blob/5ceb065bd5f9f4469717a11a73d894b0711b44f0/thys/Registers/Tmp_Move.thy#L695</a>&gt;)<br>
+    //of many constants (those used in the theorem, and recursively<br>
+    those in the definitions). This is fortunately quite easy using the<br>
+    command <em>unoverload_definition</em>.</p>
+<p>* For each of those constants I had to define a related one "on sets".<br>
+    (E.g., /definition ‹nhds_on A open a = (⨅ (principal ` {S. S ⊆ A ∧<br>
+    open S ∧ a ∈ S})) ⊓ principal A›/<br>
+    &lt;<a href="https://github.com/dominique-unruh/afp/blob/5ceb065bd5f9f4469717a11a73d894b0711b44f0/thys/Registers/Tmp_Move.thy#L475">https://github.com/dominique-unruh/afp/blob/5ceb065bd5f9f4469717a11a73d894b0711b44f0/thys/Registers/Tmp_Move.thy#L475</a>&gt;<br>
+    as an analogue to the constant nhds.)</p>
+<p>* For each of those constants I had to write a transfer-rule relating<br>
+    the one on sets to the original (unoverloaded) one. (E.g.,<br>
+    nhds_transfer<br>
+    &lt;<a href="https://github.com/dominique-unruh/afp/blob/5ceb065bd5f9f4469717a11a73d894b0711b44f0/thys/Registers/Tmp_Move.thy#L478">https://github.com/dominique-unruh/afp/blob/5ceb065bd5f9f4469717a11a73d894b0711b44f0/thys/Registers/Tmp_Move.thy#L478</a>&gt;.)<br>
+    Interestingly, I had in various cases to unfold definitions using<br>
+    the definitional axiom (e.g.,<br>
+    Topological_Spaces.topological_space.nhds_def_raw<br>
+    &lt;<a href="https://github.com/dominique-unruh/afp/blob/5ceb065bd5f9f4469717a11a73d894b0711b44f0/thys/Registers/Tmp_Move.thy#L484">https://github.com/dominique-unruh/afp/blob/5ceb065bd5f9f4469717a11a73d894b0711b44f0/thys/Registers/Tmp_Move.thy#L484</a>&gt;)<br>
+    because the unoverloaded ends up using "internal" constants such as<br>
+    topological_space.nhds instead of nhds.</p>
+<p>* Those constants on sets, I needed to relate to existing definitions<br>
+    on sets. (E.g., /‹nhds_on (topspace T) (openin T) x = nhdsin T x› if<br>
+    ‹x ∈ topspace T›/<br>
+    &lt;<a href="https://github.com/dominique-unruh/afp/blob/5ceb065bd5f9f4469717a11a73d894b0711b44f0/thys/Registers/Tmp_Move.thy#L493">https://github.com/dominique-unruh/afp/blob/5ceb065bd5f9f4469717a11a73d894b0711b44f0/thys/Registers/Tmp_Move.thy#L493</a>&gt;<br>
+    to related the nonstandard /nhds_on /to the existing /nhdsin/ on the<br>
+    type /topology/. (I cannot directly write transfer-rules from the<br>
+    unoverloaded constants to those existing definitions on sets because<br>
+    the transfer mechanism leads to definitions that behave different<br>
+    from the builtin ones in "bad" situation, e.g., when a function maps<br>
+    to values outside its supposed range.) In some cases, the<br>
+    definitions don't match up nicely, and one needs to do some<br>
+    non-trivial proofs to relate them (i.e., actually the math, not just<br>
+    translating terms, e.g. here<br>
+    &lt;<a href="https://github.com/dominique-unruh/afp/blob/5ceb065bd5f9f4469717a11a73d894b0711b44f0/thys/Registers/Tmp_Move.thy#L202">https://github.com/dominique-unruh/afp/blob/5ceb065bd5f9f4469717a11a73d894b0711b44f0/thys/Registers/Tmp_Move.thy#L202</a>&gt;).</p>
+<p>* Additionally, I had to (again recursively) write transfer theorems<br>
+    and "definitions on sets" for the type class /chilbert_space/<br>
+    &lt;<a href="https://github.com/dominique-unruh/afp/blob/5ceb065bd5f9f4469717a11a73d894b0711b44f0/thys/Registers/Tmp_Move.thy#L617">https://github.com/dominique-unruh/afp/blob/5ceb065bd5f9f4469717a11a73d894b0711b44f0/thys/Registers/Tmp_Move.thy#L617</a>&gt;<br>
+    and all its ancestors.</p>
+<p>* And I had to relate those definitions on sets to existing ones again<br>
+    (e.g., ‹chilbert_space_on V (<em>⇩R) (</em>⇩C) (+) 0 (-) uminus dist norm<br>
+    sgn (uniformity_on V) (openin (top_of_set V)) (∙⇩C)› if ‹complete V›<br>
+    &lt;<a href="https://github.com/dominique-unruh/afp/blob/5ceb065bd5f9f4469717a11a73d894b0711b44f0/thys/Registers/Tmp_Move.thy#L637">https://github.com/dominique-unruh/afp/blob/5ceb065bd5f9f4469717a11a73d894b0711b44f0/thys/Registers/Tmp_Move.thy#L637</a>&gt;).</p>
+<p>All of this is a lot of effort. In fact, the Isabelle code just for <br>
+translating the theorem is over 800 lines (available here <br>
+&lt;<a href="https://raw.githubusercontent.com/dominique-unruh/afp/5ceb065bd5f9f4469717a11a73d894b0711b44f0/thys/Registers/Tmp_Move.thy">https://raw.githubusercontent.com/dominique-unruh/afp/5ceb065bd5f9f4469717a11a73d894b0711b44f0/thys/Registers/Tmp_Move.thy</a>&gt;, <br>
+needs Isabelle2022 with AFP). Of these, about 750 are just setup.</p>
+<p>So I am wondering: Are there better ways to do this? Are there <br>
+automations for this that I am not aware of? Other shortcuts? Etc.?</p>
+<p>(And if not, then I leave this out here as an instructive example how to <br>
+do a nontrivial transfer with Types_To_Sets.)</p>
+<p>Best wishes,<br>
+Dominique.<br>
+<a href="/user_uploads/14278/xE61jX8QiPzLIgECZ2BfEGSX/DOd7tJAoTaqHiL0u.png">DOd7tJAoTaqHiL0u.png</a><br>
+<a href="/user_uploads/14278/qc6-k6A5P84oIFhkkRfDNl-6/ymc1JRSESGOFkrkG.png">ymc1JRSESGOFkrkG.png</a></p>
+
+
+
+<a name="310483008"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Using%20Types_To_Sets/near/310483008" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Using.20Types_To_Sets.html#310483008">(Nov 16 2022 at 19:26)</a>:</h4>
+<p>From: Andrei Popescu &lt;<a href="mailto:andrei.h.popescu@gmail.com">andrei.h.popescu@gmail.com</a>&gt;<br>
+Hi Dominique,</p>
+<p>Mihails Milehins has a tool in the AFP that automates much of the process:<br>
+<a href="https://www.isa-afp.org/entries/Types_To_Sets_Extension.html">https://www.isa-afp.org/entries/Types_To_Sets_Extension.html</a><br>
+He also describes this in his CPP paper:<br>
+<a href="https://gitlab.com/user9716869/etts_preprint/-/raw/master/ETTS_Preprint.pdf">https://gitlab.com/user9716869/etts_preprint/-/raw/master/ETTS_Preprint.pdf</a></p>
+<p>Best wishes,<br>
+Andrei</p>
+
+
+
+<a name="310486335"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Using%20Types_To_Sets/near/310486335" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Using.20Types_To_Sets.html#310486335">(Nov 16 2022 at 19:42)</a>:</h4>
+<p>From: Andrei Popescu &lt;<a href="mailto:andrei.h.popescu@gmail.com">andrei.h.popescu@gmail.com</a>&gt;<br>
+And just to advertise some further developments on the topic: In<br>
+recent work (with Dmitriy Traytel)<br>
+<a href="https://www.andreipopescu.uk/pdf/types2pers_POPL2023.pdf">https://www.andreipopescu.uk/pdf/types2pers_POPL2023.pdf</a><br>
+we perform truly pervasive types-to-sets relativization without<br>
+structural restrictions, in the more general form of "types to PERs".<br>
+The tool linked from the paper is currently in a very prototypical<br>
+stage, and adds axioms -- even though we show meta-theoretically that<br>
+the axioms can be replaced by proved statements.</p>
+<p>Best wishes,<br>
+Andrei</p>
+
+
+
+<a name="311420972"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Using%20Types_To_Sets/near/311420972" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Using.20Types_To_Sets.html#311420972">(Nov 21 2022 at 16:34)</a>:</h4>
+<p>From: Dominique Unruh &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Hi,</p>
+<p>thanks for the pointer. I tried out ETTS (i.e., tried porting my code to <br>
+use it instead). Here are my experiences (and further thoughts). Note <br>
+that these are experiences after a smaller project (1000 loc) so may not <br>
+or may not be accurate.</p>
+<p>* ETTS (and the connected project CTR) provide automation for defining<br>
+    unoverloaded and set-based constants and for transferring type-based<br>
+    theorems to set-based theorems. If everything works smoothly, that<br>
+    means that one can transfer both constants and theorems with minimal<br>
+    boilerplate.</p>
+<p>* I feel that in practice, it is rare that everything works smoothly.<br>
+    In many cases, one simply gets an answer such as "couldn't find a<br>
+    transfer rule". This may be due to either the need to first generate<br>
+    transfer-rules for other dependent constants, or simply because the<br>
+    terms in questions are not good for transferring. (E.g., contain<br>
+    constants that do not have admit strong parametricity- or<br>
+    transfer-rules.)</p>
+<p>* These problems also occur when directly writing transfer theorems<br>
+    but it is easier to debug. (E.g., by replacing /apply<br>
+    transfer_prover /by /apply transfer_prover_start apply<br>
+    transfer_step+/.) So I found myself often proving the required<br>
+    transfer theorems by hand (and first defining the unoverloaded<br>
+    constants by hand), and then replacing the result by a CTR call.</p>
+<p>* An additional difficulty is that to understand how to use (and<br>
+    tweak) CTR/ETTS, one needs to understand the TTS and transfer<br>
+    mechanisms quite well. So ETTS does not help users who cannot use<br>
+    TTS manually anyway. (ETTS may lead to shorter code but the effort<br>
+    to produce this code does not seem smaller to me.)</p>
+<p>* I did not get the tts_lemmas command itself to work. (But I did not<br>
+    try long after getting an error because the number of theorems that<br>
+    I wanted to transfer is quite low so I stuck to the manual approach<br>
+    there.)</p>
+<p>* In the end, my code length actually increased to my surprise. (Point<br>
+    to note: I transferred classes involving filters such as<br>
+    metric_space etc. Filters are quite fiddlesome when trying to do<br>
+    transfers because rel_filter is a complicated beast.)</p>
+<p>Altogether, I would say there there is still a lot of research potential <br>
+to make TTS more userfriendly. (But ETTS is already an important and <br>
+impressive step. It's just that TTS in its nature is complicated.)</p>
+<p>In the end, I came to follow the following approach for my own project <br>
+(maybe this guidelines is of use for others):</p>
+<p>* For each involved class X, do the following:<br>
+      o Define a locale /class_X_ow /with one additional parameter U<br>
+        (the carrier set) but otherwise analogous to the definition of<br>
+        the predicate /class.X/. (E.g., metric_space_ow<br>
+        &lt;<a href="https://github.com/dominique-unruh/afp/blob/ba7d9eb8dbe6e877c195c8077b65c6fae9d792cc/thys/Registers/Tmp_Move.thy#L638">https://github.com/dominique-unruh/afp/blob/ba7d9eb8dbe6e877c195c8077b65c6fae9d792cc/thys/Registers/Tmp_Move.thy#L638</a>&gt;.)<br>
+        Try to write the definitions already so that parametricity<br>
+        proofs are easy. In most cases, this is done by simply replacing<br>
+        unbounded "∀x" by "∀x∈U" but in some cases a little more care is<br>
+        needed.<br>
+      o Prove a parametricity result /lemma class_X_ow_parametricity<br>
+        assumes "bi_unique T" shows "(relator involving T)<br>
+        //X_ow_parametricity //X_ow_parametricity"/. (Here I deviate<br>
+        from the approach used by ETTS. There one would prove a<br>
+        transfer-rule relating the unoverloaded definition with the<br>
+        set-based definition and with assumptions /bi_unique T/ and<br>
+        /right_total T/. My approach avoids the definition of the<br>
+        intermediate unoverloaded but type-based constant. Sometimes the<br>
+        /ctr parametricity/ command manages this. (E.g., here &lt;ctr<br>
+        parametricity in metric_space_ow_def[unfolded<br>
+        metric_space_ow_axioms_def]&gt; or here<br>
+        &lt;<a href="https://github.com/dominique-unruh/afp/blob/ba7d9eb8dbe6e877c195c8077b65c6fae9d792cc/thys/Registers/Tmp_Move.thy#L517">https://github.com/dominique-unruh/afp/blob/ba7d9eb8dbe6e877c195c8077b65c6fae9d792cc/thys/Registers/Tmp_Move.thy#L517</a>&gt;.)<br>
+      o Prove an unoverloading result of the form: /lemma class_ud:<br>
+        "class.X = class_X_ow UNIV". /In most cases, this works quite<br>
+        easily by unfolding the definitions and using /simp/. E.g. here<br>
+        &lt;<a href="https://github.com/dominique-unruh/afp/blob/ba7d9eb8dbe6e877c195c8077b65c6fae9d792cc/thys/Registers/Tmp_Move.thy#L645">https://github.com/dominique-unruh/afp/blob/ba7d9eb8dbe6e877c195c8077b65c6fae9d792cc/thys/Registers/Tmp_Move.thy#L645</a>&gt;.<br>
+      o Note that this approach needs less definitions than the ETTS<br>
+        approach because we do not define first an unoverloaded version<br>
+        and then a transferred version. We still get everything that we<br>
+        have in ETTS: /class_//X_ow UNIV/ is the same as the<br>
+        unoverloaded (but not yet set-based) constant.<br>
+      o Prove various helping lemmas for standard cases, such as<br>
+        /class_metric_space_ow_typeclass/<br>
+        &lt;<a href="https://github.com/dominique-unruh/afp/blob/ba7d9eb8dbe6e877c195c8077b65c6fae9d792cc/thys/Registers/Tmp_Move.thy#L648&gt;that">https://github.com/dominique-unruh/afp/blob/ba7d9eb8dbe6e877c195c8077b65c6fae9d792cc/thys/Registers/Tmp_Move.thy#L648&gt;that</a><br>
+        servers as an introduction rule for the _ow predicate when we do<br>
+        have use the type-class /metric_space///on the set-based side.</p>
+<p>* For each involved constant X, do the following:<br>
+      o Define /X_ow/, the unoverloaded set-based constant (e.g.,<br>
+        nhds_ow<br>
+        &lt;<a href="https://github.com/dominique-unruh/afp/blob/ba7d9eb8dbe6e877c195c8077b65c6fae9d792cc/thys/Registers/Tmp_Move.thy#L656">https://github.com/dominique-unruh/afp/blob/ba7d9eb8dbe6e877c195c8077b65c6fae9d792cc/thys/Registers/Tmp_Move.thy#L656</a>&gt;).<br>
+      o Prove parametricity (e.g. here &lt;ctr parametricity in<br>
+        nhds_ow_def[folded transfer_bounded_filter_Inf_def, unfolded<br>
+        make_parametricity_proof_friendly]&gt;) and an unoverloading result<br>
+        (e.g., here<br>
+        &lt;<a href="https://github.com/dominique-unruh/afp/blob/ba7d9eb8dbe6e877c195c8077b65c6fae9d792cc/thys/Registers/Tmp_Move.thy#L664">https://github.com/dominique-unruh/afp/blob/ba7d9eb8dbe6e877c195c8077b65c6fae9d792cc/thys/Registers/Tmp_Move.thy#L664</a>&gt;)<br>
+        like with the class. And auxiliary lemmas (e.g., here<br>
+        &lt;<a href="https://github.com/dominique-unruh/afp/blob/ba7d9eb8dbe6e877c195c8077b65c6fae9d792cc/thys/Registers/Tmp_Move.thy#L667">https://github.com/dominique-unruh/afp/blob/ba7d9eb8dbe6e877c195c8077b65c6fae9d792cc/thys/Registers/Tmp_Move.thy#L667</a>&gt;<br>
+        one relating /nhds_ow /to the existing /nhds//_in/ based on the<br>
+        type /'a topology/.)</p>
+<p>*   Finally, all this can be used for transferring theorems, I give<br>
+    one example here<br>
+    &lt;<a href="https://github.com/dominique-unruh/afp/blob/ba7d9eb8dbe6e877c195c8077b65c6fae9d792cc/thys/Registers/Tmp_Move.thy#L959">https://github.com/dominique-unruh/afp/blob/ba7d9eb8dbe6e877c195c8077b65c6fae9d792cc/thys/Registers/Tmp_Move.thy#L959</a>&gt;.</p>
+<p>Note the difference in approach: we do not define two unoverloaded <br>
+constants but one. As a consequence, only one transfer-theorem is used <br>
+per constant. Also, in my opinion, things become more regular this way: <br>
+A type-based constant can often be defined in numerous equivalent ways. <br>
+But once unoverloaded, the definitions become non-equal. And the ones <br>
+that arise from unoverloading directly may then not be suitable for a <br>
+transfer theorem (because the transfer theorem can then not assume that <br>
+the laws of the original type-class are satisfied). (E.g., the sum over <br>
+an abelian monoid can choose any order in which to add, or even require <br>
+by definition that all the ways of adding give the same result. But when <br>
+I underload sum, I get something that invole THE or SOME which is very <br>
+unsuitable for transferring.) My approach forces imposes some discpline <br>
+that avoids falling into this trap. Whether it is preferrable for <br>
+transferring large libraries I cannot tell but I thought I put it out <br>
+there for inspiration.</p>
+<p>Best wishes,<br>
+Dominique.</p>
+
+
+
+<a name="312214390"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Using%20Types_To_Sets/near/312214390" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Using.20Types_To_Sets.html#312214390">(Nov 25 2022 at 15:44)</a>:</h4>
+<p>From: Mihails Milehins &lt;<a href="mailto:mihailsmilehins@gmail.com">mihailsmilehins@gmail.com</a>&gt;<br>
+Dear Dominique Unruh,</p>
+<p>Thank you for your feedback about the ETTS. I would like to make several<br>
+remarks with regard to your feedback:</p>
+<ol>
+<li>
+<p>The UD/CTR provide auxiliary/complementary commands. Neither one is a<br>
+prerequisite for using the ETTS. Neither one of them is universally<br>
+applicable. They merely implement the algorithms that are described in the<br>
+user manuals, hopefully, faithfully. Indeed, your assumption is correct,<br>
+neither creates the constants/transfer rules recursively. Thus, for<br>
+example, for the operation of the CTR, the constants that occur as subterms<br>
+in the definitions need to be relativized explicitly. Also, the CTR suffers<br>
+from the same fundamental limitations that the algorithm used in the<br>
+transfer_prover suffers from, as the CTR merely provides an interface to<br>
+it. However, most of this is already stated in the manuals/paper or, at<br>
+least, can be easily inferred from the descriptions of the algorithms.</p>
+</li>
+<li>
+<p>The ETTS was built around an implementation of a variant of the<br>
+types-to-sets algorithm that is described in the manual/paper. The<br>
+implementation is available via the command tts_lemmas. This algorithm is<br>
+largely based on the algorithm from [1], with some additional "features"<br>
+based on [2]. In a sense, the ETTS is meant to be applied in a manner<br>
+similar to how one would use traditional classical reasoners/simp-based<br>
+methods (like auto/force) with additional settings (trial and error) and,<br>
+in my view, provides a similar level of automation over proving each step<br>
+manually using the rule-based tactics. Indeed, there are times when I feel<br>
+like it is easier to use rule-based tactics explicitly, than making<br>
+auto/force work implicitly. A good rhetorical question to ask here would<br>
+be: are auto/force tools inferior in comparison to rule application or am<br>
+I a "bad" user of auto/force? Perhaps, the answer is neither. With<br>
+experience we all learn when methods like auto/force are more suitable, and<br>
+when the preference should be given to direct rule application. However,<br>
+like with the types-to-sets-related-technologies, there is much scope for<br>
+the improvement of traditional proof methods (the only difference being<br>
+that types-to-sets is still quite novel and specialized, whereas the<br>
+traditional proof methods and their implementations have been refined over<br>
+decades by a large number of users/developers).</p>
+</li>
+<li>
+<p>The most common problem for the operation of the ETTS is the<br>
+unavailability of suitably stated transfer rules. It has an in-built "proof<br>
+debugger" that can be invoked by adding "!" to the command tts_lemmas. This<br>
+shows the steps invoked by the algorithm, and it is meant to be used<br>
+extensively during the "setup" phase of the ETTS, while looking for<br>
+suitable transfer rules for the constants associated with a given theory.<br>
+The full unconstrained automation of the synthesis of arbitrary transfer<br>
+rules was never claimed anywhere in the paper/manual, merely the automation<br>
+of the application of a variant of a types-to-sets algorithm, if the<br>
+prerequisites for its application are satisfied.</p>
+</li>
+<li>
+<p>I have to admit, subjectively your feedback feels quite similar to the<br>
+feedback that new (hypothetical) users of Isabelle often give to the method<br>
+"auto" on Stack Overflow when trying it for the first time: "it just gives<br>
+me an error (failed to finish proof) and it does not prove the theorems<br>
+that I want!". I was expecting a more in-depth feedback from experienced<br>
+users of Isabelle before applying a certain amount of smear to someone<br>
+else’s work :-). However, of course, words are cheap. As you can see from<br>
+the ETTS AFP entry, I performed the relativization of significant parts of<br>
+the main library using the ETTS, including essentially all of the<br>
+relativization work performed by Fabian Immler and Bohua Zhan in [2].<br>
+Furthermore, thus far, I only reported on a fraction of all of the theorems<br>
+that I relativized while trying the tool. For example, I performed the<br>
+relativization of almost all of the theorems about topological spaces,<br>
+including the ones that required filters (the latter, indeed, was not<br>
+trivial and required some additional ad-hoc manual proof effort related to<br>
+the transfer infrastructure). Unfortunately, these efforts are now lost,<br>
+but I can recreate them within a reasonable time frame.</p>
+</li>
+<li>
+<p>I would be happy to take on the challenge of performing the<br>
+relativization of the theorems that you would like to relativize using the<br>
+ETTS in my spare time. Feel free to point me to the specific theories for<br>
+which you would like the relativization to be performed using the ETTS.<br>
+However, presently, I have little time to dedicate to such matters (the<br>
+time around Christmas would probably be the best time for me). Therefore, I<br>
+cannot guarantee a very quick response time.</p>
+</li>
+</ol>
+<p>Yours Sincerely,<br>
+Mihails Milehins<br>
+(he/him/his)</p>
+<ol>
+<li>
+<p>Kunčar O, Popescu A. From Types to Sets by Local Type Definition in<br>
+Higher-Order Logic. Journal of Automated Reasoning. 2019;62(2):237–60.</p>
+</li>
+<li>
+<p>Immler F, Zhan B. Smooth Manifolds and Types to Sets for Linear Algebra<br>
+in Isabelle/HOL. In: Mahboubi A, Myreen MO, editors. Proceedings of the 8th<br>
+ACM SIGPLAN International Conference on Certified Programs and Proofs, CPP<br>
+2019, Cascais, Portugal. New York, NY, USA: ACM; 2019. p. 65–77. (CPP<br>
+2019).</p>
+</li>
+</ol>
+
+
+
+<a name="315977404"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Using%20Types_To_Sets/near/315977404" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Using.20Types_To_Sets.html#315977404">(Dec 15 2022 at 08:04)</a>:</h4>
+<p>From: Dominique Unruh &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Hi,</p>
+<p>sorry for the late answer...</p>
+
+
+
+<a name="317839927"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Using%20Types_To_Sets/near/317839927" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Using.20Types_To_Sets.html#317839927">(Dec 25 2022 at 14:02)</a>:</h4>
+<p>From: Mihails Milehins &lt;<a href="mailto:mihailsmilehins@gmail.com">mihailsmilehins@gmail.com</a>&gt;<br>
+Dear Dominique Unruh/All,</p>
+<p>Thank you for your email.</p>
+<p>Since I already lifted the theorems using my own approach at the time of</p>
+<blockquote>
+<p>writing, I do not necessarily <em>need</em> a relativization using ETTS for my<br>
+use-case. But if you think it would be interesting as a case study, I would<br>
+at least be curious to see how easy or hard it is to do with ETTS.</p>
+<p>...<br>
+But as I said – only if you find this interesting yourself. I will<br>
+probably not include it in my theories because I already have a solution.</p>
+</blockquote>
+<blockquote>
+<p>If I understood correctly, there were three theorems for which the<br>
+relativization needed to be performed:</p>
+</blockquote>
+<p>1. on_closure_eqI<br>
+   2. orthonormal_basis_exists<br>
+   3. has_sum_comm_additive_general</p>
+<p>I felt that it could be beneficial for me to demonstrate that the ETTS can<br>
+be used for the relativization of the aforementioned theorems, because your<br>
+previous comments did cast doubt on the applicability of the ETTS to these<br>
+theorems. However, given that the results are not needed for any practical<br>
+purpose and (as I explain below) I have little personal interest in the<br>
+ETTS, I provide only the relativization of the theorems on_closure_eqI and<br>
+has_sum_comm_additive_general (<br>
+<a href="https://gitlab.com/user9716869/etts_sml_extra/">https://gitlab.com/user9716869/etts_sml_extra/</a> - this is meant to be used<br>
+with Isabelle2022 and the associated release version of the AFP). This was<br>
+achieved without any alterations of the ETTS or the methodology for its<br>
+application proposed in the SML examples suite. I hope that it is apparent<br>
+to see that orthonormal_basis_exists can also be lifted using the ETTS in a<br>
+similar manner with some further effort on the side of the relativization<br>
+of constants.</p>
+<p>I will use this opportunity to make several general remarks:</p>
+<p>1. As I mentioned before, I believe that it can be easy to conflate<br>
+   several interrelated topics when assessing the UD/CTR/ETTS. The UD/CTR/ETTS<br>
+   provide an implementation/automation/infrastructure for the application of<br>
+   several algorithms that were suggested in the published literature (e.g.,<br>
+   [2] and [3]). The relativization algorithm implemented as part of the ETTS<br>
+   requires every constant that occurs in the input theorem to be relativized<br>
+   (in a predefined format) prior to its application. AFAIK, no algorithm for<br>
+   fully automated relativization of an arbitrary constant in Isabelle/HOL was<br>
+   proposed before/while I was working on the ETTS. While the frameworks<br>
+   UD/CTR/parametricity provide a partial solution for the relativization of<br>
+   constants, it is expected that some manual effort will also be (inevitably)<br>
+   required. Essentially all of the manual proofs in<br>
+<a href="https://gitlab.com/user9716869/etts_sml_extra/">https://gitlab.com/user9716869/etts_sml_extra/</a> are somehow related to<br>
+   the relativization of constants, not the application of the relativization<br>
+   algorithm. An entirely different topic is the presentation of the<br>
+   relativized results in a specific format desired by the user. Here, the<br>
+   ETTS provides a range of utilities up to the application of certain<br>
+   attributes for post-processing of the results of the relativization at a<br>
+   large scale. Nonetheless, it is difficult to disagree with your original<br>
+   criticism that there is some scope for the improvement of the ETTS/UD/CTR:<br>
+   a common saying in commercial software development is "software can only be<br>
+   released, never finished". My own backlog for the ETTS was growing<br>
+   continuously throughout its development, and its release was based on the<br>
+   time I was happy to dedicate to its development, rather than any other<br>
+   factor.</p>
+<p>2. <a href="https://gitlab.com/user9716869/etts_sml_extra/">https://gitlab.com/user9716869/etts_sml_extra/</a> provides many<br>
+   additional results, not directly related to the theorems in<br>
+<a href="https://github.com/dominique-unruh/afp/blob/306ef85bea71cea76b5794c76ef260ab1ffa46ff/thys/Hilbert_Space_Tensor_Product/Misc_Tensor_Product_TTS.thy#L944">https://github.com/dominique-unruh/afp/blob/306ef85bea71cea76b5794c76ef260ab1ffa46ff/thys/Hilbert_Space_Tensor_Product/Misc_Tensor_Product_TTS.thy#L944</a>.<br>
+   These results are not needed for the relativization of the theorems in<br>
+   question. However, their creation required almost no extra effort, and I<br>
+   thought that it does not hurt to provide them given the opportunity.</p>
+<p>3. Overall, I largely abandoned my work on the ETTS in 2019 due to the<br>
+   lack of personal interest in this subject. Nonetheless, I felt a<br>
+   necessity to refine this work to the extent that it could be considered<br>
+   close to production level and make an attempt to publish it because much of<br>
+   the community's time was invested in it (in fact, I allowed this<br>
+   development to be largely driven by the desires of the community, providing<br>
+   merely an implementation of the ideas suggested to me) and because I<br>
+   was encouraged to do so by several members of the community. Therefore, I<br>
+   was very pleased to find out that this line of work is being taken in a<br>
+   different direction [1], as I felt that it would be a chore for me to<br>
+   respond to feedback about the ETTS or improve the ETTS in any way (I became<br>
+   aware of the other line of work some time before the publication of my own<br>
+   work at the CPP). For these two reasons, I also minimized the effort on<br>
+   investigating the current issue, and only provided a sketch of a solution<br>
+   using the ETTS, not a refined production level code immediately suitable<br>
+   for your specific application.</p>
+<p>4. Finally, from a personal perspective, I do not recommend the use of<br>
+   the original framework types-to-sets (not only the ETTS) for the<br>
+   formalization of mathematics at large. The reasons for this are largely<br>
+   subjective, but go beyond the use of the additional axioms. Despite that I<br>
+   tried not to criticize publicly my own work on types-to-sets and its<br>
+   predecessors prior to the publication of the ETTS as a courtesy to those<br>
+   who invested time in helping me, I became a staunch opponent of the library<br>
+   design patterns that rely on the conversion of type-based-results to any<br>
+   form of set-based-results (or vice versa, or any other form of duplication)<br>
+   towards the end of 2019. I believe that maintaining entire "duplicate<br>
+   libraries" of constants and results is exceptionally inefficient: the<br>
+   priority in the area of library design should be the elimination of<br>
+   duplication, not finding ways to generate more "semantic duplicates"<br>
+   automatically (of course, this is not an attempt to criticize the transfer<br>
+   tools at large, merely their use for the production of<br>
+   "semantic duplicates" in the context of the design of libraries of<br>
+   formalized mathematics).</p>
+<p>Lastly, Merry Christmas and a Happy New Year!</p>
+<p>Yours Sincerely,<br>
+Mihails Milehins<br>
+(he/him/his)</p>
+<ol>
+<li>
+<p>Popescu A, Traytel D. Admissible Types-To-PERs Relativization in<br>
+Higher-Order Logic. POPL 2023 (to appear).</p>
+</li>
+<li>
+<p>Kunčar O, Popescu A. From Types to Sets by Local Type Definition in<br>
+Higher-Order Logic. Journal of Automated Reasoning. 2019;62(2):237–60.</p>
+</li>
+<li>
+<p>Immler F, Zhan B. Smooth Manifolds and Types to Sets for Linear Algebra<br>
+in Isabelle/HOL. In: Mahboubi A, Myreen MO, editors. Proceedings of the 8th<br>
+ACM SIGPLAN International Conference on Certified Programs and Proofs, CPP<br>
+2019, Cascais, Portugal. New York, NY, USA: ACM; 2019. p. 65–77. (CPP<br>
+2019).</p>
+</li>
+</ol>
+<p>On Thu, Dec 15, 2022 at 10:03 AM Dominique Unruh &lt;<a href="mailto:unruh@ut.ee">unruh@ut.ee</a>&gt; wrote:</p>
+<blockquote>
+<p>Hi,</p>
+<p>sorry for the late answer...</p>
+<ol start="5">
+<li>I would be happy to take on the challenge of performing the<br>
+relativization of the theorems that you would like to relativize using the<br>
+ETTS in my spare time. Feel free to point me to the specific theories for<br>
+which you would like the relativization to be performed using the ETTS.<br>
+However, presently, I have little time to dedicate to such matters (the<br>
+time around Christmas would probably be the best time for me). Therefore, I<br>
+cannot guarantee a very quick response time.</li>
+</ol>
+<p>Since I already lifted the theorems using my own approach at the time of<br>
+writing, I do not necessarily <em>need</em> a relativization using ETTS for my<br>
+use-case. But if you think it would be interesting as a case study, I would<br>
+at least be curious to see how easy or hard it is to do with ETTS.</p>
+<p>You can find the relativizations that I was proving here:<br>
+<a href="https://github.com/dominique-unruh/afp/blob/306ef85bea71cea76b5794c76ef260ab1ffa46ff/thys/Hilbert_Space_Tensor_Product/Misc_Tensor_Product_TTS.thy#L944">https://github.com/dominique-unruh/afp/blob/306ef85bea71cea76b5794c76ef260ab1ffa46ff/thys/Hilbert_Space_Tensor_Product/Misc_Tensor_Product_TTS.thy#L944</a><br>
+starting from line 944.</p>
+<p>But as I said – only if you find this interesting yourself. I will<br>
+probably not include it in my theories because I already have a solution.</p>
+<p>Best wishes,<br>
+Dominique.</p>
+<p>On 2022-11-22 5:19, Mihails Milehins wrote:</p>
+<p>Dear Dominique Unruh,</p>
+<p>Thank you for your feedback about the ETTS. I would like to make several<br>
+remarks with regard to your feedback:</p>
+<ol>
+<li>
+<p>The UD/CTR provide auxiliary/complementary commands. Neither one is a<br>
+prerequisite for using the ETTS. Neither one of them is universally<br>
+applicable. They merely implement the algorithms that are described in the<br>
+user manuals, hopefully, faithfully. Indeed, your assumption is correct,<br>
+neither creates the constants/transfer rules recursively. Thus, for<br>
+example, for the operation of the CTR, the constants that occur as subterms<br>
+in the definitions need to be relativized explicitly. Also, the CTR suffers<br>
+from the same fundamental limitations that the algorithm used in the<br>
+transfer_prover suffers from, as the CTR merely provides an interface to<br>
+it. However, most of this is already stated in the manuals/paper or, at<br>
+least, can be easily inferred from the descriptions of the algorithms.</p>
+</li>
+<li>
+<p>The ETTS was built around an implementation of a variant of the<br>
+types-to-sets algorithm that is described in the manual/paper. The<br>
+implementation is available via the command tts_lemmas. This algorithm is<br>
+largely based on the algorithm from [1], with some additional "features"<br>
+based on [2]. In a sense, the ETTS is meant to be applied in a manner<br>
+similar to how one would use traditional classical reasoners/simp-based<br>
+methods (like auto/force) with additional settings (trial and error) and,<br>
+in my view, provides a similar level of automati<br>
+[message truncated]</p>
+</li>
+</ol>
+</blockquote>
+
+
+
+<a name="318014836"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Using%20Types_To_Sets/near/318014836" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Using.20Types_To_Sets.html#318014836">(Dec 26 2022 at 23:16)</a>:</h4>
+<p>From: Dominique Unruh &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Dear Mihails Milehins,</p>
+<p>thanks for the example theories. It is definitely interesting to see how <br>
+different approaches compare on this problem.</p>
+<blockquote>
+<p>I believe that maintaining entire "duplicate libraries" of constants <br>
+and results is exceptionally inefficient: the priority in the area of <br>
+library design should be the elimination of duplication, not finding <br>
+ways to generate more "semantic duplicates" automatically (of course, <br>
+this is not an attempt to criticize the transfer tools at large, merely <br>
+their use for the production of "semantic duplicates" in the context of <br>
+the design of libraries of formalized mathematics).</p>
+</blockquote>
+<p>I do agree that having libraries of duplicates is probably undesirable, <br>
+and that the TTS approach (at least at its current level of maturity) <br>
+leads to a lot of boilerplate and duplication. However, I fail to see an <br>
+alternative to the occasional use of it. For example, the three theorems <br>
+I needed to convert were not converted simply out of a which to <br>
+generalize the library. Instead, I needed those theorems in a subproof <br>
+somewhere in further developments in their set-based form (a certain <br>
+already proven lemma needed to be applied to a subset of UNIV), and I do <br>
+not see any way to avoid the TTS conversion in such a use-case. (The <br>
+alternative, redoing the proof of the already proven lemma would seem <br>
+much worse, especially since that lemma uses a lot of other lemmas on <br>
+the way, and I would have to reprove large parts of existing <br>
+developments for that.)</p>
+<p>Therefore my approach is to develop libraries in a type-based <br>
+presentation, but keeping the option open to do a TTS translation in the <br>
+rare cases where this is needed. But I am open to thoughts about <br>
+alternatives to this approach. (From the Isabelle community at large, <br>
+not just from Mihails.)</p>
+<p>Best wishes,<br>
+Dominique.</p>
+
+
+
+<a name="318017208"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Using%20Types_To_Sets/near/318017208" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Using.20Types_To_Sets.html#318017208">(Dec 26 2022 at 23:57)</a>:</h4>
+<p>From: Andrei Popescu &lt;<a href="mailto:andrei.h.popescu@gmail.com">andrei.h.popescu@gmail.com</a>&gt;<br>
+Hi Dominique and Mihails,</p>
+<blockquote>
+<p>Therefore my approach is to develop libraries in a type-based presentation, but keeping the option open to do a TTS translation in the rare cases where this is needed. But I am open to thoughts about alternatives to this approach. (From the Isabelle community at large, not just from Mihails.)</p>
+</blockquote>
+<p>In the case of libraries that have already been developed type-based,<br>
+I also do not see an alternative different from the two that were<br>
+mentioned: (1) restating the results and redoing the proofs set-based<br>
+or (2) TTS. And yes, this is exactly how we originally envisioned TTS:<br>
+translate only when needed.</p>
+<p>Moreover, there is also a case to be made for TTS for libraries that<br>
+are yet to be developed. While a set-based development would avoid the<br>
+duplication mentioned by Mihails, a type-based development is of<br>
+course easier -- which can make a big difference in productivity. Not<br>
+to mention that for large enough libraries, the duplication introduced<br>
+by (E)TTS might be dwarfed by the reduction in the overall size of the<br>
+lemmas and proofs.</p>
+<p>Best wishes,<br>
+Andrei</p>
+
+
+
+<a name="318146482"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Using%20Types_To_Sets/near/318146482" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Using.20Types_To_Sets.html#318146482">(Dec 27 2022 at 19:13)</a>:</h4>
+<p>From: Mihails Milehins &lt;<a href="mailto:mihailsmilehins@gmail.com">mihailsmilehins@gmail.com</a>&gt;<br>
+Dear All,</p>
+<p>Thank you for your replies.</p>
+
+
+
+<a name="318155899"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Using%20Types_To_Sets/near/318155899" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Using.20Types_To_Sets.html#318155899">(Dec 27 2022 at 20:31)</a>:</h4>
+<p>From: Andrei Popescu &lt;<a href="mailto:andrei.h.popescu@gmail.com">andrei.h.popescu@gmail.com</a>&gt;<br>
+Dear Mihails,</p>
+<p>Doubting the need for set-based developments leads to a useful<br>
+discussion, which is important IMO. I have not done a systematic<br>
+empirical study, but based on what I've seen I believe such<br>
+developments are common in Isabelle/HOL (even beyond what is in the<br>
+library), and perhaps in the other HOL-based provers as well. The<br>
+practice seems mostly motivated by the desire to instantiate the<br>
+results flexibly. Otherwise at instantiation time one pays the price<br>
+of having to define some types and transfer some structure.</p>
+<p>My favourite simple example is the following: For instantiating<br>
+results about groups to the set of bijections between 'a and 'a, you<br>
+may not want to define a custom type -- especially if the results<br>
+about bijections are used as part of a bigger whole, involving<br>
+arbitrary functions as well (employing results that may  instantiate<br>
+other libraries as well).</p>
+<p>Another example: Say you develop some general results about labelled<br>
+transition systems and their induced traces. Working with the<br>
+collections of labels, events, states etc. in a type-based fashion<br>
+(i.e., having entire types to model these collections) will be painful<br>
+when instantiating the theory to the semantics of particular<br>
+programming languages, where any well-formedness conditions would need<br>
+to be baked into the type.</p>
+<p>In conclusion, I don't think that set-based results are a legacy issue<br>
+that we should aim to replace.</p>
+<p>As for your remark that the type-based version of a theorem is<br>
+essentially semantically equivalent to its set-based counterpart: I<br>
+agree this is the case, just that the HOL logic cannot "see'' this --<br>
+which is why in our initial paper we advocated the addition of the<br>
+Local Typedef rule as "a gentle eye surgery" to HOL. Our last result<br>
+(which you also cited in your message) shows that this rule is in fact<br>
+(usually) admissible. So the set-based and type-based versions are<br>
+indeed very close, but still converting one to the other needs an<br>
+extra push.</p>
+<p>Finally, I do not have anything to add concerning the set theory<br>
+versus type theory debate. Everything that could have been said, and<br>
+even more, has probably been said over the years. :-) I can see the<br>
+relative advantages of both, and I think HOL is somewhere in the<br>
+middle -- a sweet spot perhaps, with some touches of bitterness.</p>
+<p>Best wishes,<br>
+Andrei</p>
+
+
+
+<a name="318172112"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Using%20Types_To_Sets/near/318172112" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Using.20Types_To_Sets.html#318172112">(Dec 27 2022 at 23:18)</a>:</h4>
+<p>From: Mihails Milehins &lt;<a href="mailto:mihailsmilehins@gmail.com">mihailsmilehins@gmail.com</a>&gt;<br>
+Dear Andrei Popescu/All,</p>
+<p>Thank you for your comments. I will try to provide concluding remarks from<br>
+my side. It seems that there are 3 possible evolution paths for<br>
+Isabelle/HOL core libraries:</p>
+<ol>
+<li>
+<p>Both type-based and set-based libraries will continue to be maintained<br>
+and developed in parallel, now with the aid of tools like<br>
+types-to-sets/types-to-PERs.</p>
+</li>
+<li>
+<p>Migration to a single type-based library.</p>
+</li>
+<li>Migration to a single set-based library.<br>
+I doubt that it will be possible to "prove" objectively that one path<br>
+should be preferred over another. However, having tried all of them, even<br>
+with the aid of the state-of-the-art types-to-sets, my personal preference<br>
+would be 2 or 3 (despite having to define additional types in 2 or the<br>
+inefficiencies associated with 3). Therefore, I guess, my initial comment<br>
+that started this debate was prompted primarily by my concern about the<br>
+structure of the core library (and its extensions), rather than tools like<br>
+types-to-sets. Indeed, if 1 is to be followed, having tools like<br>
+types-to-sets and its successor(s) is better than not having them.<br>
+Nonetheless, I still hope that one day, somehow, these distinct libraries<br>
+will coalesce into a homogeneous whole, with a single definition for each<br>
+structure/concept, one statement and one proof of each result.</li>
+</ol>
+<p>Also, I agree that much has been said already about the use of<br>
+alternative foundations and there is no reason to return to this topic. My<br>
+initial remark was prompted by my observation that the duplication problem<br>
+seems to be significantly easier to avoid in some of these alternative<br>
+systems. So, I hope that it was not entirely off-topic.</p>
+<p>Yours Sincerely,<br>
+Mihails Milehins<br>
+(he/him/his)</p>
+
+
+
+<a name="318180915"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Using%20Types_To_Sets/near/318180915" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Using.20Types_To_Sets.html#318180915">(Dec 28 2022 at 01:04)</a>:</h4>
+<p>From: Andrei Popescu &lt;<a href="mailto:andrei.h.popescu@gmail.com">andrei.h.popescu@gmail.com</a>&gt;</p>
+<blockquote>
+<ol>
+<li>Both type-based and set-based libraries will continue to be maintained and developed in parallel, now with the aid of tools like types-to-sets/types-to-PERs.</li>
+<li>Migration to a single type-based library.</li>
+<li>Migration to a single set-based library.</li>
+</ol>
+</blockquote>
+<p>Well, variant 2 could be done in conjunction with exporting set-based<br>
+results on demand via types-to-sets. This is the main appeal here:<br>
+develop type-based and export set-based.</p>
+<blockquote>
+<p>Also, I agree that much has been said already about the use of alternative foundations and there is no reason to return to this topic. My initial remark was prompted by my observation that the duplication problem seems to be significantly easier to avoid in some of these alternative systems. So, I hope that it was not entirely off-topic.</p>
+</blockquote>
+<p>Not at all off-topic, I didn't mean to suggest that. Of course working<br>
+in ZF would not face these, but other problems.</p>
+<p>Best wishes,<br>
+Andrei</p>
+
+
+
+<a name="318288141"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Using%20Types_To_Sets/near/318288141" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Using.20Types_To_Sets.html#318288141">(Dec 28 2022 at 16:25)</a>:</h4>
+<p>From: Ken Kubota &lt;<a href="mailto:mail@kenkubota.de">mail@kenkubota.de</a>&gt;<br>
+This is due to the restrictions of simple type theory lacking the possibility of quantifying over type variables, and not a matter of type theory in general.<br>
+If have shown, using some example from group theory, that with lambda binding type variables, too, it is possible to carry out abstract proofs and instantiate them later.<br>
+See the section "Type abstraction" here: <a href="https://owlofminerva.net/kubota/software-implementation-of-the-mathematical-logic-r0-available-for-download/">https://owlofminerva.net/kubota/software-implementation-of-the-mathematical-logic-r0-available-for-download/</a><br>
+Also: <a href="https://sympa.inria.fr/sympa/arc/coq-club/2022-06/msg00025.html">https://sympa.inria.fr/sympa/arc/coq-club/2022-06/msg00025.html</a></p>
+<p>Kind regards,</p>
+<p>Ken Kubota</p>
+<hr>
+<p>Ken Kubota<br>
+<a href="https://doi.org/10.4444/100">https://doi.org/10.4444/100</a></p>
+
+
+
+<a name="318288301"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Using%20Types_To_Sets/near/318288301" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Using.20Types_To_Sets.html#318288301">(Dec 28 2022 at 16:26)</a>:</h4>
+<p>From: Ken Kubota &lt;<a href="mailto:mail@kenkubota.de">mail@kenkubota.de</a>&gt;<br>
+The whole approach of set theory (generally restricting sets by a rather arbitrary list of non-logical axioms in order to avoid inconsistency) is not systematic.<br>
+Mathematics should be expressed naturally, where the restrictions are a matter of the syntax (type theory).<br>
+However, simple type theory like HOL or Isabelle/HOL is, of course, too weak. Without introducing some kind of abstraction/quantification over type variables this kind of problems will persist.</p>
+<hr>
+<p>Ken Kubota<br>
+<a href="https://doi.org/10.4444/100">https://doi.org/10.4444/100</a></p>
+
+
+
+<a name="318299016"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Using%20Types_To_Sets/near/318299016" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Using.20Types_To_Sets.html#318299016">(Dec 28 2022 at 17:39)</a>:</h4>
+<p>From: Mihails Milehins &lt;<a href="mailto:mihailsmilehins@gmail.com">mihailsmilehins@gmail.com</a>&gt;<br>
+Dear Ken Kubota,</p>
+<p>Thank you for your remarks.</p>
+
+
+
+<a name="318311320"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Using%20Types_To_Sets/near/318311320" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Using.20Types_To_Sets.html#318311320">(Dec 28 2022 at 19:10)</a>:</h4>
+<p>From: Dominique Unruh &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Maybe a variant of variant 2 would be what works on the long run: <br>
+Libraries will contain both set- and type-based definitions (with proper <br>
+linking via transfer-rules or some related mechanism), but only provide <br>
+lemmas in the type-based language. If the definitions are properly <br>
+linked, set-based lemmas could be created on the fly (maybe using an <br>
+attribute) without much extra effort. (Because it seems to me that a lot <br>
+of the effort that is not fully automatable in the TTS world is to match <br>
+up the already existing, and somewhat differently flavored, definitions <br>
+in the set- and the type-world.)</p>
+<p>A good example of something where not thinking of TTS when definition <br>
+leads to trouble is "sum". The existing definition uses THE and before <br>
+lifting it, one needs to come up with a completely different definition <br>
+(and Mihails and my writeup use different ones, too). Generally, THE and <br>
+SOME should be avoided (and maybe we should have something like <br>
+the_default that returns a specified value when the predicate does not <br>
+have unique value). Maybe "undefined" is also bad, I am not sure.</p>
+<p>Best wishes,<br>
+Dominique.</p>
+
+
+
+<a name="318342204"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Using%20Types_To_Sets/near/318342204" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Using.20Types_To_Sets.html#318342204">(Dec 29 2022 at 00:12)</a>:</h4>
+<p>From: Ken Kubota &lt;<a href="mailto:mail@kenkubota.de">mail@kenkubota.de</a>&gt;<br>
+Dear Mihails Milehins,</p>
+<p>It is correct that none of the major HOL systems, unfortunately, have moved to type quantification yet, despite the fact that Mike Gordon suggested this in 2001 already.<br>
+This includes HOL4: <a href="https://sourceforge.net/p/hol/mailman/message/37215715/">https://sourceforge.net/p/hol/mailman/message/37215715/</a> &lt;<a href="https://sourceforge.net/p/hol/mailman/message/37215715/">https://sourceforge.net/p/hol/mailman/message/37215715/</a>&gt;</p>
+<p>HOL-Omega should have enough expressiveness (although I consider the stratification of types as problematic):<br>
+"using the HOL-Omega system to model monads and prove theorems about their general properties, as well as concepts from category theory such as functors and natural transformations."<br>
+<a href="http://www.trustworthytools.com/id17.html">http://www.trustworthytools.com/id17.html</a> &lt;<a href="http://www.trustworthytools.com/id17.html">http://www.trustworthytools.com/id17.html</a>&gt;</p>
+<p>However, unless HOL4 and Isabelle/HOL move to quantification over types, users will either have to live with duplication, or have to resort to other software or to set theory, or spend an increasing amount of time on workarounds such as conversion between type theory and set theory.</p>
+<p>It should be noted that an implementation of quantification over types should use lambda as type quantifier (as suggested by Mike Gordon, and independently of that implemented in my logic R0), and not introduce type quantifiers as new primitive symbols (as described in Tom Melham's paper, which heavily draws on Peter B. Andrews' PhD thesis).</p>
+<p>Kind regards,</p>
+<p>Ken Kubota</p>
+<hr>
+<p>Ken Kubota<br>
+<a href="https://doi.org/10.4444/100">https://doi.org/10.4444/100</a></p>
+
+
+
+<a name="318493308"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Using%20Types_To_Sets/near/318493308" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Using.20Types_To_Sets.html#318493308">(Dec 29 2022 at 22:14)</a>:</h4>
+<p>From: Mihails Milehins &lt;<a href="mailto:mihailsmilehins@gmail.com">mihailsmilehins@gmail.com</a>&gt;<br>
+Dear All,</p>
+<p>Thank you for further remarks.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

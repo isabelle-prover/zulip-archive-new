@@ -1,0 +1,188 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Confusing behaviour: free variables with the s... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Confusing.20behaviour.3A.20free.20variables.20with.20the.20s.2E.2E.2E.html">[isabelle] Confusing behaviour: free variables with the s...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294741066"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Confusing%20behaviour%3A%20free%20variables%20with%20the%20s.../near/294741066" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Confusing.20behaviour.3A.20free.20variables.20with.20the.20s.2E.2E.2E.html#294741066">(Aug 22 2022 at 18:05)</a>:</h4>
+<p>From: <a href="mailto:Thibaut.Perami@data61.csiro.au">Thibaut.Perami@data61.csiro.au</a><br>
+Hello Isabelle users,</p>
+<p>I just found a strange behaviour in Isabelle/HOL using notes which allow to create to different free variables with different types but the same name. This is very confusing for a user which doesn't work with [[show_types]] (Which I think is mostly everyone). Here is a minimal example:</p>
+<p>lemma<br>
+  notes hyp = refl[where t=a]<br>
+  shows "a = a"<br>
+  apply (insert hyp)<br>
+  subgoal by assumption<br>
+  done</p>
+<p>The notes introduces a free variable named "a" with schematic type "?'a1". Then shows introduces another free variable "a" with a fixed type " 'a ". If you do by (rule hyp) right after the shows, the schematic type will be unified with "'a" and from now on both variables will be the same (same name + same type ⟹ same variable). However if you add hyp to your premises and then use the subgoal command, all schematics (here only "?'a") are instantiated with fresh free variables (here " 'b "). Therefore, right after the subgoal command, your context is:</p>
+<p>(a :: 'b) = (a :: 'b) ⟹ (a :: 'a) = (a :: 'a)</p>
+<p>but without type annotations it looks like:</p>
+<p>a = a ⟹ a = a</p>
+<p>which one would expect to be solved by assumption. In practice, the variables are different and thus assumption fails.</p>
+<p>If this is not considered as a bug, I think there should at least be either:</p>
+<p>*   a warning that two different variables with different types but same name have appeared in the context<br>
+  *   or an even simpler change: when two variables have the same name but different types, print the types in the pretty printer for those specific variables even when we are in a printing mode where types are hidden</p>
+<p>In both cases the current type printing mode (when using [[show_types]]) assumes that such name conflicts cannot exist. The previous goal gets printed as</p>
+<p>goal (1 subgoal):</p>
+<ol>
+<li>a = a ⟹ a = a<br>
+variables:<br>
+  a :: 'a<br>
+  a :: 'b</li>
+</ol>
+<p>which is not very informative about which "a" is which.</p>
+<p>For extra information: This behaviour can also be obtained with the lemmas command:</p>
+<p>lemmas hyp = refl[where t=a]<br>
+lemma<br>
+  "a = a"<br>
+  apply (insert hyp)<br>
+  subgoal by assumption<br>
+  done</p>
+<p>it can also be obtained without subgoal by manually instantiating the type variable:</p>
+<p>lemmas hyp = refl[where t=a]<br>
+lemma<br>
+  "a = a"<br>
+  apply (insert hyp[where 'a = int)<br>
+  by assumption</p>
+<p>Thank you for your attention,</p>
+<p>Thibaut Perami</p>
+
+
+
+<a name="294741566"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Confusing%20behaviour%3A%20free%20variables%20with%20the%20s.../near/294741566" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Confusing.20behaviour.3A.20free.20variables.20with.20the.20s.2E.2E.2E.html#294741566">(Aug 22 2022 at 18:08)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On 01/08/18 09:07, <a href="mailto:Thibaut.Perami@data61.csiro.au">Thibaut.Perami@data61.csiro.au</a> wrote:</p>
+<blockquote>
+<p>I just found a strange behaviour in Isabelle/HOL using notes which allow to create to different free variables with different types but the same name. This is very confusing for a user which doesn't work with [[show_types]] (Which I think is mostly everyone). Here is a minimal example:</p>
+<p>lemma<br>
+  notes hyp = refl[where t=a]<br>
+  shows "a = a"<br>
+  apply (insert hyp)<br>
+  subgoal by assumption<br>
+  done</p>
+<p>The notes introduces a free variable named "a" with schematic type "?'a1". Then shows introduces another free variable "a" with a fixed type " 'a ". If you do by (rule hyp) right after the shows, the schematic type will be unified with "'a" and from now on both variables will be the same (same name + same type ⟹ same variable). However if you add hyp to your premises and then use the subgoal command, all schematics (here only "?'a") are instantiated with fresh free variables (here " 'b "). Therefore, right after the subgoal command, your context is:</p>
+<p>(a :: 'b) = (a :: 'b) ⟹ (a :: 'a) = (a :: 'a)</p>
+<p>but without type annotations it looks like:</p>
+<p>a = a ⟹ a = a</p>
+<p>which one would expect to be solved by assumption. In practice, the variables are different and thus assumption fails.</p>
+</blockquote>
+<p>Such things can happen: Isabelle is a very complex system with many<br>
+implicit conveniences, but in rare situations it is possible to shoot<br>
+oneself into the foot.</p>
+<p>Incidents like above occur approx. every 2 years on this mailing list,<br>
+which I would consider very rare.</p>
+<blockquote>
+<p>If this is not considered as a bug, I think there should at least be either:</p>
+<p>*   a warning that two different variables with different types but same name have appeared in the context<br>
+  *   or an even simpler change: when two variables have the same name but different types, print the types in the pretty printer for those specific variables even when we are in a printing mode where types are hidden</p>
+</blockquote>
+<p>Nothing of this is as simple as it might seem on the surface. After some<br>
+decades with this inherent challenge, we are already at a local minimum<br>
+of potential confusion.</p>
+<blockquote>
+<p>For extra information: This behaviour can also be obtained with the lemmas command:</p>
+<p>lemmas hyp = refl[where t=a]</p>
+</blockquote>
+<p>Note that "a" is out-of-scope here, and bad things are to be expected<br>
+later on.</p>
+<p>In current Isabelle2018-RC3 the above command is even rejected. Such<br>
+tightening of the system usually causes other problems elsewhere, and I<br>
+am actually surprised that nobody has complained about it in the past<br>
+weeks of testing Isabelle2018 release candidates.</p>
+<p>Makarius</p>
+
+
+
+<a name="294741750"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Confusing%20behaviour%3A%20free%20variables%20with%20the%20s.../near/294741750" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Confusing.20behaviour.3A.20free.20variables.20with.20the.20s.2E.2E.2E.html#294741750">(Aug 22 2022 at 18:10)</a>:</h4>
+<p>From: Lars-Henrik Eriksson &lt;<a href="mailto:lhe@it.uu.se">lhe@it.uu.se</a>&gt;<br>
+On 2 aug. 2018 at 16:34:42 CEST  Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt; wrote:<br>
+This kind of thing happens frequently to me. I do use [[show_types]] to figure things out when I suspect this is the problem but it would still help considerably if Isabelle could provide some kind of heuristic that could warn the user.</p>
+<p>Lars-Henrik Eriksson</p>
+<p>När du har kontakt med oss på Uppsala universitet med e-post så innebär det att vi behandlar dina personuppgifter. För att läsa mer om hur vi gör det kan du läsa här: <a href="http://www.uu.se/om-uu/dataskydd-personuppgifter/">http://www.uu.se/om-uu/dataskydd-personuppgifter/</a></p>
+<p>E-mailing Uppsala University means that we will process your personal data. For more information on how this is performed, please read here: <a href="http://www.uu.se/om-uu/dataskydd-personuppgifter/">http://www.uu.se/om-uu/dataskydd-personuppgifter/</a></p>
+
+
+
+<a name="294741760"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Confusing%20behaviour%3A%20free%20variables%20with%20the%20s.../near/294741760" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Confusing.20behaviour.3A.20free.20variables.20with.20the.20s.2E.2E.2E.html#294741760">(Aug 22 2022 at 18:10)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Can you illustrate it by typical examples?</p>
+<p>Everything shown on this thread so far was quite a-typical in the use of<br>
+contexts (lack of explicit declarations, 'notes' in odd places etc.).</p>
+<p>Makarius</p>
+
+
+
+<a name="294741776"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Confusing%20behaviour%3A%20free%20variables%20with%20the%20s.../near/294741776" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Confusing.20behaviour.3A.20free.20variables.20with.20the.20s.2E.2E.2E.html#294741776">(Aug 22 2022 at 18:10)</a>:</h4>
+<p>From: Lars-Henrik Eriksson &lt;<a href="mailto:lhe@it.uu.se">lhe@it.uu.se</a>&gt;<br>
+5 aug. 2018 kl. 13:02 skrev Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;:<br>
+I work with bounded sets (HOL/Cardinals/Bounded_Set.thy). Isabelle can not always infer the bounding type. A typical proof would look like this:</p>
+<p>lemma Act_in_tau_steps: "bmember (tAct τ x) (map_bset (tau_steps_Tree x) (Abs_bset UNIV::nat set['idx]))"<br>
+proof -<br>
+  have "Suc 0 ∈ set_bset (Abs_bset UNIV::nat set['idx])"<br>
+    by auto<br>
+  then have "bmember (tau_steps_Tree x (Suc 0)) (map_bset (tau_steps_Tree x) (Abs_bset UNIV::nat set['idx]))"<br>
+     by (metis bmember.rep_eq imageI map_bset.rep_eq)<br>
+  then show ?thesis<br>
+    by simp<br>
+qed</p>
+<p>All three type annotations are necessary. In this particular case it is pretty clear where type annotations are likely to be needed, but there are cases which are not so clear (sorry, I can't dig one up right now). Also, I don't want to include unnecessary type annotations as they clutter up the proof.</p>
+<p>Lars-Henrik Eriksson</p>
+<p>När du har kontakt med oss på Uppsala universitet med e-post så innebär det att vi behandlar dina personuppgifter. För att läsa mer om hur vi gör det kan du läsa här: <a href="http://www.uu.se/om-uu/dataskydd-personuppgifter/">http://www.uu.se/om-uu/dataskydd-personuppgifter/</a></p>
+<p>E-mailing Uppsala University means that we will process your personal data. For more information on how this is performed, please read here: <a href="http://www.uu.se/om-uu/dataskydd-personuppgifter/">http://www.uu.se/om-uu/dataskydd-personuppgifter/</a></p>
+
+
+
+<a name="294742241"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Confusing%20behaviour%3A%20free%20variables%20with%20the%20s.../near/294742241" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Confusing.20behaviour.3A.20free.20variables.20with.20the.20s.2E.2E.2E.html#294742241">(Aug 22 2022 at 18:13)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+That is a slightly different problem. The examples at the start of this<br>
+thread were about free (undeclared) variables, but here it is about<br>
+polymorphic constants.</p>
+<p>The logic can handle both variables and constants of the same name and<br>
+different types: they are just different formal entities. In contrast,<br>
+the higher concepts of abstract syntax and type-checking within a local<br>
+context ensure that variables always coincide on their types, as long as<br>
+the name is equal. For constants this is not done: it is normal to have<br>
+different type instances of the same constant family in the same context<br>
+(e.g. the equality constant).</p>
+<p>More precisely, the built-in Hindley-Milner type inference for Isar<br>
+proof texts connects the types of sub-expressions via locally fixed term<br>
+variables from the context, but connecting via constants alone does not<br>
+work. For example:</p>
+<p>notepad<br>
+begin<br>
+  fix a b c d<br>
+  { have "a + b = c + d" sorry ― ‹type ‹'a›› }<br>
+  {<br>
+    have 1: "a + b = 0" sorry  ― ‹type ‹'a››<br>
+    have 2: "0 = c + d" sorry  ― ‹type ‹'b››<br>
+    thm trans [OF 1 2] ― ‹fails›<br>
+  }<br>
+end</p>
+<p>Makarius</p>
+
+
+
+<a name="294742389"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Confusing%20behaviour%3A%20free%20variables%20with%20the%20s.../near/294742389" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Confusing.20behaviour.3A.20free.20variables.20with.20the.20s.2E.2E.2E.html#294742389">(Aug 22 2022 at 18:14)</a>:</h4>
+<p>From: Lars-Henrik Eriksson &lt;<a href="mailto:lhe@it.uu.se">lhe@it.uu.se</a>&gt;<br>
+7 aug. 2018 kl. 22:16 skrev Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;:<br>
+Yes, there is a difference but the two problems have the common issue that expressions that "look" identical are in fact not.</p>
+<p>Lars-Henrik Eriksson</p>
+<p>När du har kontakt med oss på Uppsala universitet med e-post så innebär det att vi behandlar dina personuppgifter. För att läsa mer om hur vi gör det kan du läsa här: <a href="http://www.uu.se/om-uu/dataskydd-personuppgifter/">http://www.uu.se/om-uu/dataskydd-personuppgifter/</a></p>
+<p>E-mailing Uppsala University means that we will process your personal data. For more information on how this is performed, please read here: <a href="http://www.uu.se/om-uu/dataskydd-personuppgifter/">http://www.uu.se/om-uu/dataskydd-personuppgifter/</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

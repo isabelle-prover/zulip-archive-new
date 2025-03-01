@@ -1,0 +1,75 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Potential bug regarding non-permanent thinning · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Potential.20bug.20regarding.20non-permanent.20thinning.html">[isabelle] Potential bug regarding non-permanent thinning</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="271522258"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Potential%20bug%20regarding%20non-permanent%20thinning/near/271522258" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Potential.20bug.20regarding.20non-permanent.20thinning.html#271522258">(Feb 11 2022 at 02:07)</a>:</h4>
+<p>From: Wolfgang Jeltsch &lt;<a href="mailto:wolfgang@well-typed.com">wolfgang@well-typed.com</a>&gt;<br>
+Hi!</p>
+<p>I’d like to report another potential buggy behavior, this time about<br>
+thinning being non-permanent.</p>
+<p>Consider the following code:</p>
+<p>lemma "A ⟹ B ⟹ C ⟹ D"<br>
+      apply (<br>
+        match premises in a [thin]: _ ⇒ ‹<br>
+          match premises in b [thin]: _ ⇒ ‹<br>
+            succeed<br>
+          ›<br>
+        ›<br>
+      )<br>
+      oops</p>
+<p>After the application of the proof method, the goal is <code>C ⟹ D</code>, as<br>
+expected.</p>
+<p>Now let’s add some superfluous matching:</p>
+<p>lemma "A ⟹ B ⟹ C ⟹ D"<br>
+      apply (<br>
+        match premises in a [thin]: _ ⇒ ‹<br>
+          match ("()") in "()" ⇒ ‹<br>
+            match premises in b [thin]: _ ⇒ ‹<br>
+              succeed<br>
+            ›<br>
+          ›<br>
+        ›<br>
+      )<br>
+      oops</p>
+<p>This time, the generated goal is not <code>C ⟹ D</code>, but <code>B ⟹ C ⟹ D</code>, which it<br>
+shouldn’t be.</p>
+<p>Let’s add some debugging code:</p>
+<p>lemma "A ⟹ B ⟹ C ⟹ D"<br>
+      apply (<br>
+        match premises in a [thin]: _ ⇒ ‹<br>
+          match ("()") in "()" ⇒ ‹<br>
+            match premises in b [thin]: _ ⇒ ‹<br>
+              match premises in prems: _ (multi) ⇒ ‹<br>
+                print_fact prems<br>
+              ›<br>
+            ›<br>
+          ›<br>
+        ›<br>
+      )<br>
+      oops</p>
+<p>We get <code>C</code> as the content of <code>prems</code>, which is correct, while the<br>
+generated goal is still <code>B ⟹ C ⟹ D</code>.</p>
+<p>Apparently, the removal of <code>B</code> from the list of premises, while being<br>
+locally observable, is not reflected outside of the <code>match</code> invocation<br>
+that performs the superfluous matching. Changing this <code>match</code> invocation<br>
+to use a different term or a fact as its match target leads to the same<br>
+outcome. However, if <code>premises</code> or <code>conclusion</code> is used as the match<br>
+target of this <code>match</code> invocation, the generated goal is again <code>C ⟹ D</code>.<br>
+It seems that <code>match</code> invocations that don’t perform subgoal focusing<br>
+introduce some sort of barrier that the effect of thinning cannot<br>
+transcend.</p>
+<p>All the best,<br>
+Wolfgang</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

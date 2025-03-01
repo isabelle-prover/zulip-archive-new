@@ -1,0 +1,143 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Termination of function with let-binding on le... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Termination.20of.20function.20with.20let-binding.20on.20le.2E.2E.2E.html">[isabelle] Termination of function with let-binding on le...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294140089"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Termination%20of%20function%20with%20let-binding%20on%20le.../near/294140089" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Termination.20of.20function.20with.20let-binding.20on.20le.2E.2E.2E.html#294140089">(Aug 18 2022 at 17:59)</a>:</h4>
+<p>From: Mathieu Giorgino &lt;<a href="mailto:mathieu.giorgino@IRIT.FR">mathieu.giorgino@IRIT.FR</a>&gt;<br>
+Hi all,</p>
+<p>I just noticed a problem with "let" bindings on left-nested tuples in function <br>
+definitions.</p>
+<p>For example, these 2 functions -- each written with "function" and "fun" -- <br>
+are exactly the same, excepted for the nesting of tuples.</p>
+<hr>
+<p>theory Scratch imports Main<br>
+begin</p>
+<p>function (sequential) f1 :: "(nat * nat * nat) \&lt;Rightarrow&gt; unit"<br>
+  where<br>
+  "f1 (_, _, 0) = ()"<br>
+| "f1 n = (let (a1, a2, a3) = n in f1 (a2+2, a1+1, a3 - 1))"<br>
+by pat_completeness auto<br>
+termination<br>
+  apply (relation "measure (snd o snd)")<br>
+  apply (auto simp del:in_measure)<br>
+  by auto</p>
+<p>fun f1' :: "(nat * nat * nat) \&lt;Rightarrow&gt; unit"<br>
+  where<br>
+  "f1' (_, _, 0) = ()"<br>
+| "f1' n = (let (a1, a2, a3) = n in f1' (a2+2, a1+1, a3 - 1))"</p>
+<p>function (sequential) f2 :: "((nat * nat) * nat) \&lt;Rightarrow&gt; unit"<br>
+  where<br>
+  "f2 ((_, _), 0) = ()"<br>
+| "f2 n = (let ((a1, a2), a3) = n in f2 ((a2+2,a1+1), a3 - 1))"<br>
+  by pat_completeness auto<br>
+termination<br>
+  apply (relation "measure snd")<br>
+  apply (auto simp del:in_measures)<br>
+  oops</p>
+<p>fun f2' :: "((nat * nat) * nat) \&lt;Rightarrow&gt; unit"<br>
+  where<br>
+  "f2' ((_, _), 0) = ()"<br>
+| "f2' n = (let ((a1, a2), a3) = n in f2' ((a2+2, a1+1), a3 - 1))"</p>
+<hr>
+<p>Then it seems impossible to prove the termination of f2 (and "fun f2'" fails). <br>
+In the termination proof, we can see there is no equality relation for the <br>
+second component of the outermost pair.</p>
+<p>It seems to be related to congruence rules in some way but I couldn't figure <br>
+out the exact problem.</p>
+<p>In these examples, the let could be replaced by the function pattern matching <br>
+but this problem also prevents those let-bindings in more complicated <br>
+functions.</p>
+<p>An idea on what is going wrong ?</p>
+<p>Thanks,</p>
+<p>Mathieu</p>
+
+
+
+<a name="294140116"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Termination%20of%20function%20with%20let-binding%20on%20le.../near/294140116" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Termination.20of.20function.20with.20let-binding.20on.20le.2E.2E.2E.html#294140116">(Aug 18 2022 at 17:59)</a>:</h4>
+<p>From: Brian Huffman &lt;<a href="mailto:brianh@cs.pdx.edu">brianh@cs.pdx.edu</a>&gt;<br>
+Hi Mathieu,</p>
+<p>I'm pretty sure that this is a bug in the function package.</p>
+<p>If I do a theorem search for "f2_dom" during the termination proof, I<br>
+see the following rule, which is apparently derived from f2.pinduct:</p>
+<p>local.termination:<br>
+  ⟦wf ?R;<br>
+   ⋀v vb x xa y xb ya xc.<br>
+      ⟦x = (v, Suc vb); (xa, y) = x; (xb, ya) = xa⟧<br>
+      ⟹ (((ya + 2, xb + 1), xc - 1), v, Suc vb) ∈ ?R⟧<br>
+  ⟹ All f2_dom</p>
+<p>This rule is completely useless, because it does not let you assume<br>
+anything about the variable xc. The correct form of this rule should<br>
+have "xc" replaced with "y".</p>
+<p>Compare this with the similar rule we get for the termination proof of f1:</p>
+<p>local.termination:<br>
+  ⟦wf ?R;<br>
+   ⋀v vb vd x xa y xb ya.<br>
+      ⟦x = (v, vb, Suc vd); (xa, y) = x; (xb, ya) = y⟧<br>
+      ⟹ ((xb + 2, xa + 1, ya - 1), v, vb, Suc vd) ∈ ?R⟧<br>
+  ⟹ All f1_dom</p>
+<p>Here, the local assumptions imply that (v, vb, Suc vd) = (xa, xb, ya),<br>
+making the rule possible to use in practice.</p>
+<p>Unfortunately I can't think of a good workaround for this problem,<br>
+unless you want to manually prove a corrected form of f2.pinduct and<br>
+the termination rule, based on unfolding the definition of f2_dom. You<br>
+will probably just have to wait for a bug fix from the developers.</p>
+<ul>
+<li>Brian</li>
+</ul>
+
+
+
+<a name="294140159"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Termination%20of%20function%20with%20let-binding%20on%20le.../near/294140159" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Termination.20of.20function.20with.20let-binding.20on.20le.2E.2E.2E.html#294140159">(Aug 18 2022 at 17:59)</a>:</h4>
+<p>From: Alexander Krauss &lt;<a href="mailto:krauss@in.tum.de">krauss@in.tum.de</a>&gt;<br>
+Hi Matthieu,</p>
+<blockquote>
+<p>function (sequential) f2 :: "((nat * nat) * nat) \&lt;Rightarrow&gt;  unit"<br>
+   where<br>
+   "f2 ((_, _), 0) = ()"<br>
+| "f2 n = (let ((a1, a2), a3) = n in f2 ((a2+2,a1+1), a3 - 1))"<br>
+   by pat_completeness auto<br>
+[...]<br>
+Then it seems impossible to prove the termination of f2 (and "fun f2'" fails).<br>
+In the termination proof, we can see there is no equality relation for the<br>
+second component of the outermost pair.</p>
+<p>It seems to be related to congruence rules in some way but I couldn't figure<br>
+out the exact problem.</p>
+</blockquote>
+<p>Thanks for reporting this issue. The root of the problem lies in the way <br>
+the function package extracts recursive calls from the definition. This <br>
+information is then used in the construction of pretty much everything: <br>
+the function itself, the graph, the domain, the rules etc.</p>
+<p>The extraction process, guided by congruence rules, is necessarily <br>
+heuristic in nature and known to be imprecise in some cases, which can <br>
+then lead to unprovable termination conditions. This is also the case <br>
+here (the code behaves exactly as specified), but the example is <br>
+especially disturbing, since the problem is so easy and completely <br>
+first-order.</p>
+<p>Here is a different instance of the same problem, which is a bit clearer:</p>
+<p>function f3 :: "bool =&gt; nat =&gt; nat"<br>
+where<br>
+   "f3 _ 0 = 0"<br>
+| "f3 b (Suc n) = (case b of True =&gt; f3 True | False =&gt; id) n"</p>
+<p>Note that he branches of the case are functions, and one is a recursive <br>
+call. But the argument to the call sits at the other end of the term. A <br>
+similar thing happens in your example.</p>
+<p>It seems that, unlike in most other situations, this cannot be solved <br>
+(in general) by adding some cong rules. Since I'd like the process to be <br>
+complete for situations like this one, I am considering adding special <br>
+treatment for tuple patterns, but this is not trivial...</p>
+<p>Alex</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

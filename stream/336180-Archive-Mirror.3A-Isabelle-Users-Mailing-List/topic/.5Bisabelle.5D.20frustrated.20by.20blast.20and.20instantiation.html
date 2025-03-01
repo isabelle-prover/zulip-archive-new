@@ -1,0 +1,160 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] frustrated by blast and instantiation · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20frustrated.20by.20blast.20and.20instantiation.html">[isabelle] frustrated by blast and instantiation</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294045185"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20frustrated%20by%20blast%20and%20instantiation/near/294045185" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20frustrated.20by.20blast.20and.20instantiation.html#294045185">(Aug 18 2022 at 10:03)</a>:</h4>
+<p>From: Michael Norrish &lt;<a href="mailto:michael.norrish@nicta.com.au">michael.norrish@nicta.com.au</a>&gt;<br>
+I am currently trying to prove what feels like a trivial lemma and<br>
+becoming frustrated by meta-level quantifiers and blast, and no doubt<br>
+any number of sophisticated considerations that I'm not aware of.</p>
+<p>Here is a miniature theory that illustrates a stripped down version of<br>
+my problem.</p>
+<hr>
+<p>theory foo<br>
+   imports Main</p>
+<p>begin</p>
+<p>consts c :: "nat"<br>
+consts f :: "nat =&gt; 'a"</p>
+<p>lemma foo1: "ALL i. EX! n. n &lt; c &amp; f n = i"<br>
+sorry</p>
+<p>lemma foo2: "(ALL k. P k) = (ALL i. i &lt; c --&gt; P (f i))"<br>
+apply rule<br>
+   apply simp<br>
+apply rule+<br>
+apply (insert foo1[where 'a = 'a])<br>
+apply (drule_tac x = k in spec)<br>
+apply blast<br>
+done</p>
+<p>end</p>
+<hr>
+<p>(The theorem foo1 actually has a proof in the real setting.)</p>
+<p>This proof succeeds, but there are two things I dislike about it.</p>
+<ol>
+<li>
+<p>It seems as if I am doing the wrong thing in not converting foo1<br>
+     to be in "rule_format" (or proving it that way in the first<br>
+     place).  All the documentation I have suggests that rule_format is<br>
+     the right way to store lemmas.  But, I seem to have to keep the<br>
+     object level universal if I'm to be able to import/insert the<br>
+     result into the proof foo2.  If I have it in rule_format and<br>
+     insert it un-modified, then I get a meta-level implication in my<br>
+     premises, and I don't know how to do anything with that.  If I try<br>
+     to use "of" or "where" to instantiate a rule_format version of<br>
+     foo1, then the meta-level quantifier on the goal shifts its<br>
+     quantification over the goal's k to dodge my implication.</p>
+</li>
+<li>
+<p>I have to instantiate foo1 by hand, both to get its type variable<br>
+     correct, and then to instantiate i.  Why doesn't</p>
+<p>apply (blast intro: foo1)</p>
+<p>just solve this goal at the outset?  If I set the corresponding<br>
+   situation up in HOL4, my proof of foo2 looks like</p>
+<p>val foo2 = store_thm(<br>
+      "foo2",<br>
+<code>(!k. P k) = (!i. i &lt; c ==&gt; P (f i))</code>,<br>
+      PROVE_TAC [foo1])</p>
+<p>[ Perhaps I'm giving blast the wrong modifier.  But then, why<br>
+     doesn't blast let me just use add: and then figure out for<br>
+     itself how to use the given theorem?  I can believe that<br>
+     theorems being permanently added to the underlying reasoners<br>
+     should be carefully categorised as intro, dest or elim<br>
+     (particularly as there so many of them), but for a one-off<br>
+     tactic, having to apply thought is just a hindrance to getting<br>
+     through the proof. ]</p>
+</li>
+</ol>
+<p>So, what is the 'right' way to state foo1, and the right way to prove<br>
+foo2?</p>
+<p>Michael.</p>
+
+
+
+<a name="294045199"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20frustrated%20by%20blast%20and%20instantiation/near/294045199" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20frustrated.20by.20blast.20and.20instantiation.html#294045199">(Aug 18 2022 at 10:03)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+I don't think this has anything to do with which quantifier you use - <br>
+blast just seems unable to prove the goal. This may be due to the <br>
+presence of "=". Larry may be able to comment.</p>
+<p>Concerning the quantifiers: certainly simp, but I believe also blast <br>
+don't care what quantifiers a premise carries.</p>
+<p>Meta-level quantifiers in premises can be dealt with like object-level <br>
+ones with the rules meta_spec and meta_allE.</p>
+<p>Tobias</p>
+<p>Michael Norrish schrieb:</p>
+
+
+
+<a name="294045354"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20frustrated%20by%20blast%20and%20instantiation/near/294045354" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20frustrated.20by.20blast.20and.20instantiation.html#294045354">(Aug 18 2022 at 10:04)</a>:</h4>
+<p>From: Lawrence Paulson &lt;<a href="mailto:lp15@cam.ac.uk">lp15@cam.ac.uk</a>&gt;<br>
+Michael,</p>
+<p>You are right that the meta-level form of a theorem (using !! and  <br>
+==&gt;) is generally best, but it depends on various factors. You really  <br>
+need to use an Isar structured proof to take advantage of this  <br>
+format. Here is a nice version of your proof:</p>
+<p>lemma foo3: "!!i. EX! n. n &lt; c &amp; f n = i"<br>
+sorry</p>
+<p>lemma foo4: "(ALL k. P k) = (ALL i. i &lt; c --&gt; P (f i))"<br>
+proof auto<br>
+   fix k<br>
+   assume "ALL i&lt;c. P (f i)"<br>
+   with foo3 [of k]<br>
+   show "P k" by blast<br>
+qed</p>
+<p>The problem with the straight-line version is that k is a bound  <br>
+variable, and instantiation by of/where (which is really intended for  <br>
+structured proofs only) inserts a free variable. With the structured  <br>
+proof above, k becomes a free variable.</p>
+<p>Larry</p>
+
+
+
+<a name="294045372"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20frustrated%20by%20blast%20and%20instantiation/near/294045372" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20frustrated.20by.20blast.20and.20instantiation.html#294045372">(Aug 18 2022 at 10:04)</a>:</h4>
+<p>From: Michael Norrish &lt;<a href="mailto:michael.norrish@nicta.com.au">michael.norrish@nicta.com.au</a>&gt;<br>
+Lawrence Paulson wrote:</p>
+<blockquote>
+<p>You really need to use an Isar structured proof to take advantage of<br>
+this format. Here is a nice version of your proof:</p>
+</blockquote>
+<blockquote>
+<p>lemma foo3: "!!i. EX! n. n &lt; c &amp; f n = i"<br>
+sorry</p>
+</blockquote>
+<blockquote>
+<p>lemma foo4: "(ALL k. P k) = (ALL i. i &lt; c --&gt; P (f i))"<br>
+proof auto<br>
+  fix k<br>
+  assume "ALL i&lt;c. P (f i)"<br>
+  with foo3 [of k]<br>
+  show "P k" by blast<br>
+qed</p>
+</blockquote>
+<blockquote>
+<p>The problem with the straight-line version is that k is a bound<br>
+variable, and instantiation by of/where (which is really intended<br>
+for structured proofs only) inserts a free variable. With the<br>
+structured proof above, k becomes a free variable.</p>
+</blockquote>
+<p>Thanks.  I think I appreciate the distinction between the different<br>
+sorts of variables a bit better now.  I was misled by or misunderstood<br>
+the Tutorial's description of "insert", which uses of in an<br>
+apply-style proof, and doesn't seem to run into any issues with<br>
+its quantifiers.</p>
+<p>Until I figure out Isar's declarative language, I'll use meta_allE for<br>
+the moment (thanks, Tobias).</p>
+<p>Regards,<br>
+Michael.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

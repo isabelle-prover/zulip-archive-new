@@ -1,0 +1,413 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Storing Generic_Data in a local theory · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Storing.20Generic_Data.20in.20a.20local.20theory.html">[isabelle] Storing Generic_Data in a local theory</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294328900"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Storing%20Generic_Data%20in%20a%20local%20theory/near/294328900" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Storing.20Generic_Data.20in.20a.20local.20theory.html#294328900">(Aug 19 2022 at 17:19)</a>:</h4>
+<p>From: Richard Molitor &lt;<a href="mailto:gattschardo@googlemail.com">gattschardo@googlemail.com</a>&gt;<br>
+Hello Florian,</p>
+<p>thanks for your reply!</p>
+<p>On Thu, 12 Mar 2015, Florian Haftmann wrote:</p>
+<blockquote>
+<p>a) Your »workaround« with Local_Theory.background_theory is correct – as<br>
+long as you want to store data in background theories only.  There are a<br>
+couple of applications where this indeed is feasible, but it is usually<br>
+not what you want.</p>
+</blockquote>
+<p>The background for this is that I had my data stored in a Theory_Data struct<br>
+before, so my ``workaround'' just does exactly what I did before, except it's<br>
+now wrapped in a generic context. Which somehow does not seem to be what I<br>
+want.</p>
+<p>My "dream" here was that the generic context would magically convert between<br>
+theory data and proof data for me, which was maybe a bit too much to whish<br>
+for.</p>
+<p>In general I think I'm fine with just having the data in the background theory<br>
+only, the main problem is that I need to somewhat awkwardly extract it when<br>
+I'm in a local theory context.</p>
+<blockquote>
+<p>b) The established pattern to store data generically is</p>
+<p>Local_Theory.declaration (fn phi =&gt; …)</p>
+<p>As a simple example, you might study src/HOL/Tools/functor.ML.</p>
+<p>The idea is basically the following:</p>
+<p>fun foo … lthy =<br>
+ let<br>
+   (We are relative to some local theory lthy here<br>
+   and have some entities (terms t, theorems thm, …) relative<br>
+   to lthy flying around as ML values here)<br>
+   fun decl phi =<br>
+     let<br>
+       (We are called for each instance (interpretation)<br>
+       of the original lthy, including lthy itself; the<br>
+       logical difference is represented by morphism phi,<br>
+       which we can apply (using Morphism.…) to transform our<br>
+       original entities t, thm to obtain their appropriate<br>
+       shape to do something with them relative<br>
+       to the current instance)<br>
+     in Data.put (a data record resulting from suitable) end;<br>
+ in<br>
+   lthy<br>
+   |&gt; Local_Theory.declaration decl<br>
+ end;</p>
+<p>Put differently:
+* Your data is of a certain type T.
+* You explain how a fundamental morphism phi is applied to a value of<br>
+type T by giving a suitable lifting f :: morphism -&gt; T -&gt; T
+* Then your declaration for a particular x :: T looks as follows:<br>
+   fun decl phi = Data.put (f phi x)</p>
+<p>Unfortunately, there is no elaborate section on this in the<br>
+implementation manual yet.</p>
+</blockquote>
+<p>I will look into this. I had seen the morphisms before, but given the lack of<br>
+documentation, I decided to use the well-documented old-fashioned way of doing<br>
+things. Maybe reading functor.ML will enlighten me, thanks for the pointer!</p>
+<blockquote>
+<p>If you can tell more about the application you are aiming towards, a<br>
+more concrete description than this generic abstract nonsense can be given.</p>
+</blockquote>
+<p>The application is the ``open inductive'' [1] [2] package that I developed for<br>
+my master's thesis. It is in a working (but not pretty) state right now, what<br>
+I am trying to do is refine the code as best as I can, so it can be submitted<br>
+to the AFP in a somewhat maintainable state.</p>
+<p>Greetings,</p>
+<p>Richard</p>
+<p>[1] documentation: <a href="http://pp.info.uni-karlsruhe.de/thesis.php?id=253">http://pp.info.uni-karlsruhe.de/thesis.php?id=253</a><br>
+[2] code: <a href="https://github.com/gattschardo/open-inductive">https://github.com/gattschardo/open-inductive</a></p>
+
+
+
+<a name="294328972"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Storing%20Generic_Data%20in%20a%20local%20theory/near/294328972" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Storing.20Generic_Data.20in.20a.20local.20theory.html#294328972">(Aug 19 2022 at 17:19)</a>:</h4>
+<p>From: Richard Molitor &lt;<a href="mailto:gattschardo@googlemail.com">gattschardo@googlemail.com</a>&gt;<br>
+Hello again,</p>
+<p>I managed to implement the suggested morphsim variant to some success now,<br>
+thanks to your example!</p>
+<p>What somewhat worries me is that I end up ignoring the morphism argument<br>
+completely, since it can contain thms and terms and (I think) they do not<br>
+affect the outcome of my commands, since they are just storing data.</p>
+<p>When I figure out which additional thms may affect my commands though, this<br>
+way at least the infrastructure is in place in contrast to just storing in the<br>
+background theory as I did before [1], so I think I stick with this for now.</p>
+<p>In the last part of the linked commit, I have a local_theory_to_proof command.<br>
+What I do now is store the result I get in after_qed using background_theory,<br>
+I could not get declaration to work here: No matter how I produce the initial<br>
+generic context, either from the local or the background theory, I somehow<br>
+always end up needing the other variant in the end.</p>
+<p>Richard</p>
+<p>[1]: <a href="https://github.com/gattschardo/open-inductive/commit/62a4bd010e91540a00427b18c5a5656f57686591">https://github.com/gattschardo/open-inductive/commit/62a4bd010e91540a00427b18c5a5656f57686591</a></p>
+
+
+
+<a name="294328986"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Storing%20Generic_Data%20in%20a%20local%20theory/near/294328986" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Storing.20Generic_Data.20in.20a.20local.20theory.html#294328986">(Aug 19 2022 at 17:19)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear Richard,</p>
+<p>I just glanced quickly over your code, so the following might not be 100% accurate, but <br>
+here are my observations nevertheless.</p>
+<p>Your data structure for the open theorems looks rather unusual, because as far as I can <br>
+see, you are storing the literal string input rather than the parsed terms and theorems. <br>
+Of course, there is no infrastructure in Isabelle to apply the morphisms to strings.<br>
+ From what I know about open inductive, I can see why you store the strings, but I am <br>
+pretty sure that this will eventually get you into trouble. Ultimately, you have to parse <br>
+the strings, but the context may have changed in between -- just think of deleting a <br>
+notation and installing the same notation for some other constant. That is, you probably <br>
+get parsing with respect to dynamic contexts. because you no longer have access to the old <br>
+context. So I recomment that you immediately convert the strings into logical entities <br>
+(terms, types, theorems) and push them through the morphism as intended.</p>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<a name="294329001"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Storing%20Generic_Data%20in%20a%20local%20theory/near/294329001" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Storing.20Generic_Data.20in.20a.20local.20theory.html#294329001">(Aug 19 2022 at 17:19)</a>:</h4>
+<p>From: Richard Molitor &lt;<a href="mailto:gattschardo@googlemail.com">gattschardo@googlemail.com</a>&gt;<br>
+Hello Andreas,</p>
+<p>you have the correct answer! Converting these strings had been on my to-do<br>
+list, I just failed to realize that now is the moment were I need it done.</p>
+<p>Thanks for your feedback, sometimes it takes a second pair of eyes :)</p>
+<p>Richard</p>
+
+
+
+<a name="294329203"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Storing%20Generic_Data%20in%20a%20local%20theory/near/294329203" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Storing.20Generic_Data.20in.20a.20local.20theory.html#294329203">(Aug 19 2022 at 17:21)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Richard,</p>
+<blockquote>
+<p>you have the correct answer! Converting these strings had been on my to-do<br>
+list, I just failed to realize that now is the moment were I need it done.</p>
+</blockquote>
+<p>text representation of entities like terms, theorems are indeed always<br>
+parsed at the very place of their occurence in a theory text.  The whole<br>
+machinery in the background then proceeds with proper internalized ML<br>
+values of type term, thm, etc.</p>
+<p>So I would suggest to modify this accordingly and come back here for<br>
+further counsel.</p>
+<p>Hope this helps,<br>
+    Florian</p>
+<blockquote>
+<p>Thanks for your feedback, sometimes it takes a second pair of eyes :)</p>
+<p>Richard</p>
+<p>On Thu, 12 Mar 2015, Andreas Lochbihler wrote:</p>
+<blockquote>
+<p>Dear Richard,</p>
+<p>I just glanced quickly over your code, so the following might not be<br>
+100% accurate, but here are my observations nevertheless.</p>
+<p>Your data structure for the open theorems looks rather unusual,<br>
+because as far as I can see, you are storing the literal string input<br>
+rather than the parsed terms and theorems. Of course, there is no<br>
+infrastructure in Isabelle to apply the morphisms to strings.<br>
+From what I know about open inductive, I can see why you store the<br>
+strings, but I am pretty sure that this will eventually get you into<br>
+trouble. Ultimately, you have to parse the strings, but the context<br>
+may have changed in between -- just think of deleting a notation and<br>
+installing the same notation for some other constant. That is, you<br>
+probably get parsing with respect to dynamic contexts. because you no<br>
+longer have access to the old context. So I recomment that you<br>
+immediately convert the strings into logical entities (terms, types,<br>
+theorems) and push them through the morphism as intended.</p>
+<p>Best,<br>
+Andreas</p>
+</blockquote>
+<p>On 12/03/15 18:38, Richard Molitor wrote:</p>
+<blockquote>
+<blockquote>
+<p>Hello again,</p>
+<p>I managed to implement the suggested morphsim variant to some success<br>
+now,<br>
+thanks to your example!<br>
+</p>
+</blockquote>
+<p>On Thu, 12 Mar 2015, Richard Molitor wrote:</p>
+<blockquote>
+<blockquote>
+<blockquote>
+<p>Put differently:
+* Your data is of a certain type T.
+* You explain how a fundamental morphism phi is applied to a value of<br>
+type T by giving a suitable lifting f :: morphism -&gt; T -&gt; T
+* Then your declaration for a particular x :: T looks as follows:<br>
+   fun decl phi = Data.put (f phi x)</p>
+<p>Unfortunately, there is no elaborate section on this in the<br>
+implementation manual yet.</p>
+</blockquote>
+<p>I will look into this. I had seen the morphisms before, but given<br>
+the lack of<br>
+documentation, I decided to use the well-documented old-fashioned<br>
+way of doing<br>
+things. Maybe reading functor.ML will enlighten me, thanks for the<br>
+pointer!</p>
+</blockquote>
+<p>What somewhat worries me is that I end up ignoring the morphism argument<br>
+completely, since it can contain thms and terms and (I think) they do<br>
+not<br>
+affect the outcome of my commands, since they are just storing data.</p>
+<p>When I figure out which additional thms may affect my commands<br>
+though, this<br>
+way at least the infrastructure is in place in contrast to just<br>
+storing in the<br>
+background theory as I did before [1], so I think I stick with this<br>
+for now.</p>
+<p>In the last part of the linked commit, I have a local_theory_to_proof<br>
+command.<br>
+What I do now is store the result I get in after_qed using<br>
+background_theory,<br>
+I could not get declaration to work here: No matter how I produce the<br>
+initial<br>
+generic context, either from the local or the background theory, I<br>
+somehow<br>
+always end up needing the other variant in the end.</p>
+<p>Richard</p>
+<p>[1]:<br>
+<a href="https://github.com/gattschardo/open-inductive/commit/62a4bd010e91540a00427b18c5a5656f57686591">https://github.com/gattschardo/open-inductive/commit/62a4bd010e91540a00427b18c5a5656f57686591</a></p>
+</blockquote>
+</blockquote>
+<p><a href="/user_uploads/14278/WfR_zjGJ5418gEdz2SOKBbYH/signature.asc">signature.asc</a></p>
+</blockquote>
+
+
+
+<a name="294329545"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Storing%20Generic_Data%20in%20a%20local%20theory/near/294329545" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Storing.20Generic_Data.20in.20a.20local.20theory.html#294329545">(Aug 19 2022 at 17:22)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+These are very important observations.  I've point out some of this <br>
+already privately.</p>
+<p>The whole complex of "locality" in Isabelle is rather complex; it is not <br>
+easily disassembled to understand how it really works.  Ultimately, it is <br>
+all about "abstract concepts" of contexts, morphisms, declarations etc.</p>
+<p>The main strategies of survival are:</p>
+<p>(1) Study published documents (the "implementation" manual with cited<br>
+       papers) about the concepts themselves.  I know that the manual is<br>
+       not finished in that respect yet, but it does contain some<br>
+       information, notably some references to papers by Chaieb, Haftmann,<br>
+       Wenzel.</p>
+<p>(2) Figure out the canonical way to do it, by looking closely at<br>
+       existing examples.  Find such examples, by asking the question<br>
+       "Which existing things are close to what I need?".  Then look<br>
+       through the sources, and make educated guesses about their quality,<br>
+       ask experts about them etc.</p>
+<p>Often people say "I don't understand localization so I better stick with <br>
+old-fashioned global theory contexts".  This only works in limited <br>
+situations, and usually turns into a much harder problem to make it work <br>
+in general: both locality and globality need to be understood, instead of <br>
+just using locality in the proper way.</p>
+<p>Makarius</p>
+
+
+
+<a name="294633270"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Storing%20Generic_Data%20in%20a%20local%20theory/near/294633270" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Storing.20Generic_Data.20in.20a.20local.20theory.html#294633270">(Aug 22 2022 at 09:05)</a>:</h4>
+<p>From: Richard Molitor &lt;<a href="mailto:gattschardo@googlemail.com">gattschardo@googlemail.com</a>&gt;<br>
+Hello,</p>
+<p>I have a question concerning the usage of Generic_Data in conjunction with an<br>
+Outer_Syntax.local_theory command. The parameter to my handler function is of<br>
+type local_theory, which can be used initialize a generic context using<br>
+Context.Proof, which can then be used to store some data:</p>
+<p>fun test_thy_cmd name =<br>
+        Context.Proof #&gt; Data.put name #&gt; Context.proof_of</p>
+<p>val _ = Outer_Syntax.local_theory @{command_spec "test_thy"}<br>
+        "test" (<a href="http://Parse.name">Parse.name</a> &gt;&gt; test_thy_cmd)</p>
+<p>I would expect to have it stored back in the background theory when the<br>
+command completes, so using it like this:</p>
+<p>test_thy foo</p>
+<p>ML_val {* Data.get (Context.Theory @{theory}) *}</p>
+<p>I would expect to get "foo" back, but i stays at the default value.</p>
+<p>The workaround I found was wrapping the whole function in background_theory<br>
+and initializing the generic context from the theory:</p>
+<p>fun test_prf_cmd name =<br>
+        Local_Theory.background_theory (Context.Theory #&gt; Data.put name #&gt; Context.theory_of)</p>
+<p>val _ = Outer_Syntax.local_theory @{command_spec "test_prf"}<br>
+        "test" (<a href="http://Parse.name">Parse.name</a> &gt;&gt; test_prf_cmd)</p>
+<p>Using this:<br>
+      test_prf bar</p>
+<p>ML_val {* Data.get (Context.Theory @{theory}) *}</p>
+<p>I get "bar" back.</p>
+<p>Is this behaviour intended? If modify the local theory in other ways (i.e.<br>
+note theorems) the data seems to be transferred as I expect (in my first<br>
+example above).</p>
+<p>Kind regards<br>
+Richard</p>
+<p>P.S.: A full working example is attached<br>
+<a href="/user_uploads/14278/3qEnF2z_IpUWnXfOI9Am5oJl/Generic.thy">Generic.thy</a></p>
+
+
+
+<a name="294633596"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Storing%20Generic_Data%20in%20a%20local%20theory/near/294633596" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Storing.20Generic_Data.20in.20a.20local.20theory.html#294633596">(Aug 22 2022 at 09:07)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Richard,</p>
+<p>my answer is twofold.</p>
+<p>a) Your »workaround« with Local_Theory.background_theory is correct – as<br>
+long as you want to store data in background theories only.  There are a<br>
+couple of applications where this indeed is feasible, but it is usually<br>
+not what you want.</p>
+<p>b) The established pattern to store data generically is</p>
+<p>Local_Theory.declaration (fn phi =&gt; …)</p>
+<p>As a simple example, you might study src/HOL/Tools/functor.ML.</p>
+<p>The idea is basically the following:</p>
+<p>fun foo … lthy =<br>
+  let<br>
+    (We are relative to some local theory lthy here<br>
+    and have some entities (terms t, theorems thm, …) relative<br>
+    to lthy flying around as ML values here)<br>
+    fun decl phi =<br>
+      let<br>
+        (We are called for each instance (interpretation)<br>
+        of the original lthy, including lthy itself; the<br>
+        logical difference is represented by morphism phi,<br>
+        which we can apply (using Morphism.…) to transform our<br>
+        original entities t, thm to obtain their appropriate<br>
+        shape to do something with them relative<br>
+        to the current instance)<br>
+      in Data.put (a data record resulting from suitable) end;<br>
+  in<br>
+    lthy<br>
+    |&gt; Local_Theory.declaration decl<br>
+  end;</p>
+<p>Put differently:</p>
+<ul>
+<li>Your data is of a certain type T.</li>
+<li>
+<p>You explain how a fundamental morphism phi is applied to a value of<br>
+type T by giving a suitable lifting f :: morphism -&gt; T -&gt; T</p>
+</li>
+<li>
+<p>Then your declaration for a particular x :: T looks as follows:<br>
+    fun decl phi = Data.put (f phi x)</p>
+</li>
+</ul>
+<p>Unfortunately, there is no elaborate section on this in the<br>
+implementation manual yet.</p>
+<p>If you can tell more about the application you are aiming towards, a<br>
+more concrete description than this generic abstract nonsense can be given.</p>
+<p>Hope this helps,<br>
+    Florian<br>
+<a href="/user_uploads/14278/z1X0sHri407oipTVsKiWLm4T/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294650426"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Storing%20Generic_Data%20in%20a%20local%20theory/near/294650426" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Storing.20Generic_Data.20in.20a.20local.20theory.html#294650426">(Aug 22 2022 at 10:58)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Richard,</p>
+<p>as far as I discern, these are indeed the relevant patterns, although I<br>
+personally prefer to think about this without historic references like<br>
+»old way« ;-).</p>
+<p>Cheers,<br>
+    Florian<br>
+<a href="/user_uploads/14278/uVZ5BpvM48C-leuMYhDFa7R3/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294651746"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Storing%20Generic_Data%20in%20a%20local%20theory/near/294651746" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Storing.20Generic_Data.20in.20a.20local.20theory.html#294651746">(Aug 22 2022 at 11:05)</a>:</h4>
+<p>From: Richard Molitor via Cl-isabelle-users &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Sorry for resurrecting this somewhat dated thread. It seems the same saying<br>
+that applies to PhD thesis also applies to Masters: They are never finished,<br>
+only abandoned.</p>
+<p>The strings are now out of my implementation, (actually for several months<br>
+now) and all my usages of the global Local_Theory.background_theory are now<br>
+replaced by using generic contexts and calls to Local_Theory.declaration, as<br>
+was suggested here. ^1</p>
+<p>Studying some other occurences in the code as suggested by Makarius I made the<br>
+following observations for "How to converted global to localized code" in this<br>
+setting:</p>
+<ul>
+<li>
+<p>If the command needs to store Generic_Data, Local_Theory.declaration is a<br>
+   drop-in replacement for the old way (provided terms are parsed and not kept<br>
+   as strings), as explained here before.</p>
+</li>
+<li>
+<p>If the command transitions to the proof state and needs to store<br>
+   Generic_Data afterwards, the call to Local_Theory.declaration needs to be in<br>
+   the after_qed continuation function.</p>
+</li>
+<li>
+<p>If the Generic_Data is not to be modified by the command, reading it can be<br>
+   accomplished by instantiating a generic context explicitly e.g. using<br>
+   Context.Proof ^2</p>
+</li>
+</ul>
+<p>I have attached a theory file that demonstrates these on a toy example. I<br>
+think that these are the appropriate solutions, but please point out any<br>
+errors if I have gone wrong somewhere. Otherwise I hope these example may be<br>
+helpful to others that want to update their older Isabelle/ML code.</p>
+<p>Kind regards<br>
+Richard</p>
+<p>1: <a href="https://github.com/gattschardo/open-inductive/blob/master/src/open_inductive.ML">https://github.com/gattschardo/open-inductive/blob/master/src/open_inductive.ML</a><br>
+2: $ISABELLE_HOME/src/HOL/Eisbach/method_closure.ML contains an example of<br>
+    this<br>
+<a href="/user_uploads/14278/fMM4KtZoXlw0QHztkLDPAMwJ/Generic.thy">Generic.thy</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

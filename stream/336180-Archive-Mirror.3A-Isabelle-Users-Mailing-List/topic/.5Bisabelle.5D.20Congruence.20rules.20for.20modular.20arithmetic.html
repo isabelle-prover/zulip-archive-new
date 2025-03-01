@@ -1,0 +1,219 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Congruence rules for modular arithmetic · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Congruence.20rules.20for.20modular.20arithmetic.html">[isabelle] Congruence rules for modular arithmetic</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294057711"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Congruence%20rules%20for%20modular%20arithmetic/near/294057711" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Congruence.20rules.20for.20modular.20arithmetic.html#294057711">(Aug 18 2022 at 11:31)</a>:</h4>
+<p>From: John Matthews &lt;<a href="mailto:matthews@galois.com">matthews@galois.com</a>&gt;<br>
+Hi,</p>
+<p>I'm trying to use congruence rules to simplify modular arithmetic  <br>
+expressions. For example, I'd like to automatically prove the following:</p>
+<p>lemma test1: "((x::int) * y mod 2) mod 2 = (x * y) mod 2"</p>
+<p>lemma test2: "((x::int) + y mod 2) mod 2 = (x + y) mod 2"</p>
+<p>To do this, I made a special definition</p>
+<p>definition<br>
+     cong_zmod :: "int =&gt; int =&gt; int" where<br>
+    "cong_zmod p x == x mod p"</p>
+<p>and then the following congruence rules (among others):</p>
+<p>lemma zmod_cong:<br>
+     assumes "p = p'"<br>
+         and "cong_zmod p' x = cong_zmod p' x'"<br>
+     shows "x mod p = x' mod p'"</p>
+<p>lemma cong_zmod_mod[simp]:<br>
+     "p dvd q ==&gt; cong_zmod p (x mod q) = cong_zmod p x"</p>
+<p>lemma cong_zmod_plus[cong]:<br>
+     assumes A1: "p = p'"<br>
+         and A2: "cong_zmod p' x = cong_zmod p' x'"<br>
+         and A3: "cong_zmod p' y = cong_zmod p' y'"<br>
+         and A4: "x' + y' = z"<br>
+     shows "cong_zmod p (x + y) = cong_zmod p' z"</p>
+<p>lemma cong_zmod_mult[cong]:<br>
+     assumes A1: "cong_zmod p x = cong_zmod p x'"<br>
+         and A2: "cong_zmod p y = cong_zmod p y'"<br>
+         and A3: "x' * y' = z"<br>
+     shows "cong_zmod p (x * y) = cong_zmod p z"</p>
+<p>With these congruence rules, I can get Isabelle to prove the first  <br>
+lemma:</p>
+<p>lemma test1: "((x::int) * y mod 2) mod 2 = (x * y) mod 2"<br>
+   by (simp cong: zmod_cong)</p>
+<p>but not the second:</p>
+<p>lemma test2: "((x::int) + y mod 2) mod 2 = (x + y) mod 2"<br>
+   by (simp cong: zmod_cong)</p>
+<p>[Isabelle's response:  *** Terminal proof method failed<br>
+                          *** At command "by".]</p>
+<p>Since Isabelle only stores one congruence rule for any given function  <br>
+symbol, the congruence rule cong_zmod_mult clobbers cong_zmod_plus.</p>
+<p>Is there any way to fix this so Isabelle can have multiple congruence  <br>
+rules for a function symbol, when the left-hand-sides are distinct?  <br>
+The alternative of coding this up as a simproc wouldn't interact well  <br>
+with other modular arithmetic simplification rules that users may  <br>
+want to add later on.</p>
+<p>I'm appending the complete theory below.</p>
+<p>Thanks,<br>
+-john</p>
+<hr>
+<p>theory "zmod_cong_plus_example"<br>
+imports "~~/src/HOL/Word/WordGenLib"<br>
+begin</p>
+<p>definition<br>
+   cong_zmod :: "int \&lt;Rightarrow&gt; int \&lt;Rightarrow&gt; int" where<br>
+  "cong_zmod p x \&lt;equiv&gt; x mod p"</p>
+<p>lemma zmod_cong:<br>
+   assumes "p = p'"<br>
+       and "cong_zmod p' x = cong_zmod p' x'"<br>
+   shows "x mod p = x' mod p'"<br>
+by (cut_tac prems, simp add: cong_zmod_def)</p>
+<p>lemma cong_zmod_mod[simp]:<br>
+   "p dvd q \&lt;Longrightarrow&gt; cong_zmod p (x mod q) = cong_zmod p x"<br>
+by (simp add: cong_zmod_def zmod_zmod_cancel)</p>
+<p>lemma cong_zmod_plus[cong]:<br>
+   assumes A1: "p = p'"<br>
+       and A2: "cong_zmod p' x = cong_zmod p' x'"<br>
+       and A3: "cong_zmod p' y = cong_zmod p' y'"<br>
+       and A4: "x' + y' = z"<br>
+   shows "cong_zmod p (x + y) = cong_zmod p' z"<br>
+apply (cut_tac prems)<br>
+by (simp add: cong_zmod_def cong: mod_plus_cong)</p>
+<p>-- "REVISIT: Submit to WordGenLib.thy"<br>
+lemma mod_mult_cong:<br>
+   assumes A1: "b = b'"<br>
+       and A2: "(x::int) mod b' = x' mod b'"<br>
+       and A3: "(y\&lt;Colon&gt;int) mod b' = y' mod b'"<br>
+       and A4: "x' * y' = z'"<br>
+   shows "(x * y) mod b = z' mod b'"<br>
+apply (simp add: A1)<br>
+apply (subst pull_mods(2)[symmetric])<br>
+by (simp add: A2 A3 A4 pull_mods(2))</p>
+<p>lemma cong_zmod_mult[cong]:<br>
+   assumes A1: "cong_zmod p x = cong_zmod p x'"<br>
+       and A2: "cong_zmod p y = cong_zmod p y'"<br>
+       and A3: "x' * y' = z"<br>
+   shows "cong_zmod p (x * y) = cong_zmod p z"<br>
+apply (cut_tac prems)<br>
+by (simp add: cong_zmod_def cong: mod_mult_cong)</p>
+<p>lemma test1:<br>
+   "((x::int) * y mod 2) mod 2 = (x * y) mod 2"<br>
+apply (simp cong: zmod_cong)<br>
+done</p>
+<p>lemma test2:<br>
+   "((x::int) + y mod 2) mod 2 = (x + y) mod 2"<br>
+apply (simp cong: zmod_cong)<br>
+done</p>
+<p>end</p>
+
+
+
+<a name="294058097"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Congruence%20rules%20for%20modular%20arithmetic/near/294058097" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Congruence.20rules.20for.20modular.20arithmetic.html#294058097">(Aug 18 2022 at 11:33)</a>:</h4>
+<p>From: Amine Chaieb &lt;<a href="mailto:chaieb@in.tum.de">chaieb@in.tum.de</a>&gt;<br>
+Hi John,</p>
+<p>Sorry for the late answer (I have actually just noticed the mail).</p>
+<p>The two lemmas can be proved automatically by presburger.</p>
+<p>But you still might want to prove them once for all for arbitrary n, not <br>
+just 2. the method algebra actually proves such problems, but <br>
+unfortunately it is not yet set up properly.</p>
+<p>Attached is a theory that shows how to use it. The auxiliary lemmas are <br>
+actually proved in libraries (Prime numbers and Pocklington). We should <br>
+maybe move them to HOL and set up algebra properly to prove such simple <br>
+theorems.</p>
+<p>Best Regards,<br>
+Amine.</p>
+<p>John Matthews wrote:<br>
+<a href="/user_uploads/14278/ou11B-dy4ZQ6UaemPuHFh6nf/Test.thy">Test.thy</a></p>
+
+
+
+<a name="294059069"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Congruence%20rules%20for%20modular%20arithmetic/near/294059069" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Congruence.20rules.20for.20modular.20arithmetic.html#294059069">(Aug 18 2022 at 11:40)</a>:</h4>
+<p>From: John Matthews &lt;<a href="mailto:matthews@galois.com">matthews@galois.com</a>&gt;<br>
+Hi Amine,</p>
+<p>Thanks for looking into this. The examples I gave were simple, but in  <br>
+my application the terms I'm trying to simplify are much larger. Here  <br>
+is a very small instance:</p>
+<p>uint v0 mod 256 * (uint v1 mod 256) mod 256 =<br>
+     (((uint_sliceLH 0 0 v1 mod 256 *
+          (uint v0 mod 256) mod 256 +<br>
+        uint_sliceLH 1 1 v1 mod 256 *
+          (2 * (uint v0 mod 256) mod 256) mod 256) mod 256 +<br>
+        uint_sliceLH 2 2 v1 mod 256 *
+          (uint v0 mod 256 * 4 mod 256) mod 256) mod 256 +<br>
+        uint_sliceLH 3 3 v1 mod 256 *
+          (uint v0 mod 256 * 8 mod 256) mod 256) mod 256</p>
+<p>where (uint_sliceLH n m w) = uint (sliceLH n m w).</p>
+<p>Also, I need Isabelle to simplify the term itself, as I don't know  <br>
+beforehand what the term should simplify to. This is why I need to use  <br>
+congruence rules, rather than decision procedures like presburger. Can  <br>
+the algebra method perform simplification, especially when given extra  <br>
+definitions such as uint_sliceLH?</p>
+<p>Thanks,<br>
+-john</p>
+
+
+
+<a name="294059072"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Congruence%20rules%20for%20modular%20arithmetic/near/294059072" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Congruence.20rules.20for.20modular.20arithmetic.html#294059072">(Aug 18 2022 at 11:40)</a>:</h4>
+<p>From: Amine Chaieb &lt;<a href="mailto:chaieb@in.tum.de">chaieb@in.tum.de</a>&gt;<br>
+Hi John,</p>
+<p>It would be helpful if you could provide a rough description of the <br>
+class of terms you want to simplify.</p>
+<p>As for the example (I assumed the variables have type int!) you could <br>
+simplify it to e.g.</p>
+<p>uint v0 * uint v1 mod 256 =<br>
+     (uint (sliceLH 0 0 v1) * uint v0 +<br>
+      uint (sliceLH 1 1 v1) * (2 * uint v0) +<br>
+      uint (sliceLH 2 2 v1) * (uint v0 * 4) +<br>
+      uint (sliceLH 3 3 v1) * (uint v0 * 8)) mod<br>
+     256</p>
+<p>automatically using (simp add: zmod_simps H). Here H is a premise saying <br>
+that (uint_sliceLH n m w) = uint (sliceLH n m w).</p>
+<p>If you only need to gather terms together under mod/div this should not <br>
+be very difficult, provided that the constants also (not only subterms) <br>
+are of the form a mod m, for the same modulus. But I doubt your examples <br>
+are as simple as this.</p>
+<p>For e.g. (x mod 256 + 8) mod 256 = (x + 8) mod 256</p>
+<p>one would need more than simple rewriting with zmod_simps (maybe a <br>
+special simproc or tactic to convert 8 into 8 mod 256 or generally y <br>
+into y mod m provided we can prove y &lt; m and m &gt;= 0 for the integers).</p>
+<p>Unfortunately the algebra method can not prove the statement above which <br>
+boils down to</p>
+<p>EX q1 q2.<br>
+        uint v0 * uint v1 + 256 * q1 =<br>
+        uint (sliceLH 0 0 v1) * uint v0 +<br>
+        uint (sliceLH 1 1 v1) * (2 * uint v0) +<br>
+        uint (sliceLH 2 2 v1) * (uint v0 * 4) +<br>
+        uint (sliceLH 3 3 v1) * (uint v0 * 8) +<br>
+        256 * q2</p>
+<p>I guess it does not hold in all rings.</p>
+<p>Apart from that, the method algebra does not perform simplification, it <br>
+is only meant for decision. You can however give it extra theorems for <br>
+definitions or the like to be expanded before the core procedure is called.</p>
+<p>I hope this helps.</p>
+<p>Amine.</p>
+<p>John Matthews wrote:</p>
+
+
+
+<a name="294059150"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Congruence%20rules%20for%20modular%20arithmetic/near/294059150" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Congruence.20rules.20for.20modular.20arithmetic.html#294059150">(Aug 18 2022 at 11:40)</a>:</h4>
+<p>From: Jeremy Dawson &lt;<a href="mailto:jeremy@rsise.anu.edu.au">jeremy@rsise.anu.edu.au</a>&gt;<br>
+Amine Chaieb wrote:<br>
+For integers, the statement above doesn't depend on 8 being equal to 8 <br>
+mod 256.</p>
+<p>In fact it is one of the simplifications in the list rdmods, in <br>
+Num_Lemmas.thy in src/HOL/Word.</p>
+<p>Incidentally, the stuff I put into Num_Lemmas.thy was stuff I thought <br>
+was of more general interest than just to be used within the <br>
+machine-word library.</p>
+<p>Jeremy Dawson</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

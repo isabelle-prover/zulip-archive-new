@@ -1,0 +1,267 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] mutual recdefs · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20mutual.20recdefs.html">[isabelle] mutual recdefs</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="293904904"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20mutual%20recdefs/near/293904904" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20mutual.20recdefs.html#293904904">(Aug 17 2022 at 14:14)</a>:</h4>
+<p>From: Peter Sewell &lt;<a href="mailto:Peter.Sewell@cl.cam.ac.uk">Peter.Sewell@cl.cam.ac.uk</a>&gt;<br>
+Another naive question: I'd like to define several mutually recursive<br>
+functions, eg (roughly) as is_val and is_exp in the example below.<br>
+Looking in the tutorial I only see single examples - how would this be<br>
+most nicely done?  (Presumably I could make a new disjoint sum type<br>
+and work over that, but that seems ugly - though some plumbing of size<br>
+functions is going to be needed somewhere.)</p>
+<p>ta,<br>
+Peter</p>
+<p>theory Out = Main:<br>
+types ident = "string"<br>
+datatype <br>
+exp = <br>
+   Exp_ident "ident"<br>
+ | Exp_unit<br>
+ | Exp_pair "exp*exp"<br>
+ | Exp_fun "ident*exp"<br>
+ | Exp_app "exp*exp"<br>
+ | Exp_foo "exp"<br>
+and C = <br>
+   Ctx_pairL "exp"<br>
+ | Ctx_pairR "exp"<br>
+ | Ctx_appL "exp"<br>
+ | Ctx_appR "exp"<br>
+and Jop = <br>
+   JO_red "exp*exp"<br>
+and judgement = <br>
+   judgement_Jop "Jop"</p>
+<p>consts is_val :: "exp =&gt; bool"<br>
+is_C :: "C =&gt; bool"<br>
+is_Jop :: "Jop =&gt; bool"<br>
+is_exp :: "exp =&gt; bool"<br>
+recdef is_val "measure (% x . size x)"<br>
+"is_val (Exp_ident ( x ) ) = (True)"<br>
+"is_val (Exp_unit) = (True)"<br>
+"is_val (Exp_pair ( exp , exp' ) ) = (((is_val exp) &amp; (is_val exp')))"<br>
+"is_val (Exp_fun ( x , exp ) ) = (((is_exp exp)))"<br>
+"is_val (Exp_app ( exp , exp' ) ) = False"<br>
+"is_val (Exp_foo ( val ) ) = False"<br>
+recdef is_C "measure (% x . size x)"<br>
+"is_C (Ctx_pairL ( exp ) ) = (((is_exp exp)))"<br>
+"is_C (Ctx_pairR ( val ) ) = (((is_val val)))"<br>
+"is_C (Ctx_appL ( exp ) ) = (((is_exp exp)))"<br>
+"is_C (Ctx_appR ( val ) ) = (((is_val val)))"<br>
+recdef is_Jop "measure (% x . size x)"<br>
+"is_Jop (JO_red ( e , e' ) ) = (((is_exp e) &amp; (is_exp e')))"<br>
+recdef is_exp "measure (% x . size x)"<br>
+"is_exp (Exp_ident ( x ) ) = (True)"<br>
+"is_exp (Exp_unit) = (True)"<br>
+"is_exp (Exp_pair ( exp , exp' ) ) = (((is_exp exp) &amp; (is_exp exp')))"<br>
+"is_exp (Exp_fun ( x , exp ) ) = (((is_exp exp)))"<br>
+"is_exp (Exp_app ( exp , exp' ) ) = (((is_exp exp) &amp; (is_exp exp')))"<br>
+"is_exp (Exp_foo ( val ) ) = (((is_val val)))"</p>
+
+
+
+<a name="293904919"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20mutual%20recdefs/near/293904919" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20mutual.20recdefs.html#293904919">(Aug 17 2022 at 14:14)</a>:</h4>
+<p>From: Brian Huffman &lt;<a href="mailto:brianh@csee.ogi.edu">brianh@csee.ogi.edu</a>&gt;<br>
+You could actually define these functions together using primrec: Since <br>
+recursive calls are only made on subterms, you don't really need the full <br>
+power of recdef.</p>
+<p>However, using primrec is complicated by the fact that you have used product <br>
+types as arguments to your constructors. This is actually an instance of <br>
+indirect recursion, which means you would be required to additionally define <br>
+several extra constants which take the product types as arguments. If you <br>
+change your datatype definitions so that the constructors have two separate <br>
+arguments instead of a pair, then primrec should work just fine.</p>
+<ul>
+<li>Brian</li>
+</ul>
+
+
+
+<a name="293905025"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20mutual%20recdefs/near/293905025" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20mutual.20recdefs.html#293905025">(Aug 17 2022 at 14:14)</a>:</h4>
+<p>From: Peter Sewell &lt;<a href="mailto:Peter.Sewell@cl.cam.ac.uk">Peter.Sewell@cl.cam.ac.uk</a>&gt;<br>
+Brian Huffman writes:</p>
+<blockquote>
+<p>You could actually define these functions together using primrec: Since <br>
+recursive calls are only made on subterms, you don't really need the full <br>
+power of recdef.</p>
+</blockquote>
+<p>that's true in this case, indeed.</p>
+<blockquote>
+<p>However, using primrec is complicated by the fact that you have used product <br>
+types as arguments to your constructors. This is actually an instance of <br>
+indirect recursion, which means you would be required to additionally define <br>
+several extra constants which take the product types as arguments. If you <br>
+change your datatype definitions so that the constructors have two separate <br>
+arguments instead of a pair, then primrec should work just fine.</p>
+</blockquote>
+<p>But that seems not to be.  As far as I can tell it's impossible to <br>
+define multiple mutually-recursive functions over the same types, eg the</p>
+<p>is_val :: "exp =&gt; bool"<br>
+  is_exp :: "exp =&gt; bool"</p>
+<p>in the example below, using either primrec or recdef.  Is that really the case?<br>
+Clearly I could encode, with something like</p>
+<p>is_val_is_exp :: "exp =&gt; (bool * bool) "</p>
+<p>and Tom Ridge points out that I can then prove lemmas characterising<br>
+the projections of that that look like my original definition.  <br>
+But I don't want to do that encoding unless I have to...</p>
+<p>thanks,<br>
+Peter</p>
+<p>(* here is_val and is_exp define two sub-grammars of the free exp *)<br>
+theory Out = Main:<br>
+types ident = "string"<br>
+datatype <br>
+exp = <br>
+   Exp_ident "ident"<br>
+ | Exp_unit <br>
+ | Exp_pair "exp" "exp"<br>
+ | Exp_fun "ident" "exp"<br>
+ | Exp_app "exp" "exp"<br>
+ | Exp_foo "exp"</p>
+<p>consts<br>
+is_val :: "exp =&gt; bool"<br>
+is_exp :: "exp =&gt; bool"</p>
+<p>primrec<br>
+"is_val ((Exp_ident x)) = (True)"<br>
+"is_val (Exp_unit) = (True)"<br>
+"is_val ((Exp_pair exp exp')) = (((is_val exp) &amp; (is_val exp')))"<br>
+"is_val ((Exp_fun x exp)) = (((is_exp exp)))"<br>
+"is_val ((Exp_app exp exp')) = False"<br>
+"is_val ((Exp_foo val)) = False"</p>
+<p>"is_exp ((Exp_ident x)) = (True)"<br>
+"is_exp (Exp_unit) = (True)"<br>
+"is_exp ((Exp_pair exp exp')) = (((is_exp exp) &amp; (is_exp exp')))"<br>
+"is_exp ((Exp_fun x exp)) = (((is_exp exp)))"<br>
+"is_exp ((Exp_app exp exp')) = (((is_exp exp) &amp; (is_exp exp')))"<br>
+"is_exp ((Exp_foo val)) = (((is_val val)))"</p>
+
+
+
+<a name="293905030"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20mutual%20recdefs/near/293905030" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20mutual.20recdefs.html#293905030">(Aug 17 2022 at 14:14)</a>:</h4>
+<p>From: <a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a><br>
+I think the only mutual recursion we currently support is for mutually<br>
+recursive datatypes. Mutual recursion in general is in the pipeline...</p>
+<p>Below you find a higher-order encoding of mutual recursion. It avoids having<br>
+to mess around with pairs but requires its own tricks. I had never tried this<br>
+before and it was a valuable exercise.</p>
+<p>Tobias</p>
+<p>types ident = "string"<br>
+datatype<br>
+exp =<br>
+   Exp_ident "ident"<br>
+ | Exp_unit<br>
+ | Exp_pair "exp" "exp"<br>
+ | Exp_fun "ident" "exp"<br>
+ | Exp_app "exp" "exp"<br>
+ | Exp_foo "exp"</p>
+<p>consts<br>
+is_val2 :: "(exp =&gt; bool) =&gt; exp =&gt; bool"<br>
+is_exp :: "exp =&gt; bool"</p>
+<p>primrec<br>
+"is_val2 ise (Exp_ident x) = True"<br>
+"is_val2 ise (Exp_unit) = True"<br>
+"is_val2 ise (Exp_pair exp exp') = (is_val2 ise exp &amp; is_val2 ise exp')"<br>
+"is_val2 ise (Exp_fun x exp) = ise exp"<br>
+"is_val2 ise (Exp_app exp exp') = False"<br>
+"is_val2 ise (Exp_foo val) = False"</p>
+<p>recdef is_exp "measure size"<br>
+"is_exp (Exp_ident x) = True"<br>
+"is_exp (Exp_unit) = True"<br>
+"is_exp (Exp_pair exp exp') = (is_exp exp &amp; is_exp exp')"<br>
+"is_exp (Exp_fun x exp) = is_exp exp"<br>
+"is_exp (Exp_app exp exp') = (is_exp exp &amp; is_exp exp')"<br>
+"is_exp (Exp_foo val) = is_val2 is_exp val"</p>
+<p>(* The real thing: *)<br>
+constdefs is_val :: "exp =&gt; bool"<br>
+ "is_val == is_val2 is_exp"</p>
+<p>(* Deriving the real eqns: *)<br>
+lemma [simp]:<br>
+ "is_val (Exp_ident x) = True"<br>
+ "is_val (Exp_unit) = True"<br>
+ "is_val (Exp_pair exp exp') = (is_val exp &amp; is_val exp')"<br>
+ "is_val (Exp_fun x exp) = is_exp exp"<br>
+ "is_val (Exp_app exp exp') = False"<br>
+ "is_val (Exp_foo val) = False"<br>
+by(simp_all add:is_val_def)</p>
+<p>(* A complication: the final is_exp rule is more complicated than one<br>
+may naively expect. *)<br>
+thm is_exp.simps(6)</p>
+<p>lemma is_val2_cong:<br>
+ "(!!e'. size e' &lt; size e ==&gt; f e' = g e') ==&gt; is_val2 f e = is_val2 g e"<br>
+by (induct e) simp_all</p>
+<p>lemma is_exp_foo[simp]: "is_exp (Exp_foo e) = is_val e"<br>
+by(simp add:is_val_def measure_def inv_image_def is_val2_cong)</p>
+<p>declare is_exp.simps(6)[simp del]</p>
+
+
+
+<a name="293905033"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20mutual%20recdefs/near/293905033" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20mutual.20recdefs.html#293905033">(Aug 17 2022 at 14:15)</a>:</h4>
+<p>From: <a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a><br>
+I think the only mutual recursion we currently support is for mutually<br>
+recursive datatypes. Mutual recursion in general is in the pipeline...</p>
+<p>Below you find a higher-order encoding of mutual recursion. It avoids having<br>
+to mess around with pairs but requires its own tricks. I had never tried this<br>
+before and it was a valuable exercise.</p>
+<p>Tobias</p>
+<p>types ident = "string"<br>
+datatype<br>
+exp =<br>
+   Exp_ident "ident"<br>
+ | Exp_unit<br>
+ | Exp_pair "exp" "exp"<br>
+ | Exp_fun "ident" "exp"<br>
+ | Exp_app "exp" "exp"<br>
+ | Exp_foo "exp"</p>
+<p>consts<br>
+is_val2 :: "(exp =&gt; bool) =&gt; exp =&gt; bool"<br>
+is_exp :: "exp =&gt; bool"</p>
+<p>primrec<br>
+"is_val2 ise (Exp_ident x) = True"<br>
+"is_val2 ise (Exp_unit) = True"<br>
+"is_val2 ise (Exp_pair exp exp') = (is_val2 ise exp &amp; is_val2 ise exp')"<br>
+"is_val2 ise (Exp_fun x exp) = ise exp"<br>
+"is_val2 ise (Exp_app exp exp') = False"<br>
+"is_val2 ise (Exp_foo val) = False"</p>
+<p>recdef is_exp "measure size"<br>
+"is_exp (Exp_ident x) = True"<br>
+"is_exp (Exp_unit) = True"<br>
+"is_exp (Exp_pair exp exp') = (is_exp exp &amp; is_exp exp')"<br>
+"is_exp (Exp_fun x exp) = is_exp exp"<br>
+"is_exp (Exp_app exp exp') = (is_exp exp &amp; is_exp exp')"<br>
+"is_exp (Exp_foo val) = is_val2 is_exp val"</p>
+<p>(* The real thing: *)<br>
+constdefs is_val :: "exp =&gt; bool"<br>
+ "is_val == is_val2 is_exp"</p>
+<p>(* Deriving the real eqns: *)<br>
+lemma [simp]:<br>
+ "is_val (Exp_ident x) = True"<br>
+ "is_val (Exp_unit) = True"<br>
+ "is_val (Exp_pair exp exp') = (is_val exp &amp; is_val exp')"<br>
+ "is_val (Exp_fun x exp) = is_exp exp"<br>
+ "is_val (Exp_app exp exp') = False"<br>
+ "is_val (Exp_foo val) = False"<br>
+by(simp_all add:is_val_def)</p>
+<p>(* A complication: the final is_exp rule is more complicated than one<br>
+may naively expect. *)<br>
+thm is_exp.simps(6)</p>
+<p>lemma is_val2_cong:<br>
+ "(!!e'. size e' &lt; size e ==&gt; f e' = g e') ==&gt; is_val2 f e = is_val2 g e"<br>
+by (induct e) simp_all</p>
+<p>lemma is_exp_foo[simp]: "is_exp (Exp_foo e) = is_val e"<br>
+by(simp add:is_val_def measure_def inv_image_def is_val2_cong)</p>
+<p>declare is_exp.simps(6)[simp del]</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

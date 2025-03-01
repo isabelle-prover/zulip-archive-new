@@ -1,0 +1,101 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Set induction and pair datatype · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Set.20induction.20and.20pair.20datatype.html">[isabelle] Set induction and pair datatype</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294051577"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Set%20induction%20and%20pair%20datatype/near/294051577" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Set.20induction.20and.20pair.20datatype.html#294051577">(Aug 18 2022 at 10:48)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:lochbihl@infosun.fim.uni-passau.de">lochbihl@infosun.fim.uni-passau.de</a>&gt;<br>
+Hi Peter,</p>
+<p>if you look in the original TransitiveClosure theory of HOL, you also<br>
+find an extra rule for pairs.<br>
+However, you do not have to prove the induction rule by hand, but you<br>
+can have Isabelle generate it for you:</p>
+<p>In TransitiveClosure.thy:<br>
+lemmas rtrancl_induct2 =<br>
+rtrancl_induct[of "(ax,ay)" "(bx,by)", split_format (complete),<br>
+consumes 1, case_names refl step]</p>
+<p>So, your trcl_pair_induct could be written as<br>
+lemmas trcl_pair_induct =<br>
+trcl_induct[of "(xc1,xc2)" "xb" "(xa1,xa2)", split_format (complete),<br>
+consumes 1, case names empty cons]</p>
+<p>Induction over inductive sets where the element to be in the set in the<br>
+premises is not of the most general form is always a problem because<br>
+induct discards everything like pairs, a fixed parameter and the like.</p>
+<p>An alternative would be to reformulate the lemma you want to prove, but<br>
+this is very tedious if you have to do it multiple times.</p>
+<p>lemma preserves_cl: "[| (c,w,c') : trcl T; c = (a, b); c' = (a', b') |]<br>
+     \&lt;Longrightarrow&gt; Prop a b \&lt;Longrightarrow&gt; Prop a' b'"</p>
+<p>Regards,<br>
+Andreas</p>
+
+
+
+<a name="294052040"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Set%20induction%20and%20pair%20datatype/near/294052040" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Set.20induction.20and.20pair.20datatype.html#294052040">(Aug 18 2022 at 10:51)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:peter.lammich@uni-muenster.de">peter.lammich@uni-muenster.de</a>&gt;<br>
+I have the following problem with set induction and pair datatypes,<br>
+illustrated in the pice of code below:</p>
+<p>-- "Defining transitive closure of labeled transition system as<br>
+inductive set"<br>
+types ('c,'a) LTS = "('c \&lt;times&gt; 'a \&lt;times&gt; 'c) set"</p>
+<p>text {* Transitive closure of LTS *}<br>
+consts trcl :: "('c,'a) LTS \&lt;Rightarrow&gt; ('c,'a list) LTS"</p>
+<p>inductive "trcl t"<br>
+intros<br>
+  empty[simp]: "(c,[],c) \&lt;in&gt; trcl t"<br>
+  cons[simp]: "\&lt;lbrakk&gt; (c,a,c') \&lt;in&gt; t; (c',w,c'') \&lt;in&gt; trcl t<br>
+\&lt;rbrakk&gt; \&lt;Longrightarrow&gt; (c,a#w,c'') \&lt;in&gt; trcl t"</p>
+<p>-- "Now do some very simple inductive proof, using trcl.induct"<br>
+consts T':: "(nat \&lt;times&gt; bool \&lt;times&gt; nat) set"<br>
+consts Prop':: "nat \&lt;Rightarrow&gt; bool"</p>
+<p>lemma preserves': "(a,e,a')\&lt;in&gt;T' \&lt;Longrightarrow&gt; Prop' a<br>
+\&lt;Longrightarrow&gt; Prop' a'" sorry</p>
+<p>lemma preserves_trcl': "(a,w,a')\&lt;in&gt;trcl T' \&lt;Longrightarrow&gt; Prop' a<br>
+\&lt;Longrightarrow&gt; Prop' a'"<br>
+  apply (induct rule: trcl.induct)<br>
+  apply (auto simp add: preserves')<br>
+done<br>
+-- "Ok, this works fine !"</p>
+<p>-- "Now we want to do the same for states that are pairs: "<br>
+consts T:: "((nat \&lt;times&gt; nat) \&lt;times&gt; bool \&lt;times&gt; (nat \&lt;times&gt;<br>
+nat)) set"<br>
+consts Prop:: "nat \&lt;Rightarrow&gt; nat \&lt;Rightarrow&gt; bool"</p>
+<p>lemma preserves: "((a,b),e,(a',b'))\&lt;in&gt;T \&lt;Longrightarrow&gt; Prop a b<br>
+\&lt;Longrightarrow&gt; Prop a' b'" sorry</p>
+<p>lemma preserves_cl: "((a,b),w,(a',b'))\&lt;in&gt;trcl T \&lt;Longrightarrow&gt; Prop<br>
+a b \&lt;Longrightarrow&gt; Prop a' b'"<br>
+  apply (induct rule: trcl.induct)<br>
+  oops<br>
+  This did not get the induction correctly, there are the following<br>
+subgoals:</p>
+<p>1. \&lt;And&gt;c. Prop a b \&lt;Longrightarrow&gt; Prop a' b'<br>
+    2. \&lt;And&gt;aa c c' c'' w. \&lt;lbrakk&gt;(c, aa, c') \&lt;in&gt; T; (c', w, c'')<br>
+\&lt;in&gt; trcl T; Prop a b \&lt;Longrightarrow&gt; Prop a' b'; Prop a b\&lt;rbrakk&gt;<br>
+\&lt;Longrightarrow&gt; Prop a' b'<br>
+  the first one is obviously not provable</p>
+<p>What can I do about this ? Currently I'm working around by providing a<br>
+specialized induction rule for pairs:<br>
+lemma trcl_pair_induct[induct set]:<br>
+  "\&lt;lbrakk&gt;((xc1,xc2), xb, (xa1,xa2)) \&lt;in&gt; trcl t; \&lt;And&gt;c1 c2. P c1<br>
+c2 [] c1 c2; \&lt;And&gt;a c1 c2 c1' c2' c1'' c2'' w. \&lt;lbrakk&gt;((c1,c2), a,<br>
+(c1',c2')) \&lt;in&gt; t; ((c1',c2'), w, (c1'',c2'')) \&lt;in&gt; trcl t; P c1' c2'<br>
+w c1'' c2''\&lt;rbrakk&gt; \&lt;Longrightarrow&gt; P c1 c2 (a # w) c1'' c2''\&lt;rbrakk&gt;<br>
+  \&lt;Longrightarrow&gt; P xc1 xc2 xb xa1 xa2"<br>
+  using trcl.induct[of "(xc1,xc2)" xb "(xa1,xa2)" t "\&lt;lambda&gt;c w c'.<br>
+let (c1,c2)=c in let (c1',c2')=c' in P c1 c2 w c1' c2'"] by auto</p>
+<p>Is this the way to go, or is there another (nicer) possibility, i.e. one<br>
+generic scheme that can handle pairs, triples and so on</p>
+<p>Many thanks in advance, yours<br>
+Peter</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

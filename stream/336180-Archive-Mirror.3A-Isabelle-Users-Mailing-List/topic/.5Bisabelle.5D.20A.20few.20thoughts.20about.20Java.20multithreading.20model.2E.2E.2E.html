@@ -1,0 +1,167 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] A few thoughts about Java multithreading model... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20A.20few.20thoughts.20about.20Java.20multithreading.20model.2E.2E.2E.html">[isabelle] A few thoughts about Java multithreading model...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294113403"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20A%20few%20thoughts%20about%20Java%20multithreading%20model.../near/294113403" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20A.20few.20thoughts.20about.20Java.20multithreading.20model.2E.2E.2E.html#294113403">(Aug 18 2022 at 15:45)</a>:</h4>
+<p>From: Tambet &lt;<a href="mailto:qtvali@gmail.com">qtvali@gmail.com</a>&gt;<br>
+Type-safety of variables in Java is related to type constraints, but one can<br>
+always emulate variables (say, as strings), which aren't type-safe.</p>
+<p>Variables in Java are also mutexes. Say that mutexes are safe by<br>
+composition, then one can emulate mutexes, which are not - also, one could<br>
+create livelocks.</p>
+<p>I am not sure if livelocks can be avoided by strong types, but deadlocks can</p>
+<ul>
+<li>and deadlocks are the main problem.</li>
+</ul>
+<p>In Java, taking lock is achieved by synchronized method:<br>
+synchronized (a) {<br>
+  ...<br>
+}</p>
+<p>One can also take class lock by having it in function signature.</p>
+<p>First problem - it's impossible to atomically take two locks like this:<br>
+synchronized (a, b) {<br>
+  ...<br>
+}</p>
+<p>These run to deadlock if they are in different threads:<br>
+synchronized (a) { synchronized (b) { ... }}<br>
+synchronized (b) { synchronized (a) { ... }}</p>
+<p>This is easy to see, why - order differs.</p>
+<p>Say that we have "then synchronized" keyword.<br>
+synchronized (a) {<br>
+  then synchronized (b) {<br>
+    ...<br>
+  }<br>
+  ...<br>
+}</p>
+<p>This should take two locks atomically, then release one of them.</p>
+<p>Taking many locks at once, then releasing them in arbitrary order - this<br>
+wont run to deadlocks.</p>
+<p>Then, imagine this:<br>
+synchronized (a) { synchronized (b) { ... }}<br>
+synchronized (a) { ... } then synchronized (b) { ... }</p>
+<p>First one takes lock b after a, second one will take b atomically when<br>
+releasing a. As long as locks are taken in same order, it's impossible to<br>
+force system to deadlock. There is a difference between forcing it to<br>
+deadlock and allowing deadlock - it has different constraints to<br>
+thread-safety of types.</p>
+<p>Say that some type is ordered in regard to locks:<br>
+class A {<br>
+  seq Integer[] b;<br>
+}<br>
+class B {}<br>
+seq { A, B }</p>
+<p>In other file, there might be:<br>
+seq { A, C }<br>
+merging to previous sequence as { A, B, C }</p>
+<p>Sequencing locks is one rather powerful way to avoid deadlocks. Also,<br>
+integers inside A should be a sub-sequence of A.</p>
+<p>For lock of A, we have a few considerable possibilities:</p>
+<ul>
+<li>
+<p>It's last lock of it's inner sequence, then it's possible to lock it after<br>
+any lock there.</p>
+</li>
+<li>
+<p>It's first lock of it's inner sequence.</p>
+</li>
+<li>It's a covering lock of whole it's sequence, locking all Integers in b.</li>
+</ul>
+<p>We could have this goal:</p>
+<ul>
+<li>Lock whole A, get some data</li>
+<li>Work on it</li>
+<li>Lock A again, write it</li>
+</ul>
+<p>We can mark this data as being worked on or we can try to write and retry if<br>
+it's changed meanwhile. We could also have queues, which is my favorite, but<br>
+this is not interesting here.</p>
+<p>So having A at end of sequence, it is no problem to take lock of A and b[n]<br>
+at once, then release A, then work on b[n] and take A again:<br>
+synchronized (b[n]) {<br>
+  then synchronized (A) {<br>
+    // Read data.<br>
+  }<br>
+  // Work on data.<br>
+} then synchronized (A) {<br>
+  // Write data.<br>
+}</p>
+<p>This relies on fact that locking all at once we can not run to deadlock -<br>
+then, we release A and one lock left, go sequentially.</p>
+<p>Method, then, should look something like that:<br>
+int m(n) locks [(A, b[n]), A] {<br>
+  synchronized (b[n]) {<br>
+    then synchronized (A) {<br>
+      // Read data.<br>
+    }<br>
+    // Work on data.<br>
+  } then synchronized (A) {<br>
+    // Write data.<br>
+  }<br>
+}</p>
+<p>Eclipse could generate the lock signature. It contains locking path - and<br>
+challence is to make it short.</p>
+<p>For having more complex use cases - where we want to read several items,<br>
+when changing one - it's needed to have independent handler for items in b -<br>
+this handler will take internal locks. From such handler, no calls can be<br>
+made to parent (this is, by the way, most hard-to-debug deadlock case) from<br>
+locked functions. In such case, the functions are kind of "atomic" - you<br>
+call them, they have inherently good lock structure, they exit and this<br>
+makes no difference what locks you use from your own scope.</p>
+<p>This locking, to be usable, must be tightly integrated to the rest of type<br>
+system - otherwise it's unimaginable that you create all those connections<br>
+between variables (as variable structure itself is dynamic, you can always<br>
+add element to an array or reference something from some other class).</p>
+<p>Summary:</p>
+<p>Sequence structure, defined in several files, is directed and can fork/join.</p>
+<p>Each locking sequence can start by taking many locks at once, then release<br>
+all locks except connected slice of lock sequence, then progress.</p>
+<p>Independent sequences of subsystems work ok as long as one can make calls to<br>
+another, which locks things with allowed structure and then releases it's<br>
+own internal locks and returns. That other can not make back-calls to<br>
+methods, which use caller-scope locks in relation to it.</p>
+<p>I am sure that this structure can be worked on to allow more cases, but this<br>
+is a simple and proven methodology, which allows a lot. I suggest also<br>
+looking at lock structure in Google Go-lang, which basically has only<br>
+channels and no locks (and is fast compiled language - someday with a<br>
+garbage collector). The Go-lang suggestion is precisely because proving at<br>
+least one structure, which allows sending messages in two directions, to be<br>
+deadlock-safe, would cover all common needs. This is - everyone tries to<br>
+send something, reader can at any moment read the array or next message in<br>
+and process it. Sending messages back from many to one could be simple<br>
+method call, then. This would allow to emulate something similar to Go's<br>
+message-sending structure, which allows all important use cases (as they<br>
+say).</p>
+<p>Tambet</p>
+
+
+
+<a name="294113456"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20A%20few%20thoughts%20about%20Java%20multithreading%20model.../near/294113456" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20A.20few.20thoughts.20about.20Java.20multithreading.20model.2E.2E.2E.html#294113456">(Aug 18 2022 at 15:46)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@kit.edu">andreas.lochbihler@kit.edu</a>&gt;<br>
+Hi Tambet,</p>
+<p>in Isabelle, I have formalized a notion of type safety for the Java <br>
+multithreading model with deadlocks in the JinjaThreads article in the <br>
+Archive of Formal Proofs <br>
+(<a href="http://afp.sourceforge.net/entries/JinjaThreads.shtml">http://afp.sourceforge.net/entries/JinjaThreads.shtml</a>).</p>
+<p>There, I do allow deadlocks in showing type safety in the style of <br>
+progress and preservation: The progress is restricted to non-deadlocked <br>
+cases. Note that not only deadlocks via locking violate the progress <br>
+property. Java's wait-notify-mechanism and joining of threads can <br>
+similarly cause problems with progress. Suppose a thread is in a wait <br>
+set - waiting to be notified or interrupted - but there is only one <br>
+other thread which joins on the thread in the wait set. I would also <br>
+call this a deadlock.</p>
+<p>Andreas</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

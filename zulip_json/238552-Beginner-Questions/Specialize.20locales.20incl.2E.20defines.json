@@ -1,0 +1,26 @@
+[
+    {
+        "content": "<p>In my theory, I work with partial functions. To prevent writing <code>the</code> in some code (readability), I experimented with using <code>defines</code> to make use of total and partial functions.<br>\nThis approach worked quite well, but now I encountered a problem when trying to specialize a locale. The following example shows such a case:</p>\n<div class=\"codehilite\"><pre><span></span><code>abbreviation totalize :: &quot;(&#39;a ⇀ &#39;b) ⇒ &#39;a ⇒ &#39;b&quot; where\n&quot;totalize f a ≡ the (f a)&quot;\n\nlocale A =\n  fixes a :: &quot;&#39;a set&quot;\n  assumes &quot;finite a&quot;\n\nlocale B =\n  A: A a +\n  B: A b for a :: &quot;&#39;a set&quot; and b :: &quot;&#39;b set&quot; +\nfixes\n  f  :: &quot;&#39;a ⇀ &#39;b&quot; and\n  f&#39; :: &quot;&#39;a ⇒ &#39;b&quot;\ndefines\n  f_def: &quot;f&#39; ≡ totalize f&quot;\n\nlocale C = B a b &quot;λe. if e ∈ a then Some e else None&quot; id\n  for a b\n</code></pre></div>\n<p>Here, <code>locale C</code> is rejected with the following error message:</p>\n<div class=\"codehilite\"><pre><span></span><code>Bad head of lhs: existing constant &quot;id&quot;\nThe error(s) above occurred in definition:\n&quot;id ≡ λaa. totalize (If (aa ∈ a) (Some aa)) None&quot;\n</code></pre></div>\n<p>The same \"problem\"\\limitation was reported in 2015 <a href=\"https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2015-August/msg00030.html\">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2015-August/msg00030.html</a><br>\nIs there any known workaround?</p>",
+        "id": 261411502,
+        "sender_full_name": "Robert Soeldner",
+        "timestamp": 1636887696
+    },
+    {
+        "content": "<p>I don’t know understand right now what the precise problem is, let alone whether there’s a workaround for it, but I would argue that generally <code>id</code> doesn’t fulfill the relevant axiom anyhow.</p>\n<p>The representation of the partial function as a total function must use <code>the None</code> as the result for all arguments that don’t belong to the domain. However, <code>id</code> uses the arguments as the results. The point is that you’re not free to choose what to return for arguments outside the domain. While you don’t know what value <code>the None</code> really is, you’re still forced to pick this particular, unknown value.</p>\n<p>This restriction is important: If you were free to let the total function have any results for the arguments outside the domain, for example, by replacing the <code>defines</code> declaration with a <code>fixes</code> declaration that just insists that the partial and total versions coincide on the domain, then, by choosing different results for the same arguments outside the domain, you could distinguish different interpretations that should morally be the same.</p>\n<p>Therefore, my suggestion is: Just use <code>totalize</code> in the declaration of <code>C</code> as well.</p>",
+        "id": 261425067,
+        "sender_full_name": "Wolfgang Jeltsch",
+        "timestamp": 1636906706
+    },
+    {
+        "content": "<p>Thank you Wolfgang for your support :)</p>\n<p>The problem still remains:</p>\n<div class=\"codehilite\"><pre><span></span><code>locale C = B a b &quot;λe. if e ∈ a then Some e else None&quot; &quot;totalize (λe. if e ∈ a then Some e else None)&quot;\n  for a b\n</code></pre></div>\n<p>will result in the following error:</p>\n<div class=\"codehilite\"><pre><span></span><code>Bad head of lhs: &quot;λaa. totalize (If (aa ∈ a) (Some aa)) None&quot;\nThe error(s) above occurred in definition:\n&quot;λaa. totalize (If (aa ∈ a) (Some aa)) None ≡ λaa. totalize (If (aa ∈ a) (Some aa)) None&quot;\n</code></pre></div>",
+        "id": 261428400,
+        "sender_full_name": "Robert Soeldner",
+        "timestamp": 1636911040
+    },
+    {
+        "content": "<p>Weird. It seems as if <code>totalize</code> is applied to a partial application of <code>If</code> instead of the function it is actually applied to, as if the <code>totalized</code> is pushed under the <code>λ</code>.</p>",
+        "id": 261429102,
+        "sender_full_name": "Wolfgang Jeltsch",
+        "timestamp": 1636911810
+    }
+]

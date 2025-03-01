@@ -1,0 +1,105 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Porting trouble: Interpretation of locale semi... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Porting.20trouble.3A.20Interpretation.20of.20locale.20semi.2E.2E.2E.html">[isabelle] Porting trouble: Interpretation of locale semi...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294076546"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Porting%20trouble%3A%20Interpretation%20of%20locale%20semi.../near/294076546" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Porting.20trouble.3A.20Interpretation.20of.20locale.20semi.2E.2E.2E.html#294076546">(Aug 18 2022 at 13:25)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:peter.lammich@uni-muenster.de">peter.lammich@uni-muenster.de</a>&gt;<br>
+I'm currently converting theories from 2008 -&gt; 2009:</p>
+<p>I'm using the following definition of conc:<br>
+RegSet.conc_def: conc ?A ?B = {xs @ ys |xs ys. xs \&lt;in&gt; ?A \&lt;and&gt; ys<br>
+\&lt;in&gt; ?B}</p>
+<p>Then I do:<br>
+  interpretation lc_monoid: monoid_mult "{[]}" conc [...]</p>
+<p>text {* Languages with concatenation (*) and union (+) form a semiring<br>
+    with 1-element @{term "{[]}"} and 0-element @{term "{}"}: *}<br>
+  interpretation regset_semiring: semiring_1 "{[]}" conc "{}" "op \&lt;union&gt;"<br>
+    apply (unfold_locales)<br>
+    apply (auto simp add: conc_def)<br>
+    done</p>
+<p>And get the following error upon the "done" command, i.e. after (!) it<br>
+told me "No  subgoals".</p>
+<p>*** Partially applied constant on left hand side of equation<br>
+*** "semiring_1.of_nat {[]} {} op \&lt;union&gt; ?n \&lt;equiv&gt;<br>
+semiring_1.of_nat_aux (\&lt;lambda&gt;i. i \&lt;union&gt; {[]}) ?n {}"<br>
+*** At command "done".</p>
+<p>I do not know what this error message means, nor can I find any<br>
+documentation.<br>
+In Isabelle2008, the proof worked well.</p>
+<p>Many thanks for any hints,<br>
+  Peter</p>
+
+
+
+<a name="294076569"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Porting%20trouble%3A%20Interpretation%20of%20locale%20semi.../near/294076569" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Porting.20trouble.3A.20Interpretation.20of.20locale.20semi.2E.2E.2E.html#294076569">(Aug 18 2022 at 13:25)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Peter,</p>
+<p>The fundamental problem is that interpretation still does not work as<br>
+expected with definitions relative to locales.  In your case, the<br>
+definitions of of_nat and Nats relative to locale semiring_1 make<br>
+problems.  There is a workaround pattern:</p>
+<p>definition<br>
+  "conc A B = {xs @ ys | xs ys. xs \&lt;in&gt; A \&lt;and&gt; ys \&lt;in&gt; B}"</p>
+<p>interpretation lc_monoid: monoid_mult "{[]}" conc<br>
+apply unfold_locales<br>
+sorry</p>
+<p>-- {* define explicit constants for the interpretation results of of_nat<br>
+and Nats *}</p>
+<p>definition<br>
+  "regset_of_nat = semiring_1.of_nat {[]} {} (op \&lt;union&gt;)"</p>
+<p>definition<br>
+  "regset_Nats = semiring_1.Nats {[]} {} (op \&lt;union&gt;)"</p>
+<p>interpretation regset_semiring: semiring_1 "{[]}" conc "{}" "op<br>
+\&lt;union&gt;" where</p>
+<p>-- {* fold interpretation results of of_nat and Nats to the<br>
+corresponding global constants *}</p>
+<p>"semiring_1.of_nat {[]} {} (op \&lt;union&gt;) = regset_of_nat"<br>
+  and "semiring_1.Nats {[]} {} (op \&lt;union&gt;) = regset_Nats"<br>
+proof -<br>
+  show "semiring_1 {[]} conc {} (op \&lt;union&gt;)"<br>
+    by unfold_locales (auto simp add: conc_def)<br>
+qed (simp_all add: regset_of_nat_def regset_Nats_def)</p>
+<p>Ugly, but working;  we hope to repair this problem once and forall in<br>
+the next Isabelle release.</p>
+<p>Hope this helps<br>
+    Florian<br>
+<a href="/user_uploads/14278/T0LXVdAO4gAnlvbc-naiSHxo/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294076744"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Porting%20trouble%3A%20Interpretation%20of%20locale%20semi.../near/294076744" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Porting.20trouble.3A.20Interpretation.20of.20locale.20semi.2E.2E.2E.html#294076744">(Aug 18 2022 at 13:26)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+This is essentially an instance of the problem of "tool compliance" of <br>
+morphisms, see also the hints about that in the paper by Chaieb &amp; Wenzel <br>
+<a href="http://www4.in.tum.de/~wenzelm/papers/context-methods.pdf">http://www4.in.tum.de/~wenzelm/papers/context-methods.pdf</a></p>
+<p>Arbitrary data declarations that are included in a locale body (or class <br>
+or whatever) are subject to arbitrary transformations performed by other <br>
+means later (here locale interpretation).  While the primitive logic is <br>
+stable under such morphisms (theorems are mapped to theorems etc.),<br>
+arbitrary tools are not.</p>
+<p>"Tool compliance" means that the transformation by a given morphism <br>
+"works" -- what exactly is meant by that depends on the particular tool <br>
+(here the code generator).</p>
+<p>The usual strategy to prevent breakdowns like above is as follows:</p>
+<p>* Internal declarations of tool data (via certain attributes) should be<br>
+     tolerant against illformed input, i.e. not insist on a certain form,<br>
+     but give in and ignore the declaration. (This should be<br>
+     done in way that does not cause too much surprise to the user, maybe<br>
+     via a suitable warning.)</p>
+<p>* The user should be able to modify the environment that results from an<br>
+     interpretation etc. by adding new declarations of replacement data.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

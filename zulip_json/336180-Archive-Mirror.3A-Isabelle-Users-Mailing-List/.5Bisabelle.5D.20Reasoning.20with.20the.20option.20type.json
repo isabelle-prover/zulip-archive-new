@@ -1,0 +1,50 @@
+[
+    {
+        "content": "<p>From: Alfio Martini &lt;<a href=\"mailto:alfio.martini@acm.org\">alfio.martini@acm.org</a>&gt;<br>\nDear Isabelle Users,</p>\n<p>In a previous thread (Isabelle: A logic of partial functions?) I asked<br>\nsome questions about the use of the constant \"undefined\" when<br>\ndealing with partial functions, which  have to be made total according<br>\nto the foundations of Isabelle.</p>\n<p>The long thread about my difficulties with Sledgehammer made<br>\nme realize that my definition was not general enough. And after<br>\nlooking into the very well written tutorial on Code Generation, I<br>\nwas convinced that I had to deal with the option type.</p>\n<p>I'm  also very grateful to all that reply my original messages with<br>\nmany insightful and helpful observations.<br>\nSo, if some novice is interested I include here (my) proof of the<br>\ntotal correctness of that sum algorithm.</p>\n<p>I only ask the evaluation of some more experienced user, if<br>\nthis is the correct way to reason  with the option type. It looks<br>\na bit clumsy.</p>\n<p>The thy file is attached. Many thanks for any remarks!</p>\n<p>Best!<br>\n<a href=\"/user_uploads/14278/3Os1BlrbjWWUYBqC-et95ULO/SumIntOption.thy\">SumIntOption.thy</a></p>",
+        "id": 294636993,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661160563
+    },
+    {
+        "content": "<p>From: \"Eugene W. Stark\" &lt;<a href=\"mailto:stark@cs.stonybrook.edu\">stark@cs.stonybrook.edu</a>&gt;<br>\nI am not very experienced, but I looked at your proof.<br>\nIt seems very long, and there are lots of apparently unnecessary<br>\nassumptions that float in and out.  I came up with the attached,<br>\nwhich is rather shorter.  I did not see how the use of the<br>\noption type introduces any complication here.  Hopefully I did<br>\nnot misunderstand something important.</p>\n<p>- Gene Stark<br>\n<a href=\"/user_uploads/14278/y3K2XYSVApI6V5sSq3TXuxZp/SumIntOption.thy\">SumIntOption.thy</a></p>",
+        "id": 294637138,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661160616
+    },
+    {
+        "content": "<p>From: Alfio Martini &lt;<a href=\"mailto:alfio.martini@acm.org\">alfio.martini@acm.org</a>&gt;<br>\nHi Eugene,</p>\n<p>Thank you for your feedback. Indeed it looks much shorter, since the<br>\nsimplifier takes care of the<br>\nmany intermediate steps I wrote it down. Anyway, at least for these<br>\nexercises, I try to use Isabelle to check<br>\nmy handwritten proofs (or any handwritten proof that is made without<br>\nassuming automated tools).<br>\nThat is why they look unnecessary  long. But I will use some of your<br>\nsuggestions in order to improve its presentation.</p>\n<p>Best!</p>",
+        "id": 294637149,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661160622
+    },
+    {
+        "content": "<p>From: Manuel Eberl &lt;<a href=\"mailto:eberlm@in.tum.de\">eberlm@in.tum.de</a>&gt;<br>\nIt is, of course, not unreasonable to do things by hand like you did in <br>\norder to get to know the system better.</p>\n<p>I would, however, like to show you how to shorten the proof a bit more. <br>\nIsabelle's automation is very powerful, but you have to help it along a <br>\nbit. As a rule, when you try to prove a fact about a recursively-defined <br>\nfunction, it is advisable to use the induction rule for that function <br>\nthat the function package gives you. It makes things easier, both for <br>\nyou and for the automation.</p>\n<p>So let's apply it and see what we end up with:</p>\n<p>theorem<br>\n   \"l ≤ u ⟹ sumO l u f = Some (∑k=l..u. f k)\"<br>\napply (induction l u f rule: sumO.induct)<br>\napply simp_all</p>\n<p>The remaining goal is then something like<br>\n⋀n m f. n &lt; m ⟹ f m + setsum f {n..m - 1} = setsum f {n..m}</p>\n<p>This should be intuitively obvious, we're just splitting off the last <br>\nterm in the sum from n to m. We can show this as an auxiliary lemma, e.g.</p>\n<p>lemma setsum_last_int:<br>\n   \"(n::int) &lt; m ⟹ f m + setsum f {n..m - 1} = setsum f {n..m}\"<br>\n   by (subst setsum.insert[symmetric]) (auto simp del: setsum.insert <br>\nintro: setsum.cong)</p>\n<p>Now the proof is fully automatic:<br>\ntheorem<br>\n   \"l ≤ u ⟹ sumO l u f = Some (∑k=l..u. f k)\"<br>\n   by (induction l u f rule: sumO.induct) (simp_all add: setsum_last_int)</p>\n<p>Cheers,</p>\n<p>Manuel</p>",
+        "id": 294637164,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661160630
+    },
+    {
+        "content": "<p>From: Alfio Martini &lt;<a href=\"mailto:alfio.martini@acm.org\">alfio.martini@acm.org</a>&gt;<br>\nHi Manuel,</p>\n<p>Thank you for the explanations about this more general technique. I have<br>\nseen now that it is<br>\nexplained in detail in the \"Programming and Proving\" tutorial under the<br>\nname of \"computation<br>\ninduction\". I have tried to see the logical structure underlying your<br>\nversion of the proof  using<br>\nIsar. I came up with the following and I assume there is a more elegant way<br>\nto write it.</p>\n<p>lemma setsum_last_int:<br>\n  \"(n::int) &lt; m ⟹ f m + setsum f {n..m - 1} = setsum f {n..m}\"<br>\n  by (subst setsum.insert[symmetric])<br>\n  (auto simp del: setsum.insert intro: setsum.cong)</p>\n<p>theorem<br>\n  assumes \"l ≤ u\"<br>\n  shows \"sumO l u f = Some (∑k=l..u. f k)\"  (is \"?P l u f\")<br>\n  using assms<br>\n   proof (induction l u f  rule: sumO.induct)<br>\n      fix l::int and f<br>\n      show \"?P l l f\" by simp<br>\n   next<br>\n      fix n::int and m and f<br>\n      assume \"n&lt;m\" and \"(n ≤ m - 1 ==&gt; ?P n (m - 1) f)\"<br>\n      then  show \"?P n m f\"  using setsum_last_int by simp<br>\n   next<br>\n      fix n::int and m and f<br>\n      assume \"m&lt;n\"  and \"n≤m\"<br>\n      then have False by simp<br>\n      then show \"?P n m f\" by (rule FalseE)<br>\n   qed</p>\n<p>It was very helpful, because I haven´t seen before that the last goal<br>\nfollows by a simple contradiction.<br>\nYet, I am not comfortable with the way I wrote the induction hypothesis in<br>\nthe second goal. I had<br>\nto use the metalogical symbol \"==&gt;\". Assuming that I insist and writing all<br>\nthe details above,  how could<br>\nI avoid using \"==&gt;\"? I have no clue.</p>\n<p>Best!</p>",
+        "id": 294637292,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661160693
+    },
+    {
+        "content": "<p>From: Manuel Eberl &lt;<a href=\"mailto:eberlm@in.tum.de\">eberlm@in.tum.de</a>&gt;<br>\nSince the induction hypothesis contains meta implication, there is no <br>\nother way to write it. You can, however, give names to your three <br>\ndifferent cases so you don't have to fix/assume everything yourself:</p>\n<p>theorem<br>\nassumes \"l ≤ u\"<br>\nshows \"sumO l u f = Some (∑k=l..u. f k)\"  (is \"?P l u f\")<br>\nusing assms<br>\nproof (induction l u f rule: sumO.induct[case_names 1 2 3])<br>\n   case (1 l f)<br>\n   show ?case by simp<br>\nnext<br>\n   case (2 n m f)<br>\n   thus ?case using setsum_last_int by simp<br>\nnext<br>\n   case (3 n m f)<br>\n   hence False by simp<br>\n   thus \"?P n m f\" by (rule FalseE)<br>\nqed</p>\n<p>Cheers,</p>\n<p>Manuel</p>",
+        "id": 294637300,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661160698
+    },
+    {
+        "content": "<p>From: Alfio Martini &lt;<a href=\"mailto:alfio.martini@acm.org\">alfio.martini@acm.org</a>&gt;<br>\nGreat! I tried to use case, but it did not work, because I was not aware<br>\nthat<br>\nI could declare the arbitrary fixed variables in that way (although it<br>\nseems to<br>\nbe  there in section 4.4.2 of the tutorial for the case of structural<br>\ninduction).</p>\n<p>Cheers!</p>",
+        "id": 294637327,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661160710
+    },
+    {
+        "content": "<p>From: Alfio Martini &lt;<a href=\"mailto:alfio.martini@acm.org\">alfio.martini@acm.org</a>&gt;<br>\nHi Eugene,</p>\n<p>and there are lots of apparently unnecessary</p>\n<blockquote>\n<p>assumptions that float in and out.</p>\n</blockquote>\n<p>You are completely right. My original (long) version would be like this<br>\nwithout<br>\nthe unnecessary assumptions.</p>\n<p>theorem<br>\n  fixes u::int and l::int<br>\n  assumes assm: \"l≤u\"<br>\n  shows \"sumO l u f = Some (∑ k=l..u. (f k))\" (is \"?P u\")<br>\n  using assms<br>\n    proof (induct u rule: int_ge_induct)<br>\n      show \"?P l\"<br>\n       proof -<br>\n         have \"sumO l l f = Some (f l)\" by simp<br>\n         also have \"... = Some (∑ k=l..l. (f k))\" by simp<br>\n         finally show \"sumO l l f = Some (∑ k=l..l. (f k))\" by this<br>\n       qed<br>\n    next<br>\n      fix i::int<br>\n      assume hip01: \"i≥l\" and HI:\"?P i\"<br>\n      show \"sumO l (i+1) f = Some (∑ k=l..i+1. (f k))\"<br>\n         proof -<br>\n            have<br>\n            \"sumO l (i+1) f = (case sumO l i f of<br>\n             None ⇒ None | Some v ⇒ Some ((f (i+1) + v)))\"<br>\n             using hip01 by simp<br>\n             also have \"... = Some (f (i+1) + (∑ k=l..i. (f k)))\"<br>\n             using HI and hip01 by simp<br>\n             also have \"... = Some (∑ k=l..i+1. (f k))\"<br>\n                proof -<br>\n                   have \"{l..i + 1} = insert (i+1) {l..i}\" using hip01<br>\n                     by auto<br>\n                   thus ?thesis by simp<br>\n                qed<br>\n              finally  show \"sumO l (i+1) f = Some (∑ k=l..i+1. (f k))\" by<br>\nthis<br>\n         qed<br>\n    qed</p>\n<p>Best!</p>",
+        "id": 294637408,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661160730
+    }
+]

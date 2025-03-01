@@ -1,0 +1,38 @@
+[
+    {
+        "content": "<p>From: Jørgen Villadsen &lt;<a href=\"mailto:jovi@dtu.dk\">jovi@dtu.dk</a>&gt;<br>\nHi,</p>\n<p>Is there a way to make the SML code generator use opaque ascription \"structure Foo :&gt; FOO = struct ... end\" rather than transparent ascription \"structure Foo : FOO = struct ... end\"?</p>\n<p>OCaml does not have transparent ascription so perhaps the default for SML should be opaque ascription.</p>\n<p>Thanks,</p>\n<p>Jørgen</p>",
+        "id": 294677066,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661175313
+    },
+    {
+        "content": "<p>From: Florian Haftmann &lt;<a href=\"mailto:florian.haftmann@informatik.tu-muenchen.de\">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>\nHi  Jørgen,</p>\n<blockquote>\n<p>Hi,</p>\n<p>Is there a way to make the SML code generator use opaque ascription \"structure Foo :&gt; FOO = struct ... end\" rather than transparent ascription \"structure Foo : FOO = struct ... end\"?</p>\n</blockquote>\n<p>the short answer is, no.</p>\n<blockquote>\n<p>OCaml does not have transparent ascription so perhaps the default for SML should be opaque ascription.</p>\n</blockquote>\n<p>The Isabelle/ML tradition prevers abstypes over opaque ascriptions – as<br>\nfar as I remember also pretty printing of values work better with<br>\nabstypes than opaque ascriptions.  When signatures have been added to<br>\nSML code generation, this pattern has been adopted.  Maybe it is time to<br>\nrevisit that.</p>\n<p>Cheers,<br>\n    Florian<br>\n<a href=\"/user_uploads/14278/gnsLdsoGF8fdl4op5-x0vgIR/signature.asc\">signature.asc</a></p>",
+        "id": 294677076,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661175316
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nSee also<br>\n<a href=\"http://stackoverflow.com/questions/7296795/sml-whats-the-difference-between-using-abstype-and-using-a-signature-to-hide-t\">http://stackoverflow.com/questions/7296795/sml-whats-the-difference-between-using-abstype-and-using-a-signature-to-hide-t</a></p>\n<p>After the Isabelle2016 release, we have discontinued SML/NJ and old<br>\nversions of Poly/ML, so there is a bit more flexibility now in canonical<br>\npatterns for Isabelle/ML.</p>\n<p>The example with structure A3 from above is the difficult one, notably<br>\nthe situation \"does not work (overrides pp for int)\". Defining the pp<br>\noutside of the structure basically works, but exceptions are not printed<br>\ncorrectly. This is how the problem with opaque ascription was discovered<br>\nmany years ago, and the abstype solution took over.</p>\n<p>Here is an update of the example A3 from Stackoverflow above, using<br>\nIsabelle2016 with its bundled Poly/ML 5.6:</p>\n<p>ML ‹<br>\nstructure A :&gt;<br>\nsig<br>\n  type t<br>\n  exception BAD of t<br>\n  datatype test = Test of t<br>\n  val a: t<br>\n  val print: t -&gt; string<br>\nend =<br>\nstruct</p>\n<p>type t = int</p>\n<p>exception BAD of t<br>\ndatatype test = Test of t</p>\n<p>val a = 42</p>\n<p>fun print i = \"{\" ^ Int.toString i ^ \"}\"</p>\n<p>(<em>1</em>)<br>\n(*val _ = PolyML.addPrettyPrinter (fn _ =&gt; fn _ =&gt; fn x =&gt;<br>\nPolyML.PrettyString (print x))*)<br>\nend;</p>\n<p>(<em>2</em>)<br>\n(*val _ = PolyML.addPrettyPrinter (fn _ =&gt; fn _ =&gt; fn x =&gt;<br>\nPolyML.PrettyString (A.print x))*)<br>\n›</p>\n<p>ML ‹A.a; A.Test A.a; A.BAD A.a›</p>\n<p>This leads to a mix of results, depending on the place where the pretty<br>\nprinter is installed.</p>\n<p>I still don't see how to get a simple and robust pretty printer setup,<br>\nso we can't use opaque ascription – unless David Matthews wants to<br>\nrefine that again for a future release of Poly/ML.</p>\n<p>Makarius<br>\n<a href=\"/user_uploads/14278/pdf9EQMCgct2eAZlbMCgK3pg/signature.asc\">signature.asc</a></p>",
+        "id": 294677097,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661175324
+    },
+    {
+        "content": "<p>From: David Matthews &lt;<a href=\"mailto:dm@prolingua.co.uk\">dm@prolingua.co.uk</a>&gt;<br>\nPretty-printing isn't part of the ML standard so it's not always clear <br>\nhow to do it properly.  There have been various changes over the years. <br>\nIn particular, printing exception packets is difficult because the <br>\npacket can contain values of types that exist only where the exception <br>\nis raised.  In the example below, \"t\" may not actually be exported from <br>\nthe signature.  So, Poly/ML puts the print function that applies where <br>\nthe exception is raised into the exception packet and uses that if it <br>\nneeds to print the packet.  There are no plans to change this.</p>\n<p>There have been some changes around the printing of types exported <br>\nthrough opaque matching.  When a structure matches a signature <br>\ncontaining a type through opaque matching the semantics says that this <br>\ncreates a new type \"name\".  Poly/ML creates a new ref to hold the pretty <br>\nprint function for the new type.  Previously this was initialised to the <br>\npretty print function for the implementing type but this was changed in <br>\n5.6.1 to default to printing \"?\".  It later became clear that this was <br>\ntoo restrictive when the signature contained a datatype (e.g. \"test\" <br>\nbelow) so there was a further change in commit 29985b1c in git master. <br>\nSo now if you install pretty printers both within the structure, (<em>1</em>) <br>\nbelow, for the exception, and outside the signature (<em>2</em>) it will work <br>\nas you expect.</p>\n<p>David</p>",
+        "id": 294677109,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661175329
+    },
+    {
+        "content": "<p>From: Jørgen Villadsen &lt;<a href=\"mailto:jovi@dtu.dk\">jovi@dtu.dk</a>&gt;<br>\nThanks to Florian, Makarius and David for the explanations.</p>\n<p>Jørgen</p>",
+        "id": 294677198,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661175361
+    },
+    {
+        "content": "<p>From: Florian Haftmann &lt;<a href=\"mailto:florian.haftmann@informatik.tu-muenchen.de\">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>\nHi Jørgen,</p>\n<p>after revisting the matter of opaque ascription, I came to the<br>\nconclusion that the situation »as it is« seems to be fine:</p>\n<p>a) Type abstraction works via datatypes with hidden (unexported)<br>\nconstructors, which works regardless whether ascription is transparent<br>\nor opaque.  An abstract type in Isabelle/HOL is never a mere type synonym!</p>\n<p>b) The Isabelle/ML tradition has a bias towards transparent ascription.</p>\n<p>Cheers,<br>\n    Florian<br>\n<a href=\"/user_uploads/14278/wb_4JRG9B-Ig7D33Syq_70Bo/signature.asc\">signature.asc</a></p>",
+        "id": 294710828,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661182137
+    }
+]

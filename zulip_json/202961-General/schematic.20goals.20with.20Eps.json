@@ -1,0 +1,92 @@
+[
+    {
+        "content": "<p>I can easily prove this goal  </p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"n\">schematic_goal</span><span class=\"w\"> </span><span class=\"s\">\"⋀x. P x ⟹ P ?x\"</span><span class=\"w\"></span>\n</code></pre></div>\n<p>via </p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">by</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">rule</span><span class=\"w\"> </span><span class=\"n\">someI</span><span class=\"o\">)</span><span class=\"w\"></span>\n</code></pre></div>\n<p>I can also prove </p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"n\">schematic_goal</span><span class=\"w\"> </span><span class=\"s\">\"⋀x y. P x y ⟹ P ?x ?y\"</span><span class=\"w\"></span>\n</code></pre></div>\n<p>using for example</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"s\">\"P x y ⟹ P (fst (Eps (λ(x, y). P x y))) (snd (Eps (λ(x, y). P x y)))\"</span><span class=\"w\"></span>\n</code></pre></div>\n<p>But what do I do for the following?</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"n\">schematic_goal</span><span class=\"w\"> </span><span class=\"s\">\"⋀x y. P x y ⟹ P ?x y\"</span><span class=\"w\"></span>\n</code></pre></div>\n<p>For, I assume technical, reasons that I don't quite understand <code>?x</code> can't be instantiated with <code>x</code> in all these cases, which is why I have to resort to <code>Eps</code>. In the last case I'd have to instantiate <code>?x</code> with something that doesn't depend on <code>y</code>, but I in general no value for <code>?x</code> has to exist that satisfies <code>P x y</code> for all <code>y</code>.</p>",
+        "id": 305172444,
+        "sender_full_name": "Leander Behr",
+        "timestamp": 1666278821
+    },
+    {
+        "content": "<p>Do your really mean <code>(⋀x y. P x y) ⟹ P ?x ?y</code>?</p>",
+        "id": 305175155,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1666279580
+    },
+    {
+        "content": "<p>that is also the reason why <code>x</code> cannot be instantiated with <code>x</code>: they don't live in the same scope…</p>",
+        "id": 305175485,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1666279671
+    },
+    {
+        "content": "<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"n\">schematic_goal</span><span class=\"w\"> </span><span class=\"s\">\"(P x y ⟹ P ?x y)\"</span><span class=\"w\"></span>\n<span class=\"w\">  </span><span class=\"k\">by</span><span class=\"w\"> </span><span class=\"n\">assumption</span><span class=\"w\"></span>\n</code></pre></div>",
+        "id": 305175604,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1666279692
+    },
+    {
+        "content": "<p>Are you saying that <code>⋀x y. P x y ⟹ P ?x ?y</code> is the same as <code>(⋀x y. P x y) ⟹ P ?x ?y</code> because it really doesn't seem like it from the syntax highlighting in jedit. Also, <code>⋀x y. (P x y ⟹ P ?x ?y)</code> still doesn't work <code>by assumption</code>.</p>",
+        "id": 305176828,
+        "sender_full_name": "Leander Behr",
+        "timestamp": 1666279986
+    },
+    {
+        "content": "<p>oh no sorry you are right</p>",
+        "id": 305177165,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1666280059
+    },
+    {
+        "content": "<p><code>⋀x y. (P x y ⟹ P ?x ?y) </code>: this is a scope problem: you are trying to instantiate the global variable <code>?x</code> with a local variable that only exists under <code>⋀</code></p>",
+        "id": 305177411,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1666280124
+    },
+    {
+        "content": "<p>this is also why you don't have that problem with the <code>P x y ⟹ P ?x ?y</code>: you instantiate the global variable with a global variable</p>",
+        "id": 305177769,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1666280216
+    },
+    {
+        "content": "<p>Yeah, that's why I have to come up with a constant through <code>Eps</code> and why the following works, where I make <code>?x</code> explicitly dependent on the local <code>x</code>.</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"n\">schematic_goal</span><span class=\"w\"> </span><span class=\"s\">\"(⋀x y. P x y ⟹ P (?x x) y)\"</span><span class=\"w\"></span>\n<span class=\"w\">  </span><span class=\"k\">by</span><span class=\"w\"> </span><span class=\"n\">assumption</span><span class=\"w\"></span>\n</code></pre></div>\n<p>I have some cases in \"real code\" where I have schematics in the conclusion like <code>P ?x</code> from a rule application and  a premise like <code>∃x. P x</code>, which introduces a new local when I eliminate the quantifier which then can't be used to instantiate <code>?x</code>. Sometimes I can mitigate this by eliminating the <code>∃x</code> before applying the rule. But doing this automatically early enough is extremely hard.</p>",
+        "id": 305178905,
+        "sender_full_name": "Leander Behr",
+        "timestamp": 1666280529
+    },
+    {
+        "content": "<p>Actually <code>⋀x y. P x y ⟹ P ?x y</code> is the situation I encounter, that's why I'm asking about it.</p>\n<p>As far as I understand this is an entirely technical problem, not a logical one, because <code>lemma \"⋀x. P x\"</code> is equivalent to <code>lemma \"P x\"</code>. So I was hoping to find a solution to turn <code>⋀x y. P x y ⟹ P ?x y</code> into <code>P x y ⟹ P ?x y</code> or some solution involving the choice operator.</p>",
+        "id": 305179976,
+        "sender_full_name": "Leander Behr",
+        "timestamp": 1666280864
+    },
+    {
+        "content": "<p>can't you just change your theorem to require <code>\\&lt;exists&gt;x. P x y</code>?</p>",
+        "id": 305180286,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1666280985
+    },
+    {
+        "content": "<p>It creates multiple new goals containing the schematic variable</p>",
+        "id": 305181874,
+        "sender_full_name": "Leander Behr",
+        "timestamp": 1666281471
+    },
+    {
+        "content": "<p>I meant: changing the location where you actually need that theorem</p>",
+        "id": 305191344,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1666284144
+    },
+    {
+        "content": "<p>because I have a hard time imagining where you could need such a theorem</p>",
+        "id": 305191402,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1666284158
+    },
+    {
+        "content": "<p>After some consideration I think you're right. This issue doesn't occcur with properly written rules. I want to look into this again at some point though.</p>",
+        "id": 308275114,
+        "sender_full_name": "Leander Behr",
+        "timestamp": 1667752851
+    }
+]

@@ -1,0 +1,114 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] adhoc_overloading raises TYPE in locale when c... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20adhoc_overloading.20raises.20TYPE.20in.20locale.20when.20c.2E.2E.2E.html">[isabelle] adhoc_overloading raises TYPE in locale when c...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294255059"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20adhoc_overloading%20raises%20TYPE%20in%20locale%20when%20c.../near/294255059" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20adhoc_overloading.20raises.20TYPE.20in.20locale.20when.20c.2E.2E.2E.html#294255059">(Aug 19 2022 at 12:31)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear developers of adhoc_overloading and coercions,</p>
+<p>When I enable coercions and have imported adhoc_overloading, type-incorrect terms <br>
+sometimes raise a TYPE exception instead of providing a useful error message - even if <br>
+there is nothing that adhoc_overloading can replace. In the following example, the <br>
+ill-typed term at the end gives the following error message:</p>
+<p>*** exception TYPE raised (line 319 of "term.ML"):<br>
+*** type_of: type mismatch in application<br>
+*** ??'b<br>
+*** ??'a<br>
+*** &lt;malformed&gt;<br>
+*** At command "term"</p>
+<p>It is relatively hard to realise from this message that the last s should be changed to ().</p>
+<p>theory Scratch imports Main "~~/src/Tools/Adhoc_Overloading" begin</p>
+<p>declare [[coercion_enabled]]</p>
+<p>typedecl ('a, 'b, 'c) foo<br>
+typedecl ('a, 'b) bar</p>
+<p>consts t1 :: "nat =&gt; (unit, 'b option, 'c option) foo"<br>
+consts t2 :: "'a =&gt; 'b =&gt; ('a, 'b) bar"<br>
+consts t3 :: "nat =&gt; 'a option"</p>
+<p>locale l = fixes r :: "'out =&gt; 'in set" begin<br>
+definition ex :: "('a, 'out, 'in) foo =&gt; (('out × 'in), 'a) bar set"<br>
+   where "ex x = (let z = r in undefined)"<br>
+end</p>
+<p>locale l' = fixes r :: "'m1 =&gt; 'm2 set" begin<br>
+definition r' :: "'m1 option =&gt; 'm2 option set"<br>
+   where "r' x = (let z = r in undefined)"<br>
+sublocale l r' .<br>
+term "ex (t1 s) = {t2 (t3 s, None) s}"<br>
+end</p>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<a name="294255255"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20adhoc_overloading%20raises%20TYPE%20in%20locale%20when%20c.../near/294255255" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20adhoc_overloading.20raises.20TYPE.20in.20locale.20when.20c.2E.2E.2E.html#294255255">(Aug 19 2022 at 12:32)</a>:</h4>
+<p>From: Dmitriy Traytel &lt;<a href="mailto:traytel@in.tum.de">traytel@in.tum.de</a>&gt;<br>
+Hi Andreas,</p>
+<p>the problem is that the coercion inference needs/wants to pretty print <br>
+an error message containing an type-incorrect term. The uncheck phase of <br>
+adhoc_overloading (that is performed during pretty printing) chokes on <br>
+this. We had a similar interaction between other type inference phases <br>
+and adhoc overloading before. That's why I've forced adhoc_overloading <br>
+to leave type-incorrect terms alone in Isabelle/e2d08b9c9047.</p>
+<p>Later, in Isabelle/54e290da6da8 in conjunction with <br>
+Isabelle/e13b0c88c798 this check was (accidentally?) removed. Christian, <br>
+would you please reintroduce it?</p>
+<p>Additionally, I'll think about changing the behaviour on the coercions side.</p>
+<p>Thanks for the report!<br>
+Dmitriy</p>
+
+
+
+<a name="294255393"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20adhoc_overloading%20raises%20TYPE%20in%20locale%20when%20c.../near/294255393" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20adhoc_overloading.20raises.20TYPE.20in.20locale.20when.20c.2E.2E.2E.html#294255393">(Aug 19 2022 at 12:33)</a>:</h4>
+<p>From: Dmitriy Traytel &lt;<a href="mailto:traytel@in.tum.de">traytel@in.tum.de</a>&gt;<br>
+Am 18.11.2013 10:29, schrieb Dmitriy Traytel:</p>
+<blockquote>
+<p>Hi Andreas,</p>
+<p>the problem is that the coercion inference needs/wants to pretty print <br>
+an error message containing an type-incorrect term. The uncheck phase <br>
+of adhoc_overloading (that is performed during pretty printing) chokes <br>
+on this. We had a similar interaction between other type inference <br>
+phases and adhoc overloading before. That's why I've forced <br>
+adhoc_overloading to leave type-incorrect terms alone in <br>
+Isabelle/e2d08b9c9047.</p>
+<p>Later, in Isabelle/54e290da6da8 in conjunction with <br>
+Isabelle/e13b0c88c798 this check was (accidentally?) removed. <br>
+Christian, would you please reintroduce it?<br>
+OK, I reintroduced it myself (f6ffe53387ef ). Christian, if the removal <br>
+was on purpose, please give some motivation.</p>
+<p>Additionally, I'll think about changing the behaviour on the coercions <br>
+side.<br>
+Now that I thought about it: since the coercion inference reports an <br>
+error, I cannot guarantee that some subterm of the type-incorrect term <br>
+is well-typed in general (so I barely can print anything, if printing <br>
+requires well-typed terms). Hence, uncheck should better work with <br>
+type-incorrect terms.</p>
+</blockquote>
+<p>Dmitriy</p>
+
+
+
+<a name="294256380"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20adhoc_overloading%20raises%20TYPE%20in%20locale%20when%20c.../near/294256380" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20adhoc_overloading.20raises.20TYPE.20in.20locale.20when.20c.2E.2E.2E.html#294256380">(Aug 19 2022 at 12:39)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Syntax.uncheck_terms is indeed required to allow printing of bad terms, <br>
+otherwise most error messages would be impossible to deliver.  The burden <br>
+here is on all user-space tools that add to that abstract syntax phase via <br>
+Syntax_Phases.term_uncheck.</p>
+<p>These are not everyday user applications, but user-space nonetheless -- <br>
+analogous to simplification procedures written in Isabelle/ML.</p>
+<p>The particular problem with adhoc_overloading is addressed in the next <br>
+release (in about 1 week).</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

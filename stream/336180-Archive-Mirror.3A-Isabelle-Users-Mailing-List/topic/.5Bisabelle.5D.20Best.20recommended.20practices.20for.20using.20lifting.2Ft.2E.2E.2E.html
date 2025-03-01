@@ -1,0 +1,294 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Best recommended practices for using lifting/t... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Best.20recommended.20practices.20for.20using.20lifting.2Ft.2E.2E.2E.html">[isabelle] Best recommended practices for using lifting/t...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294748244"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Best%20recommended%20practices%20for%20using%20lifting/t.../near/294748244" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Best.20recommended.20practices.20for.20using.20lifting.2Ft.2E.2E.2E.html#294748244">(Aug 22 2022 at 18:53)</a>:</h4>
+<p>From: mailing-list anonymous &lt;<a href="mailto:mailing.list.anonymous@gmail.com">mailing.list.anonymous@gmail.com</a>&gt;<br>
+Dear All,</p>
+<p>I would like to ask a technical question with regard to the<br>
+best-recommended practices for using the lifting/transfer capabilities of<br>
+Isabelle/HOL in one particular scenario.</p>
+<p>Suppose there exist 4 distinct types: AS, AT, BQ, BT. The type AS is a<br>
+subtype of the type AT and the type BQ is a quotient type of the type BT<br>
+(the specific relationships between the pairs “AS and AT” and “BQ and BT”<br>
+are of secondary importance). Furthermore, suppose that the types AS and BQ<br>
+are isomorphic. Suppose, for a certain application, it would be useful to<br>
+transfer results/definitions from BQ to AS. I would like to understand what<br>
+is the best practice for performing the transfer.</p>
+<p>At the moment, I use the following solution:</p>
+<p>1. I provide functions BQ_of_AS (“representation”) and AS_of_BQ<br>
+   (“abstraction”) that allow for conversion between the types and show that<br>
+   these functions are bijective and are inverses of each other.</p>
+<p>2. I provide all lemmas similar to those that are automatically<br>
+   generated during the definition of a type copy, e.g.  BQ_of_AS_cases,<br>
+   BQ_of_AS_induct, …, type_definition_BQ_AS, etc</p>
+<p>3. I use “setup_lifting type_definition_BQ_AS” to automatically generate<br>
+   further lemmas.</p>
+<p>4. For each pair of functions (of interest) of BQ and AS, I provide<br>
+   transfer rules explicitly.</p>
+<p>This approach seems to work well for my application. However, I have<br>
+concerns about whether or not this approach is considered to be a good<br>
+practice and whether or not it is optimal for the application. In<br>
+particular, I would like to ask the following questions:</p>
+<p>1. In step 2 in my solution, is it necessary to provide the lemmas<br>
+   explicitly, i.e. is it possible to, somehow, automate the process of the<br>
+   generation of the lemmas?</p>
+<p>2. In step 3 in my solution, is it considered to be a good practice to<br>
+   use setup_lifting, given that AS was not ‘derived’ from BQ? Could this<br>
+   cause conflicts if setup_lifting has already been used for the type AS in a<br>
+   different context?</p>
+<p>3. In relation to step 4, is it possible to automate the process of<br>
+   transfer further, i.e. beyond proving each transfer relation explicitly,<br>
+   given that there exists a bijective transformation between the types?</p>
+<p>Any other comments with regard to my solution and proposals for better<br>
+alternatives will be appreciated.</p>
+<p>I provide an example that is closely related to my application. In the<br>
+example, the type AS is the type fmap from HOL-Library, the type AT is the<br>
+type map from HOL, the type BQ is my own type fmaplist and the type BT is<br>
+the type alist from HOL-Library. The subsections that are named &lt;Step N&gt; in<br>
+the code correspond to the steps in the outline of my solution above.</p>
+<hr>
+<p>theory ml_example</p>
+<p>imports</p>
+<p>Complex_Main</p>
+<p>"HOL-Library.Finite_Map"</p>
+<p>"HOL-Library.DAList"</p>
+<p>"HOL-Library.Permutation"</p>
+<p>begin</p>
+<p>subsection ‹Auxiliary›</p>
+<p>abbreviation "dmf ≡ distinct ∘ map fst"</p>
+<p>lift_definition aperm ::</p>
+<p>"('key, 'val) alist ⇒ ('key, 'val) alist ⇒ bool"  ("_ &lt;~~&gt;a _"  [50, 50]<br>
+50)</p>
+<p>is Permutation.perm .</p>
+<p>lemma aperm_trans [intro]: "xs &lt;<del>&gt;a ys ⟹ ys &lt;</del>&gt;a zs ⟹ xs &lt;~~&gt;a zs"</p>
+<p>by transfer auto</p>
+<p>lemma aperm_sym: "xs &lt;<del>&gt;a ys ⟹ ys &lt;</del>&gt;a xs"</p>
+<p>by transfer (rule perm_sym)</p>
+<p>lemma map_of_eq_mset:</p>
+<p>assumes "dmf xs" and "dmf ys"</p>
+<p>shows "map_of xs = map_of ys ⟷ mset xs = mset ys"</p>
+<p>apply(insert assms, rule)</p>
+<p>apply(simp add: distinct_map map_of_inject_set<br>
+set_eq_iff_mset_eq_distinct)</p>
+<p>using map_of_inject_set mset_eq_setD by fastforce</p>
+<p>lemma map_of_eq_perm:</p>
+<p>assumes "dmf xs" and "dmf ys"</p>
+<p>shows "map_of xs = map_of ys ⟷ xs &lt;~~&gt; ys"</p>
+<p>using assms map_of_eq_mset mset_eq_perm by auto</p>
+<p>lemma perm_eq_fmap_of_list:</p>
+<p>assumes "dmf xs" and "dmf ys"</p>
+<p>shows "xs &lt;~~&gt; ys ⟷ fmap_of_list xs = fmap_of_list ys"</p>
+<p>proof</p>
+<p>assume "xs &lt;~~&gt; ys"</p>
+<p>with assms have "map_of xs = map_of ys"</p>
+<p>by (simp add: map_of_inject_set perm_set_eq)</p>
+<p>then have "fmlookup (fmap_of_list xs) = fmlookup (fmap_of_list ys)"</p>
+<p>by (simp add: fmlookup_of_list)</p>
+<p>thus "fmap_of_list xs = fmap_of_list ys" by (rule fmlookup_inject[THEN<br>
+iffD1])</p>
+<p>next</p>
+<p>assume "fmap_of_list xs = fmap_of_list ys"</p>
+<p>then have "fmlookup (fmap_of_list xs) = fmlookup (fmap_of_list ys)" by<br>
+simp</p>
+<p>then have "map_of xs = map_of ys" by (simp add: fmlookup_of_list)</p>
+<p>with assms show "xs &lt;~~&gt; ys"  by (rule map_of_eq_perm[THEN iffD1])</p>
+<p>qed</p>
+<p>lemma exists_distinct_fst_fmap_of_list:</p>
+<p>"∃xa. (distinct ∘ <a href="http://list.map">list.map</a> fst) xa ∧ fmap_of_list xa = m"</p>
+<p>including fmap.lifting</p>
+<p>by transfer (metis comp_def distinct_clearjunk exists_map_of<br>
+map_of_clearjunk)</p>
+<p>subsection ‹Type Definition›</p>
+<p>quotient_type ('a, 'b) fmaplist = "('a, 'b) alist" / "aperm"</p>
+<p>morphisms impl_of FMapList</p>
+<p>proof(rule equivpI)</p>
+<p>show "reflp aperm" by (simp add: aperm.rep_eq reflp_def)</p>
+<p>show "symp aperm" unfolding symp_def using aperm_sym by blast</p>
+<p>show "transp aperm" by (metis aperm_trans transpI)</p>
+<p>qed</p>
+<p>lift_definition fml_lookup :: "('key, 'val) fmaplist ⇒ 'key ⇒ 'val option"</p>
+<p>is DAList.lookup</p>
+<p>by transfer (simp add: map_of_inject_set perm_set_eq)</p>
+<p>(* ... *)</p>
+<p>subsection ‹Step 1›</p>
+<p>subsubsection ‹Step 1.1 - Auxiliary›</p>
+<p>lift_definition fmap_of_alist :: "('a, 'b) alist ⇒ ('a, 'b) fmap"</p>
+<p>is fmap_of_list .</p>
+<p>lemma perm_eq_fmap_of_alist:</p>
+<p>"xs &lt;~~&gt;a ys ⟷ fmap_of_alist xs = fmap_of_alist ys"</p>
+<p>by transfer (rule perm_eq_fmap_of_list)</p>
+<p>lemma exists_distinct_fst_fmap_of_alist: "∃xs. fmap_of_alist xs = m"</p>
+<p>by transfer (insert exists_distinct_fst_fmap_of_list, auto)</p>
+<p>lemma surj_fmap_of_alist: "surj fmap_of_alist"</p>
+<p>unfolding image_def by (auto, metis exists_distinct_fst_fmap_of_alist)</p>
+<p>subsubsection ‹Step 1.2 - Definitions›</p>
+<p>lift_definition fmap_of_fmaplist :: "('a, 'b) fmaplist ⇒ ('a, 'b) fmap"</p>
+<p>is fmap_of_alist</p>
+<p>by (rule perm_eq_fmap_of_alist[THEN iffD1])</p>
+<p>definition fmaplist_of_fmap :: "('a, 'b) fmap ⇒ ('a, 'b) fmaplist" where</p>
+<p>"fmaplist_of_fmap = the_inv_into UNIV fmap_of_fmaplist"</p>
+<p>lemma inj_fmap_of_fmaplist: "inj fmap_of_fmaplist"</p>
+<p>by (rule, simp, transfer) (simp add: perm_eq_fmap_of_alist)</p>
+<p>lemma surj_fmap_of_fmaplist: "surj fmap_of_fmaplist"</p>
+<p>by transfer (auto simp add: surj_fmap_of_alist)</p>
+<p>lemma bij_fmap_of_fmaplist: "bij fmap_of_fmaplist"</p>
+<p>by (insert inj_fmap_of_fmaplist surj_fmap_of_fmaplist, rule bijI)</p>
+<p>lemma bij_fmaplist_of_fmap: "bij fmaplist_of_fmap"</p>
+<p>unfolding fmaplist_of_fmap_def using bij_fmap_of_fmaplist</p>
+<p>by (simp add: bij_fmap_of_fmaplist bij_betw_the_inv_into)</p>
+<p>lemma inj_fmaplist_of_fmap: "inj fmaplist_of_fmap"</p>
+<p>using bij_betw_def bij_fmaplist_of_fmap by auto</p>
+<p>lemma surj_fmaplist_of_fmap: "surj fmaplist_of_fmap"</p>
+<p>by (simp add: bij_fmaplist_of_fmap bij_betw_imp_surj_on)</p>
+<p>subsection ‹Step 2›</p>
+<p>lemma fmap_of_fmaplist_cases:</p>
+<p>"(⋀y. x = fmap_of_fmaplist y ⟹ y ∈ UNIV ⟹ P) ⟹ P"</p>
+<p>by (metis UNIV_I bij_fmap_of_fmaplist f_the_inv_into_f_bij_betw)</p>
+<p>lemma fmap_of_fmaplist_induct:</p>
+<p>"(⋀y. y ∈ UNIV ⟹ P (fmap_of_fmaplist y)) ⟹ P x"</p>
+<p>by (metis fmap_of_fmaplist_cases iso_tuple_UNIV_I)</p>
+<p>lemma fmap_of_fmaplist_inject:</p>
+<p>"x ∈ UNIV ⟹</p>
+<p>y ∈ UNIV ⟹</p>
+<p>(fmap_of_fmaplist x = fmap_of_fmaplist y) = (x = y)"</p>
+<p>by (meson inj_fmap_of_fmaplist inj_onD)</p>
+<p>lemma fmap_of_fmaplist_inverse:</p>
+<p>"y ∈ UNIV ⟹ fmaplist_of_fmap (fmap_of_fmaplist y) = y"</p>
+<p>by (simp add: fmaplist_of_fmap_def inj_fmap_of_fmaplist the_inv_f_f)</p>
+<p>lemma fmaplist_of_fmap: "fmaplist_of_fmap x ∈ UNIV" ..</p>
+<p>lemma fmaplist_of_fmap_cases:</p>
+<p>"y ∈ UNIV ⟹ (⋀x. y = fmaplist_of_fmap x ⟹ P) ⟹ P"</p>
+<p>by (metis fmap_of_fmaplist_inverse)</p>
+<p>lemma fmaplist_of_fmap_induct:</p>
+<p>"y ∈ UNIV ⟹ (⋀x. P (fmaplist_of_fmap x)) ⟹ P y"</p>
+<p>by (metis fmap_of_fmaplist_inverse)</p>
+<p>lemma fmaplist_of_fmap_inject:</p>
+<p>"(fmaplist_of_fmap x = fmaplist_of_fmap y) = (x = y)"</p>
+<p>by (meson injD inj_fmaplist_of_fmap)</p>
+<p>lemma fmaplist_of_fmap_inverse: "fmap_of_fmaplist (fmaplist_of_fmap x) = x"</p>
+<p>using fmap_of_fmaplist_inverse fmaplist_of_fmap_inject by auto</p>
+<p>lemma type_definition_fmaplist_fmap:</p>
+<p>"type_definition fmaplist_of_fmap fmap_of_fmaplist UNIV"</p>
+<p>unfolding type_definition_def</p>
+<p>by (simp add: fmap_of_fmaplist_inverse fmaplist_of_fmap_inverse)</p>
+<p>subsection ‹Step 3›</p>
+<p>setup_lifting type_definition_fmaplist_fmap</p>
+<p>subsection ‹Step 4›</p>
+<p>context includes lifting_syntax</p>
+<p>begin</p>
+<p>lemma fmlookup_fml_lookup_transfer_1:</p>
+<p>"((λ m ml. m = fmap_of_fmaplist ml) ===&gt; (=) ===&gt; (=)) fmlookup<br>
+fml_lookup"</p>
+<p>unfolding rel_fun_def by (transfer, auto, transfer, simp add:<br>
+fmlookup_of_list)</p>
+<p>lemma fmlookup_fml_lookup_transfer_2 [transfer_rule]:</p>
+<p>"((λ m ml. cr_fmap ml m) ===&gt; (=) ===&gt; (=)) fmlookup fml_lookup"</p>
+<p>unfolding rel_fun_def cr_fmap_def</p>
+<p>by auto</p>
+<p>(metis (mono_tags, lifting)</p>
+<p>fmaplist_of_fmap_inverse</p>
+<p>fmlookup_fml_lookup_transfer_1</p>
+<p>rel_funD)</p>
+<p>lemma fml_lookup_fmlookup_transfer_2 [transfer_rule]:</p>
+<p>"((λ ml m. cr_fmap ml m) ===&gt; (=) ===&gt; (=)) fml_lookup fmlookup"</p>
+<p>unfolding rel_fun_def cr_fmap_def</p>
+<p>by auto</p>
+<p>(metis (mono_tags, lifting)</p>
+<p>fmaplist_of_fmap_inverse</p>
+<p>fmlookup_fml_lookup_transfer_1</p>
+<p>rel_funD)</p>
+<p>lemma fml_fm_transfer_forall_transfer [transfer_rule]:</p>
+<p>"((cr_fmap ===&gt; (=)) ===&gt; (=)) transfer_forall transfer_forall"</p>
+<p>unfolding transfer_forall_def rel_fun_def cr_fmap_def</p>
+<p>using fmaplist_of_fmap_induct by auto</p>
+<p>(* ... *)</p>
+<p>end</p>
+<p>end</p>
+
+
+
+<a name="294748289"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Best%20recommended%20practices%20for%20using%20lifting/t.../near/294748289" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Best.20recommended.20practices.20for.20using.20lifting.2Ft.2E.2E.2E.html#294748289">(Aug 22 2022 at 18:53)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:mail@andreas-lochbihler.de">mail@andreas-lochbihler.de</a>&gt;<br>
+Hi there,</p>
+<p>Your approach looks sensible. There is nothing wrong with manually providing transfer <br>
+rules. But you should be careful with which rules are declared as [transfer_rule] at a <br>
+given point in time. The transfer proof method (and its friends) can easily get confused <br>
+when you have several rules for the same constant. Often, transfer just tries all <br>
+combinations until it finds a suitable one, but this can quickly exceed one's patience for <br>
+larger goals. One way to do so is to prove all rules between the isomorphic types' <br>
+constants in a locale (without parameters) and locally "interpret" the locale whenever <br>
+these rules are needed. Example:</p>
+<p>locale AS_BQ begin</p>
+<p>lemma fml_lookup_fmlookup_transfer_2 [transfer_rule]: ...</p>
+<p>end</p>
+<p>context begin<br>
+interpretation AS_BQ ..</p>
+<p>lemma ...<br>
+   by transfer ... (* uses the isomorphism rules *)</p>
+<p>end</p>
+<p>lemma ...<br>
+    by transfer ... (* does not use the isomorphism rules *)</p>
+<p>Moreover, I think that you can simplify things a bit by eliminating one of the isomorphic <br>
+types AS or BQ completely. In your example, you do not seem to exploit anything from the <br>
+quotient package. Rather, you simply prove that the quotiented definition of alist <br>
+correspond to the definitions on fmap. You should be able to prove this refinement <br>
+directly between the operations on alist and fmap.</p>
+<p>That is, manually define a representation function corresponding to the abstraction <br>
+function fmap_of_alist and prove the Quotient theorem that quotient_type generates under <br>
+the name Quotient_fmaplist. Then, declare a locale to collect all the transfer rules <br>
+between fmap and alist:</p>
+<p>locale fmap_as_alist begin</p>
+<p>setup_lifting Quotient_fmaplist</p>
+<p>In this locale, you can prove all the transfer rules that the various lift_definitions for <br>
+fmaplist generate, but for the functions on fmap. When you need the quotient view on fmap, <br>
+then you can interpret fmap_as_alist in a local context as shown above and use it.</p>
+<p>Now to your remaining questions:</p>
+<ul>
+<li>
+<p>Once you have proven the type_definition theorems, then the other theorems that you'd <br>
+get from a typedef can be obtained by interpreting the locale type_definition.</p>
+</li>
+<li>
+<p>For quotients, there is unfortunately no such locale. But once you've proven the <br>
+Quotient theorem, you can get the desired theorems by instantiating the abstract theorems <br>
+from theory Quotient (lemma Quotient_abs_rep and below), e.g.</p>
+</li>
+</ul>
+<p>lemmas fmaplist_abs_rep = Quotient_abs_rep[OF Quotient_fmaplist]<br>
+   and fmaplist_rep_reflp = Quotient_rep_reflp[OF Quotient_fmaplist]<br>
+   and ...</p>
+<ul>
+<li>There is no way around manually proving the transfer rules in step 4, because the <br>
+functions have been defined independently. The transfer rules show that the functions <br>
+respect the isomorphism between the types.</li>
+</ul>
+<p>Hope this helps,<br>
+Andreas</p>
+
+
+
+<a name="294748331"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Best%20recommended%20practices%20for%20using%20lifting/t.../near/294748331" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Best.20recommended.20practices.20for.20using.20lifting.2Ft.2E.2E.2E.html#294748331">(Aug 22 2022 at 18:53)</a>:</h4>
+<p>From: mailing-list anonymous &lt;<a href="mailto:mailing.list.anonymous@gmail.com">mailing.list.anonymous@gmail.com</a>&gt;<br>
+Dear Andreas Lochbihler,</p>
+<p>Thank you for your reply. Indeed, I found your advice very helpful.</p>
+<p>In fact, you have also answered a question that I was going to include in<br>
+my email, but for some reason forgotten about after I started writing the<br>
+email. Indeed, I was not entirely certain how to ensure that the most<br>
+relevant transfer rules are applied upon calling the transfer proof method.</p>
+<p>Thank you</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

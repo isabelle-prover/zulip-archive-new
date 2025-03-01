@@ -1,0 +1,134 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Amending an existing locale interpretation wit... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Amending.20an.20existing.20locale.20interpretation.20wit.2E.2E.2E.html">[isabelle] Amending an existing locale interpretation wit...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294763006"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Amending%20an%20existing%20locale%20interpretation%20wit.../near/294763006" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Amending.20an.20existing.20locale.20interpretation.20wit.2E.2E.2E.html#294763006">(Aug 22 2022 at 20:36)</a>:</h4>
+<p>From: mailing-list anonymous &lt;<a href="mailto:mailing.list.anonymous@gmail.com">mailing.list.anonymous@gmail.com</a>&gt;<br>
+Dear All,</p>
+<p>I would like to amend a locale interpretation with additional rewrite<br>
+rules. A (nearly) minimal example in the code listing below summarises the<br>
+problem. I also make an attempt to explain my problem explicitly in the<br>
+form of the following enumerated list:</p>
+<p>1. I create locales A and B and provide an interpretation of A in B via<br>
+   the command sublocale.</p>
+<p>2. After the interpretation, I provide several new constants with the<br>
+   intention to state additional theorems about these constants in the context<br>
+   of A.</p>
+<p>3. Once the constants are introduced, I would like to add additional<br>
+   rewrite rules (for these constants) to the existing interpretation of A in<br>
+   B in a way such that the theorems stated in the context of A after the<br>
+   introduction of the rewrite rules appear in their rewritten form in the<br>
+   context of B. I would like to know if this is something that can be<br>
+   achieved using the existing technology: a naive approach of reinterpreting<br>
+   A in B with the new rewrite rules fails.</p>
+<p>section ‹Example›<br>
+theory example<br>
+  imports Main<br>
+begin</p>
+<p>locale ord =<br>
+  fixes le :: "'a ⇒ 'a ⇒ bool" (infix "≤⇩T" 50)<br>
+    and ls :: "'a ⇒ 'a ⇒ bool" (infix "&lt;⇩T" 50)<br>
+begin</p>
+<p>notation<br>
+  le ("'(≤⇩T')") and<br>
+  le (infix "≤⇩T" 50) and<br>
+  ls ("'(&lt;⇩T')") and<br>
+  ls (infix "&lt;⇩T" 50)</p>
+<p>abbreviation (input) ge (infix "≥⇩T" 50)<br>
+  where "x ≥⇩T y ≡ y ≤⇩T x"<br>
+abbreviation (input) gt (infix "&gt;⇩T" 50)<br>
+  where "x &gt;⇩T y ≡ y &lt;⇩T x"</p>
+<p>end</p>
+<p>locale preorder = ord le ls for le ls +<br>
+  assumes less_le_not_le: "ls x y ⟷ le x y ∧ ¬ (le y x)"<br>
+    and order_refl[iff]: "le x x"<br>
+    and order_trans: "le x y ⟹ le y z ⟹ le x z"</p>
+<p>locale preorder_dual = preorder</p>
+<p>context preorder_dual<br>
+begin</p>
+<p>(* if the following interpretation is deleted,<br>
+then the desired behaviour is achieved *)<br>
+sublocale dual: preorder ge gt<br>
+  apply unfold_locales<br>
+  subgoal using less_le_not_le by blast<br>
+  subgoal by auto<br>
+  subgoal using order_trans by blast<br>
+  done</p>
+<p>end</p>
+<p>(* new definitions *)<br>
+definition min :: "('a ⇒ 'a ⇒ bool) ⇒ 'a ⇒ 'a ⇒ 'a" where<br>
+  "min le a b = (if le a b then a else b)"<br>
+definition max :: "('a ⇒ 'a ⇒ bool) ⇒ 'a ⇒ 'a ⇒ 'a" where<br>
+  "max le a b = (if le b a then a else b)"</p>
+<p>(* an attempt to reinterpret preorder in preorder_dual *)<br>
+context preorder_dual<br>
+begin</p>
+<p>sublocale dual: preorder ge gt<br>
+  rewrites "min ge ≡ max le"<br>
+  sorry</p>
+<p>end</p>
+<p>(* new theorems in preorder *)<br>
+context preorder<br>
+begin</p>
+<p>lemma min_absorb1: "x ≤⇩T y ⟹ min le x y = x"<br>
+  by (simp add: min_def)</p>
+<p>(*at this point dual.min_absorb1 does not exist *)</p>
+<p>end</p>
+<p>(*Demonstration of the failed attempt to introduce an additional rewrite<br>
+rule*)<br>
+context preorder_dual<br>
+begin</p>
+<p>thm dual.min_absorb1<br>
+(*</p>
+<p>thm dual.min_absorb1 returns</p>
+<p>y ≤⇩T x ⟹ min (λx y. y ≤⇩T x) x y = x</p>
+<p>instead of the desired</p>
+<p>y ≤⇩T x ⟹ max le x y = x</p>
+<p>*)</p>
+<p>end</p>
+<p>end</p>
+<p>Thank you</p>
+
+
+
+<a name="294763312"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Amending%20an%20existing%20locale%20interpretation%20wit.../near/294763312" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Amending.20an.20existing.20locale.20interpretation.20wit.2E.2E.2E.html#294763312">(Aug 22 2022 at 20:38)</a>:</h4>
+<p>From: Clemens Ballarin &lt;<a href="mailto:ballarin@in.tum.de">ballarin@in.tum.de</a>&gt;<br>
+This feature is only available internally, for use by the class package, <br>
+and only for what corresponds to the "interpretation" command, not for <br>
+"sublocale".</p>
+<p>Making it available in Isar for "interpretation" would be <br>
+straightforward.  For "sublocale" the matter is more involved: the <br>
+sublocale graph is labelled with morphisms, and I was never able to <br>
+convince myself that amending these morphisms in the described manner <br>
+would be robust enough.  It is conceivable that such an amendment could <br>
+break the locale hierarchy in unexpected cases.  For symmetry, the <br>
+feature is not provided for "interpretation" either.</p>
+<p>Clemens</p>
+
+
+
+<a name="294763333"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Amending%20an%20existing%20locale%20interpretation%20wit.../near/294763333" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Amending.20an.20existing.20locale.20interpretation.20wit.2E.2E.2E.html#294763333">(Aug 22 2022 at 20:38)</a>:</h4>
+<p>From: mailing-list anonymous &lt;<a href="mailto:mailing.list.anonymous@gmail.com">mailing.list.anonymous@gmail.com</a>&gt;<br>
+Dear Clemens Ballarin,</p>
+<p>Thank you for your reply. My personal opinion is that a possibility to<br>
+amend an interpretation with new rewrite rules could be a very useful<br>
+feature for the locale infrastructure, provided that it becomes available<br>
+both for 'interpretation' and 'sublocale'. However, of course, I appreciate<br>
+that enabling it may be involved and I will proceed based on the assumption<br>
+that it will not become available in the foreseeable future.</p>
+<p>Thank you</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

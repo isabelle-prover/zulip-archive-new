@@ -1,0 +1,100 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Tactic for Eliminating Parameters Wanted ... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Tactic.20for.20Eliminating.20Parameters.20Wanted.20.2E.2E.2E.html">[isabelle] Tactic for Eliminating Parameters Wanted ...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294326778"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Tactic%20for%20Eliminating%20Parameters%20Wanted%20.../near/294326778" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Tactic.20for.20Eliminating.20Parameters.20Wanted.20.2E.2E.2E.html#294326778">(Aug 19 2022 at 17:06)</a>:</h4>
+<p>From: Burkhart Wolff &lt;<a href="mailto:Burkhart.Wolff@lri.fr">Burkhart.Wolff@lri.fr</a>&gt;<br>
+Dear all, </p>
+<p>is there any way to actually eliminate a parameter or a goal ? </p>
+<p>After case-splits, parameters are often no longer of relevance.</p>
+<p>MY PROBLEM:<br>
+============</p>
+<p>I have something like:</p>
+<p>"⋀S. PUT (S::(...) action⇩i⇩p⇩c)”</p>
+<p>which I reduce via case-splitting to:</p>
+<p>"(⋀S ipc_stage ipc_direction. PUT (IPC ipc_stage ipc_direction)) ⟹ (⋀S. PUT S)”</p>
+<p>which I would like to reduce to:</p>
+<p>"(⋀ ipc_stage ipc_direction. PUT (IPC ipc_stage ipc_direction)) ⟹ (⋀S. PUT S)”</p>
+<p>(so canceling the parameter S irrelevant in the goal).</p>
+<p>SOME ELEMENTS OF A SOLUTION:<br>
+I cooked up some sketch of a tactics which does nearly what I want:</p>
+<p>ML{* val XX = Unsynchronized.ref(@{thm impI})<br>
+     fun PEEK st = (XX:=st; all_tac st)<br>
+*}<br>
+lemma "⋀S. PUT (S::(...) action⇩i⇩p⇩c)"<br>
+apply(tactic "Induct_Tacs.case_tac @{context} \"S\" 1", hypsubst)<br>
+apply(tactic "PEEK")<br>
+oops<br>
+ML{* val st = !XX;<br>
+     val thy = #thy (rep_thm (st));<br>
+     val _ $ (_ $ Abs(x,ty,t))  = concl_of(st); <br>
+     val cFree = cterm_of thy (Free(x,ty))<br>
+*}<br>
+ML{* val _ $ Abs(ss,_,T) = term_of (cprem_of (st) 1) ;<br>
+     val T' =  cterm_of thy (subst_bounds([Bound 0],T)) *}</p>
+<p>ML{* val Q  = Thm.assume T'*}<br>
+ML{* val Q' = Thm.forall_intr cFree  (Q) ; *}<br>
+ML{* val Q'' = Thm.implies_intr T' Q'*}<br>
+ML{* val Q''' = Q'' RS (st)*}</p>
+<p>Unfortunately, the very last composition step fails:<br>
+exception THM 1 raised (line 332 of "drule.ML"):<br>
+  RSN: no unifiers<br>
+  (⋀ipc_stage ipc_direction. PUT (IPC ipc_stage ipc_direction)) ⟹<br>
+  (⋀S ipc_stage ipc_direction. PUT (IPC ipc_stage ipc_direction))<br>
+  (⋀S ipc_stage ipc_direction. PUT (IPC ipc_stage ipc_direction)) ⟹ (⋀S. PUT S)</p>
+<p>which looks bizarre. The types and class types are confrom.</p>
+<p>Any ideas ?</p>
+<p>Best</p>
+<p>bu</p>
+
+
+
+<a name="294326787"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Tactic%20for%20Eliminating%20Parameters%20Wanted%20.../near/294326787" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Tactic.20for.20Eliminating.20Parameters.20Wanted.20.2E.2E.2E.html#294326787">(Aug 19 2022 at 17:06)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear Burkhart,</p>
+<p>I normally use apply(unfold triv_forall_equality) to get rid of all irrelevant parameters.</p>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<a name="294326809"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Tactic%20for%20Eliminating%20Parameters%20Wanted%20.../near/294326809" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Tactic.20for.20Eliminating.20Parameters.20Wanted.20.2E.2E.2E.html#294326809">(Aug 19 2022 at 17:07)</a>:</h4>
+<p>From: Jeremy Dawson &lt;<a href="mailto:Jeremy.Dawson@anu.edu.au">Jeremy.Dawson@anu.edu.au</a>&gt;<br>
+Hi Burkhart,</p>
+<p>If I wanted to do this in Isabelle 2005, I'd just try rewriting with the <br>
+following:</p>
+<p>triv_forall_equality ;<br>
+val it = "(!!x. PROP ?V) == PROP ?V" : Thm.thm</p>
+<p>Of course, I've no idea whether this is still available in the current <br>
+versions</p>
+<p>Cheers,</p>
+<p>Jeremy</p>
+
+
+
+<a name="294326950"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Tactic%20for%20Eliminating%20Parameters%20Wanted%20.../near/294326950" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Tactic.20for.20Eliminating.20Parameters.20Wanted.20.2E.2E.2E.html#294326950">(Aug 19 2022 at 17:07)</a>:</h4>
+<p>From: Jasmin Blanchette &lt;<a href="mailto:jasmin.blanchette@inria.fr">jasmin.blanchette@inria.fr</a>&gt;<br>
+Hi Burkhart,</p>
+<blockquote>
+<p>is there any way to actually eliminate a parameter or a goal ? </p>
+</blockquote>
+<p>This works for me:</p>
+<p>apply (simp only: triv_forall_equality)</p>
+<p>Cheers,</p>
+<p>Jasmin</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,176 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Minimizer and preplay - 2 of the many amazing ... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Minimizer.20and.20preplay.20-.202.20of.20the.20many.20amazing.20.2E.2E.2E.html">[isabelle] Minimizer and preplay - 2 of the many amazing ...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294222846"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Minimizer%20and%20preplay%20-%202%20of%20the%20many%20amazing%20.../near/294222846" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Minimizer.20and.20preplay.20-.202.20of.20the.20many.20amazing.20.2E.2E.2E.html#294222846">(Aug 19 2022 at 08:40)</a>:</h4>
+<p>From: Gottfried Barrow &lt;<a href="mailto:gottfried.barrow@gmx.com">gottfried.barrow@gmx.com</a>&gt;<br>
+Hi,</p>
+<p>I've spent a lot of time studying how Sledgehammer works with the 25 or <br>
+so ATPs that can be enabled.</p>
+<p>About the time I decide I'm spending too much time experimenting with <br>
+it, I get some new understanding of its feedback in the output panel, <br>
+and learn how to use another of its many amazing features.</p>
+<p>So I used the "dont_preplay" option, because Sledgehammer was taking <br>
+time to replay the proofs that the ATPs had found, to test them for its <br>
+own purposes, which takes time, and the proofs it has found were all <br>
+working, so I decided it didn't need to test them.</p>
+<p>But there was this one metis proof that was staying purple an annoyingly <br>
+long time as Isabelle clicked through the proofs of my theory, staying <br>
+purple for 2 or 3 seconds. That's a long time when every other proof is <br>
+only taking a half a second or less.</p>
+<p>The short story is that, not understanding the timing information <br>
+Sledgehammer was giving me due to preplay, I had picked the 3 second <br>
+proof instead of one of the half second proofs it had offered.</p>
+<p>Eventually, I discovered the use of the timing information due to <br>
+preplay. Does Sledgehammer return 10 different metis proofs? Now, I <br>
+don't just pick the one using the shortest named facts, I look at how <br>
+long Sledgehammer took to preplay the proof.</p>
+<p>Okay, I've learned to look at more than that. Are there ten proofs <br>
+offered? I look at the theorems metis uses and I ask the question, "If I <br>
+was going to do a detailed proof using the theorems metis uses, which <br>
+different set of facts used would be the most logically appealing, and <br>
+require fewer steps?</p>
+<p>But due to parallel processing and the timeout setting, there are lots <br>
+of differences in the proofs Sledgehammer will find.</p>
+<p>Sledgehammer was returning 10 or so metis proofs that were using <br>
+numerous facts, and it was offering to minimize them, which is when <br>
+Sledgehammer feeds back a proof to the ATP using fewer and fewer facts.</p>
+<p>I said, "Hey, manually going through 7 minimize attempts is not what I <br>
+call automation, so I'll set 'minimize=true'". But there's always a <br>
+trade off.</p>
+<p>After going back and running Sledgehammer on theorems with the preplay <br>
+option on, for one theorem, it was only finding one proof, rather than <br>
+the usual many proofs, and it was remote_z3_tptp that was finding the proof.</p>
+<p>This brings up the issue of nuance, one being that, given a certain <br>
+timeout setting, sometimes a remote duplicate of a local prover will <br>
+return a proof that the local prover doesn't.</p>
+<p>I had also started asking the question, "Do I really need z3_tptp in <br>
+there?" Well, obviously, yes.</p>
+<p>Since I wasn't getting lots of proofs, I disabled "minimize" and used <br>
+"dont_preplay". I then got proofs for z3_tptp, remote_z3_tptp, z3, and <br>
+remote_z3. The time spent for the 4 provers was like this:</p>
+<p>remote_z3_tptp: ATP real CPU time: 2.15 s.<br>
+    z3_tptp:               ATP real CPU time: 29.79 s.<br>
+    z3                         SMT solver real CPU time: 2.22 s<br>
+    remote_z3          SMT solver real CPU time: 5.75 s.</p>
+<p>More nuances. Sometimes the remote prover is faster than the local <br>
+prover, and sometimes not. Last week, I didn't use remote provers that <br>
+are duplicates of local provers, but now I generally do.</p>
+<p>There's more for me to tell about how to use Sledgehammer's information <br>
+than most people have time to read.</p>
+<p>For example, z3_tptp gave me a proof like this:</p>
+<p>by (metis extension_equality unordered_pair_axiom ordered_pair_def) <br>
+(406 ms)</p>
+<p>My extension_equality theorem is merely a biconditional of  my <br>
+extension_axiom. I was asking these questions, "Do I really need <br>
+extension_equality? Will the proof work using extension_axiom instead, <br>
+and will it be slower if it does?"</p>
+<p>Well, the Sledgehammer output shows you how to use the "min" option, so <br>
+I tried this, not to minimize the number of facts, but to get the timing <br>
+information with the axiom substituted for the theorem:</p>
+<p>sledgehammer min [z3_tptp, timeout = 90, verbose] (extension_axiom <br>
+unordered_pair_axiom ordered_pair_def),</p>
+<p>and I got this:</p>
+<p>Try this: by  (metis extension_axiom unordered_pair_axiom <br>
+ordered_pair_def) (408 ms).</p>
+<p>So metis only uses 2 more milliseconds when it uses the axiom directly.</p>
+<p>I finish out most of this this email with my maxed out sledgehammer <br>
+command, and the reasoning behind it.</p>
+<p>With Sledgehammer, you need a good process viewer to see what it's <br>
+doing, and a good CPU meter in your task bar to see if your CPUs are <br>
+running heavily when they shouldn't be. If you don't do things right, <br>
+processes that are taking up 25% of your CPU won't get terminated. Doing <br>
+things right is letting Sledgehammer finish normally, or deleting it <br>
+before you close jEdit. Sometimes processes just don't get terminated <br>
+when you don't let Sledgehammer finish.</p>
+<p>Win CPU meter: <a href="http://www.hexagora.com/en_dw_davperf.asp">http://www.hexagora.com/en_dw_davperf.asp</a><br>
+    Win Process Explorer: <br>
+<a href="http://technet.microsoft.com/en-us/sysinternals/bb896653.aspx">http://technet.microsoft.com/en-us/sysinternals/bb896653.aspx</a></p>
+<p>My long version is this, and I explain what's not arbitrary about it:</p>
+<p>sledgehammer[DEL,dont_preplay,minimize,timeout=90,verbose,max_relevant=smart,provers="<br>
+     metis remote_vampire e remote_z3 spass_new remote_e_sine z3_tptp<br>
+     remote_e_tofof remote_e remote_z3_tptp remote_cvc3 remote_iprover<br>
+     remote_iprover_eq remote_waldmeister satallax z3 cvc3 yices"]</p>
+<p>1) I use a macro to insert it, and I put the DEL in to cause an error so <br>
+it won't run. The "DEL,dont_preplay," is highlighted, and I press the <br>
+backspace key to delete it, after which Sledgehammer starts running.</p>
+<p>2) I want "preplay" to get the timing information, but I could decide to <br>
+not to do "preplay" so that Sledgehammer is devoting more time to only <br>
+finding proofs, in case it has been timing out and not getting many proofs.</p>
+<p>3) I normally want to automate "minimize", but if it's timing out and <br>
+not getting many proofs, I'll delete it before I run Sledgehammer.</p>
+<p>4) I could set "max_relevant=1000" so that Sledgehammer is feeding the <br>
+ATPs massive facts, but I've learned that if the ATPs have to work too <br>
+hard, then I'm trying to prove a false statement, or I need to add some <br>
+preliminary lemmas. Quite possibly, a proof that takes an ATP a long <br>
+time to find will cause the Isabelle prover to work way too hard and <br>
+long once it's given the proof.</p>
+<p>5) Only a maximum of 4 provers will run in parallel, and they run in the <br>
+order given, so I put the 7 better provers first, and I have a <br>
+reasonable timeout set so that the first 4 provers don't hold everything <br>
+else up too long. Many times the first four will finish fast anyway, and <br>
+again, if a particular prover isn't proving anything reasonably fast, <br>
+then it won't or it won't find a decently fast proof.</p>
+<p>6) metis is first, because though it can get overloaded and kick out <br>
+fast, it can also return proofs very fast; metis is run directly by <br>
+poly.exe.</p>
+<p>7) The vampire binary is hard to get, the Windows version doesn't run <br>
+right, and the remote_vampire is twice as fast as my Linux vampire, but <br>
+vampire one of the best of the best, so I put it second.</p>
+<p>8) "e" is an execllent prover, so I put the local e in the first group. <br>
+I also put remote_e in with the remote group of provers. Processing <br>
+nuances could result in remote_e returning a proof that the local e <br>
+doesn't. Local provers can fail to return proofs that remote provers <br>
+return because parallel processing is never the same, especially when <br>
+the options and provers listed are different. But I try these 20 or so <br>
+provers on the first try to try and save time; different provers find <br>
+proofs for different theorems, and always because they weren't given <br>
+enough time. If I don't get such good results on this massive try, then <br>
+I can start tweaking options.</p>
+<p>9) remote_z3 is before z3 because z3, when used directly, won't run in <br>
+parallel. It will only run after all other provers listed before it have <br>
+finished. However, it's an execellent prover, which is why I want <br>
+remote_z3 to start running in the first 4. Additionally, I leave out the <br>
+"smt" prover; smt calls z3, and z3 used directly finds better proofs, <br>
+and finds them just as fast.</p>
+<p>10) "z3_tptp" uses the z3-prover.exe just like z3, but it's not used the <br>
+same, so it finds proofs when the others don't, as shown by my example <br>
+above.</p>
+<p>11) I then let Sledgehammer go through all the other remote provers, <br>
+other than remote_leo2 and remote_satallax. These are HOL provers, and <br>
+I'm almost exclusively doing FOL. I wonder about leaving remote_iprover <br>
+and remote_iprover_eq in. They don't prove a lot, but I leave them in.</p>
+<p>12) I then do the local satallax. Maybe it's faster or slower at <br>
+finishing than the remote_satallax, but remote provers can sometimes <br>
+hold things up; a 60 second timeout might get processed remotely over a <br>
+period of much more than 60 seconds.</p>
+<p>13) z3, cvc3, and yices won't run in parallel with other provers, so I <br>
+put them last, not that it would matter. If I put them first, they still <br>
+won't start until the other provers are finished. I put z3 first, <br>
+because they will run in the order listed.</p>
+<p>Thanks to Larry Paulson and Jasmin Blanchette for writing an amazing <br>
+piece of software. Jasmin has helped me out a lot, and I give you some <br>
+links to articles Jasmin gave me. He says,</p>
+<p>For many of my papers and in my Ph.D. thesis, I've evaluated E, iProver, SPASS, Vampire, CVC3, Yices, Z3, LEO-II, and Satallax. See e.g.</p>
+<p><a href="http://www21.in.tum.de/~blanchet/jar-smt.pdf">http://www21.in.tum.de/~blanchet/jar-smt.pdf</a>  (Section 6)<br>
+<a href="http://www21.in.tum.de/~blanchet/testbench.pdf">http://www21.in.tum.de/~blanchet/testbench.pdf</a>  (Section 5)<br>
+<a href="http://www21.in.tum.de/~blanchet/enc_poly_paper.pdf">http://www21.in.tum.de/~blanchet/enc_poly_paper.pdf</a>  (Section 6)<br>
+<a href="http://www21.in.tum.de/~blanchet/itp2012-spass.pdf">http://www21.in.tum.de/~blanchet/itp2012-spass.pdf</a>  (Section 7)<br>
+<a href="http://www21.in.tum.de/~blanchet/iwil2010-sledgehammer.pdf">http://www21.in.tum.de/~blanchet/iwil2010-sledgehammer.pdf</a>  (Section 3)</p>
+<p>and of course the original "Judgement Day" paper by Böhme&amp;  Nipkow:</p>
+<p><a href="http://www21.in.tum.de/~boehmes/judgement/judgement.pdf">http://www21.in.tum.de/~boehmes/judgement/judgement.pdf</a></p>
+<p>Hence I have a very good idea, based on thousands of data points, of how <br>
+[message truncated]</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

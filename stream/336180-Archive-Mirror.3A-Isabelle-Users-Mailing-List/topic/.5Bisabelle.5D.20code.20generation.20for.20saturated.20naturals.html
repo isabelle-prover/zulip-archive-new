@@ -1,0 +1,381 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] code generation for saturated naturals · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20code.20generation.20for.20saturated.20naturals.html">[isabelle] code generation for saturated naturals</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294142241"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20code%20generation%20for%20saturated%20naturals/near/294142241" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20code.20generation.20for.20saturated.20naturals.html#294142241">(Aug 18 2022 at 18:10)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Peter, hi Brian,</p>
+<blockquote>
+<p>In his zest to ensure all uses of numerals are algebraically<br>
+well-organised, Brian manufactured the attached theory of "saturated"<br>
+arithmetic for the naturals for me.</p>
+<p>I'm now struggling to get it to work with the code generator. The<br>
+problem is that the CARD('a) construct leans on the card function, and<br>
+for some reason the code generator wants to enumerate nat while<br>
+calculating card. I can't see why it wants to do that. Can you suggest a<br>
+way forward? (The attached theory should break at an opportune point.)<br>
+</p>
+</blockquote>
+<p>find attached an experiment of mine which hopefully turn out to be helpful.</p>
+<p>First, it is important that we keep such discussions on the public<br>
+mailing list, since more eyes see more than less and also to make sure<br>
+the generic Isabelle knowledge stays publicly available and is able to grow.</p>
+<p>Here now, the answers proper to your issues:</p>
+<p>a) avoiding CARD('a) in generated code</p>
+<p>class len_card = len +<br>
+  assumes len_of_card: "len_of TYPE('a) = CARD('a)"</p>
+<p>This connects len_of TYPE('a) to CARD('a) and allows you to generate<br>
+code for type 'a::len_card sat.  Of course you have to give appropriate<br>
+instantiations, or replace CARD('a) by len_of TYPE('a) in your<br>
+specification throughout to gain full flexibility.  @Brian: Did you ever<br>
+think about including such a class as len_card into the Word libraries<br>
+directly?</p>
+<p>b) use abstract type for code generation</p>
+<p>lemma Abs_Rep_sat' [simp, code abstype]:<br>
+  "Abs_sat' (Rep_sat n) = n"<br>
+  by (simp add: Abs_sat'_def min_CARD_Rep_sat Rep_sat_inverse)</p>
+<p>(call on me again if this sounds like Bohemian villages for you)</p>
+<p>c) prove simp rules for your "abtract" operation of the form:</p>
+<p>lemma Rep_plus_sat [simp]:<br>
+  "Rep_sat (x + y) = min (Rep_sat x + Rep_sat y) CARD('a)"<br>
+  by (simp add: plus_sat_def)</p>
+<p>Together with extensionality on sat values, this will greatly simplify<br>
+your proofs and make them less cumbersome.  Look at the theory to get<br>
+more ideas.</p>
+<blockquote>
+<p>I humbly suggest that a working version of this theory make its way<br>
+into HOL/Library. I'd be happy to round out the theory with some guidance.</p>
+</blockquote>
+<p>Yes, indeed.  I'd first suggest to round up the proofs a little, and<br>
+maybe others want to comment also on that.</p>
+<p>Hope this helps,<br>
+    Florian<br>
+<a href="/user_uploads/14278/btDNZbfAPjzvLRsxSoj1jqva/Saturated.thy">Saturated.thy</a><br>
+<a href="/user_uploads/14278/H0LaYrylCZPU_qEuoHl7UGqv/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294142254"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20code%20generation%20for%20saturated%20naturals/near/294142254" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20code.20generation.20for.20saturated.20naturals.html#294142254">(Aug 18 2022 at 18:10)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Btw. theory src/HOL/Library/Dlist.thy is a very nice example how to<br>
+establish what you could call »abstract types with invariants« and<br>
+corresponding code generation in Isabelle/HOL.<br>
+I suggest to follow the patterns which can be found there wrt.<br>
+to which auxiliary lemmas about Rep/Abs/Abs' to prove, which simp rules<br>
+to prove<br>
+and how to setup code generation.</p>
+<p>Maybe your Abs_sat' can just be called Sat.</p>
+<p>Florian<br>
+<a href="/user_uploads/14278/GNHQ8jYQKGTYRC5yk-lXiWaJ/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294142278"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20code%20generation%20for%20saturated%20naturals/near/294142278" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20code.20generation.20for.20saturated.20naturals.html#294142278">(Aug 18 2022 at 18:11)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;</p>
+<blockquote>
+<p>Maybe your Abs_sat' can just be called Sat.</p>
+</blockquote>
+<p>When going through Dlist a further suggestion came to my mind:</p>
+<p>I have modified the theory further: Abs_sat' is called Sat, and Rep_sat<br>
+nat_of.  Both are operations to be expected to be used in »user space«<br>
+and should therefore carry readable names.</p>
+<p>Hope this helps,<br>
+    Florian<br>
+<a href="/user_uploads/14278/HZQM-2YqufaMvLFmnDVRBT3j/Saturated.thy">Saturated.thy</a><br>
+<a href="/user_uploads/14278/u78cD8Xqdf9PppGzuNjLXQcU/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294142500"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20code%20generation%20for%20saturated%20naturals/near/294142500" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20code.20generation.20for.20saturated.20naturals.html#294142500">(Aug 18 2022 at 18:12)</a>:</h4>
+<p>From: Peter Gammie &lt;<a href="mailto:peteg42@gmail.com">peteg42@gmail.com</a>&gt;<br>
+Florian,</p>
+<p>Thanks for this. I've tidied it up a bit. See the attached.</p>
+<p>cheers<br>
+peter<br>
+<a href="/user_uploads/14278/G6gYC2ZqsX0jvh-Sj9YsYO8Z/Saturated.thy">Saturated.thy</a></p>
+
+
+
+<a name="294142662"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20code%20generation%20for%20saturated%20naturals/near/294142662" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20code.20generation.20for.20saturated.20naturals.html#294142662">(Aug 18 2022 at 18:13)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Peter,</p>
+<blockquote>
+<p>Thanks for this. I've tidied it up a bit. See the attached.</p>
+</blockquote>
+<p>Thanks a lot.</p>
+<p>One further remark: the lemmas nat_mult_min_left etc. are quite generic.<br>
+ These should go into a separate prelude section at the beginning of the<br>
+theory, from where, after becoming part of the library, they should be<br>
+move to appropriate theories in the HOL distribution.</p>
+<p>What also comes to my mind is that saturated numbers seem to be a nice<br>
+example for complete lattices (with inf = min etc.).  Maybe you still<br>
+want to add those instances.</p>
+<p>Cheers,<br>
+    Florian<br>
+<a href="/user_uploads/14278/K5FHds-0Ln6F-1s7gQRNbBZO/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294143956"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20code%20generation%20for%20saturated%20naturals/near/294143956" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20code.20generation.20for.20saturated.20naturals.html#294143956">(Aug 18 2022 at 18:20)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Peter,</p>
+<p>the theory is in regression:<br>
+<a href="http://isabelle.in.tum.de/testboard/Isabelle/rev/fe33d6655186">http://isabelle.in.tum.de/testboard/Isabelle/rev/fe33d6655186</a></p>
+<blockquote>
+<p>I did this - see the attached. Thanks very much to sledgehammer for doing the most boring bits!</p>
+</blockquote>
+<p>Well, the first one(s) did not really perform well, but it was not very<br>
+difficult to get along without it.</p>
+<p>I'm not speaking against sledgehammer, but when you prove fundamental<br>
+things it is often better to try with less erratic methods like simp,<br>
+auto etc – this will both increase your understanding of the matter as<br>
+well as give hints which fundamental rules are still missing.  In<br>
+application with more rather technical lemmas, sledgehammer is very fine.</p>
+<p>After the next Isabelle release you might want to add also</p>
+<p>instantiation sat :: (len) complete_lattice</p>
+<p>but AFAIS this will require more lemmas about fold.</p>
+<p>Thanks a lot for your contribution.<br>
+    Florian<br>
+<a href="/user_uploads/14278/ZHWDCuIlFy9B5bToyhP8dyX9/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294143971"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20code%20generation%20for%20saturated%20naturals/near/294143971" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20code.20generation.20for.20saturated.20naturals.html#294143971">(Aug 18 2022 at 18:20)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Still one further remark:</p>
+<p>I guess with lemmas like<br>
+  "nat_of (min x y) = min (nat_of x) (nat_of y)"<br>
+  "nat_of (max x y) = max (nat_of x) (nat_of y)"<br>
+  "nat_of (Inf A) = Min_fin (insert 0 (nat_of <code> A))"
+  "nat_of (Sup A) = Sup_fin (insert (len_of TYPE('a)) (nat_of </code> A))"<br>
+life in the instances proofs can even be easier.</p>
+<p>Florian<br>
+<a href="/user_uploads/14278/t0vpR-Ilgn37ytECsGOAtKlf/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294143999"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20code%20generation%20for%20saturated%20naturals/near/294143999" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20code.20generation.20for.20saturated.20naturals.html#294143999">(Aug 18 2022 at 18:20)</a>:</h4>
+<p>From: Peter Gammie &lt;<a href="mailto:peteg42@gmail.com">peteg42@gmail.com</a>&gt;<br>
+Florian,</p>
+<p>On 08/09/2011, at 8:00 AM, Florian Haftmann wrote:</p>
+<blockquote>
+<p>the theory is in regression:<br>
+<a href="http://isabelle.in.tum.de/testboard/Isabelle/rev/fe33d6655186">http://isabelle.in.tum.de/testboard/Isabelle/rev/fe33d6655186</a></p>
+</blockquote>
+<p>Great, thanks.</p>
+<blockquote>
+<blockquote>
+<p>I did this - see the attached. Thanks very much to sledgehammer for doing the most boring bits!</p>
+</blockquote>
+<p>Well, the first one(s) did not really perform well, but it was not very<br>
+difficult to get along without it.</p>
+</blockquote>
+<p>What do you mean by "the first one(s)"? Lemmas, sledgehammers, ... ?</p>
+<blockquote>
+<p>I'm not speaking against sledgehammer, but when you prove fundamental<br>
+things it is often better to try with less erratic methods like simp,<br>
+auto etc – this will both increase your understanding of the matter as<br>
+well as give hints which fundamental rules are still missing.  In<br>
+application with more rather technical lemmas, sledgehammer is very fine.</p>
+</blockquote>
+<p>I found sledgehammer very useful for discovering the lemmas needed for the proofs. I agree that the final proofs could be presented better.</p>
+<blockquote>
+<p>After the next Isabelle release you might want to add also</p>
+<p>instantiation sat :: (len) complete_lattice</p>
+<p>but AFAIS this will require more lemmas about fold.</p>
+</blockquote>
+<p>You've lost me here - the final instantiation in the theory is precisely this one.</p>
+<blockquote>
+<p>Thanks a lot for your contribution.</p>
+</blockquote>
+<p>Thanks to you and Brian for developing the theory!</p>
+<p>cheers<br>
+peter</p>
+
+
+
+<a name="294144020"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20code%20generation%20for%20saturated%20naturals/near/294144020" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20code.20generation.20for.20saturated.20naturals.html#294144020">(Aug 18 2022 at 18:20)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+Am 08/09/2011 00:12, schrieb Peter Gammie:</p>
+<blockquote>
+<blockquote>
+<blockquote>
+<p>I did this - see the attached. Thanks very much to sledgehammer for doing the most boring bits!</p>
+</blockquote>
+<p>Well, the first one(s) did not really perform well, but it was not very<br>
+difficult to get along without it.</p>
+</blockquote>
+<p>What do you mean by "the first one(s)"? Lemmas, sledgehammers, ... ?</p>
+<blockquote>
+<p>I'm not speaking against sledgehammer, but when you prove fundamental<br>
+things it is often better to try with less erratic methods like simp,<br>
+auto etc – this will both increase your understanding of the matter as<br>
+well as give hints which fundamental rules are still missing.  In<br>
+application with more rather technical lemmas, sledgehammer is very fine.</p>
+</blockquote>
+<p>I found sledgehammer very useful for discovering the lemmas needed for the proofs. I agree that the final proofs could be presented better.</p>
+</blockquote>
+<p>I agree with both Florian and Peter: s/h is great for discovering useful<br>
+lemmas, and it can be beneficial both for performance and legibility to<br>
+transform the generated metis proofs into auto. (But one can easily<br>
+waste time on unsuccessful attempts to do so.)</p>
+<p>Tobias</p>
+<blockquote>
+<blockquote>
+<p>After the next Isabelle release you might want to add also</p>
+<p>instantiation sat :: (len) complete_lattice</p>
+<p>but AFAIS this will require more lemmas about fold.</p>
+</blockquote>
+<p>You've lost me here - the final instantiation in the theory is precisely this one.</p>
+<blockquote>
+<p>Thanks a lot for your contribution.</p>
+</blockquote>
+<p>Thanks to you and Brian for developing the theory!</p>
+<p>cheers<br>
+peter<br>
+</p>
+</blockquote>
+
+
+
+<a name="294144052"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20code%20generation%20for%20saturated%20naturals/near/294144052" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20code.20generation.20for.20saturated.20naturals.html#294144052">(Aug 18 2022 at 18:20)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Peter,</p>
+<blockquote>
+<blockquote>
+<p>Well, the first one(s) did not really perform well, but it was not very<br>
+difficult to get along without it.</p>
+</blockquote>
+<p>What do you mean by "the first one(s)"? Lemmas, sledgehammers, ... ?</p>
+</blockquote>
+<p>Well, the first metis class was very slow, I did not check the others<br>
+explicitly.</p>
+<blockquote>
+<blockquote>
+<p>instantiation sat :: (len) complete_lattice</p>
+</blockquote>
+<p>You've lost me here - the final instantiation in the theory is precisely this one.</p>
+</blockquote>
+<p>This was a slip, it should read</p>
+<p>instantiation sat :: (len) complete_distrib_lattice</p>
+<p>which is still left as an exercise to prove.</p>
+<p>Cheers,<br>
+    Florian<br>
+<a href="/user_uploads/14278/JuMNz4fdtErL4fbut6XPV4c0/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294144098"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20code%20generation%20for%20saturated%20naturals/near/294144098" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20code.20generation.20for.20saturated.20naturals.html#294144098">(Aug 18 2022 at 18:21)</a>:</h4>
+<p>From: Lukas Bulwahn &lt;<a href="mailto:bulwahn@in.tum.de">bulwahn@in.tum.de</a>&gt;<br>
+It seems as if this saturated naturals library is still causing some <br>
+trouble with the code generator. I am looking into this and will <br>
+probably solve it within the next hours.</p>
+<p>Lukas</p>
+
+
+
+<a name="294144112"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20code%20generation%20for%20saturated%20naturals/near/294144112" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20code.20generation.20for.20saturated.20naturals.html#294144112">(Aug 18 2022 at 18:21)</a>:</h4>
+<p>From: Lukas Bulwahn &lt;<a href="mailto:bulwahn@in.tum.de">bulwahn@in.tum.de</a>&gt;<br>
+The issue was related to my misunderstanding of the code generator <br>
+handling abstract (code) types.<br>
+After some enlightment, code generation for saturated naturals in <br>
+Haskell does not pose a problem any longer.</p>
+<p>Lukas</p>
+
+
+
+<a name="294144127"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20code%20generation%20for%20saturated%20naturals/near/294144127" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20code.20generation.20for.20saturated.20naturals.html#294144127">(Aug 18 2022 at 18:21)</a>:</h4>
+<p>From: Brian Huffman &lt;<a href="mailto:brianh@cs.pdx.edu">brianh@cs.pdx.edu</a>&gt;<br>
+I haven't added this instance proof yet, but I did add another one:<br>
+Type 'a sat is now an instance of the number_semiring class. Proving<br>
+this instance involved showing that the function "Sat :: nat =&gt; 'a<br>
+sat" is identical to the polymorphic function "of_nat" at the same<br>
+type.</p>
+<p>This brings up another issue: It is generally undesirable to have two<br>
+different copies of the same function around if they are both in<br>
+common use, since this means that we would have to maintain two<br>
+similar-looking but separate sets of simp rules. This was the<br>
+motivation for making "int :: nat =&gt; int" into an abbreviation for<br>
+"of_nat :: nat =&gt; int" a few years ago; it let us remove a lot of<br>
+duplication and simpset inconsistencies from the standard library.</p>
+<p>So here's what I propose for the saturated arithmetic library: Rename<br>
+the current constant "Sat :: nat =&gt; 'a sat" to something like<br>
+Abs_sat', and reintroduce the user-friendly name "Sat" as a<br>
+type-constrained abbreviation for "of_nat".</p>
+<p>The only reason I'm hesitant to make this change myself is that I<br>
+don't know how it might affect code generation -- currently "Sat" has<br>
+some special status because it appears in the [code abstype]<br>
+declaration.</p>
+<ul>
+<li>Brian</li>
+</ul>
+
+
+
+<a name="294144187"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20code%20generation%20for%20saturated%20naturals/near/294144187" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20code.20generation.20for.20saturated.20naturals.html#294144187">(Aug 18 2022 at 18:21)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Brian,</p>
+<p>And according to the type discipline of the code generator it must<br>
+remain so.  But we need the "old" Sat anyway for bootstrap reasons.  So<br>
+I would suggest:</p>
+<ul>
+<li>Abs_sat from typedef</li>
+<li>SAT is what is now called Sat</li>
+<li>Sat is abbreviation for of_nat</li>
+<li>simprule SAT = of_nat</li>
+<li>maybe hide Abs_sat and SAT after bootstrap</li>
+</ul>
+<p>I remember a similar issue concerning of_nat can be found in<br>
+Code_Numeral, which also contains such duplication due to bootstrap reasons.</p>
+<p>Florian<br>
+<a href="/user_uploads/14278/mF1apT6skE3efXx04YM8Fj4e/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294145053"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20code%20generation%20for%20saturated%20naturals/near/294145053" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20code.20generation.20for.20saturated.20naturals.html#294145053">(Aug 18 2022 at 18:26)</a>:</h4>
+<p>From: Peter Gammie &lt;<a href="mailto:peteg42@gmail.com">peteg42@gmail.com</a>&gt;<br>
+Florian,</p>
+<p>On 18/08/2011, at 4:29 PM, Florian Haftmann wrote:</p>
+<blockquote>
+<p>One further remark: the lemmas nat_mult_min_left etc. are quite generic.<br>
+These should go into a separate prelude section at the beginning of the<br>
+theory, from where, after becoming part of the library, they should be<br>
+move to appropriate theories in the HOL distribution.</p>
+</blockquote>
+<p>OK.</p>
+<blockquote>
+<p>What also comes to my mind is that saturated numbers seem to be a nice<br>
+example for complete lattices (with inf = min etc.).  Maybe you still<br>
+want to add those instances.</p>
+</blockquote>
+<p>I did this - see the attached. Thanks very much to sledgehammer for doing the most boring bits!</p>
+<p>cheers<br>
+peter<br>
+<a href="/user_uploads/14278/KCMl2mZ6rV7At3zqdy_luTeH/Saturated.thy">Saturated.thy</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

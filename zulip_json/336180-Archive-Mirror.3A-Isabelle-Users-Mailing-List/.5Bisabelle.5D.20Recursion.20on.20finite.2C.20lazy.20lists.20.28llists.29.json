@@ -1,0 +1,32 @@
+[
+    {
+        "content": "<p>From: Denis Bueno &lt;<a href=\"mailto:dbueno@gmail.com\">dbueno@gmail.com</a>&gt;<br>\n[The following is all in context of the LList2 library, available from afp.]</p>\n<p>During the course of a proof I attempt to ensure that a finite llist<br>\ndoes not have any of a certain element.  After many unsuccessful<br>\nattempts at actual pattern matching using LNil and LCons (using fun<br>\nand primrec) I finally saw the definition of llength in LList2.thy:</p>\n<p>constdefs<br>\n    llength :: \"'a llist =&gt; nat\"<br>\n    \"llength == finlsts_rec 0 (λ a r n. Suc n)\"</p>\n<p>This uses the completely opaque (to me) `finlsts_rec' operator.  I<br>\ngather the following from its uses:</p>\n<p>- 0 is the base case; if the list is LNil, 0 is returned<br>\n    - a is the current element of the list<br>\n    - r is the rest of the list<br>\n    - n is the current \"accumulator state\"<br>\n    - it has some special magic for telling Isabelle it will only deal<br>\nwith finite llists</p>\n<p>These observations lead me to the following definition, `noBot'<br>\n(mnemonic: \"no bottom state\"):</p>\n<p>constdefs<br>\n      noBot :: \"state llist =&gt; bool\"<br>\n      \"noBot == finlsts_rec True (% s r b. b &amp; (s ~= BottomState))\"</p>\n<p>As a sanity check, I try to prove that \"noBot LNil = True\":</p>\n<p>lemma<br>\n    \"noBot LNil = True\" unfolding noBot_def using finlsts_rec_LNil<br>\n(<em>here</em>) by blast</p>\n<p>When ProofGeneral has consumed everything up to \"(<em>here</em>)\", the<br>\nproofstate looks like:</p>\n<p>using this:<br>\n      finlsts_rec ?c ?d LNil = ?c</p>\n<p>goal (1 subgoal):</p>\n<p>1. finlsts_rec True (%s r b. b &amp; s ~= BottomState) LNil = True</p>\n<p>This looks like it can be proved directly by unification.  Consuming<br>\nthe blast does not prove the theorem, even after a long time.</p>\n<p>What exactly is going on here?</p>",
+        "id": 294062205,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660824126
+    },
+    {
+        "content": "<p>From: Lawrence Paulson &lt;<a href=\"mailto:lp15@cam.ac.uk\">lp15@cam.ac.uk</a>&gt;<br>\nBlast doesn't look like the right tool for this problem.</p>\n<p>You can prove it like this:</p>\n<p>lemma<br>\n    \"noBot LNil = True\" unfolding noBot_def<br>\n      by (simp add: finlsts_rec_LNil)</p>\n<p>Larry Paulson</p>",
+        "id": 294062243,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660824144
+    },
+    {
+        "content": "<p>From: Denis Bueno &lt;<a href=\"mailto:dbueno@gmail.com\">dbueno@gmail.com</a>&gt;<br>\nI had the same thought, but I tried:</p>\n<p>lemma<br>\n    \"noBot LNil = True\" unfolding noBot_def<br>\n                        using finlsts_rec_LNil<br>\n    by simp</p>\n<p>And it failed.  I expected to be able to substitute \"using\" in Isar<br>\nfor the \"add:\" argument to simp.  What is different?</p>",
+        "id": 294062257,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660824150
+    },
+    {
+        "content": "<p>From: Florian Haftmann &lt;<a href=\"mailto:florian.haftmann@informatik.tu-muenchen.de\">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>\nHi Denis,</p>\n<p>That is, in general, not the case.  Facts chained in to simp (e.g. using<br>\n\"using\") are not instantiated wrt. to types, where simp rules given to<br>\nsimp with add: are.</p>\n<p>Hope this helps<br>\n    Florian<br>\n<a href=\"/user_uploads/14278/JIQS1KTkvhrJDssoSeamACGl/signature.asc\">signature.asc</a></p>",
+        "id": 294062295,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660824164
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nAutomated proof methods like \"simp\" merely insert the facts being \"used\" <br>\ninto the goal before doing their usual business.  This means a polymorphic <br>\nrule like using finlsts_rec_LNil essentially looses its polymorphism, it <br>\ncan be instantiated at most once for logical reasons, and the Simplifier <br>\ndoes not instantiate even do that, but ignores it due to schematic type <br>\nvariables in the goal premises.</p>\n<p>In contrast, the \"add\" method modifier inserts the rule into the <br>\nSimplifier context as an independented fact.  It is eventually matched <br>\nagainst a redex in the goal, and its types get instantiated as expected.</p>\n<p>As a rule of thumb (and a matter of style), the \"using\" part typically <br>\nrefers to local things from the very proof, while rules from the library <br>\nare specified via extra method modifiers (simp add/del, blast <br>\nintro/elim/dest etc.).</p>\n<p>Makarius</p>",
+        "id": 294062307,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660824169
+    }
+]

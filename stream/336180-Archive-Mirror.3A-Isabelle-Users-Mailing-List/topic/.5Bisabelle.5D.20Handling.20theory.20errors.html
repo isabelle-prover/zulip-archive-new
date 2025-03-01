@@ -1,0 +1,117 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Handling theory errors · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Handling.20theory.20errors.html">[isabelle] Handling theory errors</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294073222"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Handling%20theory%20errors/near/294073222" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Handling.20theory.20errors.html#294073222">(Aug 18 2022 at 13:05)</a>:</h4>
+<p>From: Omar Montano Rivas &lt;<a href="mailto:O.Montano-Rivas-2@sms.ed.ac.uk">O.Montano-Rivas-2@sms.ed.ac.uk</a>&gt;<br>
+Hi all!</p>
+<p>When modifying a theory, for instance using  <br>
+"FundefPackage.add_fundef_i", how sould errors be handled? In  <br>
+particular, catching them and using the original theory results in  <br>
+stale theory errors?</p>
+<p>This is the problematic theory:</p>
+<p>(<strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong>****)<br>
+theory Test<br>
+imports Main<br>
+begin</p>
+<p>datatype numero = Cero | Siguiente numero</p>
+<p>ML {*<br>
+local<br>
+  val by_pat_completeness_simp =<br>
+    Proof.global_terminal_proof<br>
+      (Method.Basic (K FundefDatatype.pat_completeness, Position.none),<br>
+       SOME (Method.Source_i (Args.src (("<a href="http://HOL.auto">HOL.auto</a>", []),  <br>
+Position.none))));</p>
+<p>val termination_by_lexicographic_order =<br>
+    FundefPackage.setup_termination_proof NONE<br>
+    #&gt; Proof.global_terminal_proof<br>
+      (Method.Basic (LexicographicOrder.lexicographic_order [],  <br>
+Position.none), NONE);<br>
+in<br>
+  fun simple_function name eqs thy =<br>
+    let<br>
+      val group = serial_string ();<br>
+      val config = FundefCommon.FundefConfig<br>
+        {sequential = false, default = "%x. arbitrary", domintros =  <br>
+false, tailrec = false};<br>
+    in<br>
+      tracing group;<br>
+      TheoryTarget.init NONE thy<br>
+      |&gt; LocalTheory.set_group group<br>
+      |&gt; FundefPackage.add_fundef_i<br>
+        [(name, NONE, NoSyn)] (map (fn t =&gt; (("", []), t)) eqs) config  <br>
+[]<br>
+      |&gt; by_pat_completeness_simp<br>
+      |&gt; LocalTheory.restore<br>
+      |&gt; LocalTheory.set_group group<br>
+      |&gt; termination_by_lexicographic_order<br>
+      |&gt; ProofContext.theory_of<br>
+    end;<br>
+end;</p>
+<p>fun activate_defs eqs thry =<br>
+   case eqs of<br>
+      (name,eqns) :: teq =&gt; activate_defs teq (simple_function name  <br>
+eqns thry handle ERROR e =&gt; thry)<br>
+    |     _     =&gt; thry;</p>
+<p>val eqs1 = [@{prop "DEF1 x Cero = Siguiente x"},<br>
+@{prop "DEF1 (x::numero) (Siguiente y) = Siguiente (DEF1 x y)"}];</p>
+<p>val eqs2 = [@{prop "DEF2 x Cero = Siguiente x"},<br>
+@{prop "DEF2 x y = (DEF2::numero=&gt;numero=&gt;numero) x y"}];</p>
+<p>val eqs3 = [@{prop "DEF3 x Cero = (x::numero)"},<br>
+@{prop "DEF3 x (Siguiente y) = Siguiente (DEF3 (x::numero) y)"}];<br>
+*}</p>
+<p>(* This generates the Stale theory error *)<br>
+setup{*<br>
+activate_defs [("DEF1",eqs1),("DEF2",eqs2),("DEF3",eqs3)]<br>
+*}</p>
+<p>(* However swapping DEF1 and DEF2 generates no error *)<br>
+setup{*<br>
+activate_defs [("DEF2",eqs2),("DEF1",eqs1),("DEF3",eqs3)]<br>
+*}</p>
+<p>(<strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong><strong>*</strong>****)</p>
+<p>Thanks in advance!</p>
+<p>Regards,<br>
+Omar Montano</p>
+
+
+
+<a name="294073325"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Handling%20theory%20errors/near/294073325" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Handling.20theory.20errors.html#294073325">(Aug 18 2022 at 13:05)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+As explained in section 1.1.1 of the Isabelle/Isar Implementation manual, <br>
+theories are essentially a linear type, with run-time checking of <br>
+non-linear updates.  In activate_defs above, the application of <br>
+simple_function can well update thry before raising the ERROR, so thry <br>
+passed in the handler comes out as stale. The Theory.checkpoint operation <br>
+described in the manual is able to amend this. E.g. like this:</p>
+<p>fun activate_defs eqs thy0 =<br>
+  let val thy = Theory.checkpoint thy0 in<br>
+    case eqs of<br>
+       (name,eqns) :: teq =&gt; activate_defs teq (simple_function name <br>
+         eqns thy handle ERROR e =&gt; thy)<br>
+     |     _     =&gt; thy<br>
+  end</p>
+<p>Note that the canonical naming convention for theories is "thy...", this <br>
+makes it easier to do static analysis in such error cases, by <br>
+"eye-balling" the sources.</p>
+<p>Anyway, handling general ERROR exceptions like above can easily lead into <br>
+obscure situations -- the error could stem from a quite different spot <br>
+than you expect.  Which source of ERROR did you have in mind anyway?</p>
+<p>BTW, in the coming release, there will be less situations where stale <br>
+theories can emerge in regular user code.  I will also try harder to get <br>
+regular ML interfaces for the 'function' package in -- then you do not <br>
+have to copy half of the command wrapper implementation.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

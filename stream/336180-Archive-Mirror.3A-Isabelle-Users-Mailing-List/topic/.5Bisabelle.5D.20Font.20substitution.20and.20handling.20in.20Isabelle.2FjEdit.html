@@ -1,0 +1,217 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Font substitution and handling in Isabelle/jEdit · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Font.20substitution.20and.20handling.20in.20Isabelle.2FjEdit.html">[isabelle] Font substitution and handling in Isabelle/jEdit</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294652659"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Font%20substitution%20and%20handling%20in%20Isabelle/jEdit/near/294652659" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Font.20substitution.20and.20handling.20in.20Isabelle.2FjEdit.html#294652659">(Aug 22 2022 at 11:12)</a>:</h4>
+<p>From: Rafal Kolanski &lt;<a href="mailto:xs@xaph.net">xs@xaph.net</a>&gt;<br>
+As you may know, the current font handling system in the Isabelle plugin<br>
+completely bypasses the one used in jEdit.<br>
+The symptoms of this are:</p>
+<ul>
+<li>
+<p>Global Options -&gt; Text Area -&gt; "Additional fonts with font<br>
+   substitution" has no effect, confusing new users.</p>
+</li>
+<li>
+<p>Can't use Your Favorite Font™ and have missing glyphs fall<br>
+   back to the fonts you want.</p>
+</li>
+<li>
+<p>Isabelle symbols can configure the font used, but there's a global<br>
+   maximum of two user fonts (see user_font in token_markup.scala).</p>
+</li>
+<li>
+<p>jEdit splits chunks at <em>all</em> Isabelle symbols</p>
+</li>
+</ul>
+<p>jEdit's font substitution system works really well. I wanted<br>
+Isabelle users to be able to benefit from it and enjoy tweaking fonts to<br>
+their heart's content, so I performed the necessary modifications to<br>
+make it work. The resulting code is simpler (though obviously Makarius<br>
+will tune naming to be more canonical) and I believe more<br>
+understandable.</p>
+<p>I promised last week I'd deliver the change this week, and here it is.<br>
+I've also included some ad-hoc documentation on the situation and design<br>
+in the latter part of this email, hence its length. If you ever want to<br>
+tune the symbol/token/chunk system, this might be useful.</p>
+<p>If you want to try it out, two patches are attached (use git apply):</p>
+<ol>
+<li>
+<p>jEdit: 0003-Allow-specification-of-sizes-for-fallback-fonts.patch<br>
+   (see discussion at: <a href="https://sourceforge.net/p/jedit/patches/569/">https://sourceforge.net/p/jedit/patches/569/</a> )</p>
+<p>This allows one to specify desired sizes for fallback fonts. The<br>
+ reality is that font metrics between fonts don't agree. One font at<br>
+ 12 pt is the same size as another at 16 pt.</p>
+<p>It also exposes queries on the font substitution system in Chunk.java<br>
+ so that the plugin authors can use the information for their own<br>
+ rendering.</p>
+<p>This patch on its own does <em>not</em> affect existing jEdit/Isabelle users<br>
+ and is safe to apply.</p>
+<p>If you just want my version of jedit.jar, let me know.</p>
+</li>
+<li>
+<p>Isabelle plugin: 0001-Redo-Isabelle-plugin-chunk-rendering.patch<br>
+   (Isabelle 2015 version, but I can easily produce one that applies to<br>
+   current development branch)</p>
+<p>This removes the user_font setup in token_markup.scala and<br>
+ modifies the paint_chunk_list code in rich_text_area.scala to match<br>
+ the underlying chunk layout provided by jEdit even when font<br>
+ substitution is enabled.</p>
+<p>This depends on the jEdit patch (1).</p>
+</li>
+</ol>
+<p>The Outcome</p>
+<p>You can now set up whatever font chain you want. For example mine is:<br>
+Lucida Console 16 -&gt; Cambria Math 18 -&gt; DejaVu Sans 16 -&gt; IsabelleText<br>
+16 -&gt; search all system fonts.</p>
+<p>The setup is flexible enough that you can now use bizarre Unicode code<br>
+points (yes, even those above 0xFFFF) in your notation (output) if you<br>
+have the fonts to display it, e.g. I tested with:<br>
+    U+1F0A4 PLAYING CARD FOUR OF SPADES<br>
+    U+10147 GREEK ACROPHONIC ATTIC FIFTY THOUSAND</p>
+<p>The chunk rendering code in rich_text_area.scala is simpler and should<br>
+be easier to understand.</p>
+<p>By not using the user_font workaround, we free up 19*2 extended style<br>
+IDs that we can use for whatever we like. My suggestion: we can now do<br>
+<em>two</em> levels of super/subscript.</p>
+<p>The "font" specification in etc/symbols now does nothing. Pick the<br>
+Unicode code point you want the symbol to display as and you're done.</p>
+<p>The Details (only read if you are interested or Makarius)</p>
+<p>jEdit's TextArea lays out chunks based on tokens it receives from the<br>
+relevant parser. Consecutive tokens with the same ID are grouped into<br>
+one chunk.  One chunk has a single style (font, text color, background<br>
+color) plus a layout of GlyphVectors. If no font substitution was done,<br>
+the entire chunk is laid out as a single vector. Font substitution<br>
+splits vectors when the chunk is laid out, but the chunk is not split.</p>
+<p>The Isabelle plugin provides a parser which lets jEdit parse and lay out<br>
+chunks. This results in inner syntax appearing as LITERAL1 (i.e. a<br>
+string). Once this process is done, all chunks are laid out, have<br>
+specified sizes and all font substitutions are done.</p>
+<p>That's not the end of the story though. Once processed by Isabelle, we<br>
+acquire extra information. For example a part of that LITERAL1 is<br>
+actually a free variable, so should get a different text color! This<br>
+needs to be overlaid on the existing chunk somehow.</p>
+<p>The way the Isabelle plugin performs the overlay of text colors is by<br>
+turning off the existing TextArea chunk renderer and doing the rendering<br>
+itself (see rich_text_area.scala). However, it isn't dumb and does not<br>
+lay out the underlying chunks again. This means that the rendering must<br>
+match up with the underlying chunk layout <em>exactly</em> in order to have the<br>
+glyphs and cursor appear in the right place within the chunk.</p>
+<p>So if we want sub/superscript, we need to get jEdit to lay it out as<br>
+sub/superscript for us, or rendering our own ideas over it won't match<br>
+up!</p>
+<p>There is a patch to jEdit (src/Tools/jEdit/patches/extended_styles)<br>
+which extends the n jEdit styles available (about 19) to 127 (max in<br>
+Java byte). That way we can do:</p>
+<ul>
+<li>0..n-1     : jEdit</li>
+<li>n..2*n-1   : superscript</li>
+<li>2<em>n..3</em>n-1 : subscript</li>
+<li>3<em>n..4</em>n-1 : bold</li>
+<li>4<em>n..6</em>n-1 : user_font</li>
+<li>6*n        : invisible (e.g. \&lt;^sub&gt; token itself)<br>
+When jEdit sees these, it lays them out according to the extended style<br>
+specified. We set these up to match the n jEdit styles, but tweaked in<br>
+the desired way (size, font, style, elevation, etc).</li>
+</ul>
+<p>The user_font setup handles Isabelle symbols, but it's not very flexible<br>
+and it unnecessarily splits chunks (e.g. "sμn ⟶ mσσn" lays out as 9<br>
+chunks instead of one).<br>
+The renderer in Rich_Text_Area assumes one font per chunk, and user_font<br>
+only handles Isabelle symbols and not general code points present in the<br>
+text. The result is that with font substitution enabled in jEdit, using<br>
+code points not in your main font (yes, even IsabelleText has these)<br>
+will also result in glyph rendering misalignment.</p>
+<p>As Isabelle plugin developers we cannot reuse the internal glyph<br>
+vectors stored in the chunk for rendering our text colors, because if<br>
+all code points are present in your main font, then "sμn ⟶ mσσn" will<br>
+not only be a single chunk, but also a single glyph vector. After it's<br>
+assembled, we can't get at which part means what.</p>
+<p>So what do we do instead?</p>
+<p>Create an AttributeString to contain all the rendering information for<br>
+the chunk. AttributeStrings are great. They store all style information<br>
+we need, but also font information.</p>
+<p>For each Isabelle text color in the chunk, mark that range in the<br>
+AttributeString with that color, defaulting to chunk's default text<br>
+color and font. Mark where the cursor is as inverted-color.</p>
+<p>Access the font lookup mechanism in Chunk.java (possible with the<br>
+patch).  If jEdit didn't do font substitution, we don't either.<br>
+Otherwise: go through the AttributeString looking for code points the<br>
+chunk's font can't display. Ask Chunk if there's a substitute font to<br>
+use to display it. If there is, mark the range of the code point in the<br>
+AttributeString with that font.</p>
+<p>Render resulting AttributeString. Watch as it lines up perfectly with<br>
+jEdit's layout regardless of what code points you dug out from the<br>
+depths of Unicode.</p>
+<p>The end. It really is simpler, and I think a good change for Isabelle to<br>
+adopt.</p>
+<p>Makarius: I know you probably won't like CustomChunk, or at the very<br>
+least its name. I just wanted to encapsulate the AttributeString<br>
+operations for simplicity and understandability. As always, if you're<br>
+not happy with something and want me to change/redo, let me know. I want<br>
+to make useful contributions.</p>
+<p>Sincerely,</p>
+<p>Rafal Kolanski<br>
+<a href="/user_uploads/14278/QaXika7y-EyrQ1IJlpwSD1hx/0003-Allow-specification-of-sizes-for-fallback-fonts.patch">0003-Allow-specification-of-sizes-for-fallback-fonts.patch</a><br>
+<a href="/user_uploads/14278/SVOxfJe8jS9P-Gowq__tBEuQ/0001-Redo-Isabelle-plugin-chunk-rendering.patch">0001-Redo-Isabelle-plugin-chunk-rendering.patch</a></p>
+
+
+
+<a name="294654789"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Font%20substitution%20and%20handling%20in%20Isabelle/jEdit/near/294654789" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Font.20substitution.20and.20handling.20in.20Isabelle.2FjEdit.html#294654789">(Aug 22 2022 at 11:26)</a>:</h4>
+<p>From: Rafal Kolanski &lt;<a href="mailto:xs@xaph.net">xs@xaph.net</a>&gt;<br>
+There is a small update to this. Because some fonts (e.g. IsabelleText)<br>
+are dynamically inserted at Isabelle plugin load into the graphics<br>
+context <em>after</em> jEdit has loaded all properties ("settings"), jEdit<br>
+doesn't see them.</p>
+<p>Since the Isabelle plugin makes changes to existing contexts that affect<br>
+the interpretation of jEdit properties, after some deliberation (and<br>
+about a week of testing) I suggest the following solution.</p>
+<p>In src/Tools/jEdit/src/plugin.scala, at the end of the start() method,<br>
+we inform jEdit that it should look at its properties again:</p>
+<p>diff --git a/src/Tools/jEdit/src/plugin.scala<br>
+b/src/Tools/jEdit/src/plugin.scala<br>
+index ac081b1..31db703 100644<br>
+--- a/src/Tools/jEdit/src/plugin.scala<br>
++++ b/src/Tools/jEdit/src/plugin.scala<br>
+@@ -405,6 +405,9 @@ class Plugin extends EBPlugin<br>
+         PIDE.startup_failure = Some(exn)<br>
+         PIDE.startup_notified = false<br>
+     }<br>
++</p>
+<ul>
+<li>// new fonts loaded; references to them in config will now work</li>
+<li>jEdit.propertiesChanged()<br>
+   }</li>
+</ul>
+<p>Sorry for the noise. Getting this change right is important to me, and<br>
+feedback is a bit scarce. Now that Makarius potentially has time to look<br>
+at this, I want to offer as much assistance as I can.</p>
+<p>Sincerely,</p>
+<p>Rafal Kolanski.</p>
+
+
+
+<a name="294655973"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Font%20substitution%20and%20handling%20in%20Isabelle/jEdit/near/294655973" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Font.20substitution.20and.20handling.20in.20Isabelle.2FjEdit.html#294655973">(Aug 22 2022 at 11:33)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+I have recently made various reforms in the isabelle.Main vs. jedit.jar <br>
+initialization sequence, which is relevant for the coming winter release <br>
+of Isabelle2016.</p>
+<p>If there are remaining problems, we should continue the discussion on the <br>
+isabelle-dev mailing list.  The current point of reference is changeset <br>
+be3a5fee11e3.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

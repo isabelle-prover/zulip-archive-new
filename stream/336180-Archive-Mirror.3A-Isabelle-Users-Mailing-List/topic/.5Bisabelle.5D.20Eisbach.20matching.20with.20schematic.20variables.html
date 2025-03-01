@@ -1,0 +1,88 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Eisbach matching with schematic variables · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Eisbach.20matching.20with.20schematic.20variables.html">[isabelle] Eisbach matching with schematic variables</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294694527"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Eisbach%20matching%20with%20schematic%20variables/near/294694527" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Eisbach.20matching.20with.20schematic.20variables.html#294694527">(Aug 22 2022 at 14:19)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear Eisbach experts and users,</p>
+<p>I have trouble to write a proof method that does the following:</p>
+<ol>
+<li>
+<p>Apply a rule called foo.<br>
+It has two premises that both contain variables that are not bound by the conclusion of <br>
+foo. Hence, the goal state consists of two goals with a schematic variable ?x in them.</p>
+</li>
+<li>
+<p>Work on the first subgoal by applying rules from a named_theorems collection my_rules. <br>
+This is supposed to instantiate the variable ?x. All these rules in my_rules have one <br>
+constant C as the head term, and they have premises with the same head constant, but there <br>
+may also be premises with other terms (let's call them side conditions). As long as the <br>
+current subgoal has C as head symbol, I want to apply the rules in my_rules, and I want to <br>
+apply some proof automation (like clarsimp or auto) to the side conditions. In particular, <br>
+I want to make sure that clarsimp and auto are _never_ applied to a goal with C as head <br>
+symbol.</p>
+</li>
+</ol>
+<p>This should be done iteratively until either<br>
+(a) the goal arising from step 1 is solved or<br>
+(b) the current subgoal has C as head symbol, but there's no matching rule in my_rules, or<br>
+(c) one of the side conditions is not solved by clarsimp and auto.</p>
+<p>I tried to write the proof method with Eisbach, but I failed to make the distinction based <br>
+on the head symbol. Here's my attempt:</p>
+<p>method step =<br>
+   (match conclusion in "foo p1 p2 p3" for p1 p2 p3 =&gt; rule my_rules<br>
+   \&lt;bar&gt; H for H =&gt; \&lt;open&gt;solves \&lt;open&gt;clarsimp\&lt;close&gt;\&lt;close&gt;)<br>
+method my_method = (rule foo, (step+)?)</p>
+<p>The problem is that the match method seems to turn the schematic variable ?x into a fixed <br>
+variable x, which the rules in my_rules can no longer instantiate.</p>
+<p>Can I somehow achieve with Eisbach what I want?</p>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<a name="294696293"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Eisbach%20matching%20with%20schematic%20variables/near/294696293" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Eisbach.20matching.20with.20schematic.20variables.html#294696293">(Aug 22 2022 at 14:23)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Dan,</p>
+<p>Thanks for the suggestion with fail in the interesting case. That indeed gets me out of <br>
+the subgoal focus of match. Indeed, a light-weight match without subgoal focus and without <br>
+binding in the first place would be nice.</p>
+<p>Andreas</p>
+
+
+
+<a name="294696348"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Eisbach%20matching%20with%20schematic%20variables/near/294696348" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Eisbach.20matching.20with.20schematic.20variables.html#294696348">(Aug 22 2022 at 14:23)</a>:</h4>
+<p>From: <a href="mailto:Daniel.Matichuk@data61.csiro.au">Daniel.Matichuk@data61.csiro.au</a><br>
+Hi Andreas,</p>
+<p>The incompatibility with match and schematic variables is a known limitation, and unfortunately it's actually a hard problem to solve in general. Currently the "match" method performs a subgoal focus when matching on the conclusion or premises in order to turn them into proper terms/facts. This allows you to, for example, refer to "p1" (in your example) inside your method body and have it still make sense if p1 contained a goal parameter. This focus, however, needs to turns schematics into fixed terms for a number of reasons, most of which is so that they can't suddenly depend on goal parameters that they didn't before (i.e. in the case of "!!x y. (?P x) /\ (?Q y)").</p>
+<p>Makarius and I had some discussions about how to handle this particular situation, we were leaning towards making methods "smarter" and realising that certain fixed parameters were actually schematics in the context and knowing how to instantiate them. </p>
+<p>The other more lightweight solution we thought of was to introduce a non-focusing match, i.e. a match that does not manipulate the goal state or try to bind goal elements. This seems more like what you would want in your current situation. It's not immediately clear how this would interact with nested matches, however.</p>
+<p>That all being said, I believe your particular situation can be resolved simply by putting "rule my_rules" outside of the match body itself. This is not the most elegant solution, but it should get the job done.</p>
+<p>method step =<br>
+((match conclusion in <br>
+  "foo p1 p2 p3" for p1 p2 p3 ⇒ ‹fail›<br>
+  ¦ H for H ⇒ ‹solves ‹clarsimp››) | (rule my_rules))</p>
+<p>The match will not backtrack past the fact that it matched "foo p1 p2 p3" and will immediately fail through to "rule my_rules".</p>
+<p>Hopefully this resolves your issue.</p>
+<p>-Dan</p>
+<p>P.S.</p>
+<p>The "_" pattern is valid in the match method, so we can make your method a bit more succinct.</p>
+<p>method step =<br>
+((match conclusion in <br>
+  "foo _ _ _" ⇒ ‹fail›<br>
+  ¦ _ ⇒ ‹solves ‹clarsimp››) | (rule my_rules))[1]</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

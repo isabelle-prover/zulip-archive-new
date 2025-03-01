@@ -1,0 +1,255 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] automatically grade Isabelle homework? · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20automatically.20grade.20Isabelle.20homework.3F.html">[isabelle] automatically grade Isabelle homework?</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294678656"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20automatically%20grade%20Isabelle%20homework%3F/near/294678656" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20automatically.20grade.20Isabelle.20homework.3F.html#294678656">(Aug 22 2022 at 13:44)</a>:</h4>
+<p>From: Johannes Waldmann &lt;<a href="mailto:johannes.waldmann@htwk-leipzig.de">johannes.waldmann@htwk-leipzig.de</a>&gt;<br>
+Dear all,</p>
+<p>I wonder about the feasibility of the following.<br>
+Perhaps something similar has already been done.</p>
+<p>I want to automatically check solutions for homework assignments.<br>
+The problem statement could be a text with some "sorry",<br>
+and the student has to replace these with actual proofs,<br>
+and is forbidden to change anything else.</p>
+<p>I am already doing this for Haskell homework -<br>
+students have to replace "undefined",<br>
+resulting code is type-checked and then small/quick-checked.<br>
+See URL at end of this mail for implementation.</p>
+<ol>
+<li>
+<p>what is the best way to pattern-match<br>
+student's Isabelle code against problem statement?<br>
+For Haskell, I actually compare abstract syntax trees.</p>
+</li>
+<li>
+<p>how safe is it to run Isabelle? - For Haskell,<br>
+anything dangerous would be in IO, which is prohibited<br>
+by putting type annotations in the problem statement<br>
+(which the student cannot change).<br>
+And "unsafePerformIO" is prohibited because it would need<br>
+some "import" statement - which again would not survive<br>
+the pattern matching. So, the worst that can happen<br>
+is that student's code runs forever,<br>
+and for that I just limit execution time (to a few seconds).<br>
+Is there any way to sneak an IO action into a proof?</p>
+</li>
+</ol>
+<p>3.1 How would I run Isabelle? Of course I don't want the GUI.<br>
+3.2 Can I avoid putting student's submission in a file,<br>
+and pipe it instead?<br>
+3.3 How would I detect that Isabelle actually verified the proof?<br>
+Ideally, just by checking the return code?</p>
+<p>Any input appreciated.</p>
+<ul>
+<li>Johannes.</li>
+</ul>
+<p><a href="https://gitlab.imn.htwk-leipzig.de/autotool/all/tree/master/collection/src/Haskell/Blueprint">https://gitlab.imn.htwk-leipzig.de/autotool/all/tree/master/collection/src/Haskell/Blueprint</a></p>
+<p>NB: I once saw an (unrelated) project<br>
+that used "maxima" to check elementary algebra homework,<br>
+and this had serious security holes -<br>
+you could easily do IO because there is no static checking.</p>
+
+
+
+<a name="294678682"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20automatically%20grade%20Isabelle%20homework%3F/near/294678682" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20automatically.20grade.20Isabelle.20homework.3F.html#294678682">(Aug 22 2022 at 13:44)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+Dear Johannes,</p>
+<blockquote>
+<ol>
+<li>what is the best way to pattern-match<br>
+student's Isabelle code against problem statement?<br>
+For Haskell, I actually compare abstract syntax trees.</li>
+</ol>
+</blockquote>
+<p>is there any reason you require students to exactly fill out holes? For<br>
+our Haskell course we reckoned a "matching interface" is good enough.</p>
+<p>In Isabelle you could get something similar by using three theories:</p>
+<p>Interface.thy – definitions would go in there<br>
+Student.thy – lemma statements + sorry would go there, student has to<br>
+fill them<br>
+Checker.thy – contains the exact same lemma statements, but using a<br>
+proof "by rule".</p>
+<p>Example:</p>
+<p>Interface.thy</p>
+<p>theory Interface imports Main begin</p>
+<p>definition prime ...</p>
+<p>Student.thy</p>
+<p>theory Student imports Interface begin</p>
+<p>lemma no_biggest_prime: obtains p where "prime p" "p &gt; n"<br>
+  sorry</p>
+<p>Checker.thy</p>
+<p>theory Checker imports Interface Student begin</p>
+<p>lemma check_no_biggest_prime:<br>
+    obtains p where "<a href="http://Interface.prime">Interface.prime</a> p" "p &gt; n"<br>
+  by (rule Student.no_biggest_prime)</p>
+<p>Depending on where exactly a failure occurs (you can put those into<br>
+multiple sessions) you know where the student did something wrong.</p>
+<blockquote>
+<ol start="2">
+<li>how safe is it to run Isabelle? - For Haskell,<br>
+anything dangerous would be in IO, which is prohibited<br>
+by putting type annotations in the problem statement<br>
+(which the student cannot change).<br>
+And "unsafePerformIO" is prohibited because it would need<br>
+some "import" statement - which again would not survive<br>
+the pattern matching. So, the worst that can happen<br>
+is that student's code runs forever,<br>
+and for that I just limit execution time (to a few seconds).<br>
+Is there any way to sneak an IO action into a proof?</li>
+</ol>
+</blockquote>
+<p>Isabelle allows arbitrary code execution. There is currently a "safe"<br>
+flag but:</p>
+<ul>
+<li>with that many legitimate things don't work</li>
+<li>it will be gone in the next release.</li>
+</ul>
+<p>I strongly recommend containerizing Isabelle for running untrusted code.<br>
+(We use unprivileged containers without network access in a VM in our<br>
+AFP submission checker.)</p>
+<p>On the plus side, setting timeouts is possible and robust.</p>
+<blockquote>
+<p>3.1 How would I run Isabelle? Of course I don't want the GUI.</p>
+</blockquote>
+<p>You have to prepare a ROOT file and put all the files into appropriate<br>
+folders. Then you can run</p>
+<p>$ bin/isabelle build ...</p>
+<p>See also §2 in the Isabelle system manual:<br>
+&lt;<a href="https://isabelle.in.tum.de/dist/Isabelle2016/doc/system.pdf">https://isabelle.in.tum.de/dist/Isabelle2016/doc/system.pdf</a>&gt;</p>
+<blockquote>
+<p>3.2 Can I avoid putting student's submission in a file,<br>
+and pipe it instead?</p>
+</blockquote>
+<p>You could, but that would involve you writing some nontrivial amount of<br>
+custom Scala code to drive the build process. I wouldn't recommend it.</p>
+<blockquote>
+<p>3.3 How would I detect that Isabelle actually verified the proof?<br>
+Ideally, just by checking the return code?</p>
+</blockquote>
+<p>Yes, you get that for free from "isabelle build". Exit code 0 means<br>
+session built successfully, other exit codes mean timeout/failure/...</p>
+<p>Cheers<br>
+Lars</p>
+
+
+
+<a name="294678781"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20automatically%20grade%20Isabelle%20homework%3F/near/294678781" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20automatically.20grade.20Isabelle.20homework.3F.html#294678781">(Aug 22 2022 at 13:45)</a>:</h4>
+<p>From: Joachim Breitner &lt;<a href="mailto:breitner@kit.edu">breitner@kit.edu</a>&gt;<br>
+Hi Johannes,</p>
+<p>also see this thread, where I asked similar questions (but without much<br>
+more answers :-)<br>
+<a href="https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2016-April/msg00087.html">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2016-April/msg00087.html</a></p>
+<p>as Lars says, there is a safe mode, and we use in (in addition to<br>
+containerization using Docker) Karlsruhe where we automatically process<br>
+Isabelle submissions using the “Praktomat” checker. We currently do not<br>
+check what the students actually proved, for that we still manually<br>
+check their submission, but this way any sorries or other problems are<br>
+detected.</p>
+<p>Maybe<br>
+<a href="https://github.com/KITPraktomatTeam/Praktomat/blob/master/src/checker/checker/IsabelleChecker.py">https://github.com/KITPraktomatTeam/Praktomat/blob/master/src/checker/checker/IsabelleChecker.py</a><br>
+provides some inspiration.<br>
+<a href="/user_uploads/14278/9GYHCCULyNLDnWETfctOobAx/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294678801"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20automatically%20grade%20Isabelle%20homework%3F/near/294678801" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20automatically.20grade.20Isabelle.20homework.3F.html#294678801">(Aug 22 2022 at 13:45)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+The point I was trying to make is: there is a "safe" mode, but don't<br>
+ever use it! :-)</p>
+<p>Cheers<br>
+Lars</p>
+
+
+
+<a name="294678832"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20automatically%20grade%20Isabelle%20homework%3F/near/294678832" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20automatically.20grade.20Isabelle.20homework.3F.html#294678832">(Aug 22 2022 at 13:45)</a>:</h4>
+<p>From: Joachim Breitner &lt;<a href="mailto:breitner@kit.edu">breitner@kit.edu</a>&gt;<br>
+Hi,</p>
+<p>besides adding security (which is better handled by containerization),<br>
+the safe mode also prevents the student from adding ML code that allows<br>
+them to implement a bad oracle, i.e. their own "sorry", right? Will<br>
+there be another way of avoiding that, once the safe mode is gone?</p>
+<p>Greetings,<br>
+Joachim<br>
+<a href="/user_uploads/14278/WoNpH7I6CmhUENkxbUkIJkBH/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294678868"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20automatically%20grade%20Isabelle%20homework%3F/near/294678868" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20automatically.20grade.20Isabelle.20homework.3F.html#294678868">(Aug 22 2022 at 13:45)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+Hi Joachim,</p>
+<blockquote>
+<p>besides adding security (which is better handled by containerization),</p>
+</blockquote>
+<p>... a dubious amount at best. Using "code_printing" and "export_code"<br>
+you can already write arbitrary things to the file system, e.g.<br>
+".bashrc" or the checker theory (if those are writeable). Also let me<br>
+reiterate that the "secure" mode is gone after Isabelle2016.</p>
+<blockquote>
+<p>the safe mode also prevents the student from adding ML code that allows<br>
+them to implement a bad oracle, i.e. their own "sorry", right? Will<br>
+there be another way of avoiding that, once the safe mode is gone?</p>
+</blockquote>
+<p>There are more ways to cheat than that, e.g. with "axiomatization" or<br>
+introducing custom or changing existing input/output syntax. However, ML<br>
+oracles can be easily detected using "Thm.peek_status" (the "oracle"<br>
+field is set to "true").</p>
+<p>Given that the whole system is so complex there is no bullet-proof way<br>
+you can reasonably assign grades without reserving the right to deduct<br>
+points if cheating is detected by a human. (Human review of Isabelle<br>
+sources is a necessity.)</p>
+<p>Cheers<br>
+Lars</p>
+
+
+
+<a name="294678873"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20automatically%20grade%20Isabelle%20homework%3F/near/294678873" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20automatically.20grade.20Isabelle.20homework.3F.html#294678873">(Aug 22 2022 at 13:45)</a>:</h4>
+<p>From: Ondřej Kunčar &lt;<a href="mailto:kuncar@in.tum.de">kuncar@in.tum.de</a>&gt;<br>
+This is not reliable either. You can hide usage of an oracle in the <br>
+instance proof when you instantiate a type class. For example, create a <br>
+type class that assumes False and use sorry in the instance proof.</p>
+<p>Probably the most reliable way that we can amend this is to remove the <br>
+axiomatic type classes from the kernel.</p>
+<p>Bests,<br>
+Ondrej</p>
+
+
+
+<a name="294679258"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20automatically%20grade%20Isabelle%20homework%3F/near/294679258" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20automatically.20grade.20Isabelle.20homework.3F.html#294679258">(Aug 22 2022 at 13:48)</a>:</h4>
+<p>From: Johannes Waldmann &lt;<a href="mailto:johannes.waldmann@htwk-leipzig.de">johannes.waldmann@htwk-leipzig.de</a>&gt;<br>
+Well, you can always give a name to a "hole" inside an expression.<br>
+Then student has to add a top-level definition for that name.</p>
+<p>But then, being top-level (module-level)<br>
+means that it cannot refer to local names<br>
+from the scope that the hole was in,<br>
+but sometimes that's the point of an exercise,<br>
+if it's about "local" programming techniques.</p>
+<p>Also, there are other kinds of holes (than expressions),<br>
+I want to use this also for patterns and types.<br>
+Again, these could be named, but then I lose the scope information,<br>
+or have to make it explicit (by adding arguments).</p>
+<p>I imagine the same could be useful for Isabelle homework:<br>
+"fill the gap(s) in this proof (but don't touch the non-gaps)"<br>
+the point being that the student has to respect the (local) structure.</p>
+<ul>
+<li>Johannes.</li>
+</ul>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

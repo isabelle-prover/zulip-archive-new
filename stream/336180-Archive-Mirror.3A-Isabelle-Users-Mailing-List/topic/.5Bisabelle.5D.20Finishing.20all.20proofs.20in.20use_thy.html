@@ -1,0 +1,204 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Finishing all proofs in use_thy · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Finishing.20all.20proofs.20in.20use_thy.html">[isabelle] Finishing all proofs in use_thy</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294747035"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Finishing%20all%20proofs%20in%20use_thy/near/294747035" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Finishing.20all.20proofs.20in.20use_thy.html#294747035">(Aug 22 2022 at 18:45)</a>:</h4>
+<p>From: Dominique Unruh &lt;<a href="mailto:unruh@ut.ee">unruh@ut.ee</a>&gt;<br>
+Hello,</p>
+<p>I have the following setting:</p>
+<p>- In an external program I load an Isabelle theory Test (via<br>
+   libisabelle). From the Isabelle point of view, this is a call to<br>
+   Thy_Info.use_thy.</p>
+<p>- If Test.thy contains errors, Thy_Info.use_thy will usually fail. This<br>
+   is desired from my side.</p>
+<p>- However, in some cases (e.g., a "by" that fails, or a use of "sorry"<br>
+   without quick_and_dirty mode), errors occur inside futures (I think). Then<br>
+   Thy_Info.use_thy will succeed. This is not desired because I want to give<br>
+   an error message when loading fails.</p>
+<p>How can I, on the Isabelle/ML level, force all futures involved in a theory<br>
+to finish in order to throw any potential exceptions? (Something like "val
+_ = Thy_Info.use_thy "Draft.Test"; val thy = Thy_Info.get_theory<br>
+"Draft.Test"; val _ = join_theory thy (* This one does not exist *)")</p>
+<p>I believe this should be possible because the build process does give<br>
+errors when a proof fails, after all, instead of simply storing a failing<br>
+future in the heap image.</p>
+<p>To avoid misunderstandings: I am not working in the bootstrap<br>
+ML-environment, but the proper Isabelle/ML environment.</p>
+<p>Best wishes,<br>
+Dominique.</p>
+
+
+
+<a name="294747080"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Finishing%20all%20proofs%20in%20use_thy/near/294747080" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Finishing.20all.20proofs.20in.20use_thy.html#294747080">(Aug 22 2022 at 18:45)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On 15/11/2018 17:38, Dominique Unruh wrote:</p>
+<blockquote>
+<p>- However, in some cases (e.g., a "by" that fails, or a use of "sorry"<br>
+   without quick_and_dirty mode), errors occur inside futures (I think). Then<br>
+   Thy_Info.use_thy will succeed. This is not desired because I want to give<br>
+   an error message when loading fails.</p>
+</blockquote>
+<p>Thy_Info.use_thy should be strict under normal circumstances. Can you<br>
+show an example where it succeeds?</p>
+<p>Of course it is possible to fabricate some Isabelle/ML snippets that<br>
+hides errors in futures, but I suppose you have used regular proof<br>
+language elements here (Isar commands and proof methods)?</p>
+<p>Another potential source of problems: using Thy_Info.use_thy in<br>
+multithreaded user-space Isabelle/ML; it is only for the raw bootstrap<br>
+environment when nothing else is running.</p>
+<blockquote>
+<p>How can I, on the Isabelle/ML level, force all futures involved in a theory<br>
+to finish in order to throw any potential exceptions? (Something like "val
+_ = Thy_Info.use_thy "Draft.Test"; val thy = Thy_Info.get_theory<br>
+"Draft.Test"; val _ = join_theory thy (* This one does not exist *)")</p>
+</blockquote>
+<p>Thy_Info.use_thy should to the full join_theory for you. If it does not,<br>
+there is something wrong somewhere.</p>
+<p>Note that "ML level" is outdated terminology from 20 years ago. Today we<br>
+have two main ML environments:</p>
+<p>(1) Isabelle/ML: this is regular user-space Isabelle/ML (inside a<br>
+theory context).</p>
+<p>(2) The ML bootstrap environment (Poly/ML with some add-ons). Normally<br>
+only Isabelle system tools use that, but it is also possible do<br>
+"isabelle process" invocations, analogously to how "isabelle build".</p>
+<blockquote>
+<p>I believe this should be possible because the build process does give<br>
+errors when a proof fails, after all, instead of simply storing a failing<br>
+future in the heap image.</p>
+<p>To avoid misunderstandings: I am not working in the bootstrap<br>
+ML-environment, but the proper Isabelle/ML environment.</p>
+</blockquote>
+<p>If you are actually using Thy_Info.use_thy inside regular user-space<br>
+Isabelle/ML, this is not going to work. Maybe that is the actual problem<br>
+here.</p>
+<p>Again the usual questions: What is your greater application context?<br>
+What are you trying to do?</p>
+<p>The new Isabelle PIDE server might be better for it, but it is still<br>
+unused / untested in Isabelle2018. After the release, I have made my own<br>
+applications on top of it: to process all of Isabelle + AFP and<br>
+overserve resulting theory status and markup. This required some<br>
+reworking on the server, and it probably needs more reworking to make it<br>
+applicable in even more applications.</p>
+<p>Makarius</p>
+
+
+
+<a name="294747239"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Finishing%20all%20proofs%20in%20use_thy/near/294747239" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Finishing.20all.20proofs.20in.20use_thy.html#294747239">(Aug 22 2022 at 18:46)</a>:</h4>
+<p>From: Dominique Unruh &lt;<a href="mailto:unruh@ut.ee">unruh@ut.ee</a>&gt;</p>
+<blockquote>
+<p>Of course it is possible to fabricate some Isabelle/ML snippets that<br>
+hides errors in futures, but I suppose you have used regular proof<br>
+language elements here (Isar commands and proof methods)?<br>
+</p>
+</blockquote>
+<p>I am using libisabelle. So <em>essentially</em> I do is: I instantiate Isabelle<br>
+with libisabelle. I issue a command from libisabelle to Isabelle to load a<br>
+theory which uses Thy_Info.use_thy. This operation completes (that is, I<br>
+know that I get a theory and not a "theory future" back because I do<br>
+successfully, e.g., print theorems from it). At some point I am asking for<br>
+a proof term, and this leads to a delayed exception. On the level of the<br>
+theory that is loaded, however, I don't do weird ML. I can get the error<br>
+with something as simple as a "sorry" in quick_and_dirty=false mode.</p>
+<p>Thy_Info.use_thy should be strict under normal circumstances. Can you</p>
+<blockquote>
+<p>show an example where it succeeds?<br>
+</p>
+</blockquote>
+<p>I could, I think, but it would be quite some work. (Since I would have to<br>
+rewrite the whole setting involving libisabelle described above from<br>
+scratch since the problem is too deeply buried in my application. Including<br>
+setting up all the build environment etc. I don't see a way to make it<br>
+happen without libisabelle because, as you pointed out, using use_thy<br>
+inside a normal Isabelle session does not work.)</p>
+<p>Interestingly, when trying to get the same to happen using<br>
+"Isabelle2018/bin/isabelle console -l HOL -s" and then entering<br>
+Thy_Info.use_thy, the problem does not occur (the theory fails right away).<br>
+So it might actually be a problem with libisabelle.</p>
+<p>I will ask Lars Hupel, perhaps he knows something about this.</p>
+<p>But if you know some hotfix (i.e., some way to force the theory to join<br>
+after it has loaded even if we don't understand why it hasn't been fully<br>
+joined in the first place) I would be happy. Because this problem looks<br>
+like it's going to be confusing to track down.</p>
+<p>Again the usual questions: What is your greater application context?</p>
+<blockquote>
+<p>What are you trying to do?<br>
+</p>
+</blockquote>
+<p>I have a scala application (<a href="https://github.com/dominique-unruh/qrhl-tool">https://github.com/dominique-unruh/qrhl-tool</a>)<br>
+that uses Isabelle as a backend for reasoning about terms. For this,<br>
+Isabelle gets loaded via libisabelle, the Isabelle session containing my<br>
+theories gets loaded via libisabelle, and then various ML-snippets (e.g.,<br>
+for calling the simplifier on a term) are invoked via libisabelle.</p>
+<p>The new Isabelle PIDE server might be better for it, but it is still</p>
+<blockquote>
+<p>unused / untested in Isabelle2018. After the release, I have made my own<br>
+applications on top of it: to process all of Isabelle + AFP and<br>
+overserve resulting theory status and markup. This required some<br>
+reworking on the server, and it probably needs more reworking to make it<br>
+applicable in even more applications.<br>
+</p>
+</blockquote>
+<p>I had a look at the PIDE server. While I didn't fully understand the scope<br>
+of it, I had the feeling that it was more for "highlevel" operations (like<br>
+"build a theory"), and not for things like "simplify this particular term".</p>
+<p>Best wishes,<br>
+Dominique.</p>
+
+
+
+<a name="294747297"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Finishing%20all%20proofs%20in%20use_thy/near/294747297" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Finishing.20all.20proofs.20in.20use_thy.html#294747297">(Aug 22 2022 at 18:47)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;</p>
+<blockquote>
+<p>I could, I think, but it would be quite some work. (Since I would have to<br>
+rewrite the whole setting involving libisabelle described above from<br>
+scratch since the problem is too deeply buried in my application. Including<br>
+setting up all the build environment etc. I don't see a way to make it<br>
+happen without libisabelle because, as you pointed out, using use_thy<br>
+inside a normal Isabelle session does not work.)</p>
+</blockquote>
+<p>I can corroborate this (mostly). When developing the Isabelle<br>
+integration with Leon, I used "Goal.parallel_proofs := 0" quite<br>
+liberally. In my case the problem was less with loading theories;<br>
+rather, running arbitrary ML code that may or may not throw asynchronous<br>
+exceptions.</p>
+<blockquote>
+<p>I will ask Lars Hupel, perhaps he knows something about this.</p>
+</blockquote>
+<p>If you can send me a minimal example how I can reproduce the problem, I<br>
+could take a look.</p>
+<p>Cheers<br>
+Lars</p>
+
+
+
+<a name="294747337"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Finishing%20all%20proofs%20in%20use_thy/near/294747337" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Finishing.20all.20proofs.20in.20use_thy.html#294747337">(Aug 22 2022 at 18:47)</a>:</h4>
+<p>From: Dominique Unruh &lt;<a href="mailto:unruh@ut.ee">unruh@ut.ee</a>&gt;<br>
+Hi Lars,</p>
+<p>I managed to make a minimal example (attached).</p>
+<p>The actual code is in src/main/scala/test/Test.thy, and the bad theory is<br>
+TestEx.thy.<br>
+The line "val response = ..." is the offending code which fails to give an<br>
+error.<br>
+Interestingly, a variation of this line (included and commented out) does<br>
+raise an error!</p>
+<p>You can test the code simply using "sbt run".</p>
+<p>Best wishes,<br>
+Dominique.<br>
+<a href="/user_uploads/14278/ahryI6ffr7XXVWjQ-mutxBHl/libisabelle-use-thy.zip">libisabelle-use-thy.zip</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

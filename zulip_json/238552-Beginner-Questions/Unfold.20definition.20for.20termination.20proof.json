@@ -1,0 +1,56 @@
+[
+    {
+        "content": "<p>Hey there, </p>\n<p>in recursively defined functions I want to use other functions on the rhs, which got an definition elsewhere, as shown by the simple example below.<br>\nNote that the function defined elsewhere again takes the recursive function as an argument, which blocks automatic termination proofs.<br>\nCan I easily unfold the definition for the termination proof without the need to give a custom termination order by using \"function\" instead of \"fun\"?</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">definition</span><span class=\"w\"> </span><span class=\"n\">foo</span><span class=\"w\"> </span><span class=\"o\">::</span><span class=\"w\"> </span><span class=\"s\">\"nat ⇒ (nat ⇒ nat list) ⇒ nat list\"</span>\n<span class=\"w\">  </span><span class=\"kp\">where</span><span class=\"w\"> </span><span class=\"s\">\"foo n f = n # f n\"</span>\n\n<span class=\"k\">fun</span><span class=\"w\"> </span><span class=\"n\">bar</span><span class=\"w\"> </span><span class=\"o\">::</span><span class=\"w\"> </span><span class=\"s\">\"nat ⇒ nat list\"</span><span class=\"w\"> </span><span class=\"kp\">where</span>\n<span class=\"w\">  </span><span class=\"s\">\"bar 0 = []\"</span>\n<span class=\"o\">|</span><span class=\"w\"> </span><span class=\"s\">\"bar (Suc n) = n # foo n bar\"</span>\n</code></pre></div>",
+        "id": 400095432,
+        "sender_full_name": "Marvin Brieger",
+        "timestamp": 1699004162
+    },
+    {
+        "content": "<p>You can register <code>foo_def</code> as <code>termination_simp</code>.</p>",
+        "id": 400097028,
+        "sender_full_name": "Fabian Huch",
+        "timestamp": 1699004752
+    },
+    {
+        "content": "<p>Sounds like the way to go, but </p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">definition</span><span class=\"w\"> </span><span class=\"n\">foo</span><span class=\"w\"> </span><span class=\"o\">::</span><span class=\"w\"> </span><span class=\"s\">\"nat ⇒ (nat ⇒ nat list) ⇒ nat list\"</span>\n<span class=\"w\">  </span><span class=\"kp\">where</span><span class=\"w\"> </span><span class=\"s\">\"foo n f = n # f n\"</span>\n\n<span class=\"k\">declare</span><span class=\"w\"> </span><span class=\"n\">foo_def</span><span class=\"w\"> </span><span class=\"o\">[</span><span class=\"n\">termination_simp</span><span class=\"o\">]</span>\n\n<span class=\"k\">fun</span><span class=\"w\"> </span><span class=\"n\">bar</span><span class=\"w\"> </span><span class=\"o\">::</span><span class=\"w\"> </span><span class=\"s\">\"nat ⇒ nat list\"</span><span class=\"w\"> </span><span class=\"kp\">where</span>\n<span class=\"w\">  </span><span class=\"s\">\"bar 0 = []\"</span>\n<span class=\"o\">|</span><span class=\"w\"> </span><span class=\"s\">\"bar (Suc n) = n # foo n bar\"</span>\n</code></pre></div>\n<p>is not immediately successful. Do I miss something?</p>",
+        "id": 400098517,
+        "sender_full_name": "Marvin Brieger",
+        "timestamp": 1699005278
+    },
+    {
+        "content": "<p>I have the feeling that something goes wrong in the function package. It says that there is a call <code>Suc n ~&gt; x</code> which is not true</p>",
+        "id": 400099106,
+        "sender_full_name": "Lukas Stevens",
+        "timestamp": 1699005488
+    },
+    {
+        "content": "<p>I think you have to define the function as mutually recursive functions.</p>",
+        "id": 400100204,
+        "sender_full_name": "Lukas Stevens",
+        "timestamp": 1699005838
+    },
+    {
+        "content": "<p>Hm, experimenting with that does not get rid of the problem</p>",
+        "id": 400106691,
+        "sender_full_name": "Lukas Stevens",
+        "timestamp": 1699007833
+    },
+    {
+        "content": "<p>Doing a mutual recursive definition is anyway against what I want to achieve since having a separate definition would allow to prove lemmas about it instead of having the definition always be unfolded directly.<br>\nIt seems that doing a manual termination proof is the way out.</p>",
+        "id": 400107127,
+        "sender_full_name": "Marvin Brieger",
+        "timestamp": 1699007994
+    },
+    {
+        "content": "<p>I found the problem. This is documented under higher order recursion in the function manual. You need the following lemma:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"k\">definition</span><span class=\"w\"> </span><span class=\"n\">foo</span><span class=\"w\"> </span><span class=\"o\">::</span><span class=\"w\"> </span><span class=\"s\">\"nat ⇒ (nat ⇒ nat list) ⇒ nat list\"</span>\n<span class=\"w\">  </span><span class=\"kp\">where</span><span class=\"w\"> </span><span class=\"s\">\"foo n f = n # f n\"</span>\n\n<span class=\"kn\">lemma</span><span class=\"w\"> </span><span class=\"o\">[</span><span class=\"n\">fundef_cong</span><span class=\"o\">]:</span>\n<span class=\"w\">  </span><span class=\"s\">\"n = m ⟹ f n = g m ⟹ foo n f = foo m g\"</span>\n<span class=\"w\">  </span><span class=\"k\">unfolding</span><span class=\"w\"> </span><span class=\"n\">foo_def</span><span class=\"w\"> </span><span class=\"k\">by</span><span class=\"w\"> </span><span class=\"n\">blast</span>\n\n<span class=\"k\">fun</span><span class=\"w\"> </span><span class=\"n\">bar</span><span class=\"w\"> </span><span class=\"o\">::</span><span class=\"w\"> </span><span class=\"s\">\"nat ⇒ nat list\"</span><span class=\"w\"> </span><span class=\"kp\">where</span>\n<span class=\"w\">  </span><span class=\"s\">\"bar 0 = []\"</span>\n<span class=\"o\">|</span><span class=\"w\"> </span><span class=\"s\">\"bar (Suc n) = n # foo n bar\"</span>\n</code></pre></div>",
+        "id": 400107537,
+        "sender_full_name": "Lukas Stevens",
+        "timestamp": 1699008126
+    },
+    {
+        "content": "<p>Great, I could successfully adopt this to my actual (more complex) definition!</p>",
+        "id": 400113800,
+        "sender_full_name": "Marvin Brieger",
+        "timestamp": 1699010504
+    }
+]

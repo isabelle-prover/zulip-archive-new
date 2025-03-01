@@ -1,0 +1,201 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Question about classes · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Question.20about.20classes.html">[isabelle] Question about classes</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294102882"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Question%20about%20classes/near/294102882" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Question.20about.20classes.html#294102882">(Aug 18 2022 at 14:51)</a>:</h4>
+<p>From: Viorel Preoteasa &lt;<a href="mailto:viorel.preoteasa@abo.fi">viorel.preoteasa@abo.fi</a>&gt;<br>
+Hello,</p>
+<p>I have the following class definition:</p>
+<p>class well_founded_transitive = ord +<br>
+   assumes order_trans1: "x &lt; y ==&gt; y &lt; z ==&gt;  y &lt; z"<br>
+   and less_eq_def: "x &lt;= y =( x = y \/ x &lt; y)"<br>
+   and less_induct1 [case_names less]: "(!!x . (!!y . y &lt; x ==&gt; y) ==&gt; <br>
+x) ==&gt; a"<br>
+begin<br>
+definition<br>
+   "Sup_less P w = SUPR {v . v &lt; w} P";<br>
+end</p>
+<p>and I have the following definition</p>
+<p>definition<br>
+   "Sup_less2 pair X (u::'a::well_founded_transitive) i = SUPR {v . pair <br>
+v i &lt; u} (% v . X v i)";</p>
+<p>However, what I am interested in is something like:</p>
+<p>definition<br>
+   "Sup_less2 X u i = SUPR {v . (v, i) &lt; u} (% v . X v i)";</p>
+<p>However, with the second definition I get the error message:</p>
+<p>*** Type unification failed: No type arity * :: ord<br>
+*** Type error in application: Incompatible operand type</p>
+<hr>
+<p>*** Operator:  op &lt; :: ??'a × ??'b =&gt; ??'a × ??'b =&gt; bool<br>
+*** Operand:   (v, i) :: ??'a × ??'b</p>
+<hr>
+<p>*** At command "definition".</p>
+<p>Is there a way to achieve the second kind of definition for Sup_less2?<br>
+I need the order to be over pairs, however, I must have an un-instantiated<br>
+order relation.</p>
+<p>Best regards,</p>
+<p>Viorel Preoteasa</p>
+
+
+
+<a name="294102940"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Question%20about%20classes/near/294102940" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Question.20about.20classes.html#294102940">(Aug 18 2022 at 14:52)</a>:</h4>
+<p>From: Brian Huffman &lt;<a href="mailto:brianh@cs.pdx.edu">brianh@cs.pdx.edu</a>&gt;<br>
+The problem is that Isabelle doesn't know what you mean by "(v, i) &lt;<br>
+u", since the comparison operators have not been defined for pairs.<br>
+(That's what "No type arity * :: ord" is supposed to tell you.)</p>
+<p>There are two ways to solve this problem:</p>
+<ol>
+<li>Define the less-than operator for pairs, by giving an instance of<br>
+the ord class:</li>
+</ol>
+<p>instantiation "*" :: (ord, ord) ord<br>
+begin<br>
+definition "a &lt; b = fst a &lt; fst b | (fst a = fst b &amp; snd a &lt; snd b)"<br>
+instance ..<br>
+end</p>
+<p>The above definition is the lexicographic ordering, but other<br>
+definitions are certainly possible. You could also define less-than<br>
+pointwise:</p>
+<p>instantiation "*" :: (ord, ord) ord<br>
+begin<br>
+definition "a &lt; b = fst a &lt; fst b &amp; snd a &lt; snd b"<br>
+instance ..<br>
+end</p>
+<p>The drawback is that once you give a type class instance, you are<br>
+stuck with it: You must use the same definition of less-than for pairs<br>
+throughout the remainder of your theory.</p>
+<ol start="2">
+<li>Instead of writing "(v, i) &lt; u" in your definition, unfold whatever<br>
+definition of less-than on pairs that you mean. For example, if you<br>
+want the lexicographic ordering, you could define Sup_less2 like this:</li>
+</ol>
+<p>definition<br>
+ "Sup_less2 X u i = SUPR {v . v &lt; fst u | (v = fst u &amp; i &lt; snd u)} (%<br>
+v . X v i)";</p>
+<p>On the other hand, if you want a point-wise less-than ordering, you<br>
+would use this definition:</p>
+<p>definition<br>
+ "Sup_less2 X u i = SUPR {v . v &lt; fst u &amp; i &lt; snd u} (% v . X v i)";</p>
+<p>Hope this helps,</p>
+<ul>
+<li>Brian</li>
+</ul>
+
+
+
+<a name="294102965"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Question%20about%20classes/near/294102965" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Question.20about.20classes.html#294102965">(Aug 18 2022 at 14:52)</a>:</h4>
+<p>From: Viorel Preoteasa &lt;<a href="mailto:viorel.preoteasa@abo.fi">viorel.preoteasa@abo.fi</a>&gt;<br>
+Hello Brian,</p>
+<p>Thank you for your answer. Unfortunately both of the approaches<br>
+you suggested require defining the order in terms of possible orders on<br>
+the components, and this is something I don't want. I need to<br>
+have an un-interpreted order on pairs, and later I need to<br>
+instantiate it differently for different examples. The first definition<br>
+I used</p>
+<p>Sup_less2 pair X u i = SUPR {v . pair v i &lt; u} (% v . X v i)</p>
+<p>could give me what I need. In examples I can instantiate both<br>
+the order and the function pair. However this approach,<br>
+using classes, does not bring any advantage because<br>
+everything becomes simpler if I use directly the order as a<br>
+parameter:</p>
+<p>Sup_less2 lesspairs X u i = SUPR {v . lesspairs (v, i) u} (% v . X v i)</p>
+<p>I have also tried to have the function pair defined by the class,<br>
+but then it was not possible to be of the type:<br>
+pair:: 'b * 'c =&gt; 'a.</p>
+<p>Best regards,</p>
+<p>Viorel</p>
+
+
+
+<a name="294102989"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Question%20about%20classes/near/294102989" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Question.20about.20classes.html#294102989">(Aug 18 2022 at 14:52)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Viorel,</p>
+<p>something like</p>
+<p>class pair_ord =<br>
+  fixes pair_less_eq :: "'a * 'b =&gt; 'a * 'b =&gt; bool"<br>
+  assumes ...</p>
+<p>is indeed beyond the rather restricted Isabelle polymorphism.</p>
+<p>Perhaps a possible solution is to formulate this order as locale and<br>
+develope your specfication relative to this:</p>
+<p>locale pair_ord =<br>
+  fixes pair_less_eq :: "'a * 'b =&gt; 'a * 'b =&gt; bool"<br>
+  assumes ...<br>
+begin</p>
+<p>definition ...</p>
+<p>lemma ...</p>
+<p>primrec ...</p>
+<p>...</p>
+<p>end</p>
+<p>This could then be interpreted on different pair order predicates:</p>
+<p>definition pair_less_eq_nat_int :: "nat * int =&gt; nat * int =&gt; bool"<br>
+where ...</p>
+<p>definition pair_less_eq_list_unit :: 'a list * unit =&gt; 'a list * unit =&gt;<br>
+bool" where ...</p>
+<p>interpretation pair_ord_nat_int: pair_ord pair_less_eq_nat_int ...</p>
+<p>interpretation pair_ord_list_unit: pair_ord pair_less_eq_list_unit ...</p>
+<p>Hope this helps,<br>
+    Florian<br>
+<a href="/user_uploads/14278/ctgN-HydU-oJIDym2Tog9viU/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294103290"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Question%20about%20classes/near/294103290" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Question.20about.20classes.html#294103290">(Aug 18 2022 at 14:53)</a>:</h4>
+<p>From: Viorel Preoteasa &lt;<a href="mailto:viorel.preoteasa@abo.fi">viorel.preoteasa@abo.fi</a>&gt;<br>
+Hello Florian,</p>
+<p>Thank you for your answer. In my development I need the order<br>
+on 'a types as well as on  pairs 'a * 'b, and I have a general<br>
+result using a order on 'a which is instantiated later to a order on pairs.</p>
+<p>I think that I have finally reached a conclusion which is flexible enough,<br>
+and also sound.</p>
+<p>I will define the class of well founded and transitive relations</p>
+<p>class well_founded_transitive = ord +<br>
+  assumes order_trans1: "x &lt; y /\ y &lt; z ==&gt; x &lt; z"<br>
+  ...<br>
+  begin...end</p>
+<p>I will also declare an uninterpreted constant</p>
+<p>consts<br>
+  pair:: "'a =&gt; 'b =&gt; 'c::well_founded_transitive"</p>
+<p>and I will prove all results based on these facts</p>
+<p>Later for concrete examples I instantiate both the<br>
+class for pairs, as well as I define the pair<br>
+using an axiom:</p>
+<p>instantiation "*":: (well_founded_transitive, well_founded_transitive) <br>
+well_founded_transitive<br>
+begin ...end</p>
+<p>axioms pair_def: "pair a b = (a, b)";</p>
+<p>I have tested this approach and it seems to work. I also<br>
+think that I am not introducing inconsistencies, because<br>
+I only introduce this axiom once after I instantiate<br>
+the class for pairs.</p>
+<p>Viorel</p>
+<p>Florian Haftmann wrote:</p>
+
+
+
+<a name="294103395"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Question%20about%20classes/near/294103395" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Question.20about.20classes.html#294103395">(Aug 18 2022 at 14:54)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Viorel,</p>
+<p>Yes, since your axiom is nothing else than a definition -- a copy of<br>
+Pair :: 'a =&gt; 'b =&gt; 'a * 'b, essentially.  In that case you should use<br>
+the "overloading" target (see §5.7. of the Isabelle reference manual).</p>
+<p>Hope this helps<br>
+    Florian<br>
+<a href="/user_uploads/14278/SElbqhUqidEICLaN9hR42uuu/signature.asc">signature.asc</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,68 @@
+[
+    {
+        "content": "<p>I'm having trouble matching meta-universally quantified variables in my conclusion in Eisabach with the match command. Let's say I want to match an HOL \\&lt;forall&gt; . I can do that as follows:</p>\n<div class=\"codehilite\"><pre><span></span><code>method mymethod =\n  (match conclusion in &quot;∀x. A x&quot; for A ⇒ blah)\n</code></pre></div>\n<p>And that works fine:</p>\n<div class=\"codehilite\"><pre><span></span><code>lemma &quot;∀x::nat. x + x = 2*x&quot;\n  apply(mymethod) (* matches, does blah *)\n</code></pre></div>\n<p>However, a similar looking method with an \\&lt;And&gt; instead doesn't match:</p>\n<div class=\"codehilite\"><pre><span></span><code>method mymethod2 =\n  (match conclusion in &quot;⋀x. A x&quot; for A ⇒ blah)\n\nlemma &quot;⋀x::nat. x + x = 2*x&quot;\n  apply(mymethod) (* fails *)\n</code></pre></div>\n<p>I can kind of see why, since:</p>\n<div class=\"codehilite\"><pre><span></span><code>method debugabit =\n  (match conclusion in A for A ⇒ ‹print_term A›)\n\nlemma &quot;⋀x::nat. x + x = 2*x&quot;\n  apply(debugabit)\n</code></pre></div>\n<p>gives:</p>\n<div class=\"codehilite\"><pre><span></span><code>print_term: A: x + x = 2 * x\n</code></pre></div>\n<p>Which obviously doesn't have an explicit \\&lt;And&gt;. What ways are there for dealing with this? One solution is that I can match very broadly:</p>\n<div class=\"codehilite\"><pre><span></span><code>method mymethod2 =\n  (match conclusion in &quot;A x&quot; for A x ⇒ blah)\n</code></pre></div>\n<p>But this is annoying, since it picks up x = a billion things other than the variable I'm interested in, and that was breaking some of my other methods. Are there any suggestions for matching this correctly, or getting a reference to the quantified variable?</p>",
+        "id": 263573811,
+        "sender_full_name": "Matthew Torrence",
+        "timestamp": 1638535399
+    },
+    {
+        "content": "<p>(An email thread that may be relevant: <a href=\"https://lists.cam.ac.uk/mailman/htdig/cl-isabelle-users/2016-October/msg00091.html\">https://lists.cam.ac.uk/mailman/htdig/cl-isabelle-users/2016-October/msg00091.html</a>)</p>",
+        "id": 263578405,
+        "sender_full_name": "Matthew Torrence",
+        "timestamp": 1638537817
+    },
+    {
+        "content": "<p>Yes, interestingly, the application of <code>match</code> seems to fix the universally quantified variable.</p>\n<p>When matching a pattern like <code>A x</code>, you need to make sure that <code>x</code> refers to the <code>x</code> in your conclusion. For this, I think, you need to manually fix the variable and then reference it inside your method application as follows (I’m using <code>n</code> instead of <code>x</code>):</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">lemma</span>\n  <span class=\"kp\">fixes</span> <span class=\"n\">n</span> <span class=\"o\">::</span> <span class=\"n\">nat</span>\n  <span class=\"kp\">shows</span> <span class=\"s\">\"n + n = 2 * n\"</span>\n  <span class=\"kp\">apply</span> <span class=\"o\">(</span><span class=\"n\">match</span> <span class=\"n\">conclusion</span> <span class=\"kp\">in</span> <span class=\"s\">\"A n\"</span> <span class=\"kp\">for</span> <span class=\"n\">A</span> <span class=\"err\">⇒</span> <span class=\"err\">‹</span><span class=\"n\">print_term</span> <span class=\"n\">A</span><span class=\"err\">›</span><span class=\"o\">)</span>\n</code></pre></div>\n<p>This correctly prints <code>λa. a + a = 2 * a</code>. Note that fixing the variable only affects the proof; from the outside, <code>n</code> appears as a schematic variable, like if you had explicitly universally quantified it.</p>\n<p>Now the above example uses <code>match</code> directly inside <code>apply</code>. What if you wanted to have it in a separate, custom proof method? Then you would have to explicitly communicate the variable to be considered the argument of <code>A</code> to the method (it’s good you have to do that, because it ensures that your proof method is independent of the naming of the argument in the respective conclusion). Here’s how you could achieved that:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"n\">method</span> <span class=\"n\">print_predicate</span> <span class=\"kp\">for</span> <span class=\"n\">n</span> <span class=\"o\">=</span> <span class=\"o\">(</span><span class=\"n\">match</span> <span class=\"n\">conclusion</span> <span class=\"kp\">in</span> <span class=\"s\">\"A n\"</span> <span class=\"kp\">for</span> <span class=\"n\">A</span> <span class=\"err\">⇒</span> <span class=\"err\">‹</span><span class=\"n\">print_term</span> <span class=\"n\">A</span><span class=\"err\">›</span><span class=\"o\">)</span>\n\n<span class=\"kn\">lemma</span>\n  <span class=\"kp\">fixes</span> <span class=\"n\">n</span> <span class=\"o\">::</span> <span class=\"n\">nat</span>\n  <span class=\"kp\">shows</span> <span class=\"s\">\"n + n = 2 * n\"</span>\n  <span class=\"kp\">apply</span> <span class=\"o\">(</span><span class=\"n\">print_predicate</span> <span class=\"n\">n</span><span class=\"o\">)</span>\n</code></pre></div>\n<p>I hope that helps. <span aria-label=\"smile\" class=\"emoji emoji-1f642\" role=\"img\" title=\"smile\">:smile:</span></p>",
+        "id": 263673267,
+        "sender_full_name": "Wolfgang Jeltsch",
+        "timestamp": 1638580106
+    },
+    {
+        "content": "<p>This is helpful information, thanks. Unfortunately, there's still a slight problem with it, which is that I can't refer to the variable <code>x</code> when it's universally quantified in my goal. For instance, your example works well when we have</p>\n<div class=\"codehilite\"><pre><span></span><code>lemma\n  fixes n :: nat\n  shows &quot;n + n = 2 * n&quot;\n</code></pre></div>\n<p>but if we have</p>\n<div class=\"codehilite\"><pre><span></span><code>lemma\n  shows &quot;!!n. n + n = 2 * n&quot;\n</code></pre></div>\n<p>we're kind of out of luck, since we have no name to refer to n with. In this simple example, the solution is very obvious (just use <code>fix n</code>). However, I encounter this situation often where I'm in the middle of an apply-style proof, and my subgoals have all these \"un-referable\" variables, and I need to break out Isar to get anything done. I encountered the main problem here when trying to create methods to help deal with this</p>",
+        "id": 263844606,
+        "sender_full_name": "Matthew Torrence",
+        "timestamp": 1638794924
+    },
+    {
+        "content": "<p>For instance, I encounter this type of situation when I <code>apply(insert atheorem[of stuff])</code> where I haven't filled in all the unknowns in <code>atheorem</code>, or when I <code>apply(induction)</code> (in the inductive hypothesis)</p>",
+        "id": 263844786,
+        "sender_full_name": "Matthew Torrence",
+        "timestamp": 1638795034
+    },
+    {
+        "content": "<p>It looks like <code>apply(atomize)</code> might be of some help: <a href=\"https://stackoverflow.com/questions/21430238/how-to-replace-%E2%8B%80-and-%E2%9F%B9-with-%E2%88%80-and-%E2%9F%B6-in-assumption\">https://stackoverflow.com/questions/21430238/how-to-replace-%E2%8B%80-and-%E2%9F%B9-with-%E2%88%80-and-%E2%9F%B6-in-assumption</a>, but I can't quite get it to work on the example I gave...</p>",
+        "id": 263846038,
+        "sender_full_name": "Matthew Torrence",
+        "timestamp": 1638795680
+    },
+    {
+        "content": "<p>aha! What I was looking for was <code>apply(atomize (full))</code> (<a href=\"https://stackoverflow.com/questions/53487024/pull-all-occurrences-of-the-induction-variable-into-the-conclusion-in-isabelle\">https://stackoverflow.com/questions/53487024/pull-all-occurrences-of-the-induction-variable-into-the-conclusion-in-isabelle</a>). To summarize, this takes meta quantifiers to HOL quantifiers, which (as we started with) might be easier to match over. I'll have to play around, because this feels fairly hack-y, but I'm glad to at least have a solution</p>",
+        "id": 263846860,
+        "sender_full_name": "Matthew Torrence",
+        "timestamp": 1638796095
+    },
+    {
+        "content": "<p>Why are you using <code>apply</code>-style?</p>\n<p>Personally, I find <code>apply</code> style great for experimenting in order to find concise proof method expressions to be used with <code>by</code> (for example, to come up with something like <code>by transfer (auto simp del: shift_append simp add: shift_append [symmetric])</code>. For the final code, I never use <code>apply</code> but exclusively Isar.</p>",
+        "id": 263939146,
+        "sender_full_name": "Wolfgang Jeltsch",
+        "timestamp": 1638832992
+    },
+    {
+        "content": "<p>In this case, it's mostly so I can automate the reasoning with <code>method</code>s, but I also find it nicer for certain subgoals to work backwards rather than forwards (for example, when you're repeatedly applying rules, end up with lots of subgoals, and want to know which ones disappear by <code>auto</code>)</p>",
+        "id": 264013982,
+        "sender_full_name": "Matthew Torrence",
+        "timestamp": 1638889741
+    },
+    {
+        "content": "<p>I guess dropping into a forward proof in these cases is by far the more maintainable option though</p>",
+        "id": 264014052,
+        "sender_full_name": "Matthew Torrence",
+        "timestamp": 1638889774
+    },
+    {
+        "content": "<p>Another case is when I have a very complicated algebraic term, and I want to apply a lot of substitutions. In that case, my Isar proofs get very long very quickly, because I'm having to repeat myself. I find myself in this case a lot</p>",
+        "id": 264014208,
+        "sender_full_name": "Matthew Torrence",
+        "timestamp": 1638889831
+    }
+]

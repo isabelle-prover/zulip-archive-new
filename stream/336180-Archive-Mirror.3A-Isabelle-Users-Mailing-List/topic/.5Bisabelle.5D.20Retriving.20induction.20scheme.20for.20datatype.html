@@ -1,0 +1,104 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Retriving induction scheme for datatype · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Retriving.20induction.20scheme.20for.20datatype.html">[isabelle] Retriving induction scheme for datatype</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294654058"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Retriving%20induction%20scheme%20for%20datatype/near/294654058" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Retriving.20induction.20scheme.20for.20datatype.html#294654058">(Aug 22 2022 at 11:21)</a>:</h4>
+<p>From: Moa Johansson &lt;<a href="mailto:jomoa@chalmers.se">jomoa@chalmers.se</a>&gt;<br>
+Hi,</p>
+<p>We are updating our tools for inductive theorem proving to Isabelle2015.</p>
+<p>We noticed that the Datatype package has changed, and wonder what the <br>
+proper way of fetching the induction theorem for a given datatype is now <br>
+(working on the ML-level, as we have a tactic for automated induction).</p>
+<p>We can get things to work by using "Old_Datatype_Data.get_info", and <br>
+registering all our datatypes with<br>
+"datatype_compat". However, we would obviously want to do this in the <br>
+proper way intended instead.</p>
+<p>Grateful for help on where to look!</p>
+<p>Best,<br>
+Moa</p>
+
+
+
+<a name="294654070"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Retriving%20induction%20scheme%20for%20datatype/near/294654070" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Retriving.20induction.20scheme.20for.20datatype.html#294654070">(Aug 22 2022 at 11:21)</a>:</h4>
+<p>From: Dmitriy Traytel &lt;<a href="mailto:traytel@inf.ethz.ch">traytel@inf.ethz.ch</a>&gt;<br>
+Hi Moa,</p>
+<p>the proper way would be as follows:</p>
+<p>ML ‹<br>
+   BNF_FP_Def_Sugar.fp_sugar_of @{context} @{type_name list}<br>
+   |&gt; the<br>
+   |&gt; #fp_co_induct_sugar<br>
+   |&gt; #co_inducts;<br>
+›</p>
+<p>The fp_sugar records are quite rich in comparison to the old info record <br>
+of a datatype---they should contain everything that the datatype command <br>
+spits out.</p>
+<p>Note that for nested datatypes such as rose trees (datatype 'a tree = <br>
+Node 'a "'a tree list") the induction principle will look different from <br>
+the one output by the old package. (Using datatype_compat is one way <br>
+around it, but the new format is more compositional---so there is a <br>
+point of adjusting tools to work with it.)</p>
+<p>Dmitriy</p>
+
+
+
+<a name="294654100"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Retriving%20induction%20scheme%20for%20datatype/near/294654100" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Retriving.20induction.20scheme.20for.20datatype.html#294654100">(Aug 22 2022 at 11:21)</a>:</h4>
+<p>From: Jasmin Blanchette &lt;<a href="mailto:jasmin.blanchette@inria.fr">jasmin.blanchette@inria.fr</a>&gt;<br>
+Hi Moa,</p>
+<p>There are basically two options:</p>
+<ol>
+<li>Use the compatibility layer in "HOL/Tools/BNF/bnf_lfp_compat.ML". The function "BNF_LFP_Compat.get_info" has almost the same signature as the old "get_info" and gives you access to both old and new datatypes. The second argument specifies some preferences; you should probably just pass "[]". Examples:<p>ML {*<br>
+  BNF_LFP_Compat.get_info @{theory} [] @{type_name list}<br>
+  |&gt; the<br>
+  |&gt; #induct<br>
+  *}</p>
+<p>datatype 'a tree = Tree 'a "'a tree list"</p>
+<p>ML {*<br>
+  BNF_LFP_Compat.get_info @{theory} [] @{type_name tree}<br>
+  |&gt; the<br>
+  |&gt; #induct<br>
+  *}</p>
+<p>datatype_compat tree</p>
+<p>ML {*<br>
+  BNF_LFP_Compat.get_info @{theory} [] @{type_name tree}<br>
+  |&gt; the<br>
+  |&gt; #induct<br>
+  *}</p>
+</li>
+</ol>
+<p>Notice that for types with nesting (like "list"), you get a different induction scheme depending on whether you call "datatype_compat". You can pass the "Keep_Nesting" option if you prefer the new scheme. See our ITP 2014 paper for details about the nested vs. mutual styles.</p>
+<ol start="2">
+<li>Use the new interface in "HOL/Tools/BNF/bnf_fp_def_sugar.ML".<p>ML {*<br>
+  BNF_FP_Def_Sugar.fp_sugar_of @{context} @{type_name list}<br>
+  |&gt; the<br>
+  |&gt; #fp_co_induct_sugar<br>
+  |&gt; #co_inducts<br>
+  |&gt; hd<br>
+  *}</p>
+<p>datatype 'a tree = Tree 'a "'a tree list"</p>
+<p>ML {*<br>
+  BNF_FP_Def_Sugar.fp_sugar_of @{context} @{type_name tree}<br>
+  |&gt; the<br>
+  |&gt; #fp_co_induct_sugar<br>
+  |&gt; #co_inducts<br>
+  |&gt; hd<br>
+  *}</p>
+</li>
+</ol>
+<p>I hope this helps.</p>
+<p>Cheers,</p>
+<p>Jasmin</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

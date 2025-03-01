@@ -1,0 +1,140 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] strange simplifier behaviour · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20strange.20simplifier.20behaviour.html">[isabelle] strange simplifier behaviour</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294650536"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20strange%20simplifier%20behaviour/near/294650536" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20strange.20simplifier.20behaviour.html#294650536">(Aug 22 2022 at 10:58)</a>:</h4>
+<p>From: noam neer &lt;<a href="mailto:noamneer@gmail.com">noamneer@gmail.com</a>&gt;<br>
+in the following simple (and artificial) example, the proof of lemma 'tl2'<br>
+fails at its firsy 'apply'. it seems the simplifier couldn't apply lemma<br>
+'tl1' at all, even though a proof with 'rule' instead of 'simp' does work.<br>
+can anyone explain this to me?</p>
+<p>theory tmp_prop<br>
+imports Complex_Main<br>
+begin</p>
+<p>definition fff :: "real ⇒ real ⇒ real"<br>
+      where "fff x y = 0"</p>
+<p>lemma tl1: "x≠0  ==&gt;  (fff x y) = 0"<br>
+      by (simp add: fff_def)</p>
+<p>lemma tl2: "x≠0  ==&gt;  (fff x y) = 0"<br>
+      using [[simp_trace]]<br>
+      apply (simp only: tl1 [of x y])<br>
+      oops</p>
+<p>(* a proof that does work -<br>
+      apply (rule tl1 [of x y])<br>
+        apply simp<br>
+*)</p>
+<p>end</p>
+
+
+
+<a name="294650538"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20strange%20simplifier%20behaviour/near/294650538" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20strange.20simplifier.20behaviour.html#294650538">(Aug 22 2022 at 10:59)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:eberlm@in.tum.de">eberlm@in.tum.de</a>&gt;<br>
+The problem has to do with how the simplifier turns facts into simp rules.</p>
+<p>In your example, you have the fact "x ≠ 0", and the simplifier turns<br>
+that into the simp rule "(x = 0) = False". In order to apply the rule<br>
+tl1[of x y] that you added as a simp rule, the simplifier has to solve<br>
+the precondition "x ≠ 0".</p>
+<p>What happens is that this precondition gets rewritten with the above<br>
+simp rule, so you end up with "¬False" and then the simplifier gets<br>
+stuck because you used "simp only:" and therefore have no simp rules for<br>
+something like "¬False".</p>
+<p>If you do "apply (simp only: not_False_eq_True tl1[of x y])", everything<br>
+works out fine.</p>
+
+
+
+<a name="294650550"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20strange%20simplifier%20behaviour/near/294650550" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20strange.20simplifier.20behaviour.html#294650550">(Aug 22 2022 at 10:59)</a>:</h4>
+<p>From: Lars Noschinski &lt;<a href="mailto:noschinl@in.tum.de">noschinl@in.tum.de</a>&gt;<br>
+Manuel already gave an answer. I guess you arrived at that by<br>
+investigating some behaviour you did not understand. In such cases, the<br>
+use of "simp_thms" with "simp only:" can be useful -- it contains all<br>
+the basic logic rules you expect the simplifier to know..</p>
+
+
+
+<a name="294650554"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20strange%20simplifier%20behaviour/near/294650554" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20strange.20simplifier.20behaviour.html#294650554">(Aug 22 2022 at 10:59)</a>:</h4>
+<p>From: noam neer &lt;<a href="mailto:noamneer@gmail.com">noamneer@gmail.com</a>&gt;<br>
+thanx for the answers. but I just tried the same proof with</p>
+<p>apply (simp (no_asm_simp) only: tl1 [of x y])</p>
+<p>if Manuel's explanation is correct this should have worked,<br>
+because the "x~=0" should have stayed unchanged.<br>
+but this fails too. what am I missing?</p>
+
+
+
+<a name="294650604"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20strange%20simplifier%20behaviour/near/294650604" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20strange.20simplifier.20behaviour.html#294650604">(Aug 22 2022 at 10:59)</a>:</h4>
+<p>From: Lars Noschinski &lt;<a href="mailto:noschinl@in.tum.de">noschinl@in.tum.de</a>&gt;<br>
+The simplifier can only work with (conditional equations) of the form<br>
+"[|_|] ==&gt; _ == _". Anything, which does not have this form is converted<br>
+first. This includes steps as</p>
+<p>x = y ----&gt; x == y<br>
+   ~P    ----&gt; P == False<br>
+   P     ----&gt; P == True</p>
+<p>This behaviour is hard-coded for each logic and cannot be disabled.</p>
+<p>-- Lars</p>
+
+
+
+<a name="294650998"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20strange%20simplifier%20behaviour/near/294650998" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20strange.20simplifier.20behaviour.html#294650998">(Aug 22 2022 at 11:01)</a>:</h4>
+<p>From: noam neer &lt;<a href="mailto:noamneer@gmail.com">noamneer@gmail.com</a>&gt;<br>
+OK. but now I tried a different condition -</p>
+<p>lemma tl3: "x&gt;1  ==&gt;  (fff x y) = 0"<br>
+      using [[simp_trace]]<br>
+      using [[simp_trace_depth_limit=2]]<br>
+      apply (simp (no_asm_simp) only: tl1 [of x y])<br>
+      done</p>
+<p>the proof worked though I don't understand why.<br>
+here the simplifier has to prove "x~=0" from "x&gt;1",<br>
+and from the trace output it seems he adds many rules<br>
+that enable him to prove this. why is he adding them?<br>
+is this the lin arith module at work?</p>
+<p>and another question - was there an attempt to add backtracking abilities<br>
+to the simplifier, like in 'blast'? seems it'd be usefull.</p>
+<p>thanx</p>
+
+
+
+<a name="294651181"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20strange%20simplifier%20behaviour/near/294651181" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20strange.20simplifier.20behaviour.html#294651181">(Aug 22 2022 at 11:02)</a>:</h4>
+<p>From: Thomas Sewell &lt;<a href="mailto:thomas.sewell@nicta.com.au">thomas.sewell@nicta.com.au</a>&gt;<br>
+You are right, there is something pretty strange going on here. The<br>
+'only:' mode of simp is meant to turn off anything that might surprise you.</p>
+<p>In general the simplifier trace can be quite confusing, because the<br>
+simplifier sometimes runs simprocs and other tools which then call back<br>
+to the simplifier. The tracing mode is set globally, so you see an inner<br>
+trace mixed into your trace which explains what happened on the<br>
+recursive call.</p>
+<p>It looks like this is what happens here. Unfortunately the simp trace<br>
+isn't detailed enough to figure out what the tool that is working here<br>
+is, or how it got called.</p>
+<p>OK, so, from my quick reading, "simp only:" calls<br>
+Raw_Simplifier.clear_simpset, which drops the rules, congs, procs, etc,<br>
+but keeps the mksimps mechanism, the term order, subgoal tactic and<br>
+"solvers".</p>
+<p>Indeed, lin_arith is added as a "solver" (see "addSolver" in<br>
+global_setup in src/HOL/Tools/lin_arith.ML). And solvers are not removed<br>
+by the "simp only:" command. You could do some ML work to force the<br>
+non-default solvers out of the simpset, which would make the simplifier<br>
+a bit more predictable. Or just accept that it's a bit of a headache.</p>
+<p>Cheers,<br>
+     Thomas.</p>
+<hr>
+<p>The information in this e-mail may be confidential and subject to legal professional privilege and/or copyright. National ICT Australia Limited accepts no liability for any damage caused by this email or its attachments.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

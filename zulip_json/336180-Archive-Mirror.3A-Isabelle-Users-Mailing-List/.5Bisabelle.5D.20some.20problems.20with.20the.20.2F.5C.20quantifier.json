@@ -1,0 +1,62 @@
+[
+    {
+        "content": "<p>From: noam neer &lt;<a href=\"mailto:noamneer@gmail.com\">noamneer@gmail.com</a>&gt;<br>\nOK, I just tried the Isar form of induction that starts with<br>\n  proof (induction n)<br>\nand when I reached<br>\n  case (Suc n)<br>\nit seems there are still problems. the 'n' has different color and the<br>\nsimplifier doesn't work properly.</p>\n<p>so, what should I do if I want to use the induction variable? what is the<br>\nparallel of 'obtain'?</p>",
+        "id": 294652709,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661166763
+    },
+    {
+        "content": "<p>From: Lars Noschinski &lt;<a href=\"mailto:noschinl@in.tum.de\">noschinl@in.tum.de</a>&gt;<br>\nOn 18.09.2015 12:00, noam neer wrote:</p>\n<blockquote>\n<p>OK, I just tried the Isar form of induction that starts with<br>\n  proof (induction n)<br>\nand when I reached<br>\n  case (Suc n)<br>\nit seems there are still problems. the 'n' has different color and the</p>\n</blockquote>\n<p>That is normal: Free variables fixed in a proof are brown-ish.</p>\n<blockquote>\n<p>simplifier doesn't work properly.</p>\n</blockquote>\n<p>What do you mean by that?</p>\n<blockquote>\n<p>so, what should I do if I want to use the induction variable? what is<br>\nthe parallel of 'obtain'?</p>\n</blockquote>\n<p>Just use it. \"case (Suc n)\" fixes an n for your use.</p>\n<p>-- Lars</p>",
+        "id": 294652717,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661166769
+    },
+    {
+        "content": "<p>From: noam neer &lt;<a href=\"mailto:noamneer@gmail.com\">noamneer@gmail.com</a>&gt;<br>\nmy mistake,<br>\nit's working fine.</p>",
+        "id": 294652858,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661166826
+    },
+    {
+        "content": "<p>From: noam neer &lt;<a href=\"mailto:noamneer@gmail.com\">noamneer@gmail.com</a>&gt;<br>\nI have a certain predicate whose definition is not important for this<br>\nquestion, so assume it is</p>\n<p>definition P :: \"real ⇒ bool\"<br>\n  where \"P x = False\"</p>\n<p>and assume I proved it holds for x's that equal 'real_of_int(y)',</p>\n<p>lemma tl1:<br>\n    fixes x :: real and<br>\n            y :: int<br>\n    assumes \"x = real_of_int(y)\"<br>\n    shows   \"P(x)\"<br>\n    sorry</p>\n<p>now I want to prove something equivalent but easier to use,</p>\n<p>lemma<br>\n    fixes        w :: real<br>\n    assumes \"w \\&lt;in&gt; Ints\"<br>\n    shows     \"P(w)\"</p>\n<p>I want to use lemma tl1, so I start the proof with</p>\n<p>apply (rule_tac q=w in Ints_cases)<br>\n      apply (rule assms)</p>\n<p>after which the goal is</p>\n<p>goal (1 subgoal):</p>\n<p>1. ⋀ z. w = real_of_int z ==&gt; P w</p>\n<p>so, the only thing left is to substitute w and z in tl1 :</p>\n<p>apply (rule tl1 [of w z])</p>\n<p>but this doesn't work as I expected, and I get a new goal with a new<br>\nvariable za.</p>\n<p>goal (1 subgoal):</p>\n<p>1. ⋀ za. w = real_of_int za ==&gt; w = real_of_int z</p>\n<p>what am I doing wrong ?</p>",
+        "id": 294654671,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661167546
+    },
+    {
+        "content": "<p>From: Lars Hupel &lt;<a href=\"mailto:hupel@in.tum.de\">hupel@in.tum.de</a>&gt;<br>\nHello,</p>\n<p>the clue lies in the highlighting of the variable 'z': it has a<br>\nyellow-ish background. In a proof, this denotes a free variable which<br>\ndoesn't occur in the statement and hasn't been fixed in any other way.<br>\nIn your example, it decidedly does not refer to the 'z' bound by the<br>\nquantifier. This isn't a problem with the quantifier, but an effect of<br>\nhow bound variables are treated in Isabelle.</p>\n<p>There are two ways to solve your problem:</p>\n<ol>\n<li>\n<p>Don't instantiate.</p>\n<p>apply (rule tl1)<br>\n   apply assumption</p>\n<p>This will solve your goal just fine. There are no ambiguities at<br>\n all in how the variables should be instantiated here.</p>\n</li>\n<li>\n<p>Use 'rule_tac'.</p>\n<p>apply (rule_tac y=z in tl1)<br>\n   apply assumption</p>\n<p>Here, the 'z' refers to the bound variable, which is why it is<br>\n coloured red. The ability to refer to bound variable is a specialty<br>\n of 'rule_tac' and not available to all methods or attributes.</p>\n</li>\n</ol>\n<p>In general, I strongly recommend against the use of 'rule_tac' together<br>\nwith explicit instantiations talking about bound variables (unless it is<br>\ntemporary and pending refactoring). (Imagine a huge red warning sign<br>\npopping up when you use it.) The reason is quite simple: Bound variable<br>\nnames are usually system-generated and thus sometimes unpredictable.<br>\nYour proof will break when you have another variable called 'z', someone<br>\nrenames the 'z' in 'Int_cases', ...</p>\n<p>Here is how I would write the proof:</p>\n<p>from assms obtain z where \"w = real_of_int z\"<br>\n    by (auto elim: Ints_cases)<br>\n  thus \"P(w)\"<br>\n    by (rule tl1)</p>\n<p>The 'z' above is written down explicitly and much more robust and you<br>\nwill find that explicit instantiation using 'of' works as expected.</p>\n<p>Cheers<br>\nLars</p>",
+        "id": 294654672,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661167548
+    },
+    {
+        "content": "<p>From: noam neer &lt;<a href=\"mailto:noamneer@gmail.com\">noamneer@gmail.com</a>&gt;</p>\n<ol>\n<li>\n<p>here it is possible to not instantiate, because it is a simplified<br>\nexample. in the original proof I had to instantiate.</p>\n</li>\n<li>\n<p>this is a nice solution, but why do methods differ with this respect?<br>\nthis is very confusing.</p>\n</li>\n<li>\n<p>I admit this proof isn't robust with respect to variable names, but this<br>\ncan be solved with 'rename_tac', as explained in the documentation. your<br>\nrecommended solution uses 'auto' which I try not to use too much because<br>\nI'm not sure what exactly it is doing, and I prefer simple commands like<br>\n[of ...] or 'rule_tac' for this reason. I guess this is also a kind of<br>\nrobustness consideration.</p>\n</li>\n</ol>\n<p>many thanx, noam<br>\nבתאריך 13 בספט 2015 08:22,‏ \"Lars Hupel\" &lt;<a href=\"mailto:hupel@in.tum.de\">hupel@in.tum.de</a>&gt; כתב:</p>",
+        "id": 294654687,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661167554
+    },
+    {
+        "content": "<p>From: Lars Hupel &lt;<a href=\"mailto:hupel@in.tum.de\">hupel@in.tum.de</a>&gt;</p>\n<blockquote>\n<ol start=\"2\">\n<li>this is a nice solution, but why do methods differ with this respect?<br>\nthis is very confusing.</li>\n</ol>\n</blockquote>\n<p>No, it is not a nice solution. These methods are \"improper\", which means<br>\nthey are still supported but you should refrain from using them. They<br>\nare really nice for exploring proofs, but as I said, it is much better<br>\nto rewrite such proofs afterwards. See also §9.2.3 from the Isar<br>\nReference Manual.</p>\n<blockquote>\n<ol start=\"3\">\n<li>I admit this proof isn't robust with respect to variable names, but this<br>\ncan be solved with 'rename_tac', as explained in the documentation. your<br>\nrecommended solution uses 'auto' which I try not to use too much because<br>\nI'm not sure what exactly it is doing, and I prefer simple commands like<br>\n[of ...] or 'rule_tac' for this reason. I guess this is also a kind of<br>\nrobustness consideration.</li>\n</ol>\n</blockquote>\n<p>'rename_tac' might make your proof more robust, but it does not improve<br>\nreadability at all.</p>\n<p>The precise methods to use were not the main point of my recommendation;<br>\nrather that instantiations and eliminations often are much more elegant<br>\nin Isar style. If you don't want to use 'auto', 'rule' would also work<br>\nin that situation:</p>\n<p>from assms obtain z where \"w = real_of_int z\"<br>\n    by (rule Ints_cases)</p>\n<p>By the way, because of the LCF nature of Isabelle, there is no harm in<br>\nusing 'auto' even if you don't understand what it's doing. In fact,<br>\nautomated tactics are very often more robust than low-level proofs<br>\nbecause they are not as sensitive to details.</p>\n<p>Cheers<br>\nLars</p>",
+        "id": 294654750,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661167566
+    },
+    {
+        "content": "<p>From: Larry Paulson &lt;<a href=\"mailto:lp15@cam.ac.uk\">lp15@cam.ac.uk</a>&gt;<br>\nI know that others share such views, and they make sense on occasion, above all when you are trying to figure out how logic works. But it’s not a practical attitude if you want to get much work done. Assuming that you are using structured proofs, auto does not harm robustness; on the contrary, it can be more robust than single-step proofs, which often break in the presence of the slightest change. How much work will you have to do if you find yourself changing a definition?</p>\n<p>Larry Paulson</p>",
+        "id": 294654756,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661167572
+    },
+    {
+        "content": "<p>From: noam neer &lt;<a href=\"mailto:noamneer@gmail.com\">noamneer@gmail.com</a>&gt;<br>\ndoes this problem happen whenever the /\\ quantifier is involved,<br>\nor just when automatic names are generated?<br>\nfor example if I use<br>\n  apply(induct n)<br>\nwill I be able to use 'n' with all the methods?</p>",
+        "id": 294655549,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661167887
+    },
+    {
+        "content": "<p>From: Lars Noschinski &lt;<a href=\"mailto:noschinl@in.tum.de\">noschinl@in.tum.de</a>&gt;<br>\nProof methods (and attributes like of, where) can usually only address<br>\nfree variables -- the reason being that bound variables have no meaning<br>\noutside the subterm they were bound in.</p>\n<p>They are a few older methods (the \"_tac\" family), which have special<br>\ncode to match names with bound variables.</p>\n<p>-- Lars</p>",
+        "id": 294655562,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661167891
+    }
+]

@@ -1,0 +1,165 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Adhoc Overloading corrupted by unrelated defin... · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Adhoc.20Overloading.20corrupted.20by.20unrelated.20defin.2E.2E.2E.html">[isabelle] Adhoc Overloading corrupted by unrelated defin...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="420123514"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Adhoc%20Overloading%20corrupted%20by%20unrelated%20defin.../near/420123514" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Adhoc.20Overloading.20corrupted.20by.20unrelated.20defin.2E.2E.2E.html#420123514">(Feb 06 2024 at 19:52)</a>:</h4>
+<p>From: <a href="mailto:hannobecker@posteo.de">hannobecker@posteo.de</a><br>
+Hi all,</p>
+<p>This is about enabling/disabling adhoc overloading.</p>
+<p>Expectation: A pair of <code>adhoc_overloading const term</code> and <br>
+<code>no_adhoc_overloading const term</code> in the same context should work and <br>
+lead to the overloading of <code>const</code> by <code>term</code> be disabled subsequently.</p>
+<p>Observed behavior: In the context of locales and polymorphic <code>term</code>, <br>
+unrelated definitions in between <code>adhoc_overloading</code> and <br>
+<code>no_adhoc_overloading</code> can lead to <code>no_adhoc_overloading</code> failing.</p>
+<p>Example:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">theory</span><span class="w"> </span><span class="n">Scratch</span>
+<span class="w">    </span><span class="kp">imports</span><span class="w"> </span><span class="n">Main</span><span class="w"> </span><span class="s">"HOL-Library.Adhoc_Overloading"</span>
+<span class="k">begin</span>
+
+<span class="k">consts</span><span class="w"> </span><span class="n">abstract</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">‹'x›</span>
+
+<span class="k">locale</span><span class="w"> </span><span class="n">foo</span><span class="w"> </span><span class="o">=</span>
+<span class="w">   </span><span class="kp">fixes</span><span class="w"> </span><span class="n">param</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">‹'s›</span>
+<span class="k">begin</span>
+
+<span class="k">definition</span><span class="w"> </span><span class="n">concrete</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">‹'v ⇒ 'v›</span>
+<span class="w">   </span><span class="kp">where</span><span class="w"> </span><span class="s">‹concrete ≡ id›</span>
+
+<span class="k">adhoc_overloading</span><span class="w"> </span><span class="n">abstract</span><span class="w"> </span><span class="n">concrete</span>
+<span class="k">no_adhoc_overloading</span><span class="w"> </span><span class="n">abstract</span><span class="w"> </span><span class="n">concrete</span><span class="w"> </span><span class="c">(* OK *)</span>
+
+<span class="k">adhoc_overloading</span><span class="w"> </span><span class="n">abstract</span><span class="w"> </span><span class="n">concrete</span>
+
+<span class="c">(* debug only *)</span>
+<span class="k">ML</span><span class="s">‹"concrete" |&gt; Syntax.parse_term @{context}</span>
+<span class="s">               |&gt; singleton (Variable.polymorphic @{context})</span>
+<span class="s">               |&gt; Term.fastype_of</span>
+<span class="s">               |&gt; Syntax.pretty_typ @{context}</span>
+<span class="s">               |&gt; Pretty.writeln›</span><span class="w"> </span><span class="c">(* ?&lt;position&gt; *)</span>
+
+<span class="c">(* Seemingly unrelated ... *)</span>
+<span class="k">definition</span><span class="w"> </span><span class="n">test</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">‹'s ⇒ 'v ⇒ 'v›</span><span class="w"> </span><span class="kp">where</span>
+<span class="w">   </span><span class="s">‹test _ x ≡ x›</span>
+
+<span class="c">(* debug only *)</span>
+<span class="k">ML</span><span class="s">‹"concrete" |&gt; Syntax.parse_term @{context}</span>
+<span class="s">               |&gt; singleton (Variable.polymorphic @{context})</span>
+<span class="s">               |&gt; Term.fastype_of</span>
+<span class="s">               |&gt; Syntax.pretty_typ @{context}</span>
+<span class="s">               |&gt; Pretty.writeln›</span><span class="w"> </span><span class="c">(* ?&lt;position&gt;1 *)</span>
+
+<span class="c">(* Mismatch due to strict type equality check</span>
+<span class="c">    cf. L60 in Adhoc_Overloading.thy</span>
+
+<span class="c">    fun variants_eq ((v1, T1), (v2, T2)) =</span>
+<span class="c">       Term.aconv_untyped (v1, v2) andalso T1 = T2;</span>
+<span class="c">*)</span>
+<span class="k">no_adhoc_overloading</span><span class="w"> </span><span class="n">abstract</span><span class="w"> </span><span class="n">concrete</span>
+<span class="c">(* FAIL: Not a variant of "Scratch.abstract" *)</span>
+
+<span class="k">end</span>
+
+<span class="k">end</span>
+
+<span class="n">As</span><span class="w"> </span><span class="n">indicated</span><span class="w"> </span><span class="kp">in</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">comment</span><span class="o">,</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">issue</span><span class="w"> </span><span class="n">here</span><span class="w"> </span><span class="kp">is</span><span class="w"> </span><span class="n">that</span>
+<span class="sx">`no_adhoc_overloading const term`</span><span class="w"> </span><span class="n">expects</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">type</span><span class="w"> </span><span class="n">of</span><span class="w"> </span><span class="sx">`term`</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">be</span>
+<span class="o">_</span><span class="n">equal_</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">type</span><span class="w"> </span><span class="n">of</span><span class="w"> </span><span class="sx">`term`</span><span class="w"> </span><span class="n">at</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">time</span><span class="w"> </span><span class="n">of</span><span class="w"> </span><span class="sx">`adhoc_overloading const</span>
+<span class="sx">term`</span><span class="ow">.</span><span class="w"> </span><span class="n">However</span><span class="o">,</span><span class="w"> </span><span class="kp">if</span><span class="w"> </span><span class="sx">`term`</span><span class="w"> </span><span class="kp">is</span><span class="w"> </span><span class="n">polymorphic</span><span class="o">,</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">polymorphic</span><span class="w"> </span><span class="n">parsing</span><span class="w"> </span><span class="n">of</span>
+<span class="sx">`term`</span><span class="w"> </span><span class="o">(</span><span class="k">using</span><span class="w"> </span><span class="n">Syntax.parse_term</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">Variable.polymorphic</span><span class="o">,</span><span class="w"> </span><span class="n">cf.</span><span class="w"> </span><span class="n">source</span><span class="w"> </span><span class="n">of</span>
+<span class="k">adhoc_overloading</span><span class="o">)</span><span class="w"> </span><span class="n">introduces</span><span class="w"> </span><span class="n">schematic</span><span class="w"> </span><span class="n">type</span><span class="w"> </span><span class="n">variables</span><span class="w"> </span><span class="n">whose</span><span class="w"> </span><span class="n">names</span><span class="w"> </span><span class="n">are</span>
+<span class="n">not</span><span class="w"> </span><span class="n">stable.</span><span class="w"> </span><span class="n">This</span><span class="w"> </span><span class="n">can</span><span class="w"> </span><span class="n">be</span><span class="w"> </span><span class="n">witnessed</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="k">ML</span><span class="w"> </span><span class="n">snippets</span><span class="w"> </span><span class="n">inserted</span><span class="w"> </span><span class="n">above.</span>
+
+<span class="n">It</span><span class="w"> </span><span class="n">seems</span><span class="w"> </span><span class="n">that</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">type</span><span class="o">-</span><span class="n">comparison</span><span class="w"> </span><span class="n">needs</span><span class="w"> </span><span class="n">weakening</span><span class="o">,</span><span class="w"> </span><span class="n">but</span><span class="w"> </span><span class="n">I</span><span class="w"> </span><span class="n">am</span><span class="w"> </span><span class="n">not</span><span class="w"> </span><span class="n">sure</span>
+<span class="n">what</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">right</span><span class="w"> </span><span class="n">comparator</span><span class="w"> </span><span class="n">would</span><span class="w"> </span><span class="n">be.</span>
+
+<span class="n">If</span><span class="w"> </span><span class="n">this</span><span class="w"> </span><span class="n">could</span><span class="w"> </span><span class="n">be</span><span class="w"> </span><span class="n">addressed</span><span class="w"> </span><span class="kp">for</span><span class="w"> </span><span class="n">Isabelle2024</span><span class="o">,</span><span class="w"> </span><span class="n">I'd</span><span class="w"> </span><span class="n">be</span><span class="w"> </span><span class="n">grateful.</span><span class="w"> </span><span class="n">In</span><span class="w"> </span><span class="n">the</span>
+<span class="n">meantime</span><span class="o">,</span><span class="w"> </span><span class="kp">if</span><span class="w"> </span><span class="n">anyone</span><span class="w"> </span><span class="n">has</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="n">workaround</span><span class="w"> </span><span class="n">at</span><span class="w"> </span><span class="n">hand</span><span class="o">,</span><span class="w"> </span><span class="n">that</span><span class="w"> </span><span class="n">would</span><span class="w"> </span><span class="n">be</span><span class="w"> </span><span class="n">much</span>
+<span class="n">appreciated</span><span class="w"> </span><span class="n">as</span><span class="w"> </span><span class="n">well</span><span class="o">,</span><span class="w"> </span><span class="n">as</span><span class="w"> </span><span class="n">we</span><span class="w"> </span><span class="k">have</span><span class="w"> </span><span class="n">encountered</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">above</span><span class="w"> </span><span class="n">issue</span><span class="w"> </span><span class="n">multiple</span>
+<span class="n">times.</span>
+
+<span class="n">Thank</span><span class="w"> </span><span class="n">you</span><span class="o">,</span>
+<span class="n">Hanno</span>
+</code></pre></div>
+
+
+
+<a name="420204117"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Adhoc%20Overloading%20corrupted%20by%20unrelated%20defin.../near/420204117" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Adhoc.20Overloading.20corrupted.20by.20unrelated.20defin.2E.2E.2E.html#420204117">(Feb 07 2024 at 08:51)</a>:</h4>
+<p>From: <a href="mailto:hannobecker@posteo.de">hannobecker@posteo.de</a><br>
+Hi,</p>
+<p>Quick correction: It's <code>read_term</code>, not <code>parse_term</code>, that is used by <br>
+the adhoc overloading code. The problem is still the same, though.</p>
+<p>Updated example below.</p>
+<p>Best,<br>
+Hanno</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">theory</span><span class="w"> </span><span class="n">Scratch</span>
+<span class="w">    </span><span class="kp">imports</span><span class="w"> </span><span class="n">Main</span><span class="w"> </span><span class="s">"HOL-Library.Adhoc_Overloading"</span>
+<span class="k">begin</span>
+
+<span class="k">declare</span><span class="w"> </span><span class="o">[[</span><span class="n">show_variants</span><span class="o">]]</span>
+<span class="k">consts</span><span class="w"> </span><span class="n">abstract</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">‹'x›</span>
+
+<span class="k">locale</span><span class="w"> </span><span class="n">foo</span><span class="w"> </span><span class="o">=</span>
+<span class="w">   </span><span class="kp">fixes</span><span class="w"> </span><span class="n">param</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">‹'s›</span>
+<span class="k">begin</span>
+
+<span class="k">definition</span><span class="w"> </span><span class="n">concrete</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">‹'v ⇒ 'v›</span>
+<span class="w">   </span><span class="kp">where</span><span class="w"> </span><span class="s">‹concrete ≡ id›</span>
+
+<span class="k">adhoc_overloading</span><span class="w"> </span><span class="n">abstract</span><span class="w"> </span><span class="n">concrete</span>
+<span class="k">no_adhoc_overloading</span><span class="w"> </span><span class="n">abstract</span><span class="w"> </span><span class="n">concrete</span><span class="w"> </span><span class="c">(* OK *)</span>
+
+<span class="k">adhoc_overloading</span><span class="w"> </span><span class="n">abstract</span><span class="w"> </span><span class="n">concrete</span>
+<span class="c">(* debug only *)</span>
+<span class="k">ML</span><span class="s">‹"concrete" |&gt; Syntax.read_term @{context}</span>
+<span class="s">               |&gt; singleton (Variable.polymorphic @{context})</span>
+<span class="s">               |&gt; Term.fastype_of</span>
+<span class="s">               |&gt; Syntax.pretty_typ @{context}</span>
+<span class="s">               |&gt; Pretty.writeln›</span><span class="w"> </span><span class="c">(* ?'a ⇒ ?'a  *)</span>
+
+<span class="c">(* Seemingly unrelated ... *)</span>
+<span class="k">definition</span><span class="w"> </span><span class="n">test</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">‹'s ⇒ 'v ⇒ 'v›</span><span class="w"> </span><span class="kp">where</span>
+<span class="w">   </span><span class="s">‹test _ x ≡ x›</span>
+
+<span class="c">(* debug only *)</span>
+<span class="k">ML</span><span class="s">‹"concrete" |&gt; Syntax.read_term @{context}</span>
+<span class="s">               |&gt; singleton (Variable.polymorphic @{context})</span>
+<span class="s">               |&gt; Term.fastype_of</span>
+<span class="s">               |&gt; Syntax.pretty_typ @{context}</span>
+<span class="s">               |&gt; Pretty.writeln›</span><span class="w"> </span><span class="c">(* ?'a1 ⇒ ?'a1 *)</span>
+
+<span class="c">(* Mismatch due to strict type equality check</span>
+<span class="c">    cf. L60 in Adhoc_Overloading.thy</span>
+
+<span class="c">    fun variants_eq ((v1, T1), (v2, T2)) =</span>
+<span class="c">       Term.aconv_untyped (v1, v2) andalso T1 = T2;</span>
+<span class="c">*)</span>
+<span class="k">no_adhoc_overloading</span><span class="w"> </span><span class="n">abstract</span><span class="w"> </span><span class="n">concrete</span>
+<span class="c">(* FAIL: Not a variant of "Scratch.abstract" *)</span>
+
+<span class="k">end</span>
+
+<span class="k">end</span>
+</code></pre></div>
+
+
+
+<a name="500615032"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Adhoc%20Overloading%20corrupted%20by%20unrelated%20defin.../near/500615032" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Adhoc.20Overloading.20corrupted.20by.20unrelated.20defin.2E.2E.2E.html#500615032">(Feb 19 2025 at 10:27)</a>:</h4>
+<p>From: hannobecker &lt;<a href="mailto:hannobecker@posteo.de">hannobecker@posteo.de</a>&gt;<br>
+Hi all,The issue seems to have been addressed in Isabelle2025-RC2 -- thanks!Best,Hanno<br>
+-------- Original message --------From: <a href="mailto:hannobecker@posteo.de">hannobecker@posteo.de</a> Date: 07/02/2024  08:51  (GMT+00:00) To: Cl isabelle users &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt; Cc: <a href="mailto:cl-isabelle-users-request@lists.cam.ac.uk">cl-isabelle-users-request@lists.cam.ac.uk</a> Subject: Re: [isabelle] Adhoc Overloading corrupted by unrelated definition Hi,Quick correction: It's <code>read_term</code>, not <code>parse_term</code>, that is used by the adhoc overloading code. The problem is still the same, though.Updated example below.Best,Hanno<code>theory Scratch    imports Main "HOL-Library.Adhoc_Overloading"begindeclare [[show_variants]]consts abstract :: ‹'x›locale foo =   fixes param :: ‹'s›begindefinition concrete :: ‹'v ⇒ 'v›   where ‹concrete ≡ id›adhoc_overloading abstract concreteno_adhoc_overloading abstract concrete (* OK *)adhoc_overloading abstract concrete(* debug only *)ML‹"concrete" |&gt; Syntax.read_term @{context}               |&gt; singleton (Variable.polymorphic @{context})               |&gt; Term.fastype_of               |&gt; Syntax.pretty_typ @{context}               |&gt; Pretty.writeln› (* ?'a ⇒ ?'a  *)(* Seemingly unrelated ... *)definition test :: ‹'s ⇒ 'v ⇒ 'v› where   ‹test _ x ≡ x›(* debug only *)ML‹"concrete" |&gt; Syntax.read_term @{context}               |&gt; singleton (Variable.polymorphic @{context})               |&gt; Term.fastype_of               |&gt; Syntax.pretty_typ @{context}               |&gt; Pretty.writeln› (* ?'a1 ⇒ ?'a1 *)(* Mismatch due to strict type equality check    cf. L60 in Adhoc_Overloading.thy    fun variants_eq ((v1, T1), (v2, T2)) =       Term.aconv_untyped (v1, v2) andalso T1 = T2;*)no_adhoc_overloading abstract concrete(* FAIL: Not a variant of "Scratch.abstract" *)endend</code>Am 06.02.2024 19:52 schrieb <a href="mailto:hannobecker@posteo.de">hannobecker@posteo.de</a>:&gt; Hi all,&gt; &gt; This is about enabling/disabling adhoc overloading.&gt; &gt; Expectation: A pair of <code>adhoc_overloading const term</code> and&gt; <code>no_adhoc_overloading const term</code> in the same context should work and&gt; lead to the overloading of <code>const</code> by <code>term</code> be disabled subsequently.&gt; &gt; Observed behavior: In the context of locales and polymorphic <code>term</code>,&gt; unrelated definitions in between <code>adhoc_overloading</code> and&gt; <code>no_adhoc_overloading</code> can lead to <code>no_adhoc_overloading</code> failing.&gt; &gt; Example:&gt; &gt; <code>``&gt; theory Scratch&gt;    imports Main "HOL-Library.Adhoc_Overloading"&gt; begin&gt; &gt; consts abstract :: ‹'x›&gt; &gt; locale foo =&gt;   fixes param :: ‹'s›&gt; begin&gt; &gt; definition concrete :: ‹'v ⇒ 'v›&gt;   where ‹concrete ≡ id›&gt; &gt; adhoc_overloading abstract concrete&gt; no_adhoc_overloading abstract concrete (* OK *)&gt; &gt; adhoc_overloading abstract concrete&gt; &gt; (* debug only *)&gt; ML‹"concrete" |&gt; Syntax.parse_term @{context}&gt;               |&gt; singleton (Variable.polymorphic @{context})&gt;               |&gt; Term.fastype_of&gt;               |&gt; Syntax.pretty_typ @{context}&gt;               |&gt; Pretty.writeln› (* ?&lt;position&gt; *)&gt; &gt; (* Seemingly unrelated ... *)&gt; definition test :: ‹'s ⇒ 'v ⇒ 'v› where&gt;   ‹test _ x ≡ x›&gt; &gt; (* debug only *)&gt; ML‹"concrete" |&gt; Syntax.parse_term @{context}&gt;               |&gt; singleton (Variable.polymorphic @{context})&gt;               |&gt; Term.fastype_of&gt;               |&gt; Syntax.pretty_typ @{context}&gt;               |&gt; Pretty.writeln› (* ?&lt;position&gt;1 *)&gt; &gt; (* Mismatch due to strict type equality check&gt;    cf. L60 in Adhoc_Overloading.thy&gt; &gt;    fun variants_eq ((v1, T1), (v2, T2)) =&gt;       Term.aconv_untyped (v1, v2) andalso T1 = T2;&gt; *)&gt; no_adhoc_overloading abstract concrete&gt; (* FAIL: Not a variant of "Scratch.abstract" *)&gt; &gt; end&gt; &gt; end&gt; &gt; As indicated in the comment, the issue here is that&gt; </code>no_adhoc_overloading const term<code> expects the type of </code>term<code> to be&gt; _equal_ to the type of </code>term<code> at the time of </code>adhoc_overloading const&gt; term<code>. However, if </code>term<code> is polymorphic, the polymorphic parsing of&gt; </code>term` (using Syntax.parse_term + Variable.polymorphic, cf. source of&gt; adhoc_overloading) introduces schematic type variables whose names are&gt; not stable. This can be witnessed by the ML snippets inserted above.&gt; &gt; It seems that the type-comparison needs weakening, but I am not sure&gt; what the right comparator would be.&gt; &gt; If this could be addressed for Isabelle2024, I'd be grateful. In the&gt; meantime, if anyone has a workaround at hand, that would be much&gt; appreciated as well, as we have encountered the above issue multiple&gt; times.&gt; &gt; Thank you,&gt; Hanno</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,212 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Default implementations for instances · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Default.20implementations.20for.20instances.html">[isabelle] Default implementations for instances</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294275332"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Default%20implementations%20for%20instances/near/294275332" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Default.20implementations.20for.20instances.html#294275332">(Aug 19 2022 at 14:16)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+Assume the following classes:</p>
+<p>class a =<br>
+   fixes f :: "'a =&gt; nat"<br>
+   assumes ...</p>
+<p>class b =<br>
+   fixes g :: "'a =&gt; 'a =&gt; nat"<br>
+   assumes ...</p>
+<p>(the precise types of the class parameters don't matter)</p>
+<p>Furthermore assume that 'f' can be implemented in terms of 'g', but not <br>
+ all types can be made instances of class 'b'. In such a case, I would <br>
+ like to define a subclass relationship between 'b' and 'a', but this <br>
+ doesn't work (because 'f' is not a class parameter of 'g').</p>
+<p>Johannes showed me the following "pattern" which is used e.g. in <br>
+ Real_Vector_Space:</p>
+<p>class a0 =<br>
+   fixes f :: "'a =&gt; nat"</p>
+<p>class a =<br>
+   assumes ...</p>
+<p>class b = a0 +<br>
+   assumes "f = foo g" (* the implementation of 'f' in terms of 'g' *)<br>
+   and ...<br>
+ begin</p>
+<p>subclass a<br>
+   proof ...</p>
+<p>end</p>
+<p>This works well, but comes at the cost of having to duplicate the 'f = <br>
+ foo g' line in every instantiation of some type for 'b'. Additionally, <br>
+ when using 'f', type inference will give me a class constraint 'a0' <br>
+ which does not carry the necessary assumptions.</p>
+<p>My question now is whether this is common enough that it warrants a <br>
+ "default implementation" mechanism, in the sense that one could specify <br>
+ the implementation of 'f' in terms of 'g' "once and for all", and not <br>
+ having to define and prove it everywhere. This could potentially also <br>
+ make sense if just one class is involved:</p>
+<p>class eq =<br>
+   fixes eq  :: "'a =&gt; 'a =&gt; bool"<br>
+     and neq :: "'a =&gt; 'a =&gt; bool"<br>
+   assumes "neq x y &lt;--&gt; ~(eq x y)"</p>
+<p>Lars</p>
+
+
+
+<a name="294275350"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Default%20implementations%20for%20instances/near/294275350" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Default.20implementations.20for.20instances.html#294275350">(Aug 19 2022 at 14:16)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Lars,</p>
+<p>I have longed for a similar mechanism for default implementations in two situations:</p>
+<ol>
+<li>In the context of code generation, one often introduces a type class with a parameter <br>
+whose assumptions completely determine the parameter. As parameters of type classes may <br>
+have type-specific code equations, this is the only way to implement a polymorphic <br>
+constant for each individual type.</li>
+</ol>
+<p>The most prominent example of this probably is "op &lt;" in the preorder type class, which is <br>
+completely determined by the assumption strict_iff_order. All instantiations have to <br>
+specify both "op &lt;=" and "op &lt;" and prove that they are compatible. The theory <br>
+Partial_Function even defines a general mk_less operator to that end.</p>
+<ol start="2">
+<li>In my AFP entry Containers, I introduce a new typeclass clinorder which has a default <br>
+implementation if the type is in linorder, and the same for ceq and HOL.equal. René <br>
+Thiemann extended his Datatype_Order_Generator such that it can automatically produce <br>
+these instantiations and discharge the proof obligations.</li>
+</ol>
+<p>However, in this setting, I would not want to the instance to be automatic. Rather do I <br>
+want to decide when I pick the default implementation and when I choose some other <br>
+implementation. This would mean that I still issue a command that triggers the default <br>
+implementation, but I no longer have to specify the instantiation nor prove the assumptions.</p>
+<p>Note that in this case, the assumptions are not of the form "f = foo g".</p>
+<p>Andreas</p>
+
+
+
+<a name="294275617"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Default%20implementations%20for%20instances/near/294275617" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Default.20implementations.20for.20instances.html#294275617">(Aug 19 2022 at 14:18)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+The story is more complicated since a »definition« in general is not<br>
+necessarily equational.  As example have a look at class<br>
+complete_lattice where Inf determines Sup and vice versa, but none is<br>
+characterized equationally in the class' assumes.</p>
+<p>I hope someday that »permanent_interpretation« inside instantiation<br>
+targets yields a pattern for default instantiations, but this is music<br>
+of the future.</p>
+<p>Cheers,<br>
+    Florian<br>
+<a href="/user_uploads/14278/meh_0F81LGLxA2gaZ7sHxw83/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294275679"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Default%20implementations%20for%20instances/near/294275679" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Default.20implementations.20for.20instances.html#294275679">(Aug 19 2022 at 14:18)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;</p>
+<blockquote>
+<p>The most prominent example of this probably is "op &lt;" in the preorder<br>
+type class, which is completely determined by the assumption<br>
+strict_iff_order. All instantiations have to specify both "op &lt;=" and<br>
+"op &lt;" and prove that they are compatible. The theory Partial_Function<br>
+even defines a general mk_less operator to that end.</p>
+</blockquote>
+<p>This strict coupling of Orderings.less_eq and Orderings.less is mainly<br>
+historic and could be split into two class hierarchies (e.g. strict_*<br>
+and reflexive_*, where the existing class »foo« joins the classes<br>
+strict_foo and reflexive_foo).</p>
+<p>If the situation is pressing enough, this should be seriously considered.</p>
+<p>Cheers,<br>
+    Florian</p>
+<blockquote>
+<ol start="2">
+<li>In my AFP entry Containers, I introduce a new typeclass clinorder<br>
+which has a default implementation if the type is in linorder, and the<br>
+same for ceq and HOL.equal. René Thiemann extended his<br>
+Datatype_Order_Generator such that it can automatically produce these<br>
+instantiations and discharge the proof obligations.</li>
+</ol>
+<p>However, in this setting, I would not want to the instance to be<br>
+automatic. Rather do I want to decide when I pick the default<br>
+implementation and when I choose some other implementation. This would<br>
+mean that I still issue a command that triggers the default<br>
+implementation, but I no longer have to specify the instantiation nor<br>
+prove the assumptions.</p>
+<p>Note that in this case, the assumptions are not of the form "f = foo g".</p>
+<p>Andreas</p>
+<p>On 10/04/14 16:16, Lars Hupel wrote:</p>
+<blockquote>
+<p>Assume the following classes:</p>
+<p>class a =<br>
+   fixes f :: "'a =&gt; nat"<br>
+   assumes ...</p>
+<p>class b =<br>
+   fixes g :: "'a =&gt; 'a =&gt; nat"<br>
+   assumes ...</p>
+<p>(the precise types of the class parameters don't matter)</p>
+<p>Furthermore assume that 'f' can be implemented in terms of 'g', but<br>
+not all types can be<br>
+made instances of class 'b'. In such a case, I would like to define a<br>
+subclass<br>
+relationship between 'b' and 'a', but this doesn't work (because 'f'<br>
+is not a class<br>
+parameter of 'g').</p>
+<p>Johannes showed me the following "pattern" which is used e.g. in<br>
+Real_Vector_Space:</p>
+<p>class a0 =<br>
+   fixes f :: "'a =&gt; nat"</p>
+<p>class a =<br>
+   assumes ...</p>
+<p>class b = a0 +<br>
+   assumes "f = foo g" (* the implementation of 'f' in terms of 'g' *)<br>
+   and ...<br>
+begin</p>
+<p>subclass a<br>
+   proof ...</p>
+<p>end</p>
+<p>This works well, but comes at the cost of having to duplicate the 'f =<br>
+foo g' line in<br>
+every instantiation of some type for 'b'. Additionally, when using<br>
+'f', type inference<br>
+will give me a class constraint 'a0' which does not carry the<br>
+necessary assumptions.</p>
+<p>My question now is whether this is common enough that it warrants a<br>
+"default<br>
+implementation" mechanism, in the sense that one could specify the<br>
+implementation of 'f'<br>
+in terms of 'g' "once and for all", and not having to define and prove<br>
+it everywhere. This<br>
+could potentially also make sense if just one class is involved:</p>
+<p>class eq =<br>
+   fixes eq  :: "'a =&gt; 'a =&gt; bool"<br>
+     and neq :: "'a =&gt; 'a =&gt; bool"<br>
+   assumes "neq x y &lt;--&gt; ~(eq x y)"</p>
+<p>Lars</p>
+<p><a href="/user_uploads/14278/1UZKyEADOXcApLN2XFA1waQU/signature.asc">signature.asc</a></p>
+</blockquote>
+</blockquote>
+
+
+
+<a name="294275890"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Default%20implementations%20for%20instances/near/294275890" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Default.20implementations.20for.20instances.html#294275890">(Aug 19 2022 at 14:19)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Florian,</p>
+<p>No, please do not triple the number of type classes. It is already now somewhat cumbersome <br>
+to instantiate the order type classes for some type 'a foo to get the right sort <br>
+constraints on the type parameter (things are already worse for the algebraic type classes).</p>
+<p>instantiation foo :: (ord) ord ...<br>
+instance foo :: (preorder) preorder ...<br>
+instance foo :: (order) order ...<br>
+instance foo :: (linorder) linorder ...</p>
+<p>If you split each of these type classes into three, one would have to write twelve <br>
+instance declarations and proofs.</p>
+<p>My point was that such default implementations might be convenient for the order <br>
+hierarchy. By the way, another example of making constants to type class parameters for <br>
+the sake of code generation can be found in the card_UNIV hierarchy in <br>
+HOL/Library/Cardinality.</p>
+<p>Andreas</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

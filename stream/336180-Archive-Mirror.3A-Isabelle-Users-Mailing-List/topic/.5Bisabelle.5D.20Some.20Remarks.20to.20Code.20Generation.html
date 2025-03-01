@@ -1,0 +1,420 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Some Remarks to Code Generation · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Some.20Remarks.20to.20Code.20Generation.html">[isabelle] Some Remarks to Code Generation</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294218566"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Some%20Remarks%20to%20Code%20Generation/near/294218566" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Some.20Remarks.20to.20Code.20Generation.html#294218566">(Aug 19 2022 at 08:03)</a>:</h4>
+<p>From: Patrick Michel &lt;<a href="mailto:uni@pbmichel.de">uni@pbmichel.de</a>&gt;<br>
+Hi!</p>
+<p>I am currently using the code generation facility (mostly for Scala).<br>
+All in all it works very well so far, the generated code compiles, I have tried data type refinement, code equation replacement, etc. </p>
+<p>So thank you for this great feature!</p>
+<p>There are some minor oddities I stumbled on, however, some of which might be worth a change in the library:</p>
+<p>A) I was a bit shocked that after proving every function to be total in Isabelle and using proven code equations for refinement, I could make the generated code loop quite easily.</p>
+<p>I don't think this is discussed in the code equation chapter of the code generation tutorial.</p>
+<p>I stumbled upon it while giving some (admittedly very stupid) equation for an "equal_class.equal" implementation and first thought it would only be a corner case, as equality is handled in a quite special way.</p>
+<p>As it turns out it is quite easy to prove a code equation that obviously leads to non-terminating execution.<br>
+I guess it is non-trivial to find out if code equations screw you over, so there is not much that can be done here...</p>
+<p>B) Code_Integer uses reference equality on BigInt in Scala. That seems to be a bad idea… I had a hard time figuring out why my code did not behave as expected and it turned out that some zeros were not equal to zero (same with some ones). Replacing the equality in the generated code with "inta.equals(int)" fixed all my problems.</p>
+<p>I don't know how to adjust the part in Code_Integer to fix the code generator instead, so any advise there would be helpful.</p>
+<p>C) Tail recursion. I got stack overflows (with increased stack size) from many of my own functions and some of the library functions. I solved mine by data type refinement and code equations, which leaves the ones in the library.</p>
+<p>I think there was a discussion involving fold variants some time ago and which was more "canonical".<br>
+The situation now seems to be that there is fold, foldl and foldr in List.thy:</p>
+<blockquote>
+<p>primrec fold :: "('a =&gt; 'b =&gt; 'b) =&gt; 'a list =&gt; 'b =&gt; 'b"<br>
+where<br>
+  fold_Nil:  "fold f [] = id"<br>
+| fold_Cons: "fold f (x # xs) = fold f xs o f x" -- {* natural argument order *}</p>
+<p>primrec foldr :: "('a =&gt; 'b =&gt; 'b) =&gt; 'a list =&gt; 'b =&gt; 'b"<br>
+where<br>
+  foldr_Nil:  "foldr f [] = id"<br>
+| foldr_Cons: "foldr f (x # xs) = f x o foldr f xs" -- {* natural argument order *}</p>
+<p>primrec foldl :: "('b =&gt; 'a =&gt; 'b) =&gt; 'b =&gt; 'a list =&gt; 'b"<br>
+where<br>
+  foldl_Nil:  "foldl f a [] = a"<br>
+| foldl_Cons: "foldl f a (x # xs) = foldl f (f a x) xs"</p>
+</blockquote>
+<p>Of these three, only foldl is tail recursive. My generated code had to tackle _extremely large_ parameters, so it was a good benchmark to test for tail recursion…</p>
+<p>Most notably the rev function on lists is not tail recursive, as its code equations are based on fold:</p>
+<blockquote>
+<p>lemma rev_conv_fold [code]:<br>
+  "rev xs = fold Cons xs []"<br>
+  by (simp add: fold_Cons_rev)</p>
+</blockquote>
+<p>I see no good reason for this as rev is the most basic of all tail recursive functions, so I replaced its code equations:</p>
+<blockquote>
+<p>declare rev_conv_fold [code del]</p>
+<p>lemma rev_foldl_general:<br>
+  "rev m @ n = foldl (λl e. e # l) n m"<br>
+  by (induct m, auto) (metis fold_Cons_rev foldr_conv_fold foldr_conv_foldl rev_rev_ident)</p>
+<p>lemma rev_foldl [code]:<br>
+  "rev = foldl (λl e. e # l) []"<br>
+  by (rule ext, fold rev_foldl_general) simp</p>
+</blockquote>
+<p>The parameters needed to be flipped, which is not perfect, but I did no longer get stack overflows from rev.</p>
+<p>The other function I noticed was map, which is of course a totally different story. It also produced stack overflows for me, so I had to replace it, yet I don't think this is a good idea in general, as map is just not tail recursive.</p>
+<blockquote>
+<p>fun rev_map where<br>
+  "rev_map f = foldl (λl e. f e # l) []"</p>
+<p>theorem rev_map_eq:<br>
+  "rev_map f l = rev (map f l)"<br>
+  by (induct l rule: rev_induct) auto</p>
+<p>declare map.simps [code del]</p>
+<p>lemma map_tail [code]:<br>
+  "map f l = rev (rev_map f l)"<br>
+  by (metis rev_map_eq rev_swap)</p>
+</blockquote>
+<p>Thanks again for an overall amazing and extremely powerful feature!</p>
+<p>Patrick Michel<br>
+Software Technology Group<br>
+University of Kaiserslautern</p>
+
+
+
+<a name="294218583"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Some%20Remarks%20to%20Code%20Generation/near/294218583" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Some.20Remarks.20to.20Code.20Generation.html#294218583">(Aug 19 2022 at 08:03)</a>:</h4>
+<p>From: "Yannick Duchêne (Hibou57 )" &lt;<a href="mailto:yannick_duchene@yahoo.fr">yannick_duchene@yahoo.fr</a>&gt;<br>
+I've not reached that point (still learning Isabelle and HOL), but I'm  <br>
+already interested in this, as I will generate SML programs from proofs.  <br>
+Can you please, provide a concrete example of an erroneous proof of a  <br>
+non‑terminating function?</p>
+
+
+
+<a name="294218593"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Some%20Remarks%20to%20Code%20Generation/near/294218593" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Some.20Remarks.20to.20Code.20Generation.html#294218593">(Aug 19 2022 at 08:04)</a>:</h4>
+<p>From: Patrick Michel &lt;<a href="mailto:uni@pbmichel.de">uni@pbmichel.de</a>&gt;<br>
+Hi!</p>
+<p>Here is a small example:</p>
+<p>theory Scratch imports Main<br>
+begin</p>
+<p>fun fib :: "nat \&lt;Rightarrow&gt; nat" where<br>
+ "fib 0 = 0"<br>
+| "fib (Suc 0) = Suc 0"<br>
+| "fib (Suc (Suc n)) = fib (Suc n) + fib n"</p>
+<p>value "map (fib o nat) [0..10]"</p>
+<p>theorem fib_loop [code]:<br>
+ "fib n = fib n"<br>
+ by simp</p>
+<p>export_code fib in Scala file "Fib.scala"</p>
+<p>end</p>
+<p>Patrick Michel</p>
+
+
+
+<a name="294218639"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Some%20Remarks%20to%20Code%20Generation/near/294218639" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Some.20Remarks.20to.20Code.20Generation.html#294218639">(Aug 19 2022 at 08:04)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+Am 31/07/2012 18:13, schrieb Patrick Michel:</p>
+<blockquote>
+<p>Hi!</p>
+<p>I am currently using the code generation facility (mostly for Scala).<br>
+All in all it works very well so far, the generated code compiles, I have tried data type refinement, code equation replacement, etc. </p>
+<p>So thank you for this great feature!</p>
+<p>There are some minor oddities I stumbled on, however, some of which might be worth a change in the library:</p>
+<p>A) I was a bit shocked that after proving every function to be total in Isabelle and using proven code equations for refinement, I could make the generated code loop quite easily.</p>
+<p>I don't think this is discussed in the code equation chapter of the code generation tutorial.</p>
+<p>I stumbled upon it while giving some (admittedly very stupid) equation for an "equal_class.equal" implementation and first thought it would only be a corner case, as equality is handled in a quite special way.</p>
+<p>As it turns out it is quite easy to prove a code equation that obviously leads to non-terminating execution.</p>
+</blockquote>
+<p>Indeed: "f x = f x".</p>
+<p>This is not a bug but a feature. Code equations give the user a lot of power,<br>
+for example to optimize his/her code, but also to shoot yourself in the foot. To<br>
+look at it from the intended positive side: it allows you to generate partial<br>
+functions, something that some other provers cannot.</p>
+<p>Tobias</p>
+<blockquote>
+<p>I guess it is non-trivial to find out if code equations screw you over, so there is not much that can be done here...</p>
+<p>B) Code_Integer uses reference equality on BigInt in Scala. That seems to be a bad idea… I had a hard time figuring out why my code did not behave as expected and it turned out that some zeros were not equal to zero (same with some ones). Replacing the equality in the generated code with "inta.equals(int)" fixed all my problems.</p>
+<p>I don't know how to adjust the part in Code_Integer to fix the code generator instead, so any advise there would be helpful.</p>
+<p>C) Tail recursion. I got stack overflows (with increased stack size) from many of my own functions and some of the library functions. I solved mine by data type refinement and code equations, which leaves the ones in the library.</p>
+<p>I think there was a discussion involving fold variants some time ago and which was more "canonical".<br>
+The situation now seems to be that there is fold, foldl and foldr in List.thy:</p>
+<blockquote>
+<p>primrec fold :: "('a =&gt; 'b =&gt; 'b) =&gt; 'a list =&gt; 'b =&gt; 'b"<br>
+where<br>
+  fold_Nil:  "fold f [] = id"<br>
+| fold_Cons: "fold f (x # xs) = fold f xs o f x" -- {* natural argument order *}</p>
+<p>primrec foldr :: "('a =&gt; 'b =&gt; 'b) =&gt; 'a list =&gt; 'b =&gt; 'b"<br>
+where<br>
+  foldr_Nil:  "foldr f [] = id"<br>
+| foldr_Cons: "foldr f (x # xs) = f x o foldr f xs" -- {* natural argument order *}</p>
+<p>primrec foldl :: "('b =&gt; 'a =&gt; 'b) =&gt; 'b =&gt; 'a list =&gt; 'b"<br>
+where<br>
+  foldl_Nil:  "foldl f a [] = a"<br>
+| foldl_Cons: "foldl f a (x # xs) = foldl f (f a x) xs"</p>
+</blockquote>
+<p>Of these three, only foldl is tail recursive. My generated code had to tackle _extremely large_ parameters, so it was a good benchmark to test for tail recursion…</p>
+<p>Most notably the rev function on lists is not tail recursive, as its code equations are based on fold:</p>
+<blockquote>
+<p>lemma rev_conv_fold [code]:<br>
+  "rev xs = fold Cons xs []"<br>
+  by (simp add: fold_Cons_rev)</p>
+</blockquote>
+<p>I see no good reason for this as rev is the most basic of all tail recursive functions, so I replaced its code equations:</p>
+<blockquote>
+<p>declare rev_conv_fold [code del]</p>
+<p>lemma rev_foldl_general:<br>
+  "rev m @ n = foldl (λl e. e # l) n m"<br>
+  by (induct m, auto) (metis fold_Cons_rev foldr_conv_fold foldr_conv_foldl rev_rev_ident)</p>
+<p>lemma rev_foldl [code]:<br>
+  "rev = foldl (λl e. e # l) []"<br>
+  by (rule ext, fold rev_foldl_general) simp</p>
+</blockquote>
+<p>The parameters needed to be flipped, which is not perfect, but I did no longer get stack overflows from rev.</p>
+<p>The other function I noticed was map, which is of course a totally different story. It also produced stack overflows for me, so I had to replace it, yet I don't think this is a good idea in general, as map is just not tail recursive.</p>
+<blockquote>
+<p>fun rev_map where<br>
+  "rev_map f = foldl (λl e. f e # l) []"</p>
+<p>theorem rev_map_eq:<br>
+  "rev_map f l = rev (map f l)"<br>
+  by (induct l rule: rev_induct) auto</p>
+<p>declare map.simps [code del]</p>
+<p>lemma map_tail [code]:<br>
+  "map f l = rev (rev_map f l)"<br>
+  by (metis rev_map_eq rev_swap)</p>
+</blockquote>
+<p>Thanks again for an overall amazing and extremely powerful feature!</p>
+<p>Patrick Michel<br>
+Software Technology Group<br>
+University of Kaiserslautern<br>
+</p>
+</blockquote>
+
+
+
+<a name="294219982"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Some%20Remarks%20to%20Code%20Generation/near/294219982" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Some.20Remarks.20to.20Code.20Generation.html#294219982">(Aug 19 2022 at 08:15)</a>:</h4>
+<p>From: Magnus Myreen &lt;<a href="mailto:mom22@cam.ac.uk">mom22@cam.ac.uk</a>&gt;</p>
+<blockquote>
+<p>2) The only guarantee code-generation gives (and that is quite a strong one)<br>
+is that the generated code is a sound rewriting engine for the function<br>
+defined in the logic (assuming that every tool in the typical chain -- e.g.,<br>
+compiler, OS -- is correct).</p>
+</blockquote>
+<p>I think you should add to that list of assumptions that the soundness<br>
+of the Isabelle code generator must also be assumed. To my knowledge<br>
+(correct me if I'm wrong!), Isabelle's code generator comes with no<br>
+formal guarantee of producing code that is correct w.r.t. the<br>
+semantics of the generated code. By formal guarantee, I mean a theorem<br>
+in Isabelle/HOL's logic relating the given input (equations in<br>
+Isabelle/HOL) to the semantics of the generated code (ML, Haskell,<br>
+Scala ...).</p>
+<p>Scott Owens and I have developed a code generator (for HOL4) which<br>
+provides such guarantees, see:</p>
+<p>Magnus O. Myreen and Scott Owens.<br>
+  Proof-Producing Synthesis of ML from Higher-Order Logic.<br>
+  To appear in ICFP'12.<br>
+<a href="http://www.cl.cam.ac.uk/~mom22/miniml/hol2miniml.pdf">http://www.cl.cam.ac.uk/~mom22/miniml/hol2miniml.pdf</a></p>
+<p>Our code generator takes normal HOL functions as input, translates<br>
+these into ML and proves that the generated ML code <em>terminates</em> and<br>
+correctly implements the given input functions according to an<br>
+operational semantics of our ML language (called MiniML, which is a<br>
+pure subset of ML and Haskell).</p>
+<p>Example:</p>
+<p>As an example, if we were to translate HOL4's library function for<br>
+FOLDL:</p>
+<p>|- (forall f e. FOLDL f e [] = e) /\<br>
+    (forall f e x l. FOLDL f e (x::l) = FOLDL f (f e x) l)</p>
+<p>The tool generates some MiniML code (shown here in SML syntax):</p>
+<p>datatype ('a) list =<br>
+      Cons of 'a * ('a) list<br>
+    | Nil ;</p>
+<p>fun FOLDL v3 =<br>
+    (fn v4 =&gt;<br>
+      (fn v5 =&gt;<br>
+        (case v5 of<br>
+            Nil =&gt; v4<br>
+          | (Cons (v2, v1)) =&gt; (((FOLDL v3) ((v3 v4) v2)) v1)))) ;</p>
+<p>and our code generator automatically proves that this code correctly<br>
+implements the HOL function FOLDL according to an operational<br>
+semantics of MiniML (Eval below).  Here code_for_FOLDL_in asserts that<br>
+the above code is in the environment env, and --&gt; is an infix<br>
+"refinement invariant combinator" explained in the paper.</p>
+<p>|- code_for_FOLDL_in env ==&gt;<br>
+    Eval env (Var "FOLDL")<br>
+      (((b --&gt; a --&gt; b) --&gt; b --&gt; LIST a --&gt; b) FOLDL)</p>
+<p>We call such theorems 'certificate theorems'.</p>
+<p>End of Example.</p>
+<p>I should also mention that we (Ramana Kumar, Scott Owens and I) are<br>
+constructing a verified MiniML implementation (including dynamic<br>
+compilation to x86), so that the trust story can be extended all the<br>
+way down to concrete x86/ARM machine code.</p>
+<blockquote>
+<p>See also "Code Generation via Higher-Order Rewrite Systems" by Haftmann and<br>
+Nipkow, where they state:</p>
+</blockquote>
+<p>Interesting. I wasn't aware of this paper. It seems that this paper<br>
+has proved that an internal phase (dictionary translation) does the<br>
+right thing w.r.t. a model of HRSs.</p>
+<blockquote>
+<p>[...] partial correctness of the generated programs w.r.t. the<br>
+  original equational theorems is guaranteed.</p>
+</blockquote>
+<p>Note that your "[...]" omission hides the big assumption: "If the code<br>
+generator preserves [the semantics of] the equations from the logic<br>
+when turning them into programs"</p>
+<blockquote>
+<p>No claims are stated for aspects which have no explicit<br>
+  representation in the logic, in particular termination or<br>
+  runtime complexity.</p>
+</blockquote>
+<p>Our code generator proves termination. It does this by using the<br>
+induction theorems that arise from function definition (and their<br>
+totality proofs).</p>
+<p>By the way, the last part of the following sentence from Haftmann and<br>
+Nipkow's FLOPS'10 paper is a brave statement with no justification:</p>
+<p>"The transformation of an intermediate program to a program in a<br>
+   full-blown SML or Haskell-like target language is again a mere<br>
+   syntactic adjustment and does not change the equational semantics."</p>
+<p>Cheers,<br>
+Magnus</p>
+<p>On 1 August 2012 03:12, Christian Sternagel &lt;<a href="mailto:c-sterna@jaist.ac.jp">c-sterna@jaist.ac.jp</a>&gt; wrote:</p>
+<blockquote>
+<p>On 08/01/2012 01:38 AM, Yannick Duchêne (Hibou57) wrote:</p>
+<blockquote>
+<p>Le Tue, 31 Jul 2012 18:13:12 +0200, Patrick Michel &lt;<a href="mailto:uni@pbmichel.de">uni@pbmichel.de</a>&gt; a<br>
+écrit:</p>
+<blockquote>
+<p>As it turns out it is quite easy to prove a code equation that<br>
+obviously leads to non-terminating execution.</p>
+</blockquote>
+<p>I've not reached that point (still learning Isabelle and HOL), but I'm<br>
+already interested in this, as I will generate SML programs from proofs.<br>
+Can you please, provide a concrete example of an erroneous proof of a<br>
+non-terminating function?</p>
+</blockquote>
+<p>Just to clarify. There is nothing "erroneous" going on here. There are just<br>
+two different perspectives:</p>
+<p>1) In HOL only functions that are provably total are accepted (but being<br>
+total does not mean that the same function when executed as a functional<br>
+program is terminating, since in HOL there is nothing like an evaluation<br>
+strategy). Consider, e.g.,</p>
+<p>definition ite where<br>
+    "ite b x y == if b then x else y"</p>
+<p>lemmas ite_cong [fundef_cong] =  if_cong [folded ite_def]</p>
+<p>fun f :: "nat =&gt; nat" where<br>
+    "f x = ite (x = 0) 1 (f (x - 1) * x)"</p>
+<p>The call relation of f is well-founded (since in every recursive call the<br>
+argument is decreased by one). However when exporting code in any language<br>
+with strict evaluation, the result will loop on any input.</p>
+<p>2) The only guarantee code-generation gives (and that is quite a strong one)<br>
+is that the generated code is a sound rewriting engine for the function<br>
+defined in the logic (assuming that every tool in the typical chain -- e.g.,<br>
+compiler, OS -- is correct). Being a sound rewriting engine means that every<br>
+equation that can be derived by evaluation in the programming language is<br>
+also an equation of HOL.</p>
+<p>See also "Code Generation via Higher-Order Rewrite Systems" by Haftmann and<br>
+Nipkow, where they state:</p>
+<p>[...] partial correctness of the generated programs w.r.t. the<br>
+  original equational theorems is guaranteed.<br>
+  No claims are stated for aspects which have no explicit<br>
+  representation in the logic, in particular termination or<br>
+  runtime complexity.</p>
+<p>cheers</p>
+<p>chris<br>
+</p>
+</blockquote>
+
+
+
+<a name="294220866"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Some%20Remarks%20to%20Code%20Generation/near/294220866" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Some.20Remarks.20to.20Code.20Generation.html#294220866">(Aug 19 2022 at 08:23)</a>:</h4>
+<p>From: Christian Sternagel &lt;<a href="mailto:c-sterna@jaist.ac.jp">c-sterna@jaist.ac.jp</a>&gt;<br>
+Just to clarify. There is nothing "erroneous" going on here. There are <br>
+just two different perspectives:</p>
+<p>1) In HOL only functions that are provably total are accepted (but being <br>
+total does not mean that the same function when executed as a functional <br>
+program is terminating, since in HOL there is nothing like an evaluation <br>
+strategy). Consider, e.g.,</p>
+<p>definition ite where<br>
+     "ite b x y == if b then x else y"</p>
+<p>lemmas ite_cong [fundef_cong] =  if_cong [folded ite_def]</p>
+<p>fun f :: "nat =&gt; nat" where<br>
+     "f x = ite (x = 0) 1 (f (x - 1) * x)"</p>
+<p>The call relation of f is well-founded (since in every recursive call <br>
+the argument is decreased by one). However when exporting code in any <br>
+language with strict evaluation, the result will loop on any input.</p>
+<p>2) The only guarantee code-generation gives (and that is quite a strong <br>
+one) is that the generated code is a sound rewriting engine for the <br>
+function defined in the logic (assuming that every tool in the typical <br>
+chain -- e.g., compiler, OS -- is correct). Being a sound rewriting <br>
+engine means that every equation that can be derived by evaluation in <br>
+the programming language is also an equation of HOL.</p>
+<p>See also "Code Generation via Higher-Order Rewrite Systems" by Haftmann <br>
+and Nipkow, where they state:</p>
+<p>[...] partial correctness of the generated programs w.r.t. the<br>
+   original equational theorems is guaranteed.<br>
+   No claims are stated for aspects which have no explicit<br>
+   representation in the logic, in particular termination or<br>
+   runtime complexity.</p>
+<p>cheers</p>
+<p>chris</p>
+
+
+
+<a name="294221500"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Some%20Remarks%20to%20Code%20Generation/near/294221500" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Some.20Remarks.20to.20Code.20Generation.html#294221500">(Aug 19 2022 at 08:28)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Magnus,</p>
+<blockquote>
+<p>By the way, the last part of the following sentence from Haftmann and<br>
+Nipkow's FLOPS'10 paper is a brave statement with no justification:</p>
+<p>"The transformation of an intermediate program to a program in a<br>
+   full-blown SML or Haskell-like target language is again a mere<br>
+   syntactic adjustment and does not change the equational semantics."</p>
+</blockquote>
+<p>here you are comparing apples with bananas.  We do not claim anything<br>
+beyond preservation of equational semantics, and argue that our abstract<br>
+intermediate language is appropriately close to ML or Haskell such that<br>
+the final transition »only« involves turning abstract into concrete<br>
+syntax, but no transformations introducing new equations etc.  This,<br>
+naturally, is technically involved, but if I have a look at your<br>
+reference, it also admits that a formal treatment of this is beyond scope:</p>
+<blockquote>
+<p>We have not attempted to solve the problem of verified<br>
+parsing or pretty printing.</p>
+</blockquote>
+<p>Cheers,<br>
+    Florian<br>
+<a href="/user_uploads/14278/VkdB_sLU0mkAglLDvXpCGQd8/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294221517"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Some%20Remarks%20to%20Code%20Generation/near/294221517" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Some.20Remarks.20to.20Code.20Generation.html#294221517">(Aug 19 2022 at 08:29)</a>:</h4>
+<p>From: Magnus Myreen &lt;<a href="mailto:mom22@cam.ac.uk">mom22@cam.ac.uk</a>&gt;<br>
+Hi Florian,</p>
+<p>Admittedly our pretty printing from abstract syntax to concrete SML<br>
+syntax is ad hoc at the moment. However, we do perform this<br>
+translation inside the logic, i.e. by inferences inside the logic, and<br>
+hope to prove it correct w.r.t. an SML parser function. You can find<br>
+the definition of the "dec_to_sml_string" function in the following<br>
+Lem file</p>
+<p><a href="https://github.com/mn200/HOL/blob/master/examples/miniML/semantics/print_ast.lem">https://github.com/mn200/HOL/blob/master/examples/miniML/semantics/print_ast.lem</a></p>
+<p>which is used to generate the HOL4 definition. For evaluation inside<br>
+the logic, we use HOL4's standard EVAL conversion, which is not super<br>
+fast but fast enough.</p>
+<p>My original comment was not so much to do with parsing and printing,<br>
+but more with the fact that you claim with no justification that the<br>
+semantics of "full-blown SML" matches the equational semantics of your<br>
+HRSs.</p>
+<p>This is not to say that our work solves that problem completely<br>
+either! We worry that our MiniML semantics doesn't perfectly match<br>
+"full-blown SML". That is partly our motivation for implementing a<br>
+verified runtime for MiniML, so that we can extend this guarantee down<br>
+to the machine code (where e.g. concrete syntax is trivial).</p>
+<p>Cheers,<br>
+Magnus</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

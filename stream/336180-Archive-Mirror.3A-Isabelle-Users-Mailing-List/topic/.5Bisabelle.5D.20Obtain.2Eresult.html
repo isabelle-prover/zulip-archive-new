@@ -1,0 +1,153 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Obtain.result · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Obtain.2Eresult.html">[isabelle] Obtain.result</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294099546"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Obtain.result/near/294099546" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Obtain.2Eresult.html#294099546">(Aug 18 2022 at 14:35)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+The following version tries to imitate what the system actually does -- <br>
+only concerning contexts, facts and goals, without Isar proof machinery <br>
+getting in between.</p>
+<p>ML {*<br>
+   val cert = Thm.cterm_of @{theory};<br>
+   val ctxt1 = @{context};</p>
+<p>val (_, ctxt2) = ctxt1 |&gt; Variable.add_fixes ["P", "f"];<br>
+   val [A, C] = Syntax.read_props ctxt2 ["EX x. P (f x)", "EX y. P y"];<br>
+   val ([a], ctxt3) = ctxt2<br>
+     |&gt; Variable.declare_term A<br>
+     |&gt; Variable.declare_term C<br>
+     |&gt; Assumption.add_assumes [cert A];</p>
+<p>val ((xs, [b]), ctxt4) = ctxt3<br>
+     |&gt; Obtain.result (fn _ =&gt; etac @{thm exE} 1) [a];</p>
+<p>val res = Goal.prove ctxt4 [] [] C (fn _ =&gt; rtac @{thm exI} 1 THEN rtac b 1);<br>
+   val final_res = singleton (ProofContext.export ctxt4 ctxt1) res;<br>
+*}</p>
+<p>This may also serve as an example of operations from Chapter 4 in the Isar <br>
+Implementation manual.</p>
+<p>When experimenting, you can often do it in a more light-weight fashion, <br>
+e.g. using @{cprop "EX x. P (f x)"} the produce a certified proposition <br>
+that will become the assumption later.  Nonetheless, simultaneous reading <br>
+of propositions as above affects type-inference -- a priori the "f" and <br>
+"P" carry no type constraint. The fully official Variable.declare_term is <br>
+required in production code to get implicit polymorphism of results right, <br>
+among other things.</p>
+<p>Makarius</p>
+
+
+
+<a name="294099901"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Obtain.result/near/294099901" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Obtain.2Eresult.html#294099901">(Aug 18 2022 at 14:37)</a>:</h4>
+<p>From: Palle Raabjerg &lt;<a href="mailto:palle.raabjerg@it.uu.se">palle.raabjerg@it.uu.se</a>&gt;<br>
+Makarius wrote:<br>
+Thanks. It appears we are getting closer to a possible solution. But<br>
+Obtain.result is still causing some headaches.<br>
+In the specific case we are working on, we have this obtain line in Isar:<br>
+from <code>length xvec = length Tvec</code> <code>¬(a \&lt;sharp&gt; xvec)</code> obtain T where<br>
+"(Name a)[xvec:=Tvec] = T" and "T mem Tvec"</p>
+<p>Which will give us the proof obligation:<br>
+(\&lt;And&gt;T. [|Name a[xvec:=Tvec] = T; T mem Tvec|] ==&gt; thesis) ==&gt; thesis<br>
+With the assumptions:<br>
+length xvec = length Tvec<br>
+\&lt;not&gt;(a \&lt;sharp&gt; xvec)<br>
+Which we have a tactic for solving.</p>
+<p>What confuses me is that Obtain.result takes a list of assumptions and a<br>
+tactic, and will give as output lists of bindings (witnesses) and a list<br>
+of propositions, whereas the Isar-obtain allows us to specify the<br>
+witnesses and propositions explicitly.</p>
+<p>If we have an existentially quantified assumption and want it to become<br>
+a proposition and a witness, then Obtain.result seems to work.</p>
+<p>But if I want to do something like the above, and I give the assumptions<br>
+<code>length xvec = length Tvec</code> and <code>\&lt;not&gt;(a \&lt;sharp&gt; xvec)</code> to<br>
+Obtain.result, it simply expects us to prove ([|length xvec = length<br>
+Tvec; \&lt;not&gt;(a \&lt;sharp&gt; xvec)|] ==&gt; thesis) ==&gt; (thesis)<br>
+which is not quite what we want.</p>
+<p>The Isar-obtain and Obtain.result are clearly related. But there is a<br>
+disconnect somewhere that I don't quite understand.</p>
+<ul>
+<li>Palle Raabjerg</li>
+</ul>
+
+
+
+<a name="294102020"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Obtain.result/near/294102020" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Obtain.2Eresult.html#294102020">(Aug 18 2022 at 14:47)</a>:</h4>
+<p>From: Palle Raabjerg &lt;<a href="mailto:palle.raabjerg@it.uu.se">palle.raabjerg@it.uu.se</a>&gt;<br>
+First, thank you for the replies to "Structured induction with custom<br>
+tactics". FOCUS and SUBPROOF does indeed seem to be more or less what we<br>
+were looking for. We may have read over that particular part of the<br>
+programming tutorial a bit too lightly. At the time, we were also using<br>
+a slightly older Isabelle version without FOCUS.</p>
+<p>Anyway. This time I have a somewhat more specific question. How do we<br>
+use Obtain.result?</p>
+<p>For some proofs, we often need to fix variables using the Isar obtain<br>
+command. Obtain.result would seem to be the corresponding ML function,<br>
+but we have so far been unable to figure out how to use it properly. And<br>
+we may possibly be on the wrong track again.</p>
+<p>An example may be best at this stage, so let us take a simple one from<br>
+the Isar tutorial:</p>
+<p>lemma<br>
+  assumes Pf: "\&lt;exists&gt;x. P(f x)"<br>
+  shows "\&lt;exists&gt;y. P y"<br>
+using assms<br>
+proof -<br>
+  from Pf obtain x where "P(f x)" ..<br>
+  thus "\&lt;exists&gt;y. P y" ..<br>
+qed</p>
+<p>What might that look like in ML?</p>
+<p>Regards,<br>
+Palle Raabjerg</p>
+
+
+
+<a name="294102311"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Obtain.result/near/294102311" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Obtain.2Eresult.html#294102311">(Aug 18 2022 at 14:49)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On Tue, 23 Feb 2010, Palle Raabjerg wrote:</p>
+<blockquote>
+<p>It appears we are getting closer to a possible solution. But <br>
+Obtain.result is still causing some headaches. In the specific case we <br>
+are working on, we have this obtain line in Isar: from <code>length xvec = 
+length Tvec</code> <code>¬(a \&lt;sharp&gt; xvec)</code> obtain T where "(Name a)[xvec:=Tvec] = <br>
+T" and "T mem Tvec"</p>
+</blockquote>
+<blockquote>
+<p>What confuses me is that Obtain.result takes a list of assumptions and a <br>
+tactic, and will give as output lists of bindings (witnesses) and a list <br>
+of propositions, whereas the Isar-obtain allows us to specify the <br>
+witnesses and propositions explicitly.</p>
+<p>But if I want to do something like the above, and I give the assumptions<br>
+<code>length xvec = length Tvec</code> and <code>\&lt;not&gt;(a \&lt;sharp&gt; xvec)</code> to<br>
+Obtain.result, it simply expects us to prove ([|length xvec = length<br>
+Tvec; \&lt;not&gt;(a \&lt;sharp&gt; xvec)|] ==&gt; thesis) ==&gt; (thesis)<br>
+which is not quite what we want.</p>
+<p>The Isar-obtain and Obtain.result are clearly related. But there is a <br>
+disconnect somewhere that I don't quite understand.</p>
+</blockquote>
+<p>Isar text is always based on explicit statements by the user, this is <br>
+usually easy to write and easy to read.  When working in ML, composing <br>
+statements is often quite delicate, so Obtain.result refrains from asking <br>
+for that.  In stead the obtained result is specified indirectly via the <br>
+given facts and the tactic to smash them, and extract the result context <br>
+(with local parameters and premises).</p>
+<blockquote>
+<p>If we have an existentially quantified assumption and want it to become<br>
+a proposition and a witness, then Obtain.result seems to work.</p>
+</blockquote>
+<p>You can try it as follows (in ML):</p>
+<p>have "EX x y. A x y &amp; B x y" by your_specific_tactic<br>
+     -- "explicit proposition composed in ML"<br>
+   then obtain x y where "A x y" and "B x y" by (elim exE conjE)<br>
+     -- "Obtain.result here"</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

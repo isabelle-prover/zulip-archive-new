@@ -1,0 +1,147 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Term rewriting systems · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Term.20rewriting.20systems.html">[isabelle] Term rewriting systems</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294065566"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Term%20rewriting%20systems/near/294065566" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Term.20rewriting.20systems.html#294065566">(Aug 18 2022 at 12:22)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:peter.lammich@uni-muenster.de">peter.lammich@uni-muenster.de</a>&gt;<br>
+Hi all,</p>
+<p>I wonder whether there is any tool support (best Isabelle compatible <br>
+tool support) to reason about term rewriting systems of the following form:</p>
+<p>I have a term rewriting system defined over terms of the form:</p>
+<p>datatype 'm action = ENTER "'m" | LEAVE "'m" | USE "'m set"<br>
+datatype 'm tree = NIL | NODE "'m action" "'m tree list" "'m tree"</p>
+<p>the rules are like this:</p>
+<p>1)  NODE (ENTER m) c1 (NODE (LEAVE m) c2 <br>
+t)                                               -&gt; NODE (USE m) (c1@c2) t<br>
+2)  NODE (ENTER m) c1 (NODE (USE m') c2 (NODE (LEAVE m) c3 t))         <br>
+-&gt; NODE (USE (m\&lt;union&gt;m'))  (c1@c2@c3) t<br>
+3)  NODE (USE u1) c1 (NODE (USE u2) c2 t)                              <br>
+                        -&gt; NODE (USE (u1\&lt;union&gt;u2)) (c1@c2) t<br>
+4)  NODE (USE u) (c1@NIL#c2) t                                           <br>
+                                -&gt; NODE (USE u) (c1@c2) t<br>
+5)  NODE (USE u) (c1@(NODE (USE u1) cs1 ts1)@c2@(NODE (USE u2) cs2 <br>
+ts2)@c3) t -&gt; NODE (USE u) (c1@(NODE (USE (u1\&lt;union&gt;u2)) cs1 <br>
+ts1)#c2@cs2@ts2#c3) t<br>
+6)  NODE (USE u1) (c1@(NODE (USE u2) cs ts)#c2) NIL                   -&gt; <br>
+NODE (USE (u1\&lt;union&gt;u2)) (c1@cs@ts#c2)</p>
+<p>My rewriting strategy is rewriting of an arbitrary subterm. Currently I <br>
+define an inductive predicate step ("-&gt;") by the rules 1-6 and <br>
+additionally the inductive rules:<br>
+ 7) t -&gt; t'  ==&gt;  NODE a c t                    -&gt; NODE a c t'<br>
+ 8) t -&gt; t'  ==&gt;  NODE a (c1@t#c2) x   -&gt; NODE a (c1@t'#c2) x</p>
+<p>I want to show termination and confluence of this system. Termination is <br>
+easy, as the size of the tree decreases in any step, hence I easily get<br>
+  lemma "wfP (step^--)"</p>
+<p>By Newman's lemma (A version is in HOL/Lambda/Commutation.thy), it <br>
+suffices to show local confluence, I even think my system above has the <br>
+diamond property.</p>
+<p>Is there any standard approach to term rewriting systems in Isabelle or <br>
+are there some other tools out there, to show confluence (and <br>
+termination) as automatic as possible?<br>
+Are there any suggestions on how to show local confluence of such a <br>
+system in Isabelle (as automatic as possible)?</p>
+<p>The main problem seems to be the non-constructor patterns (like c1@t#c2) <br>
+I use in my rewriting rules (4,5,6,8)</p>
+<p>Thanks for any suggestions/comments in advance, best<br>
+  Peter</p>
+
+
+
+<a name="294065614"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Term%20rewriting%20systems/near/294065614" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Term.20rewriting.20systems.html#294065614">(Aug 18 2022 at 12:22)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+I am not aware of any support for confluence proofs other than abstract<br>
+relation-algebraic theorems.</p>
+<p>Have you proved confluence by hand yet? By some standard method, like<br>
+absence of critical pairs? If not, do that first, by reducing it to some<br>
+standard variety of rewrite system. As you correctly note, list patterns<br>
+of the form xs @ [t] @ ys could be a problem. Either you have to do<br>
+rewriting modulo associativity of @ or add associativity of @ in both<br>
+dirctions as a rewrite rule, which loses termination but may preserve<br>
+confluence.</p>
+<p>Tobias</p>
+<p>Peter Lammich schrieb:</p>
+
+
+
+<a name="294065632"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Term%20rewriting%20systems/near/294065632" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Term.20rewriting.20systems.html#294065632">(Aug 18 2022 at 12:22)</a>:</h4>
+<p>From: Jeremy Dawson &lt;<a href="mailto:jeremy@rsise.anu.edu.au">jeremy@rsise.anu.edu.au</a>&gt;<br>
+Peter Lammich wrote:</p>
+<blockquote>
+<p>Hi all,</p>
+<p>I wonder whether there is any tool support (best Isabelle compatible <br>
+tool support) to reason about term rewriting systems of the following <br>
+form:</p>
+<p>I have a term rewriting system defined over terms of the form:</p>
+<p>datatype 'm action = ENTER "'m" | LEAVE "'m" | USE "'m set"<br>
+datatype 'm tree = NIL | NODE "'m action" "'m tree list" "'m tree"</p>
+<p>the rules are like this:</p>
+<p>1)  NODE (ENTER m) c1 (NODE (LEAVE m) c2 <br>
+t)                                               -&gt; NODE (USE m) <br>
+(c1@c2) t<br>
+2)  NODE (ENTER m) c1 (NODE (USE m') c2 (NODE (LEAVE m) c3 t))         <br>
+-&gt; NODE (USE (m\&lt;union&gt;m'))  (c1@c2@c3) t<br>
+3)  NODE (USE u1) c1 (NODE (USE u2) c2 t)                              <br>
+                       -&gt; NODE (USE (u1\&lt;union&gt;u2)) (c1@c2) t<br>
+4)  NODE (USE u) (c1@NIL#c2) <br>
+t                                           <br>
+                               -&gt; NODE (USE u) (c1@c2) t<br>
+5)  NODE (USE u) (c1@(NODE (USE u1) cs1 ts1)@c2@(NODE (USE u2) cs2 <br>
+ts2)@c3) t -&gt; NODE (USE u) (c1@(NODE (USE (u1\&lt;union&gt;u2)) cs1 <br>
+ts1)#c2@cs2@ts2#c3) t<br>
+6)  NODE (USE u1) (c1@(NODE (USE u2) cs ts)#c2) NIL                   <br>
+-&gt; NODE (USE (u1\&lt;union&gt;u2)) (c1@cs@ts#c2)</p>
+<p>My rewriting strategy is rewriting of an arbitrary subterm. Currently <br>
+I define an inductive predicate step ("-&gt;") by the rules 1-6 and <br>
+additionally the inductive rules:<br>
+7) t -&gt; t'  ==&gt;  NODE a c t                    -&gt; NODE a c t'<br>
+8) t -&gt; t'  ==&gt;  NODE a (c1@t#c2) x   -&gt; NODE a (c1@t'#c2) x</p>
+<p>I want to show termination and confluence of this system. Termination <br>
+is easy, as the size of the tree decreases in any step, hence I easily <br>
+get<br>
+ lemma "wfP (step^--)"</p>
+<p>By Newman's lemma (A version is in HOL/Lambda/Commutation.thy), it <br>
+suffices to show local confluence, I even think my system above has <br>
+the diamond property.</p>
+<p>Is there any standard approach to term rewriting systems in Isabelle <br>
+or are there some other tools out there, to show confluence (and <br>
+termination) as automatic as possible?<br>
+Are there any suggestions on how to show local confluence of such a <br>
+system in Isabelle (as automatic as possible)?</p>
+<p>The main problem seems to be the non-constructor patterns (like <br>
+c1@t#c2) I use in my rewriting rules (4,5,6,8)</p>
+<p>Thanks for any suggestions/comments in advance, best<br>
+ Peter</p>
+<p>Peter,</p>
+</blockquote>
+<p>I have a lot of proofs relating to some theorems for proving rewrite <br>
+systems terminating.  There are a number of examples of its application <br>
+to specific rewrite rule systems.</p>
+<p>The model of term which is rewritten is (n-ary function symbol) (list of <br>
+n subterms),<br>
+so rewriting a subterm naturally is rewriting f (c1@t#c2) to f (c1@t'#c2).</p>
+<p>The work is focussed on proving general results rather than applying <br>
+them to particular systems, but you may find it useful.  At the moment <br>
+it runs in Isabelle 2005,<br>
+I started trying to update it to Isabelle 2007 but the incompatibilities <br>
+are significant.</p>
+<p>It's at <a href="http://users.rsise.anu.edu.au/~jeremy/isabelle/2005/snabs/">http://users.rsise.anu.edu.au/~jeremy/isabelle/2005/snabs/</a><br>
+(also uses <a href="http://users.rsise.anu.edu.au/~jeremy/isabelle/2005/gen/">http://users.rsise.anu.edu.au/~jeremy/isabelle/2005/gen/</a>)</p>
+<p>Jeremy</p>
+<p>&gt;<br>
+&gt;<br>
+&gt;</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

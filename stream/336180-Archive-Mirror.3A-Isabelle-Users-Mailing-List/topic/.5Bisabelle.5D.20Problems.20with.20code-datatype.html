@@ -1,0 +1,266 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Problems with code-datatype · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20code-datatype.html">[isabelle] Problems with code-datatype</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294306952"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20code-datatype/near/294306952" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20code-datatype.html#294306952">(Aug 19 2022 at 15:56)</a>:</h4>
+<p>From: René Thiemann &lt;<a href="mailto:rene.thiemann@uibk.ac.at">rene.thiemann@uibk.ac.at</a>&gt;<br>
+Dear all,</p>
+<p>I currently have some trouble when trying to build code for types with invariants.<br>
+In principle, I have some </p>
+<p>typedef foo = {b :: bar. P b} ...</p>
+<p>and now want to construct some function which creates objects of type bar as follows:</p>
+<p>setup_lifting type_definition_foo</p>
+<p>lift_definition create_foo :: "bar =&gt; foo option" is "% b. if P b then Some b else None" ...</p>
+<p>However, then I cannot create code for create_foo:<br>
+a simple <br>
+  export_code create_foo in Haskell<br>
+fails.</p>
+<p>Reading the manual on code-generation and "Data Refinement in Isabelle/HOL", I realized that<br>
+page 109 it is mentioned that for abstract type A and concrete type C one can<br>
+lift a function f :: C =&gt; (C)θ =&gt; C to a function f whose type should be A =&gt; (A)θ =&gt; A.<br>
+So does that mean that I won't be able to define my function create_foo as essentially it is<br>
+of type C =&gt; A?</p>
+<p>Any help is appreciated,</p>
+<p>Kind regards,<br>
+René</p>
+<p>PS: Below you find a more detailed example</p>
+<p>theory Test<br>
+imports  <br>
+  Main<br>
+begin</p>
+<p>datatype test = A | B | C<br>
+typedef no_B = "{ t :: test. t ~= B}" by auto</p>
+<p>setup_lifting type_definition_no_B</p>
+<p>lift_definition get_test :: "no_B =&gt; test" <br>
+  is "% x. x" .</p>
+<p>lift_definition get_no_B :: "test =&gt; no_B option" <br>
+  is "% t. if t = B then None else Some t" <br>
+  by auto</p>
+<p>export_code get_test in Haskell <br>
+(* works fine *)</p>
+<p>export_code get_no_B in Haskell<br>
+(* No code equations for get_no_B *)</p>
+<p>declare get_no_B.abs_eq[code]</p>
+<p>export_code get_no_B in Haskell<br>
+(* Abstraction violation<br>
+(in code equation get_no_B ?x ≡<br>
+                  map_option Abs_no_B<br>
+                   (if equal_test_inst.equal_test ?x<br>
+                        B<br>
+                    then None else Some ?x)):<br>
+constant Abs_no_B *)<br>
+(* somehow the violation is just because the criterion seems to be purely<br>
+   syntactic. Via the if-then-else it is guaranteed that the invariant of <br>
+   no_B is satisfied ! *)</p>
+
+
+
+<a name="294306967"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20code-datatype/near/294306967" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20code-datatype.html#294306967">(Aug 19 2022 at 15:57)</a>:</h4>
+<p>From: Wenda Li &lt;<a href="mailto:wl302@cam.ac.uk">wl302@cam.ac.uk</a>&gt;<br>
+Dear René,</p>
+<p>This is not quite true, as you can define</p>
+<p>lift_definition g:: "test =&gt; no_B "<br>
+   is "% t. if t = B then A else t"<br>
+   by auto</p>
+<p>and the code generation works fine. In terms of</p>
+<p>lift_definition get_no_B :: "test =&gt; no_B option"<br>
+   is "% t. if t = B then None else Some t"<br>
+   by auto</p>
+<p>I think the problem is with</p>
+<p>get_no_B.rep_eq: map_option Rep_no_B (get_no_B ?x) = (if ?x = B then <br>
+None else Some ?x)</p>
+<p>An ideal code abstract equation for type no_B is of the form</p>
+<p>Rep_no_B (f ...) = ...</p>
+<p>so that code equations that preserve invariants of no_B could be derived <br>
+for f. Lemma get_no_B.rep_eq does not match such format, and I guess <br>
+that is why code generation fails for get_no_B (although in theory I <br>
+think we can still derive code equations in such cases). Experts on data <br>
+refinements should be able to comment more ;-)</p>
+<p>Hope this helps,<br>
+Wenda</p>
+
+
+
+<a name="294306993"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20code-datatype/near/294306993" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20code-datatype.html#294306993">(Aug 19 2022 at 15:57)</a>:</h4>
+<p>From: René Thiemann &lt;<a href="mailto:rene.thiemann@uibk.ac.at">rene.thiemann@uibk.ac.at</a>&gt;<br>
+Dear Wenda,</p>
+<blockquote>
+<blockquote>
+<p>Reading the manual on code-generation and "Data Refinement in Isabelle/HOL", I realized that<br>
+page 109 it is mentioned that for abstract type A and concrete type C one can<br>
+lift a function f :: C =&gt; (C)? =&gt; C to a function f whose type should be A =&gt; (A)? =&gt; A.<br>
+So does that mean that I won't be able to define my function create_foo as essentially it is<br>
+of type C =&gt; A?</p>
+</blockquote>
+<p>This is not quite true, as you can define</p>
+<p>lift_definition g:: "test =&gt; no_B "<br>
+ is "% t. if t = B then A else t"<br>
+ by auto</p>
+<p>and the code generation works fine. In terms of</p>
+<p>lift_definition get_no_B :: "test =&gt; no_B option"<br>
+ is "% t. if t = B then None else Some t"<br>
+ by auto</p>
+<p>I think the problem is with</p>
+<p>get_no_B.rep_eq: map_option Rep_no_B (get_no_B ?x) = (if ?x = B then None else Some ?x)</p>
+</blockquote>
+<p>I fully agree.</p>
+<blockquote>
+<p>An ideal code abstract equation for type no_B is of the form</p>
+<p>Rep_no_B (f ...) = ...</p>
+<p>so that code equations that preserve invariants of no_B could be derived for f. Lemma get_no_B.rep_eq does not match such format, and I guess that is why code generation fails for get_no_B (although in theory I think we can still derive code equations in such cases).</p>
+</blockquote>
+<p>Again I agree, in principle the test ensures that no bad terms can walk below an Abs_no_B.</p>
+<blockquote>
+<p>Experts on data refinements should be able to comment more ;-)</p>
+<p>Hope this helps,</p>
+</blockquote>
+<p>Definitely it was helpful, thanks a lot. Based on your definition of get_no_B I now could modify my code as follows to my original setting, which now is code-exportable.</p>
+<p>datatype test = A | B | C<br>
+typedef no_B = "{ t :: test. t ~= B}" by auto</p>
+<p>setup_lifting type_definition_no_B</p>
+<p>lift_definition get_test :: "no_B =&gt; test" <br>
+  is "% x. x" .</p>
+<p>lift_definition get_no_B' :: "test =&gt; no_B" <br>
+  is "% t. if t = B then A else t" <br>
+  by auto</p>
+<p>definition get_no_B :: "test =&gt; no_B option" where<br>
+  "get_no_B t = (if t = B then None else Some (get_no_B' t))"</p>
+<p>lemma get_no_B: "get_no_B t = Some no_b ==&gt; <br>
+  get_test no_b = t" <br>
+  unfolding get_no_B_def<br>
+  by (cases "t = B", simp_all, transfer, auto)</p>
+<p>export_code get_test in Haskell <br>
+export_code get_no_B in Haskell </p>
+<p>However, this solution has the small problem, that the test "t = B" is done in both<br>
+get_no_B and get_no_B'. In my real application this test "t = B" is a bit more complicated to<br>
+compute, so still the solution is not optimal. (The original definition of get_no_B only had <br>
+one test "t = B")</p>
+<p>Cheers,<br>
+René</p>
+
+
+
+<a name="294307056"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20code-datatype/near/294307056" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20code-datatype.html#294307056">(Aug 19 2022 at 15:57)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi René,</p>
+<p>You can avoid the duplicate test by lifting the invariant no_B to the type "no_B option". <br>
+To that end, you have to introduce another type constructor, say no_B_option (see below <br>
+for an adaptation of your example). The tricky bit is to get from no_B_option back to no_B <br>
+option. There, you must not use lifting in the result type; otherwise, the same problem <br>
+reoccurs. Here, I use a a case combinator, but your real use case might require something <br>
+else.</p>
+<p>Hope this helps,<br>
+Andreas</p>
+<p>datatype test = A | B | C<br>
+typedef no_B = "{ t :: test. t ~= B}" by auto</p>
+<p>setup_lifting type_definition_no_B</p>
+<p>lift_definition A_no_B :: "no_B" is A by simp<br>
+lift_definition C_no_B :: "no_B" is C by simp</p>
+<p>typedef no_B_option = "{x. B ∉ set_option x}" by auto</p>
+<p>setup_lifting type_definition_no_B_option</p>
+<p>lift_definition get_no_B' :: "test ⇒ no_B_option"<br>
+is "λt . if t = B then None else Some t" by simp</p>
+<p>lift_definition unpack_no_B_option :: "no_B_option ⇒ no_B option"<br>
+is "λx. (case x of None ⇒ None | Some A ⇒ Some A_no_B | Some C ⇒ Some C_no_B)" .</p>
+<p>definition get_no_B :: "test ⇒ no_B option"<br>
+where "get_no_B t = unpack_no_B_option (get_no_B' t)"</p>
+<p>export_code get_no_B</p>
+
+
+
+<a name="294307260"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20code-datatype/near/294307260" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20code-datatype.html#294307260">(Aug 19 2022 at 15:58)</a>:</h4>
+<p>From: René Thiemann &lt;<a href="mailto:rene.thiemann@uibk.ac.at">rene.thiemann@uibk.ac.at</a>&gt;<br>
+Hi Andreas,</p>
+<blockquote>
+<blockquote>
+<p>However, this solution has the small problem, that the test "t = B" is done in both<br>
+get_no_B and get_no_B'. In my real application this test "t = B" is a bit more complicated to<br>
+compute, so still the solution is not optimal. (The original definition of get_no_B only had<br>
+one test "t = B")<br>
+You can avoid the duplicate test by lifting the invariant no_B to the type "no_B option". To that end, you have to introduce another type constructor, say no_B_option (see below for an adaptation of your example). The tricky bit is to get from no_B_option back to no_B option. There, you must not use lifting in the result type; otherwise, the same problem reoccurs.</p>
+</blockquote>
+</blockquote>
+<p>First of all, thanks for your hints.</p>
+<p>Unfortunately I was not able to adapt your proposed solution to my case for the following reasons.</p>
+<p>1) I do not see why in your solution there is only one test "t = B":<br>
+   in get_noB' there definitely is one "t = B" test, and the second one is hidden in<br>
+   unpack_no_B_option, where again you make a case analysis which seems similar to a "t = B" test,<br>
+   i.e., here you have to choose the reason why the value is in no_B (whether it is the reason A or C)</p>
+<p>2) I did not understand why the type-copy no_B_option should help at all: with A_no_B and C_no_B at hand you can<br>
+   more easily and directly define</p>
+<p>definition get_no_B :: "test =&gt; no_B option" where<br>
+     "get_no_B t == if t = B then None else case t of A =&gt; Some A_no_B | C =&gt; Some C_no_B"</p>
+<p>or even </p>
+<p>definition get_no_B :: "test =&gt; no_B option" where<br>
+     "get_no_B t == case t of A =&gt; Some A_no_B | B =&gt; None | C =&gt; Some C_no_B"</p>
+<blockquote>
+<p>Here, I use a a case combinator, but your real use case might require something else.</p>
+</blockquote>
+<p>3) Exactly. In my real case I have </p>
+<p>typedef special_functions = "{ f :: nat =&gt; nat. P f}" </p>
+<p>where P is some predicate of interest on functions. Here, I do not see how I can easily write functions similar to "A_no_B" or "C_no_B" <br>
+which always create objects of special_function type (without actually checking P). <br>
+This would then again lead to two invocations of checking P: one in the function corresponding to "A_no_B", and the other similar to get_no_B <br>
+with then checks whether it should return None or Some.</p>
+<p>Cheers,<br>
+René</p>
+
+
+
+<a name="294307324"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20code-datatype/near/294307324" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20code-datatype.html#294307324">(Aug 19 2022 at 15:59)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi René,</p>
+<p>On 30/09/14 15:14, René Thiemann wrote:</p>
+<blockquote>
+<p>1) I do not see why in your solution there is only one test "t = B":<br>
+    in get_noB' there definitely is one "t = B" test, and the second one is hidden in<br>
+    unpack_no_B_option, where again you make a case analysis which seems similar to a "t = B" test,<br>
+    i.e., here you have to choose the reason why the value is in no_B (whether it is the reason A or C)<br>
+That's right. I just thought that a case analysis is faster than a complicated predicate <br>
+test, but at second thought it does not buy you anything.</p>
+</blockquote>
+<blockquote>
+<p>2) I did not understand why the type-copy no_B_option should help at all: with A_no_B and C_no_B at hand you can<br>
+    more easily and directly define</p>
+<p>definition get_no_B :: "test =&gt; no_B option" where<br>
+      "get_no_B t == if t = B then None else case t of A =&gt; Some A_no_B | C =&gt; Some C_no_B"</p>
+<p>or even</p>
+<p>definition get_no_B :: "test =&gt; no_B option" where<br>
+      "get_no_B t == case t of A =&gt; Some A_no_B | B =&gt; None | C =&gt; Some C_no_B"<br>
+The idea for the type copy comes from the paper on Data Refinement, as I have answered on <br>
+stackexchange some time ago:</p>
+</blockquote>
+<p><a href="http://stackoverflow.com/questions/16040064/isabelles-code-generation-abstraction-lemmas-for-containers">http://stackoverflow.com/questions/16040064/isabelles-code-generation-abstraction-lemmas-for-containers</a></p>
+<p>However, this does not solve your problem with duplicate testing. In a follow-up thread, <br>
+Joachim describes a solution to avoid duplicate tests:</p>
+<p><a href="http://stackoverflow.com/questions/16273812/working-with-isabelles-code-generator-data-refinement-and-higher-order-functio">http://stackoverflow.com/questions/16273812/working-with-isabelles-code-generator-data-refinement-and-higher-order-functio</a></p>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<a name="294317120"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20code-datatype/near/294317120" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20code-datatype.html#294317120">(Aug 19 2022 at 16:16)</a>:</h4>
+<p>From: René Thiemann &lt;<a href="mailto:rene.thiemann@uibk.ac.at">rene.thiemann@uibk.ac.at</a>&gt;<br>
+Hi Andreas,</p>
+<p>thanks for this reference. Joachim's solution can perfectly be adapted to our application, and indeed now we also require only one test.</p>
+<p>Cheers,<br>
+René</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

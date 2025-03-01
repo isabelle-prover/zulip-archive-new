@@ -1,0 +1,166 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle-dev] Debugging help: Hacking the kernel for pro... · Mirror: Isabelle Development Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/index.html">Mirror: Isabelle Development Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20Debugging.20help.3A.20Hacking.20the.20kernel.20for.20pro.2E.2E.2E.html">[isabelle-dev] Debugging help: Hacking the kernel for pro...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="206353070"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20Debugging%20help%3A%20Hacking%20the%20kernel%20for%20pro.../near/206353070" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20Debugging.20help.3A.20Hacking.20the.20kernel.20for.20pro.2E.2E.2E.html#206353070">(Aug 08 2020 at 15:53)</a>:</h4>
+<p>From: Mario Carneiro &lt;<a href="mailto:di.gama@gmail.com">di.gama@gmail.com</a>&gt;<br>
+(I'm posting this to isabelle-dev since it's a very internal technical<br>
+question that probably won't be of interest to end users.)</p>
+<p>So I've managed to successfully modify the kernel to support better proof<br>
+traces, with ~0 performance impact, but while processing HOL I hit an error<br>
+in Extraction.thy that am having trouble debugging.</p>
+<p>The line that fails is:</p>
+<p>lemmas [extraction_expand] = meta_spec</p>
+<p>which gives an error "add_expand_thm: unnamed theorem". I believe this<br>
+means that add_expand_thm is being passed the wrong theorem, or a variant<br>
+on the theorem, that hasn't been explicitly tagged with the name. However,<br>
+as near as I can tell, this lemmas directive does the same thing as</p>
+<p>ML "Extraction.add_expand_thm false @{thm meta_spec} @{theory}"</p>
+<p>and this has no errors. How can I more precisely unfold the meaning of the<br>
+lemmas command here to get ML code that has exactly the same behavior, so<br>
+that I can inline functions until I've isolated the source of the<br>
+problematic theorem?</p>
+<p>Also, is there any way for me to do "printf debugging" in isabelle/ML? The<br>
+focus on pure functional programming makes debugging especially difficult,<br>
+but I'm sure I'm just missing the idioms for doing so (understandably, I<br>
+can't find any examples of debugging in the source).</p>
+
+
+
+<a name="206353387"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20Debugging%20help%3A%20Hacking%20the%20kernel%20for%20pro.../near/206353387" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20Debugging.20help.3A.20Hacking.20the.20kernel.20for.20pro.2E.2E.2E.html#206353387">(Aug 08 2020 at 16:00)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:eberlm@in.tum.de">eberlm@in.tum.de</a>&gt;<br>
+On 08/08/2020 17:52, Mario Carneiro wrote:</p>
+<blockquote>
+<p>So I've managed to successfully modify the kernel to support better<br>
+proof traces, with ~0 performance impact, but while processing HOL I hit<br>
+an error in Extraction.thy that am having trouble debugging.</p>
+</blockquote>
+<p>Oof, I can't help you with your actual question, but my advice would be<br>
+to just ignore Extraction for now (i.e. just remove it from HOL). It's<br>
+not really used much and I don't think anyone except Stefan Berghofer<br>
+understands the code in detail. For an experiment such as the one that<br>
+you are doing, I think it is safe to ignore whatever problems arise from<br>
+Extraction for now.</p>
+<blockquote>
+<p>Also, is there any way for me to do "printf debugging" in isabelle/ML?<br>
+The focus on pure functional programming makes debugging especially<br>
+difficult, but I'm sure I'm just missing the idioms for doing so<br>
+(understandably, I can't find any examples of debugging in the source).</p>
+</blockquote>
+<p>There are a few functions ("writeln", "Pretty.writeln", "print_tac" for<br>
+tactics) but the easiest one in most circumstances is the @{print}<br>
+antiquotation which takes just about anything (integers, lists, types,<br>
+terms, theorems) and just prints it. For instance:</p>
+<p>let<br>
+  val _ = @{print} my_term<br>
+in<br>
+  &lt;actual code&gt;<br>
+end</p>
+<p>I sometimes turn terms into cterms before printing them like this<br>
+because then they are printed more nicely.</p>
+<p>Very interesting thing that you're trying here, and I must commend you<br>
+for your bravery to delve this deep into the internals of Isabelle all<br>
+by yourself!</p>
+<p>I recall you saying earlier this year that you might try to do this, but<br>
+I didn't expect you to actually go through with it. You must /really/<br>
+want some of our precious Isabelle/HOL theorems very badly. ;)</p>
+<p>Manuel</p>
+<hr>
+<p>isabelle-dev mailing list<br>
+<a href="mailto:isabelle-dev@in.tum.de">isabelle-dev@in.tum.de</a><br>
+<a href="https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev">https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev</a></p>
+
+
+
+<a name="206354461"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20Debugging%20help%3A%20Hacking%20the%20kernel%20for%20pro.../near/206354461" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20Debugging.20help.3A.20Hacking.20the.20kernel.20for.20pro.2E.2E.2E.html#206354461">(Aug 08 2020 at 16:28)</a>:</h4>
+<p>From: Kevin Kappelmann &lt;<a href="mailto:kevin.kappelmann@tum.de">kevin.kappelmann@tum.de</a>&gt;<br>
+On 08.08.20 17:52, Mario Carneiro wrote:&gt; ....</p>
+<blockquote>
+<p>Also, is there any way for me to do "printf debugging" in isabelle/ML?<br>
+The focus on pure functional programming makes debugging especially<br>
+difficult, but I'm sure I'm just missing the idioms for doing so<br>
+(understandably, I can't find any examples of debugging in the source).</p>
+</blockquote>
+<p>The ML-cookbook has a section (2.2) about debugging that might help you:<br>
+<a href="https://nms.kcl.ac.uk/christian.urban/Cookbook/">https://nms.kcl.ac.uk/christian.urban/Cookbook/</a><br>
+Some  combinators (like "tap") might also speed up your development (see<br>
+section 2.3).</p>
+<blockquote>
+<p>Currently I'm in the first stage, which involves modifying primarily<br>
+thm.ML and proofterm.ML to support "proof traces" instead of "proof<br>
+terms".</p>
+</blockquote>
+<p>Do you mind giving more details about what you mean by "proof traces" in<br>
+this context?</p>
+<p>Best wishes,</p>
+<p>Kevin</p>
+<hr>
+<p>isabelle-dev mailing list<br>
+<a href="mailto:isabelle-dev@in.tum.de">isabelle-dev@in.tum.de</a><br>
+<a href="https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev">https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev</a></p>
+
+
+
+<a name="206363496"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20Debugging%20help%3A%20Hacking%20the%20kernel%20for%20pro.../near/206363496" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20Debugging.20help.3A.20Hacking.20the.20kernel.20for.20pro.2E.2E.2E.html#206363496">(Aug 08 2020 at 20:48)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+This means you are interfering with the ongoing Isabelle development process<br>
+(i.e. everything around repository versions, including administrative problems).</p>
+<p>Whatever you do with official Isabelle releases outside of the Isabelle<br>
+development process belongs to the isabelle-users mailing list. We don't have<br>
+a separate "kernel hacking mailing list" (and don't need that).</p>
+<p>My own priority in answering threads is as follows (high to low):</p>
+<p>1. isabelle-dev<br>
+  2. isabelle-users<br>
+  3. isabelle-dev material that does not belong here</p>
+<p>Makarius</p>
+<hr>
+<p>isabelle-dev mailing list<br>
+<a href="mailto:isabelle-dev@in.tum.de">isabelle-dev@in.tum.de</a><br>
+<a href="https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev">https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev</a></p>
+
+
+
+<a name="206363658"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20Debugging%20help%3A%20Hacking%20the%20kernel%20for%20pro.../near/206363658" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20Debugging.20help.3A.20Hacking.20the.20kernel.20for.20pro.2E.2E.2E.html#206363658">(Aug 08 2020 at 20:53)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Standard disclaimer: the cookbook is somewhat outdated and non-standard.<br>
+People who have learned special "tricks" over there might have to unlearn them<br>
+later: there is a 50/50 chance that they are conceptually wrong, or just old.</p>
+<p>Answer to the original question: see the "implementation" manual section "0.2.4<br>
+Printing ML values" (with examples).</p>
+<p>(These questions belong to the isabelle-users mailing list, where more people<br>
+can benefit from the answers as well.)</p>
+<p>Makarius</p>
+<hr>
+<p>isabelle-dev mailing list<br>
+<a href="mailto:isabelle-dev@in.tum.de">isabelle-dev@in.tum.de</a><br>
+<a href="https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev">https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev</a></p>
+
+
+
+<a name="206363716"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247542-Mirror%3A%20Isabelle%20Development%20Mailing%20List/topic/%5Bisabelle-dev%5D%20Debugging%20help%3A%20Hacking%20the%20kernel%20for%20pro.../near/206363716" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247542-Mirror.3A-Isabelle-Development-Mailing-List/topic/.5Bisabelle-dev.5D.20Debugging.20help.3A.20Hacking.20the.20kernel.20for.20pro.2E.2E.2E.html#206363716">(Aug 08 2020 at 20:55)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+I find this all very interesting, but it does not belong the the<br>
+administrative isabelle-dev mailing list.</p>
+<p>Makarius</p>
+<hr>
+<p>isabelle-dev mailing list<br>
+<a href="mailto:isabelle-dev@in.tum.de">isabelle-dev@in.tum.de</a><br>
+<a href="https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev">https://mailman46.in.tum.de/mailman/listinfo/isabelle-dev</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

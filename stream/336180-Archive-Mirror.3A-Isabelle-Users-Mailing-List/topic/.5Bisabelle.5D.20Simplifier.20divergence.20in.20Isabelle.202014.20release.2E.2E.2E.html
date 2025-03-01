@@ -1,0 +1,189 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Simplifier divergence in Isabelle 2014 release... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Simplifier.20divergence.20in.20Isabelle.202014.20release.2E.2E.2E.html">[isabelle] Simplifier divergence in Isabelle 2014 release...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294288241"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Simplifier%20divergence%20in%20Isabelle%202014%20release.../near/294288241" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Simplifier.20divergence.20in.20Isabelle.202014.20release.2E.2E.2E.html#294288241">(Aug 19 2022 at 15:22)</a>:</h4>
+<p>From: Thomas Sewell &lt;<a href="mailto:thomas.sewell@nicta.com.au">thomas.sewell@nicta.com.au</a>&gt;<br>
+Hello Isabelle users.</p>
+<p>I've been putting a little time into updating the l4.verified proofs to <br>
+isabelle-2014 (partly because I wanted to know what fraction of the <br>
+problems would be caused by my hypsubst change). I've had a few problems <br>
+I will soon report on. The simplest problem to report involves the <br>
+simplifier.</p>
+<p>I haven't been following closely, but I take it the simplifier is now a <br>
+bit more aggressive in figuring out how to instantiate assumptions. This <br>
+is probably a good thing, and has shrunk a few of the proofs in the <br>
+repository already.</p>
+<p>The problem is that this new mechanism sometimes leads to divergence, <br>
+and I don't know how to turn it off. Here's an example I came across (or <br>
+see the attached theory):</p>
+<p>theory Scratch imports Main begin</p>
+<p>lemma foo:<br>
+   "⋀a aa b ba ab bb bc.<br>
+        pasDomainAbs initial_aag (cur_domain b)<br>
+        ∈ subjectReads (pasPolicy initial_aag) (OrdinaryLabel a) ⟹<br>
+        u = Partition a ⟹<br>
+        s = ((aa, b), ba) ⟹<br>
+        s' = ((ab, bb), bc) ⟹<br>
+        states_equiv_for<br>
+         (λx. pasObjectAbs initial_aag x ∈ subjectReads (pasPolicy <br>
+initial_aag) (OrdinaryLabel a))<br>
+         (λx. pasIRQAbs initial_aag x ∈ subjectReads (pasPolicy <br>
+initial_aag) (OrdinaryLabel a))<br>
+         (λx. pasASIDAbs initial_aag x ∈ subjectReads (pasPolicy <br>
+initial_aag) (OrdinaryLabel a))<br>
+         (λx. pasDomainAbs initial_aag x ∈ subjectReads (pasPolicy <br>
+initial_aag) (OrdinaryLabel a))<br>
+         (λx. ptr_range x 12) b bb ⟹<br>
+        pasDomainAbs initial_aag (cur_domain b)<br>
+        ∈ subjectReads (pasPolicy initial_aag) (OrdinaryLabel a) ⟶<br>
+        cur_domain b = cur_domain bb ∧<br>
+        globals_equiv b bb ∧<br>
+        scheduler_action b = scheduler_action bb ∧<br>
+        work_units_completed b = work_units_completed bb ∧<br>
+        equiv_irq_state (machine_state b) (machine_state bb) ∧<br>
+        (user_modes ba ⟶ aa = ab) ∧<br>
+        ba = bc ∧ equiv_for (λx. pasObjectAbs initial_aag x = SilcLabel) <br>
+kheap b bb ⟹<br>
+        pasDomainAbs initial_aag (cur_domain bb)<br>
+        ∈ subjectReads (pasPolicy initial_aag) (OrdinaryLabel a) ⟶<br>
+        cur_domain b = cur_domain bb ∧<br>
+        globals_equiv b bb ∧<br>
+        scheduler_action b = scheduler_action bb ∧<br>
+        work_units_completed b = work_units_completed bb ∧<br>
+        equiv_irq_state (machine_state b) (machine_state bb) ∧<br>
+        (user_modes ba ⟶ aa = ab) ∧<br>
+        ba = bc ∧ equiv_for (λx. pasObjectAbs initial_aag x = SilcLabel) <br>
+kheap b bb ⟹<br>
+        (user_modes ba ⟶ aa = ab) ∧ ba = bc<br>
+   "</p>
+<p>This is just a copy of a goal that came up in a proof somewhere. I don't <br>
+know what any of this means either, and it turns out it doesn't matter. <br>
+The behaviour is the same in a scratch theory with none of the constants <br>
+defined.</p>
+<p>This problem will cause "simp" or "(simp only: )" to loop. It will be <br>
+solved immediately by clarify or blast. It can be solved by metis if we <br>
+adjust the problem a little to ensure the type variables all have sorts.</p>
+<p>The news file suggests that [[simp_legacy_precond]] might be relevant to <br>
+this issue, but it doesn't seem to change anything.</p>
+<p>In detail, this problem is solved by simplifying the implication whose <br>
+premise is already known, i.e. apply (drule(1) mp). It happens the <br>
+script "apply (drule(1) mp, simp)" solves the goal.</p>
+<p>This weakness of simp is quite frustrating. To generate the above goal, <br>
+I had to work around the possible simp divergence by simplifying in stages:<br>
+   apply (simp add: uwr_def sameFor_def sameFor_subject_def)<br>
+   apply clarify<br>
+   apply (simp(no_asm_use))<br>
+   apply clarify</p>
+<p>I'm willing to accept the argument that this is not a bug but rather a <br>
+tradeoff, with the default behaviour now being to solve more problems <br>
+but sometimes time out more often. However I'd really like a way to turn <br>
+this off. I've already had to dance around the problem in a couple of <br>
+places, and it seems to be a generally unpleasant experience. My usual <br>
+workarounds (simp only: ) and (simp(no_asm_use)) can't help me here.</p>
+<p>I attach my scratch theory with this problem.</p>
+<p>I hope there's a simple fix.</p>
+<p>Cheers,<br>
+     Thomas.<br>
+<a href="/user_uploads/14278/kDxRJQv8zq5-cPwir1cBIN8D/Scratch.thy">Scratch.thy</a></p>
+
+
+
+<a name="294288275"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Simplifier%20divergence%20in%20Isabelle%202014%20release.../near/294288275" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Simplifier.20divergence.20in.20Isabelle.202014.20release.2E.2E.2E.html#294288275">(Aug 19 2022 at 15:22)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+Dear Thomas,</p>
+<p>I just tried your file with Isabelle2013-2 and simp looped. This corroborates<br>
+your experience that [[simp_legacy_precond]] doesn't do anything, because the<br>
+divergence is not related to it. In any case, the only simplifier change I am<br>
+aware of relates to the handling of conjunctions in the premises of conditional<br>
+rewrite rules, and [[simp_legacy_precond]] switches that off.</p>
+<p>Tobias</p>
+
+
+
+<a name="294288304"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Simplifier%20divergence%20in%20Isabelle%202014%20release.../near/294288304" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Simplifier.20divergence.20in.20Isabelle.202014.20release.2E.2E.2E.html#294288304">(Aug 19 2022 at 15:23)</a>:</h4>
+<p>From: Thomas Sewell &lt;<a href="mailto:thomas.sewell@nicta.com.au">thomas.sewell@nicta.com.au</a>&gt;<br>
+It's been pointed out to me that this particular behaviour of the <br>
+simplifier predates Isabelle2014.</p>
+<p>Apologies to everyone. I assumed that the extracted example was <br>
+representative because it also caused the simplifier to loop. Instead it <br>
+looks like the context somehow previously allowed the simplifier not to <br>
+loop, and this has changed. I will have to investigate further.</p>
+<p>Apologies once again,<br>
+     Thomas.</p>
+
+
+
+<a name="294288318"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Simplifier%20divergence%20in%20Isabelle%202014%20release.../near/294288318" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Simplifier.20divergence.20in.20Isabelle.202014.20release.2E.2E.2E.html#294288318">(Aug 19 2022 at 15:23)</a>:</h4>
+<p>From: Thomas Sewell &lt;<a href="mailto:thomas.sewell@nicta.com.au">thomas.sewell@nicta.com.au</a>&gt;<br>
+The mystery deepens. This problem is somehow my fault.</p>
+<p>It is the presence of the three completely redundant equalities "u = <br>
+Partition a" "s = ((aa, b), ba)" "s' = ((ab, bb), bc)" which causes the <br>
+simplifier to loop. These have been preserved by the hypothesis <br>
+substitution change.</p>
+<p>In either case, the simplifier initially loops on the assumption it has<br>
+   "pasDomainAbs initial_aag (cur_domain b)<br>
+        ∈ subjectReads (pasPolicy initial_aag) (OrdinaryLabel a) ⟶<br>
+        cur_domain b = cur_domain bb"</p>
+<p>But in the old world, the simplifier goes down the rabbit hole - up to a <br>
+recursive depth of 100 - then realises it is stuck, gives up, and solves <br>
+the problem instead.</p>
+<p>In the new world, the simplifier does the same things. But once it has <br>
+done that, it starts thinking about the preserved subgoal containing <br>
+"aa" which provides a use for one of the conditional rewrites "aa = ab" <br>
+floating around. Somehow the simplifier has multiple options now, so <br>
+instead of running to a depth of 100 and then giving up and coming back, <br>
+it starts backtracking different approaches, and will never finish.</p>
+<p>In hindsight this all makes sense, and is entirely my problem. I hope <br>
+noone else has to deal with anything this awful as a result of this change.</p>
+<p>Thanks to everyone for listening to me talk to myself about simplifier <br>
+mysteries.</p>
+<p>Cheers,<br>
+     Thomas.</p>
+
+
+
+<a name="294289003"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Simplifier%20divergence%20in%20Isabelle%202014%20release.../near/294289003" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Simplifier.20divergence.20in.20Isabelle.202014.20release.2E.2E.2E.html#294289003">(Aug 19 2022 at 15:26)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+This thread seems to be resolved for now.  I just want to make sure that <br>
+there is nothing left to reconsider for the Isabelle2014 release, which <br>
+will be shipped next week.</p>
+<p>Some months ago there was a similar surprise about simplifier depth limit <br>
+concerning simprocs.  See the subject line "Product_Type.split_beta fails" <br>
+in October 2013 with the conclusion here: <br>
+<a href="https://lists.cam.ac.uk/mailman/htdig/cl-isabelle-users/2014-February/msg00056.html">https://lists.cam.ac.uk/mailman/htdig/cl-isabelle-users/2014-February/msg00056.html</a></p>
+<p>The changeset mentioned there is:</p>
+<p>changeset:   55375:d79c057c68f0<br>
+user:        wenzelm<br>
+date:        Mon Feb 10 13:04:08 2014 +0100<br>
+files:       src/Pure/raw_simplifier.ML<br>
+description:<br>
+more elementary put_simpset: exchange the simplifier configuration <br>
+outright, which is particularly relevant concerning cumulative depth, e.g. <br>
+for Product_Type.split_beta in the subsequent example:</p>
+<p>lemma "P (\&lt;lambda&gt;s. (case s of (x, y) \&lt;Rightarrow&gt; c))"<br>
+     using [[simp_depth_limit = 1]]<br>
+     apply simp<br>
+     oops</p>
+<p>It falls in the interval between the last release Isabelle2013-2 and the <br>
+emerging one Isabelle2014.  Thus it might be relevant concerning potential <br>
+regressions of Simplifier behaviour due to a change that was meant to <br>
+improve the situation.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

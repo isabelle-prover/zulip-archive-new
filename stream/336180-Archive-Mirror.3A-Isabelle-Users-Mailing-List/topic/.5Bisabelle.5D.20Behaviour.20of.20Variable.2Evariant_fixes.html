@@ -1,0 +1,110 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Behaviour of Variable.variant_fixes · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Behaviour.20of.20Variable.2Evariant_fixes.html">[isabelle] Behaviour of Variable.variant_fixes</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294290030"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Behaviour%20of%20Variable.variant_fixes/near/294290030" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Behaviour.20of.20Variable.2Evariant_fixes.html#294290030">(Aug 19 2022 at 15:32)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+Dear list,</p>
+<p>consider this snippet:</p>
+<p>ML{*<br>
+  val constr = (((Binding.empty, @{binding Constr}), []), NoSyn)<br>
+  val datatyp = (([], @{binding test}), NoSyn)</p>
+<p>val lthy = Named_Target.init "" @{theory}</p>
+<p>val (x, lthy) = Variable.variant_fixes ["x"] lthy</p>
+<p>val lthy =<br>
+    BNF_FP_Def_Sugar.co_datatypes<br>
+      BNF_Util.Least_FP BNF_LFP.construct_lfp<br>
+      ((false, false), [(((datatyp, [constr]), (Binding.empty,<br>
+Binding.empty)), [])]) lthy</p>
+<p>val (x', lthy) = Variable.variant_fixes ["x"] lthy<br>
+*}</p>
+<p>The results for x and x' are somewhat unexpected to me:</p>
+<p>val x = ["x"]: string list<br>
+  val x' = ["x"]: string list</p>
+<p>I expected them to be different. Indeed, they are different when I move<br>
+the BNF definition to the front, before the calls to <code>variant_fixes</code>.</p>
+<p>In my use case, I'm translating between a foreign AST and Isabelle's<br>
+term language. This AST contains type and value definitions, but the<br>
+respective translations do not depend on each other, so they can be done<br>
+in parallel (this is an actual parallelized algorithm -- the definitions<br>
+are presented to the Isabelle system in some unordered way).</p>
+<p>I can't even declare my newly-fixed variables immediately inside the<br>
+context, because I don't know their types in advance. (I tried doing<br>
+that in my above example nonetheless by inserting the line</p>
+<p>val lthy = Variable.declare_term (Free (x, @{typ int})) lthy</p>
+<p>after the first <code>variant_fixes</code>, but that didn't change the outcome at all.)</p>
+<p>Do I need to sequentialize my algorithm?</p>
+<p>Cheers<br>
+Lars</p>
+
+
+
+<a name="294290475"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Behaviour%20of%20Variable.variant_fixes/near/294290475" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Behaviour.20of.20Variable.2Evariant_fixes.html#294290475">(Aug 19 2022 at 15:34)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+One more thing: this doesn't happen for other kinds of operations, e.g.<br>
+<code>Function.add_function</code>. Executing</p>
+<p>val fun_config = Function_Common.FunctionConfig<br>
+    {sequential=true, default=NONE, domintros=false, partials=false}<br>
+  fun pat_completeness_auto ctxt =<br>
+    Pat_Completeness.pat_completeness_tac ctxt 1 THEN auto_tac ctxt</p>
+<p>val (_, lthy) = Function.add_function<br>
+    [(@{binding foo}, NONE, NoSyn)]<br>
+    ([(Attrib.empty_binding, @{term "Trueprop (foo (Suc r) = r)"})])<br>
+    fun_config pat_completeness_auto lthy</p>
+<p>between two calls of <code>variant_fixes</code> doesn't exhibit this behaviour<br>
+(i.e. fixed variables are preserved). That makes me wonder whether it is<br>
+some oddity in BNF, or for type definitions in general.</p>
+
+
+
+<a name="294322028"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Behaviour%20of%20Variable.variant_fixes/near/294322028" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Behaviour.20of.20Variable.2Evariant_fixes.html#294322028">(Aug 19 2022 at 16:40)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+Reviving this old thread, because Dmitriy and Ondrej were asking me<br>
+about the workaround I found, so I figured I should post it publicly.</p>
+<p>Anyway, it turns out that if the definition of a datatype is carried out<br>
+in a local theory created using Local_Theory.init, the variable names<br>
+are preserved.</p>
+<p>ML{*<br>
+  fun init ctxt = ctxt<br>
+    |&gt; Local_Theory.init (Sign.naming_of @{theory})<br>
+       {define = Generic_Target.define Generic_Target.theory_foundation,<br>
+        notes = Generic_Target.notes Generic_Target.theory_notes,<br>
+        abbrev = Generic_Target.abbrev Generic_Target.theory_abbrev,<br>
+        declaration = K Generic_Target.theory_declaration,<br>
+        subscription = Generic_Target.theory_registration,<br>
+        pretty = K [],<br>
+        exit = Local_Theory.target_of #&gt; Sign.change_end_local}</p>
+<p>val ctxt = @{theory}<br>
+    |&gt; Sign.change_begin<br>
+    |&gt; Proof_Context.init_global</p>
+<p>val (x, ctxt) = Variable.variant_fixes ["x"] ctxt<br>
+  val lthy = init ctxt</p>
+<p>val constr = (((Binding.empty, @{binding Constr}), []), NoSyn)<br>
+  val datatyp = (([], @{binding test}), NoSyn)</p>
+<p>val lthy =<br>
+    BNF_FP_Def_Sugar.co_datatypes<br>
+      BNF_Util.Least_FP BNF_LFP.construct_lfp<br>
+      ((false, false), [(((datatyp, [constr]), (Binding.empty,<br>
+Binding.empty)), [])]) lthy</p>
+<p>val ctxt = Local_Theory.exit lthy</p>
+<p>val (x', ctxt) = Variable.variant_fixes ["x"] ctxt<br>
+*}</p>
+<p>The only difference to the previous code is that all other operations<br>
+apart from datatype definition happens in a regular proof context, not<br>
+in a local theory, and that a local theory is created and exited on the<br>
+spot when a datatype is to be defined.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

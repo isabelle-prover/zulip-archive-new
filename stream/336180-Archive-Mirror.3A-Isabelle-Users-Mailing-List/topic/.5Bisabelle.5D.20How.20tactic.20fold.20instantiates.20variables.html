@@ -1,0 +1,111 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] How tactic fold instantiates variables · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20How.20tactic.20fold.20instantiates.20variables.html">[isabelle] How tactic fold instantiates variables</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294642010"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20How%20tactic%20fold%20instantiates%20variables/near/294642010" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20How.20tactic.20fold.20instantiates.20variables.html#294642010">(Aug 22 2022 at 10:01)</a>:</h4>
+<p>From: Daniel Raggi &lt;<a href="mailto:danielraggi@gmail.com">danielraggi@gmail.com</a>&gt;<br>
+I'm having trouble understanding something. Let me explain:</p>
+<p>When folding a definition, why would someone (in some cases), need to<br>
+specify instantiations of variables using [where "X = ..."]?</p>
+<p>I can see how it's useful to do it in some cases to avoid having to<br>
+backtrack.</p>
+<p>I've defined function <em>fadd</em> as follows:<br>
+<em>definition "fadd M N = (λa. M a + N a)"</em></p>
+<p>purely as a test, I have the following goal to prove:<br>
+<em>lemma "(λx. 0 + 0) = (λx. 0)"</em></p>
+<p>However, when I try this:<br>
+<em>lemma "(λx. 0 + 0) = (λx. 0)"</em></p>
+<ul>
+<li>apply (fold fadd_def)*</li>
+</ul>
+<p>I get *(λx. fadd (λa. 0) (λa. a) 0) = (λx. 0) *as a result. However, if I<br>
+try:<br>
+lemma "(λx. 0 + 0) = (λx. 0)"</p>
+<ul>
+<li>apply (fold fadd_def[where M = "λx. 0" and N = "λx. 0"]) *</li>
+</ul>
+<p>I get what I want, which is <em>fadd (λx. 0) (λx. 0) = (λx. 0)</em>.</p>
+<p>I'm a bit confused, because in the case of *apply (fold fadd_def) *I'm not<br>
+even getting what I want, even when using <em>back</em>. Can anyone point me at<br>
+why my desired instantiation of variables is not tried?</p>
+<p>Thanks a lot to anyone who minds taking a look at this.</p>
+<p>Best,<br>
+Daniel</p>
+
+
+
+<a name="294644674"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20How%20tactic%20fold%20instantiates%20variables/near/294644674" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20How.20tactic.20fold.20instantiates.20variables.html#294644674">(Aug 22 2022 at 10:19)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+(This old thread still looks unsettled.)</p>
+<p>On Fri, 29 May 2015, Daniel Raggi wrote:</p>
+<blockquote>
+<p>When folding a definition, why would someone (in some cases), need to<br>
+specify instantiations of variables using [where "X = ..."]?</p>
+<p>I can see how it's useful to do it in some cases to avoid having to<br>
+backtrack.</p>
+</blockquote>
+<p>First note that (fold eq) is the same as (unfold eq [symmetric]).</p>
+<p>For more than one equation, there is a slight difference in the initial <br>
+order, although the details are unclear to me; see <br>
+src/Pure/raw_simplifer.ML:</p>
+<p>val rev_defs = sort_lhs_depths o map Thm.symmetric;</p>
+<p>Larry might be able to explain that code "from the depths of time", as he <br>
+usually says; see<br>
+<a href="http://isabelle.in.tum.de/repos/isabelle/rev/e7588b53d6b0">http://isabelle.in.tum.de/repos/isabelle/rev/e7588b53d6b0</a></p>
+<p>Back to "unfold".  That is just the Simplifier with its usual policies, <br>
+see also the isar-ref manual section 9.3 "The Simplifier".  The main <br>
+strategy is bottom-up rewriting with higher-order patterns.</p>
+<p>There is no support for back-tracking in the rewrite engine, so the <br>
+command 'back' normally does not make any sense with applications of <br>
+"unfold", "simp" etc.  (In principle some wrapper tactics of the <br>
+simplifier can produce more than one result for back-tracking.)</p>
+<blockquote>
+<p>I've defined function <em>fadd</em> as follows:<br>
+<em>definition "fadd M N = (λa. M a + N a)"</em></p>
+<p>purely as a test, I have the following goal to prove:<br>
+<em>lemma "(λx. 0 + 0) = (λx. 0)"</em></p>
+<p>However, when I try this:<br>
+<em>lemma "(λx. 0 + 0) = (λx. 0)"</em>
+*  apply (fold fadd_def)*</p>
+<p>I get *(λx. fadd (λa. 0) (λa. a) 0) = (λx. 0) *as a result. However, if I<br>
+try:<br>
+lemma "(λx. 0 + 0) = (λx. 0)"
+*  apply (fold fadd_def[where M = "λx. 0" and N = "λx. 0"]) *</p>
+<p>I get what I want, which is <em>fadd (λx. 0) (λx. 0) = (λx. 0)</em>.</p>
+<p>I'm a bit confused, because in the case of *apply (fold fadd_def) *I'm not<br>
+even getting what I want, even when using <em>back</em>. Can anyone point me at<br>
+why my desired instantiation of variables is not tried?</p>
+</blockquote>
+<p>Looking quickly over the example, it looks as an expected result of <br>
+bottom-up rewriting.</p>
+<p>What you want, might be something else.  Depending on the application, you <br>
+can try a simproc to determine instantiations in ML, or you can try to <br>
+implement your very own replacement strategy as a conversion in ML.</p>
+<p>The latter is actually easier than writing common tactics, although less <br>
+known.  The starting point is src/Pure/conv.ML and examples may be found <br>
+in existing Isabelle sources, although that structure Conv is exceptional <br>
+in being used as "open" in Isabelle/ML, i.e. it requires a hypersearch <br>
+with unqualified names.</p>
+<p>Makarius</p>
+
+
+
+<a name="294644861"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20How%20tactic%20fold%20instantiates%20variables/near/294644861" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20How.20tactic.20fold.20instantiates.20variables.html#294644861">(Aug 22 2022 at 10:20)</a>:</h4>
+<p>From: Larry Paulson &lt;<a href="mailto:lp15@cam.ac.uk">lp15@cam.ac.uk</a>&gt;<br>
+I don’t have anything to explain about the code, other than to note that the comments refer to critical pairs. This is a reminder that a set of rewrite rules can be ambiguous. Instantiating variables is one way to cope with ambiguity, and it also helps if folding the right hand side would involve higher-order matching.</p>
+<p>Larry Paulson</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,128 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] instantiation order for a record · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20instantiation.20order.20for.20a.20record.html">[isabelle] instantiation order for a record</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294252624"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20instantiation%20order%20for%20a%20record/near/294252624" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20instantiation.20order.20for.20a.20record.html#294252624">(Aug 19 2022 at 12:16)</a>:</h4>
+<p>From: Sven Schneider &lt;<a href="mailto:Sven.Schneider@TU-Berlin.DE">Sven.Schneider@TU-Berlin.DE</a>&gt;<br>
+Dear Isabelle community,</p>
+<p>I am having trouble instantiation the typeclass order for one of my records.<br>
+Actually, the problem exists whenever the typeclass has parameters, to<br>
+be defined.</p>
+<p>The error message is not particularly helpful to me.<br>
+*** Bad head of lhs: existing constant "op \&lt;le&gt;"<br>
+*** The error(s) above occurred in definition:<br>
+*** "A \&lt;le&gt; B \&lt;equiv&gt; lesseqTESTRECORD A B"</p>
+<p>The online manual did not help me much in this case either; I tried<br>
+unsuccessfully to translate the examples from the manual to my case.</p>
+<p>Hopefully somebody can give me a hint on what to change to get to the<br>
+point where the proving can start.</p>
+<p>Cheers,<br>
+Sven</p>
+<p>==============================<br>
+TESTRECORD.thy BEGIN<br>
+==============================<br>
+theory TESTRECORD<br>
+imports<br>
+  Main</p>
+<p>begin</p>
+<p>record 'a TESTRECORD =<br>
+  prefix_elem :: "'a set"</p>
+<p>definition lesseqTESTRECORD :: "'a TESTRECORD \&lt;Rightarrow&gt; 'a<br>
+TESTRECORD \&lt;Rightarrow&gt; bool" where<br>
+  "lesseqTESTRECORD D1 D2 \&lt;equiv&gt; (prefix_elem D1 \&lt;subseteq&gt;<br>
+prefix_elem D2)"</p>
+<p>definition lessTESTRECORD :: "'a TESTRECORD \&lt;Rightarrow&gt; 'a TESTRECORD<br>
+\&lt;Rightarrow&gt; bool" where<br>
+  "lessTESTRECORD D1 D2 \&lt;equiv&gt; lesseqTESTRECORD D1 D2 \&lt;and&gt; D1\&lt;noteq&gt;D2"</p>
+<p>instantiation "TESTRECORD_ext" :: (type,type) order<br>
+begin</p>
+<p>print_context</p>
+<p>definition<br>
+  less_eq_TESTRECORD_ext_def: "less_eq A B = lesseqTESTRECORD A B"</p>
+<p>definition<br>
+  less_TESTRECORD_ext_def: "less A B = lessTESTRECORD A B"</p>
+<p>instance proof<br>
+==============================<br>
+TESTRECORD.thy END<br>
+==============================</p>
+
+
+
+<a name="294252682"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20instantiation%20order%20for%20a%20record/near/294252682" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20instantiation.20order.20for.20a.20record.html#294252682">(Aug 19 2022 at 12:16)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear Sven,</p>
+<p>When you define the parameters of a type class in an instantiation, you must make sure <br>
+that type inference infers exactly the expected type for the constant to be defined. If <br>
+the type is not right, Isabelle does not recognize this as the definition of the <br>
+parameter. In your example with record, you instantiate the type class for TESTRECORD_ext.<br>
+Hence, your definition of less_eq should have the type<br>
+   ('a, 'b) TESTRECORD_ext =&gt; ('a, 'b) TESTRECORD_ext =&gt; bool<br>
+However, type inference computes the type<br>
+   'a TESTRECORD =&gt; 'a TESTRECORD =&gt; bool<br>
+where 'a TESTRECORD abbreviates ('a, unit) TESTRECORD_ext, i.e, the type is too specialised.</p>
+<p>Therefore, you have to generalise your definition of lesseqTESTRECORD and lessTESTRECORD <br>
+to the raw type ('a, 'b) TESTRECORD_ext of the extensible record. In fact, if you just <br>
+delete the type annotation for your definition of these two constants, the definitions <br>
+will work, but you will not be able to show the order class axioms, because your <br>
+comparison functions ignore any possible extensions of the record and therefore <br>
+antisymmetry does not hold.</p>
+<p>Instead, the comparison operations should work for any extension of the record. The <br>
+following should work. There are three differences:</p>
+<ol>
+<li>
+<p>The types are generalised to TESTRECORD_ext with the extension type parameter 'b being <br>
+of sort ord</p>
+</li>
+<li>
+<p>The comparison is extended point-wise to the extension of the record (more D1 &lt;= more D2)</p>
+</li>
+<li>
+<p>The instantiation requires the sort order for the extension type parameter, as you will <br>
+otherwise not be able to complete the proof.</p>
+</li>
+</ol>
+<p>definition lesseqTESTRECORD :: "('a, 'b :: ord) TESTRECORD_ext \&lt;Rightarrow&gt; ('a, 'b)<br>
+TESTRECORD_ext \&lt;Rightarrow&gt; bool" where<br>
+   "lesseqTESTRECORD D1 D2 \&lt;equiv&gt; (prefix_elem D1 \&lt;subseteq&gt;<br>
+prefix_elem D2) &amp; more D1 &lt;= more D2"</p>
+<p>definition lessTESTRECORD :: "('a, 'b :: ord) TESTRECORD_ext \&lt;Rightarrow&gt; ('a, 'b) <br>
+TESTRECORD_ext<br>
+\&lt;Rightarrow&gt; bool" where<br>
+   "lessTESTRECORD D1 D2 \&lt;equiv&gt; lesseqTESTRECORD D1 D2 \&lt;and&gt; D1\&lt;noteq&gt;D2"</p>
+<p>instantiation "TESTRECORD_ext" :: (type,order) order<br>
+begin</p>
+<p>There is just one remaining problem: In Isabelle2013, the unit type is not an instance of <br>
+order, and neither in the coming release (but probably in Isabelle2014). So, you have to <br>
+provide an instantiation for unit yourself. You can import, e.g., the theory from the <br>
+Archive of Formal Proofs at<br>
+<a href="http://afp.sourceforge.net/browser_info/devel/AFP/Containers/Unit_Instantiations.html">http://afp.sourceforge.net/browser_info/devel/AFP/Containers/Unit_Instantiations.html</a></p>
+<p>One further remark: It is generally better to avoid intermediate constants like <br>
+lesseqTESTRECORD and instead to define the order operation directly inside the <br>
+instantiation context, unless you have particular reasons.</p>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<a name="294252693"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20instantiation%20order%20for%20a%20record/near/294252693" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20instantiation.20order.20for.20a.20record.html#294252693">(Aug 19 2022 at 12:16)</a>:</h4>
+<p>From: Sven Schneider &lt;<a href="mailto:Sven.Schneider@TU-Berlin.DE">Sven.Schneider@TU-Berlin.DE</a>&gt;<br>
+Dear Andreas,</p>
+<p>thank you very much.<br>
+With your help I could solve my actual problem/.</p>
+<p>/Best regards,<br>
+Sven</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

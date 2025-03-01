@@ -1,0 +1,128 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Some lemmas with a combinatoric flavor · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Some.20lemmas.20with.20a.20combinatoric.20flavor.html">[isabelle] Some lemmas with a combinatoric flavor</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="223069209"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Some%20lemmas%20with%20a%20combinatoric%20flavor/near/223069209" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Some.20lemmas.20with.20a.20combinatoric.20flavor.html#223069209">(Jan 17 2021 at 23:23)</a>:</h4>
+<p>From: Jakub Kądziołka &lt;<a href="mailto:kuba@kadziolka.net">kuba@kadziolka.net</a>&gt;<br>
+Good evening,</p>
+<p>I have proven some lemmas that would probably fit into the Isabelle<br>
+distribution - a lower bound on the size of a set of natural numbers,<br>
+and a summation formula that counts how many times each value occurs.</p>
+<p>By the way, I seem to be submitting mails like these somewhat often<br>
+lately; please let me know if I should be doing something to make this<br>
+more manageable.</p>
+<p>Regards,<br>
+Jakub Kądziołka</p>
+<p>lemma max_ge_card: "finite S ⟹ Suc (Max S) ≥ card S"<br>
+proof (rule classical)<br>
+  assume "finite S" and "¬ Suc (Max S) ≥ card S"<br>
+  then have "Suc (Max S) &lt; card S"<br>
+    by simp<br>
+  with <code>finite S</code> have "S ⊆ {0..Max S}"<br>
+    by auto<br>
+  hence "card S ≤ card {0..Max S}"<br>
+    by (intro card_mono; auto)<br>
+  thus "card S ≤ Suc (Max S)"<br>
+    by simp<br>
+qed</p>
+<p>lemma nat_sum_ge_card_sum:<br>
+  shows "∑ {0..&lt;card S} ≤ ∑ S"<br>
+proof (cases "finite S")<br>
+  case True<br>
+  then show ?thesis<br>
+  proof (induction "card S" arbitrary: S)<br>
+    case (Suc x)<br>
+    then have "Max S ≥ x" using max_ge_card by fastforce<br>
+    let ?S' = "S - {Max S}"<br>
+    from Suc have "Max S ∈ S" by (auto intro: Max_in)<br>
+    hence cards: "card S = Suc (card ?S')"<br>
+      using <code>finite S</code> by (intro card.remove; auto)<br>
+    hence "∑ {0..&lt;card ?S'} ≤ ∑ ?S'"<br>
+      using Suc by (intro Suc; auto)</p>
+<p>hence "∑ {0..&lt;card ?S'} + x ≤ ∑ ?S' + Max S"<br>
+      using <code>Max S ≥ x</code> by simp<br>
+    also have "... = ∑ S"<br>
+      using sum.remove[OF <code>finite S</code> <code>Max S ∈ S</code>, where g="λx. x"]<br>
+      by simp<br>
+    finally show ?case<br>
+      using cards Suc by auto<br>
+  qed simp<br>
+qed simp</p>
+<p>lemma sum_count:<br>
+  assumes "finite S" "finite R" "g <code> S ⊆ R"
+  shows "(∑x ∈ S. f (g x)) = (∑y ∈ R. of_nat (card {x ∈ S. g x = y}) * f y)"
+proof -
+  let ?r = "relation_of (λp q. g p = g q) S"
+  have eqv: "equiv S ?r"
+    unfolding relation_of_def by (auto intro: comp_equivI)
+  have finite: "C ∈ S//?r ⟹ finite C" for C
+    by (fact finite_equiv_class[OF </code>finite S<code> equiv_type[OF </code>equiv S ?r`]])<br>
+  have disjoint: "A ∈ S//?r ⟹ B ∈ S//?r ⟹ A ≠ B ⟹ A ∩ B = {}" for A B<br>
+    using eqv quotient_disj by blast</p>
+<p>let ?cls = "λy. {x ∈ S. y = g x}"<br>
+  have quot_as_img: "S//?r = ?cls <code> g </code> S"<br>
+    by (auto simp add: relation_of_def quotient_def)<br>
+  have cls_inj: "inj_on ?cls (g ` S)"<br>
+    by (auto intro: inj_onI)</p>
+<p>have rest_0: "(∑y ∈ R - g <code> S. of_nat (card (?cls y)) * f y) = 0"
+    (is "?rest = 0")
+  proof -
+    {
+      fix y
+      assume "y ∈ R - g </code> S"<br>
+      then have *: "?cls y = {}"<br>
+        by auto<br>
+      have "of_nat (card (?cls y)) * f y = 0"<br>
+        unfolding * by simp<br>
+    }<br>
+    thus ?thesis by simp<br>
+  qed</p>
+<p>have "(∑x ∈ S. f (g x)) = (∑C ∈ S//?r. ∑x ∈ C. f (g x))"<br>
+    using eqv finite disjoint<br>
+    by (simp flip: sum.Union_disjoint[simplified] add: Union_quotient)<br>
+  also have "... = (∑y ∈ g <code> S. ∑x ∈ ?cls y. f (g x))"
+    unfolding quot_as_img by (simp add: sum.reindex[OF cls_inj])
+  also have "... = (∑y ∈ g </code> S. ∑x ∈ ?cls y. f y)"<br>
+    by auto<br>
+  also have "... = (∑y ∈ g <code> S. of_nat (card (?cls y)) * f y)"
+    by (simp flip: sum_constant)
+  also have "... = (∑y ∈ R. of_nat (card (?cls y)) * f y)"
+    using rest_0 by (simp add: sum.subset_diff[OF ‹g </code> S ⊆ R› ‹finite R›])<br>
+  finally show ?thesis<br>
+    by (simp add: eq_commute)<br>
+qed</p>
+
+
+
+<a name="223208944"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Some%20lemmas%20with%20a%20combinatoric%20flavor/near/223208944" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Some.20lemmas.20with.20a.20combinatoric.20flavor.html#223208944">(Jan 19 2021 at 10:30)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+Thank you for your contributions, they will be added shortly.<br>
+Yes, the process of submitting contributions like yours needs to be improved.</p>
+<p>Tobias<br>
+<a href="/user_uploads/14278/fJfwbAtwDMe1toM12J_3uKxe/smime.p7s">smime.p7s</a></p>
+
+
+
+<a name="223368100"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Some%20lemmas%20with%20a%20combinatoric%20flavor/near/223368100" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Some.20lemmas.20with.20a.20combinatoric.20flavor.html#223368100">(Jan 20 2021 at 12:51)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+Jakub,</p>
+<p>I added and renamed your lemmas:<br>
+<a href="http://isabelle.in.tum.de/repos/isabelle/rev/be9b73dfd3e0">http://isabelle.in.tum.de/repos/isabelle/rev/be9b73dfd3e0</a></p>
+<p>Thanks<br>
+Tobias<br>
+<a href="/user_uploads/14278/EydFbCK2vJCXUbJ047bP_nGQ/smime.p7s">smime.p7s</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

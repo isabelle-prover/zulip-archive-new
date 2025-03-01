@@ -1,0 +1,106 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Transfer rule for undefined · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Transfer.20rule.20for.20undefined.html">[isabelle] Transfer rule for undefined</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294241271"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Transfer%20rule%20for%20undefined/near/294241271" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Transfer.20rule.20for.20undefined.html#294241271">(Aug 19 2022 at 11:04)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear developers of lifting/transfer,</p>
+<p>First of all, I'd like to thank all of you for this great tool, I am now using it all the <br>
+time. Unfortunately, I keep proving different transfer rules for the constant undefined <br>
+over and over again, although they all have the same shape.</p>
+<p>The following example illustrates my setting:</p>
+<p>typedef my_int = "UNIV :: int set" .. setup_lifting type_definition_my_int<br>
+typedef my_nat = "UNIV :: nat set" .. setup_lifting type_definition_my_nat</p>
+<p>lift_definition P :: "my_int =&gt; bool" is "op &gt; 0" .<br>
+lift_definition foo :: "my_int =&gt; bool =&gt; my_nat" is "%i _. nat i" .<br>
+lift_definition my_int_of_my_nat :: "my_nat =&gt; my_int" is int .</p>
+<p>definition bar :: "my_int =&gt; bool =&gt; my_nat"<br>
+   where "bar i b = (if P i then undefined i b else foo i b)"</p>
+<p>lemma "foo (my_int_of_my_nat n) b = bar (my_int_of_my_nat n) b"<br>
+   unfolding bar_def<br>
+   apply transfer</p>
+<p>This gives me the following second subgoal for undefined:</p>
+<p>Transfer.Rel (fun_rel cr_my_int (fun_rel op = cr_my_nat)) ?ah23 undefined</p>
+<p>So far, I just proved this transfer rule for an appropriate instantiation of ?ah23, but I <br>
+have to prove similar goals with different combinations of fun_rel, cr_... etc. So I tried <br>
+to prove a generic transfer lemma for quotients:</p>
+<p>lemma undefined_transfer:<br>
+   assumes Q1: "Quotient A Abs1 Rep1 cr1"<br>
+   and Q2: "Quotient B Abs2 Rep2 cr2"<br>
+   shows "(fun_rel cr2 cr1) (Rep1 o undefined o Abs2) undefined"<br>
+by(auto dest!: Q2[unfolded Quotient_alt_def, THEN conjunct1, rule_format]<br>
+      intro!: Q1[unfolded Quotient_alt_def, THEN conjunct2, THEN conjunct1, rule_format])</p>
+<p>With this lemma, I can prove all these rules for undefined -- in the running example:</p>
+<p>apply(unfold Rel_def)<br>
+apply(rule undefined_transfer fun_quotient identity_quotient<br>
+         Quotient_my_nat Quotient_my_int)+</p>
+<p>Unfortunately, I did not manage to have transfer prove these rules on the fly. How can I <br>
+get there? The following declarations do not suffice:</p>
+<p>lemmas [transfer_rule] =<br>
+   undefined_transfer Quotient_my_int Quotient_my_nat fun_quotient identity_quotient</p>
+<p>Thanks in advance for any help,<br>
+Andreas</p>
+<p>PS: The example is from Isabelle2013, but it is similar in the development version (id <br>
+13171b27eaca).</p>
+
+
+
+<a name="294242773"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Transfer%20rule%20for%20undefined/near/294242773" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Transfer.20rule.20for.20undefined.html#294242773">(Aug 19 2022 at 11:14)</a>:</h4>
+<p>From: Ondřej Kunčar &lt;<a href="mailto:kuncar@in.tum.de">kuncar@in.tum.de</a>&gt;<br>
+Hi Andreas,<br>
+the issue with undefined is on my to-do list. I think your solution is <br>
+on the right track. When I have more time, I will make something more <br>
+robust to deal with undefined.</p>
+<p>OK, how to make your example working:<br>
+1) Quotient_my_int and Quotient_my_nat uses non-parametric <br>
+correspondence relation cr_my_int and cr_my_nat, whereas the transfer <br>
+rules uses pcr_my_int and pcr_my_nat. In this case you can just use <br>
+my_int.pcr_cr_eq and my_nat.pcr_cr_eq to change the former relations to <br>
+the latter ones.<br>
+2) identity_quotient should be always before all rules for other types, <br>
+thus it is used at the very end.<br>
+3) I think this theorem should be enough to generate transfer rules for <br>
+undefined on the fly:<br>
+lemma undefined_transfer_better:<br>
+   assumes "Quotient R Abs Rep T"<br>
+   shows "T (Rep undefined) undefined"<br>
+using assms unfolding Quotient_alt_def by blast</p>
+<p>Thus the result is:<br>
+lemmas [transfer_rule] = identity_quotient fun_quotient<br>
+   Quotient_my_int[unfolded my_int.pcr_cr_eq[symmetric]]<br>
+   Quotient_my_nat[unfolded my_nat.pcr_cr_eq[symmetric]]<br>
+   undefined_transfer_better</p>
+<p>Ondrej</p>
+
+
+
+<a name="294242782"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Transfer%20rule%20for%20undefined/near/294242782" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Transfer.20rule.20for.20undefined.html#294242782">(Aug 19 2022 at 11:14)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Ondřej,</p>
+<p>Thank you for your suggestion, it works like a charm.</p>
+<p>This only applies to the development version, e.g., 608afd26a476. As is good practice on <br>
+isabelle-users, I have back-ported my problem to Isabelle2013 where there are only <br>
+non-parametric correspondence relations. But you rightly guessed that I am actually <br>
+working with the development version.</p>
+<p>By the way, I wrap the type "32 word" in a type of its own to do the usual code generation <br>
+refinement stuff. When I call setup_lifting with the type definition, it warns that it <br>
+cannot generate a parametrized correspondence relation failed because it could not find a <br>
+relator for the type "Numeral_Type.bit0". Honestly, I have no clue what a relator for <br>
+these numeral types should look like. Or is it OK to ignore the warning in this case?</p>
+<p>Thanks again,<br>
+Andreas</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

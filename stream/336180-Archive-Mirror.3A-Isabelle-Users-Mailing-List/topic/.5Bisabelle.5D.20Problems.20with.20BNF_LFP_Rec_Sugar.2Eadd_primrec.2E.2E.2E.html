@@ -1,0 +1,126 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Problems with BNF_LFP_Rec_Sugar.add_primrec... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20BNF_LFP_Rec_Sugar.2Eadd_primrec.2E.2E.2E.html">[isabelle] Problems with BNF_LFP_Rec_Sugar.add_primrec...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294316630"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20BNF_LFP_Rec_Sugar.add_primrec.../near/294316630" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20BNF_LFP_Rec_Sugar.2Eadd_primrec.2E.2E.2E.html#294316630">(Aug 19 2022 at 16:14)</a>:</h4>
+<p>From: René Thiemann &lt;<a href="mailto:rene.thiemann@uibk.ac.at">rene.thiemann@uibk.ac.at</a>&gt;<br>
+Dear all,</p>
+<p>I'm currently working with the Isabelle/ML-interface of the datatype_new command, where I'm defining some functions as follows:</p>
+<p>theory Scratch<br>
+imports Main<br>
+begin<br>
+datatype_new someType = Constructor nat</p>
+<p>(* primrec "f (Constructor x) = x" *)</p>
+<p>local_setup {*<br>
+fn lthy =&gt; <br>
+  let <br>
+    val x = Free ("x", @{typ nat})<br>
+    val fT = @{typ "someType =&gt; nat"}<br>
+    val (info,lthy) = BNF_LFP_Rec_Sugar.add_primrec_simple [((<a href="http://Binding.name">Binding.name</a> "f", fT), NoSyn)]<br>
+      [HOLogic.mk_Trueprop (HOLogic.mk_eq (Free ("f",fT) $ (@{term Constructor} $ x), x))] lthy<br>
+    val _ = Output.urgent_message (@{make_string} info)<br>
+  in<br>
+    lthy<br>
+  end<br>
+*}</p>
+<p>(* output: (["f"], ([Free ("f", "someType ⇒ nat")], ([[0]], [["Scratch.f (Constructor x) = x"]]))) *)</p>
+<p>Whereas the primrec command indeed generates the intended function, I noticed some inconvenience in the returned<br>
+information "info": it contains the newly defined constant "h" as well as the simplification rules. <br>
+However, the level between the constant and the simp-rules is not in sync:</p>
+<ul>
+<li>the constant is still some free variable "Free 'f'"</li>
+<li>the simp-rules already speak about the global constant "Const (Scratch.f)"</li>
+</ul>
+<p>Is this the intended behavior? Or wouldn't it be more sensibly to return <br>
+  "(Free f) (Constructor x) = x" as simp-rule? <br>
+(I prefer to stay in the current context)</p>
+<p>The behavior is also different from similar commands like Local_Theory.define where the <br>
+defining equation speaks about "Free g", and not about "Const (Scratch.g)"</p>
+<p>(* definition g :: nat =&gt; nat where "g = % x. x" *)</p>
+<p>local_setup {*<br>
+fn lthy =&gt; <br>
+  let <br>
+    val x = Free ("x", @{typ nat})<br>
+    val gT = @{typ "nat =&gt; nat"}<br>
+    val (info,lthy) = Local_Theory.define ((<a href="http://Binding.name">Binding.name</a> "g", NoSyn), ((<a href="http://Binding.name">Binding.name</a> "g_def", []),<br>
+      (lambda x x))) lthy<br>
+    val _ = Output.urgent_message (@{make_string} info)<br>
+  in<br>
+    lthy<br>
+  end<br>
+*}</p>
+<p>(* output: (Free ("g", "nat ⇒ nat"), ("local.g_def", "g ≡ λx. x"  [.])) *)</p>
+<p>Best regards,<br>
+René</p>
+
+
+
+<a name="294316673"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20BNF_LFP_Rec_Sugar.add_primrec.../near/294316673" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20BNF_LFP_Rec_Sugar.2Eadd_primrec.2E.2E.2E.html#294316673">(Aug 19 2022 at 16:14)</a>:</h4>
+<p>From: René Thiemann &lt;<a href="mailto:rene.thiemann@uibk.ac.at">rene.thiemann@uibk.ac.at</a>&gt;<br>
+Short update:</p>
+<p>the behavior of BNF_LFP_Rec_Sugar.add_primrec_simple is also incompatible to the one of Primrec.add_primrec_simple,<br>
+the latter has the expected behavior as Local_Theory.define:</p>
+<p>datatype someType = Constructor nat</p>
+<p>local_setup {*<br>
+fn lthy =&gt; <br>
+  let <br>
+    val x = Free ("x", @{typ nat})<br>
+    val fT = @{typ "someType =&gt; nat"}<br>
+    val (new,lthy) = Primrec.add_primrec_simple [((<a href="http://Binding.name">Binding.name</a> "f", fT), NoSyn)]<br>
+      [HOLogic.mk_Trueprop (HOLogic.mk_eq (Free ("f",fT) $ (@{term Constructor} $ x), x))] lthy<br>
+    val _ = Output.urgent_message (@{make_string} new)<br>
+  in<br>
+    lthy<br>
+  end<br>
+*}</p>
+<p>produces</p>
+<p>("f", ([Free ("f", "someType ⇒ nat")], ["f (Constructor ?x) = ?x"  [.]]))</p>
+<p>Moreover, it does not depend on whether one uses add_primrec_simple or add_primrec </p>
+<p>Best,<br>
+René</p>
+
+
+
+<a name="294316695"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20BNF_LFP_Rec_Sugar.add_primrec.../near/294316695" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20BNF_LFP_Rec_Sugar.2Eadd_primrec.2E.2E.2E.html#294316695">(Aug 19 2022 at 16:14)</a>:</h4>
+<p>From: Dmitriy Traytel &lt;<a href="mailto:traytel@in.tum.de">traytel@in.tum.de</a>&gt;<br>
+Hi René,</p>
+<p>indeed the terms and the theorems should be in sync. I can not tell at <br>
+the moment if both will be about Free's (monomorphic) or about Const's <br>
+(polymorphic). This depends on fact whether the polymorphism is needed <br>
+for something internal or not. I'll have a closer look next week.</p>
+<p>Thanks for the report,<br>
+Dmitriy</p>
+
+
+
+<a name="294321812"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20BNF_LFP_Rec_Sugar.add_primrec.../near/294321812" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20BNF_LFP_Rec_Sugar.2Eadd_primrec.2E.2E.2E.html#294321812">(Aug 19 2022 at 16:39)</a>:</h4>
+<p>From: Dmitriy Traytel &lt;<a href="mailto:traytel@in.tum.de">traytel@in.tum.de</a>&gt;<br>
+It should be better with 1ae67039b14f.</p>
+<p>Dmitriy</p>
+
+
+
+<a name="294321838"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20BNF_LFP_Rec_Sugar.add_primrec.../near/294321838" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20BNF_LFP_Rec_Sugar.2Eadd_primrec.2E.2E.2E.html#294321838">(Aug 19 2022 at 16:39)</a>:</h4>
+<p>From: René Thiemann &lt;<a href="mailto:rene.thiemann@uibk.ac.at">rene.thiemann@uibk.ac.at</a>&gt;</p>
+<blockquote>
+<p>It should be better with 1ae67039b14f.</p>
+</blockquote>
+<p>Thanks, works perfectly now.</p>
+<p>René</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,234 @@
+<html>
+<head><meta charset="utf-8"><title>Proofing measures with simp · Beginner Questions · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/index.html">Beginner Questions</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Proofing.20measures.20with.20simp.html">Proofing measures with simp</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="418415338"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Proofing%20measures%20with%20simp/near/418415338" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Salvatore Francesco Rossetta <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Proofing.20measures.20with.20simp.html#418415338">(Jan 27 2024 at 12:48)</a>:</h4>
+<p>Hi, sorry for long question. I have this loop</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">function</span><span class="w"> </span><span class="n">loop_divisor</span><span class="w"> </span><span class="o">::</span>
+<span class="w">    </span><span class="s">"('a::linorder, 'b) Divisor_Module_Params ⇒ ('a::linorder, 'b) Divisor_Module_Params"</span><span class="w"> </span><span class="kp">where</span>
+<span class="w">  </span><span class="s">"(parties rec = []) ⟹ loop_divisor rec = rec"</span><span class="w"> </span><span class="o">|</span>
+<span class="w">  </span><span class="s">"¬(parties rec = []) ⟹ loop_divisor rec = loop_divisor (divisor_module rec)"</span>
+</code></pre></div>
+<p>for which I want to prove termination. rec is a record with a list "parties". divisor_module removes head of this list, which gets shorter, this way: </p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">fun</span><span class="w"> </span><span class="n">divisor_module</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">"('a::linorder, 'b) Divisor_Module_Params ⇒ ('a::linorder, 'b) Divisor_Module_Params"</span><span class="w"> </span><span class="kp">where</span>
+<span class="s">"divisor_module rec =</span>
+<span class="s">  (let</span>
+<span class="s">    p = hd (parties rec);</span>
+<span class="s">    ps = remove_first (parties rec);</span>
+<span class="s">    ni = Min (snd (snd (result rec)));</span>
+<span class="s">    nrec = ⦇ result = (fst (result rec) ∪ {ni}, {},snd (snd (result rec)) - {ni}),</span>
+<span class="s">                    parties = ps, indexes = indexes rec,</span>
+<span class="s">                    seats = assign_seat ni p (seats rec),</span>
+<span class="s">                    votes = votes rec, fract_votes = update_votes p (seats rec) (indexes rec) (votes rec) (fract_votes rec) (params rec),</span>
+<span class="s">                    params = params rec ⦈</span>
+<span class="s">  in</span>
+<span class="s">    nrec)"</span>
+</code></pre></div>
+<p>My idea was to write a lemma about the list getting shorter and use it in the termination of the loop above. I already wrote a lemma for remove_first which seems correct to me. </p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">fun</span><span class="w"> </span><span class="n">remove_first</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">"'a list ⇒ 'a list"</span><span class="w"> </span><span class="kp">where</span>
+<span class="w">  </span><span class="s">"remove_first (x # xs) = xs"</span>
+
+<span class="kn">lemma</span><span class="w"> </span><span class="n">length_remove_first</span><span class="o">:</span>
+<span class="w">  </span><span class="kp">assumes</span><span class="w"> </span><span class="n">non_empty</span><span class="o">:</span><span class="w"> </span><span class="s">"(x # xs) ≠ []"</span>
+<span class="w">  </span><span class="kp">shows</span><span class="w"> </span><span class="s">"length xs &lt; length (x # xs)"</span>
+<span class="k">proof</span><span class="w"> </span><span class="o">-</span>
+<span class="w">  </span><span class="k">from</span><span class="w"> </span><span class="n">non_empty</span><span class="w"> </span><span class="k">have</span><span class="w"> </span><span class="s">"x # xs ≠ []"</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">simp</span>
+<span class="w">  </span><span class="k">then</span><span class="w"> </span><span class="k">have</span><span class="w"> </span><span class="s">"length (x # xs) = Suc (length xs)"</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">simp</span>
+<span class="w">  </span><span class="k">then</span><span class="w"> </span><span class="k">show</span><span class="w"> </span><span class="o">?</span><span class="n">thesis</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">simp</span>
+<span class="k">qed</span>
+</code></pre></div>
+<p>But then trying to prove that in divisor_module "parties nrec" (indeed ps) is shorter than "parties rec"</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="kn">lemma</span><span class="w"> </span><span class="n">divisor_module_p_length</span><span class="o">:</span>
+<span class="w">  </span><span class="kp">assumes</span><span class="w"> </span><span class="n">non_empty_parties</span><span class="o">:</span><span class="w"> </span><span class="s">"parties rec ≠ []"</span>
+<span class="w">  </span><span class="kp">shows</span><span class="w"> </span><span class="s">"length (parties (divisor_module rec)) &lt; length (parties rec)"</span>
+<span class="k">proof</span><span class="w"> </span><span class="o">-</span>
+<span class="w">  </span><span class="k">have</span><span class="w"> </span><span class="s">"length (remove_first (parties rec)) &lt; length (parties rec)"</span>
+<span class="w">    </span><span class="k">using</span><span class="w"> </span><span class="n">non_empty_parties</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="o">(</span><span class="n">rule</span><span class="w"> </span><span class="n">length_remove_first</span><span class="o">)</span>
+<span class="w">  </span><span class="k">then</span><span class="w"> </span><span class="k">show</span><span class="w"> </span><span class="o">?</span><span class="n">thesis</span>
+<span class="w">    </span><span class="k">by</span><span class="w"> </span><span class="n">simp</span>
+<span class="k">qed</span>
+</code></pre></div>
+<p>it fails to prove the subgoal. Isn't my first lemma sufficient for this? Also, since I am a beginner in proofing, is the logic behind the proofing correct or I should proceed in another way? Thanks in advance</p>
+
+
+
+<a name="418416249"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Proofing%20measures%20with%20simp/near/418416249" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Proofing.20measures.20with.20simp.html#418416249">(Jan 27 2024 at 13:02)</a>:</h4>
+<p>First your remove_first is exactly <code>tl</code></p>
+
+
+
+<a name="418416526"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Proofing%20measures%20with%20simp/near/418416526" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Proofing.20measures.20with.20simp.html#418416526">(Jan 27 2024 at 13:08)</a>:</h4>
+<p>Second, you have not provided enough to reproduce the bug. </p>
+<p>If the problem is this, then let's see where rule is stuck:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="w">  </span><span class="k">have</span><span class="w"> </span><span class="s">"length (remove_first (parties rec)) &lt; length (parties rec)"</span>
+<span class="w">    </span><span class="n">supply</span><span class="w"> </span><span class="o">[[</span><span class="n">unify_trace_failure</span><span class="o">]]</span>
+<span class="w">    </span><span class="kp">apply</span><span class="w"> </span><span class="o">(</span><span class="n">rule</span><span class="w"> </span><span class="n">length_remove_first</span><span class="o">)</span>
+
+<span class="c">(*</span>
+<span class="c">Clash: List.list.Cons =/= Scratch.stuff.parties</span>
+<span class="c">Failed to apply proof method⌂:</span>
+<span class="c">goal (1 subgoal):</span>
+<span class="c"> 1. length (remove_first (parties rec)) &lt; length (parties rec)</span>
+<span class="c">*)</span>
+</code></pre></div>
+<p>… so it is stuck because it does not why <code>parties rec</code> would  be unifiable with "Cons _ _"</p>
+
+
+
+<a name="418416612"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Proofing%20measures%20with%20simp/near/418416612" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Proofing.20measures.20with.20simp.html#418416612">(Jan 27 2024 at 13:09)</a>:</h4>
+<p>Now I strongly suspect that if you had used tl, then simp would actually be able to solve the goal</p>
+
+
+
+<a name="418416684"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Proofing%20measures%20with%20simp/near/418416684" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Proofing.20measures.20with.20simp.html#418416684">(Jan 27 2024 at 13:10)</a>:</h4>
+<p>Here the version I tried without the <code>Divisor_Module_Params</code> that is not part of Main:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">datatype</span><span class="w"> </span><span class="n">stuff</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">S</span><span class="w"> </span><span class="o">(</span><span class="n">parties</span><span class="o">:</span><span class="w"> </span><span class="s">‹nat list›</span><span class="o">)</span>
+
+<span class="k">fun</span><span class="w"> </span><span class="n">divisor_module</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">"_ ⇒ stuff"</span><span class="w"> </span><span class="kp">where</span>
+<span class="s">"divisor_module rec =   S (tl (parties rec))"</span>
+
+
+<span class="kn">function</span><span class="w"> </span><span class="n">loop_divisor</span><span class="w"> </span><span class="o">::</span>
+<span class="w">    </span><span class="s">"stuff ⇒ stuff"</span><span class="w"> </span><span class="kp">where</span>
+<span class="w">  </span><span class="s">"(parties rec = []) ⟹ loop_divisor rec = rec"</span><span class="w"> </span><span class="o">|</span>
+<span class="w">  </span><span class="s">"¬(parties rec = []) ⟹ loop_divisor rec = loop_divisor (divisor_module rec)"</span>
+
+<span class="k">fun</span><span class="w"> </span><span class="n">remove_first</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">"'a list ⇒ 'a list"</span><span class="w"> </span><span class="kp">where</span>
+<span class="w">  </span><span class="s">"remove_first (x # xs) = xs"</span>
+
+<span class="kn">lemma</span><span class="w"> </span><span class="n">length_remove_first</span><span class="o">:</span>
+<span class="w">  </span><span class="kp">assumes</span><span class="w"> </span><span class="n">non_empty</span><span class="o">:</span><span class="w"> </span><span class="s">"(x # xs) ≠ []"</span>
+<span class="w">  </span><span class="kp">shows</span><span class="w"> </span><span class="s">"length xs &lt; length (x # xs)"</span>
+<span class="k">proof</span><span class="w"> </span><span class="o">-</span>
+<span class="w">  </span><span class="k">from</span><span class="w"> </span><span class="n">non_empty</span><span class="w"> </span><span class="k">have</span><span class="w"> </span><span class="s">"x # xs ≠ []"</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">simp</span>
+<span class="w">  </span><span class="k">then</span><span class="w"> </span><span class="k">have</span><span class="w"> </span><span class="s">"length (x # xs) = Suc (length xs)"</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">simp</span>
+<span class="w">  </span><span class="k">then</span><span class="w"> </span><span class="k">show</span><span class="w"> </span><span class="o">?</span><span class="n">thesis</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">simp</span>
+<span class="k">qed</span>
+
+<span class="kn">lemma</span><span class="w"> </span><span class="n">divisor_module_p_length</span><span class="o">:</span>
+<span class="w">  </span><span class="kp">assumes</span><span class="w"> </span><span class="n">non_empty_parties</span><span class="o">:</span><span class="w"> </span><span class="s">"parties rec ≠ []"</span>
+<span class="w">  </span><span class="kp">shows</span><span class="w"> </span><span class="s">"length (parties (divisor_module rec)) &lt; length (parties rec)"</span>
+<span class="w">   </span><span class="k">using</span><span class="w"> </span><span class="n">assms</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">simp</span>
+</code></pre></div>
+
+
+
+<a name="418429832"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Proofing%20measures%20with%20simp/near/418429832" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Salvatore Francesco Rossetta <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Proofing.20measures.20with.20simp.html#418429832">(Jan 27 2024 at 16:27)</a>:</h4>
+<p><span class="user-mention silent" data-user-id="233198">Mathias Fleury</span> <a href="#narrow/stream/238552-Beginner-Questions/topic/Proofing.20measures.20with.20simp/near/418416684">said</a>:</p>
+<blockquote>
+<p>Here the version I tried without the <code>Divisor_Module_Params</code> that is not part of Main:</p>
+<p><div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">datatype</span><span class="w"> </span><span class="n">stuff</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">S</span><span class="w"> </span><span class="o">(</span><span class="n">parties</span><span class="o">:</span><span class="w"> </span><span class="s">‹nat list›</span><span class="o">)</span>
+
+<span class="k">fun</span><span class="w"> </span><span class="n">divisor_module</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">"_ ⇒ stuff"</span><span class="w"> </span><span class="kp">where</span>
+<span class="s">"divisor_module rec =   S (tl (parties rec))"</span>
+
+
+<span class="kn">function</span><span class="w"> </span><span class="n">loop_divisor</span><span class="w"> </span><span class="o">::</span>
+<span class="w">    </span><span class="s">"stuff ⇒ stuff"</span><span class="w"> </span><span class="kp">where</span>
+<span class="w">  </span><span class="s">"(parties rec = []) ⟹ loop_divisor rec = rec"</span><span class="w"> </span><span class="o">|</span>
+<span class="w">  </span><span class="s">"¬(parties rec = []) ⟹ loop_divisor rec = loop_divisor (divisor_module rec)"</span>
+
+<span class="k">fun</span><span class="w"> </span><span class="n">remove_first</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">"'a list ⇒ 'a list"</span><span class="w"> </span><span class="kp">where</span>
+<span class="w">  </span><span class="s">"remove_first (x # xs) = xs"</span>
+
+<span class="kn">lemma</span><span class="w"> </span><span class="n">length_remove_first</span><span class="o">:</span>
+<span class="w">  </span><span class="kp">assumes</span><span class="w"> </span><span class="n">non_empty</span><span class="o">:</span><span class="w"> </span><span class="s">"(x # xs) ≠ []"</span>
+<span class="w">  </span><span class="kp">shows</span><span class="w"> </span><span class="s">"length xs &lt; length (x # xs)"</span>
+<span class="k">proof</span><span class="w"> </span><span class="o">-</span>
+<span class="w">  </span><span class="k">from</span><span class="w"> </span><span class="n">non_empty</span><span class="w"> </span><span class="k">have</span><span class="w"> </span><span class="s">"x # xs ≠ []"</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">simp</span>
+<span class="w">  </span><span class="k">then</span><span class="w"> </span><span class="k">have</span><span class="w"> </span><span class="s">"length (x # xs) = Suc (length xs)"</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">simp</span>
+<span class="w">  </span><span class="k">then</span><span class="w"> </span><span class="k">show</span><span class="w"> </span><span class="o">?</span><span class="n">thesis</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">simp</span>
+<span class="k">qed</span>
+
+<span class="kn">lemma</span><span class="w"> </span><span class="n">divisor_module_p_length</span><span class="o">:</span>
+<span class="w">  </span><span class="kp">assumes</span><span class="w"> </span><span class="n">non_empty_parties</span><span class="o">:</span><span class="w"> </span><span class="s">"parties rec ≠ []"</span>
+<span class="w">  </span><span class="kp">shows</span><span class="w"> </span><span class="s">"length (parties (divisor_module rec)) &lt; length (parties rec)"</span>
+<span class="w">   </span><span class="k">using</span><span class="w"> </span><span class="n">assms</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">simp</span>
+</code></pre></div><br>
+</p>
+</blockquote>
+<p>I used tl and also simp in the lemma but it is not working, i think it's the only changes to my code, then to me it looks the same.</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">record</span><span class="w"> </span><span class="o">(</span><span class="n n-Type">'a</span><span class="o">,</span><span class="w"> </span><span class="n n-Type">'b</span><span class="o">)</span><span class="w"> </span><span class="n">Divisor_Module_Params</span><span class="w"> </span><span class="o">=</span>
+<span class="w">  </span><span class="n">result</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">"'a Result"</span>
+<span class="w">  </span><span class="n">parties</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">"'b Parties"</span>
+<span class="w">  </span><span class="n">indexes</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">"'a set"</span>
+<span class="w">  </span><span class="n">seats</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">"('a, 'b) Seats"</span>
+<span class="w">  </span><span class="n">votes</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">"'b StructVotes"</span>
+<span class="w">  </span><span class="n">fract_votes</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">"'b StructVotes"</span>
+<span class="w">  </span><span class="n">params</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">"nat list"</span>
+
+<span class="k">fun</span><span class="w"> </span><span class="n">divisor_module</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">"_ ⇒ ('a::linorder, 'b) Divisor_Module_Params"</span><span class="w"> </span><span class="kp">where</span>
+<span class="s">"divisor_module rec =</span>
+<span class="s">  (let</span>
+<span class="s">    ni = Min (snd (snd (result rec)))</span>
+<span class="s">     in ⦇ result = (fst (result rec) ∪ {ni}, {},snd (snd (result rec)) - {ni}),</span>
+<span class="s">                    parties = tl (parties rec), indexes = indexes rec,</span>
+<span class="s">                    seats = assign_seat ni (hd(parties rec)) (seats rec),</span>
+<span class="s">                    votes = votes rec, fract_votes = update_votes (hd(parties rec)) (seats rec) (indexes rec) (votes rec) (fract_votes rec) (params rec),</span>
+<span class="s">                    params = params rec ⦈)"</span>
+
+<span class="kn">function</span><span class="w"> </span><span class="n">loop_divisor</span><span class="w"> </span><span class="o">::</span>
+<span class="w">    </span><span class="s">"('a::linorder, 'b) Divisor_Module_Params ⇒ ('a::linorder, 'b) Divisor_Module_Params"</span><span class="w"> </span><span class="kp">where</span>
+<span class="w">  </span><span class="s">"(parties rec = []) ⟹ loop_divisor rec = rec"</span><span class="w"> </span><span class="o">|</span>
+<span class="w">  </span><span class="s">"¬(parties rec = []) ⟹ loop_divisor rec = loop_divisor (divisor_module rec)"</span>
+
+<span class="k">fun</span><span class="w"> </span><span class="n">remove_first</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="s">"'a list ⇒ 'a list"</span><span class="w"> </span><span class="kp">where</span>
+<span class="w">  </span><span class="s">"remove_first (x # xs) = xs"</span>
+
+<span class="kn">lemma</span><span class="w"> </span><span class="n">length_remove_first</span><span class="o">:</span>
+<span class="w">  </span><span class="kp">assumes</span><span class="w"> </span><span class="n">non_empty</span><span class="o">:</span><span class="w"> </span><span class="s">"(x # xs) ≠ []"</span>
+<span class="w">  </span><span class="kp">shows</span><span class="w"> </span><span class="s">"length xs &lt; length (x # xs)"</span>
+<span class="k">proof</span><span class="w"> </span><span class="o">-</span>
+<span class="w">  </span><span class="k">from</span><span class="w"> </span><span class="n">non_empty</span><span class="w"> </span><span class="k">have</span><span class="w"> </span><span class="s">"x # xs ≠ []"</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">simp</span>
+<span class="w">  </span><span class="k">then</span><span class="w"> </span><span class="k">have</span><span class="w"> </span><span class="s">"length (x # xs) = Suc (length xs)"</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">simp</span>
+<span class="w">  </span><span class="k">then</span><span class="w"> </span><span class="k">show</span><span class="w"> </span><span class="o">?</span><span class="n">thesis</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">simp</span>
+<span class="k">qed</span>
+
+<span class="kn">lemma</span><span class="w"> </span><span class="n">divisor_module_p_length</span><span class="o">:</span>
+<span class="w">  </span><span class="kp">assumes</span><span class="w"> </span><span class="n">non_empty_parties</span><span class="o">:</span><span class="w"> </span><span class="s">"parties rec ≠ []"</span>
+<span class="w">  </span><span class="kp">shows</span><span class="w"> </span><span class="s">"length (parties (divisor_module rec)) &lt; length (parties rec)"</span>
+<span class="w"> </span><span class="n">supply</span><span class="w"> </span><span class="o">[[</span><span class="n">unify_trace_failure</span><span class="o">]]</span>
+<span class="w">   </span><span class="k">using</span><span class="w"> </span><span class="n">assms</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">simp</span>
+</code></pre></div>
+<p>The error is always failing to prove the subgoal. Could it be for the record instead of datatype?</p>
+
+
+
+<a name="418430373"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Proofing%20measures%20with%20simp/near/418430373" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Proofing.20measures.20with.20simp.html#418430373">(Jan 27 2024 at 16:36)</a>:</h4>
+<ol>
+<li>Your example is still not working when importing only Main</li>
+<li>There is a "by auto" missing after the definition of loop_divisor to prove completeness.</li>
+<li>Did you look at the error message? The result after simp is:</li>
+</ol>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="w"> </span><span class="n">parties</span><span class="w"> </span><span class="n">rec</span><span class="w"> </span><span class="n">≠</span><span class="w"> </span><span class="o">[]</span><span class="w"> </span><span class="n">⟹</span>
+<span class="w">    </span><span class="n">length</span>
+<span class="w">     </span><span class="o">(</span><span class="n">parties</span>
+<span class="w">       </span><span class="o">(</span><span class="k">let</span><span class="w"> </span><span class="n">ni</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Min</span><span class="w"> </span><span class="o">(</span><span class="n">snd</span><span class="w"> </span><span class="o">(</span><span class="n">snd</span><span class="w"> </span><span class="o">(</span><span class="n">result</span><span class="w"> </span><span class="n">rec</span><span class="o">)))</span><span class="w"> </span><span class="kp">in</span><span class="w"> </span><span class="n">⦇result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">(</span><span class="n">insert</span><span class="w"> </span><span class="n">ni</span><span class="w"> </span><span class="o">(</span><span class="n">fst</span><span class="w"> </span><span class="o">(</span><span class="n">result</span><span class="w"> </span><span class="n">rec</span><span class="o">)),</span><span class="w"> </span><span class="ow">{}</span><span class="o">,</span><span class="w"> </span><span class="n">snd</span><span class="w"> </span><span class="o">(</span><span class="n">snd</span><span class="w"> </span><span class="o">(</span><span class="n">result</span><span class="w"> </span><span class="n">rec</span><span class="o">))</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="ow">{</span><span class="n">ni</span><span class="ow">}</span><span class="o">),</span><span class="w"> </span><span class="n">parties</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">tl</span><span class="w"> </span><span class="o">(</span><span class="n">parties</span><span class="w"> </span><span class="n">rec</span><span class="o">),</span><span class="w"> </span><span class="n">indexes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">indexes</span><span class="w"> </span><span class="n">rec</span><span class="o">,</span><span class="w"> </span><span class="n">seats</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">seats</span><span class="w"> </span><span class="n">rec</span><span class="o">,</span><span class="w"> </span><span class="n">votes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">votes</span><span class="w"> </span><span class="n">rec</span><span class="o">,</span><span class="w"> </span><span class="n">fract_votes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">fract_votes</span><span class="w"> </span><span class="n">rec</span><span class="o">,</span><span class="w"> </span><span class="n">params</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">params</span><span class="w"> </span><span class="n">rec⦈</span><span class="o">))</span>
+<span class="w">    </span><span class="n">&lt;</span><span class="w"> </span><span class="n">length</span><span class="w"> </span><span class="o">(</span><span class="n">parties</span><span class="w"> </span><span class="n">rec</span><span class="o">)</span>
+</code></pre></div>
+<p>which clearly shows that the Let is not unfolded by simp…  Therefore you need to Let_def to the simplifier.</p>
+
+
+
+<a name="418431948"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Proofing%20measures%20with%20simp/near/418431948" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Salvatore Francesco Rossetta <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Proofing.20measures.20with.20simp.html#418431948">(Jan 27 2024 at 17:02)</a>:</h4>
+<p>thanks, I added Let_def, now it is working</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

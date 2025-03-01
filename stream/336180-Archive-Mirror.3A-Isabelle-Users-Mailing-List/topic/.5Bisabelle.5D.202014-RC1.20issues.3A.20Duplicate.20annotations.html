@@ -1,0 +1,143 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] 2014-RC1 issues: Duplicate annotations · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.202014-RC1.20issues.3A.20Duplicate.20annotations.html">[isabelle] 2014-RC1 issues: Duplicate annotations</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294289749"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%202014-RC1%20issues%3A%20Duplicate%20annotations/near/294289749" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.202014-RC1.20issues.3A.20Duplicate.20annotations.html#294289749">(Aug 19 2022 at 15:30)</a>:</h4>
+<p>From: Lars Noschinski &lt;<a href="mailto:noschinl@in.tum.de">noschinl@in.tum.de</a>&gt;<br>
+Hi,</p>
+<p>in some cases, duplicate annotations occur in terms in proof_methods.<br>
+Consider the theory:</p>
+<p>lemma P<br>
+  apply (simp add: exI[of _ 1])</p>
+<p>and hover over the 1, which now has a duplicate set of annotations.</p>
+<p>Duplicate annotations also occur in locale expressions:</p>
+<p>locale A = fixes x<br>
+locale B = A z for z + assumes False</p>
+<p>Here, the "z" has a duplicate set of annotations from Syntax.check_term<br>
+(but only a single one from Syntax.read_term).</p>
+<p>I tried to dig into what triggers this behaviour:</p>
+<p>For proof methods, this is related to the introduction of a method<br>
+closure (which executes every proof method twice). The use of e.g. the<br>
+Args.term parser is fine; but if one uses Args.name_inner_syntax and<br>
+Syntax.read_term later, annotations are duplicated:</p>
+<p>method_setup foo1 = ‹<br>
+  Args.term &gt;&gt; (fn _ =&gt; fn _ =&gt; SIMPLE_METHOD' (K all_tac))<br>
+›</p>
+<p>vs.</p>
+<p>method_setup foo2 = ‹<br>
+  Scan.peek (fn ctxt =&gt; Args.name_inner_syntax &gt;&gt; Syntax.read_term<br>
+(Context.proof_of ctxt)) &gt;&gt;<br>
+  (fn _ =&gt; fn _ =&gt; SIMPLE_METHOD' (K all_tac))<br>
+›</p>
+<p>except if the method errors out unconditionally (and hence is called<br>
+only once):</p>
+<p>method_setup foo3 = ‹<br>
+  Args.term -- Scan.peek (fn ctxt =&gt; Args.name_inner_syntax &gt;&gt;<br>
+Syntax.read_term (Context.proof_of ctxt)) &gt;&gt;<br>
+  (fn _ =&gt; raise Match)<br>
+›</p>
+<p>-- Lars</p>
+
+
+
+<a name="294290205"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%202014-RC1%20issues%3A%20Duplicate%20annotations/near/294290205" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.202014-RC1.20issues.3A.20Duplicate.20annotations.html#294290205">(Aug 19 2022 at 15:33)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+This is a careful analysis of this particular situation in <br>
+Isabelle2014-RC1, which was the result of spending several weeks this year <br>
+to make refinements over Isabelle2013-2.</p>
+<p>Here is another example:</p>
+<p>lemma "x = x" "x = x" "x = x" by (rule refl [of x])+</p>
+<p>If you C-hover over the fact "refl" and the variable "x" in either <br>
+Isabelle version, you see how often the system traverses that spot to make <br>
+a PIDE markup report.</p>
+<p>It is the very concept of PIDE that markup is produced as a trace from <br>
+internal aspects of the prover.  It is then left as an exercise to rework <br>
+the prover that this information makes sense to the user.  Attendants of <br>
+the UITP2014 workshop in Vienna may remember the brief discussion we've <br>
+had about that for Coq PIDE in particular.</p>
+<p>In the example above, the rule method is already in a pretty good state: <br>
+its main argument outline is processed exactly once in its "static phase", <br>
+before actually applying it to the goal state.  The attribute "of" <br>
+notoriously suffers from dynamic evaluation, though, and causes redundant <br>
+multiplication of markup.</p>
+<p>The static closure of proof methods has made progress in Isabelle2014-RC1, <br>
+but it is not fully finished yet.  Even in that partial stage, I can <br>
+foresee complaints by proof tool authors about that sanitation.  See also <br>
+the NEWS:</p>
+<p>* More static checking of proof methods, which allows the system to<br>
+   form a closure over the concrete syntax.  Method arguments should be<br>
+   processed in the original proof context as far as possible, before<br>
+   operating on the goal state.  In any case, the standard discipline for<br>
+   subgoal-addressing needs to be observed: no subgoals or a subgoal<br>
+   number that is out of range produces an empty result sequence, not an<br>
+   exception.  Potential INCOMPATIBILITY for non-conformant tactical<br>
+   proof tools.</p>
+<p>The requirements for tactics or Isar proof methods are described in the <br>
+"implementation" manual, as usual.</p>
+<p>The relative silence in that respect of "potential incompatibility" is <br>
+probably a proof that only few people have tested their own tools with<br>
+Isabelle2014-RC1 so far.</p>
+<p>Makarius</p>
+
+
+
+<a name="294292095"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%202014-RC1%20issues%3A%20Duplicate%20annotations/near/294292095" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.202014-RC1.20issues.3A.20Duplicate.20annotations.html#294292095">(Aug 19 2022 at 15:43)</a>:</h4>
+<p>From: Lars Noschinski &lt;<a href="mailto:noschinl@in.tum.de">noschinl@in.tum.de</a>&gt;<br>
+On 01.08.2014 21:19, Makarius wrote:<br>
+Here is another example:</p>
+<blockquote>
+<p>In the example above, the rule method is already in a pretty good<br>
+state: its main argument outline is processed exactly once in its<br>
+"static phase", before actually applying it to the goal state.  The<br>
+attribute "of" notoriously suffers from dynamic evaluation, though,<br>
+and causes redundant multiplication of markup.</p>
+<p>The static closure of proof methods has made progress in<br>
+Isabelle2014-RC1, but it is not fully finished yet.  Even in that<br>
+partial stage, I can foresee complaints by proof tool authors about<br>
+that sanitation.  See also the NEWS:</p>
+<p>* More static checking of proof methods, which allows the system to<br>
+  form a closure over the concrete syntax.  Method arguments should be<br>
+  processed in the original proof context as far as possible, before<br>
+  operating on the goal state.  In any case, the standard discipline for<br>
+  subgoal-addressing needs to be observed: no subgoals or a subgoal<br>
+  number that is out of range produces an empty result sequence, not an<br>
+  exception.  Potential INCOMPATIBILITY for non-conformant tactical<br>
+  proof tools.<br>
+After looking carefully at args.ML I know now how e.g. Args.term<br>
+prevents a term from being parsed twice.</p>
+</blockquote>
+<p>I am in a more complicated situation: I have a parser which read_term-s<br>
+the terms in a different order than they appear in the source and<br>
+modifies the context (by fixing some of the term variables), so I need<br>
+to use Parse.term instead of Args.term. It is static in the sense that<br>
+the interpretation of the terms does not depend on the goal state.</p>
+<p>Some questions arise from that and my new understanding of<br>
+static/dynamic phase separation:</p>
+<p>* Does it make sense at this point to mimic the Token.assign machinery<br>
+    used in Args? Or is it likely that the need to do this manually will<br>
+    go away with say 2014+1?</p>
+<p>If yes:</p>
+<p>* Is it ok for a context_parser to modify the context? (probably not,<br>
+    since most of the parser will be short-circuited after the static phase)</p>
+<blockquote>
+<p>The relative silence in that respect of "potential incompatibility" is<br>
+probably a proof that only few people have tested their own tools with<br>
+Isabelle2014-RC1 so far.<br>
+I had to convert a few methods already; mostly by wrapping them into<br>
+SUBGOAL.</p>
+</blockquote>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,80 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Using lemma before proof by induction in Isar ... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Using.20lemma.20before.20proof.20by.20induction.20in.20Isar.20.2E.2E.2E.html">[isabelle] Using lemma before proof by induction in Isar ...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294723322"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Using%20lemma%20before%20proof%20by%20induction%20in%20Isar%20.../near/294723322" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Using.20lemma.20before.20proof.20by.20induction.20in.20Isar.20.2E.2E.2E.html#294723322">(Aug 22 2022 at 16:26)</a>:</h4>
+<p>From: Andreas Halkjær From &lt;<a href="mailto:andro.from@gmail.com">andro.from@gmail.com</a>&gt;<br>
+Hey,</p>
+<p>I ran into this issue in a larger theory (*) but it can be boiled down at<br>
+least to the following (silly) theory:</p>
+<p>theory THM0_741 imports Main begin</p>
+<p>datatype 'a s  = S 'a</p>
+<p>datatype 'a t = T ‹'a s›</p>
+<p>primrec f :: ‹'a s ⇒ 'a set› where<br>
+  ‹f (S x) = {x}›</p>
+<p>primrec g :: ‹'a t ⇒ 'a set› where<br>
+  ‹g (T x) = f x›</p>
+<p>lemma trigger: ‹f t ⊆ UNIV›<br>
+  by blast</p>
+<p>lemma ‹g p ⊆ UNIV›<br>
+  using trigger (* raises: *)<br>
+proof (induct p)<br>
+  case (T x)    (* exception THM 0 raised (line 741 of "thm.ML"):<br>
+assume: variables *)<br>
+  then show ?case<br>
+    by simp<br>
+qed</p>
+<p>end</p>
+<p>Also available here:<br>
+<a href="https://gist.github.com/andreasfrom/d4b87d0bbac6d94742ecdfd8605369f7">https://gist.github.com/andreasfrom/d4b87d0bbac6d94742ecdfd8605369f7</a></p>
+<p>It's unclear from the error what the problem is.<br>
+In the larger theory I worked around it by moving the <code>using</code> into each<br>
+case that needed it.</p>
+<p>Andreas</p>
+<p>*:<br>
+<a href="https://bitbucket.org/isafol/isafol/src/91dc3bf2cf5c70a61aab2bcdc9b4c8f6f995d321/FOL_Berghofer/FOL_Berghofer.thy?fileviewer=file-view-default#FOL_Berghofer.thy-3340">https://bitbucket.org/isafol/isafol/src/91dc3bf2cf5c70a61aab2bcdc9b4c8f6f995d321/FOL_Berghofer/FOL_Berghofer.thy?fileviewer=file-view-default#FOL_Berghofer.thy-3340</a></p>
+
+
+
+<a name="294723337"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Using%20lemma%20before%20proof%20by%20induction%20in%20Isar%20.../near/294723337" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Using.20lemma.20before.20proof.20by.20induction.20in.20Isar.20.2E.2E.2E.html#294723337">(Aug 22 2022 at 16:26)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Andreas,</p>
+<p>I agree that the error message is suboptimal. It occurs when the subgoal corresponding to <br>
+the case contains schematic (type) variables. In your example, the lemma trigger <br>
+introduces a schematic type variable ?'a into the goal state, on which the "case" command <br>
+chokes. If you instantiate the type variable, the error goes away. For example:</p>
+<p>lemma ‹g p ⊆ UNIV› for p :: "'a t"<br>
+   using trigger[where ?'a='a]</p>
+<p>For schematic term variables, the induct(ion) proof method has an optional argument <br>
+"taking: ..." where the instantiations can be given. Unfortunately, there is no equivalent <br>
+for type variables.</p>
+<p>A general remark: You should feed only those assumptions into the induction proof method <br>
+that are consumed by the induction rule or mention some of the induction variables. <br>
+Eveything else such as the trigger should really be added with "using" in the relevant <br>
+cases. Every non-inductive assumption just makes the goal state much larger and the proof <br>
+checking and pretty printing slower.</p>
+<p>Hope this helps,<br>
+Andreas</p>
+
+
+
+<a name="294723378"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Using%20lemma%20before%20proof%20by%20induction%20in%20Isar%20.../near/294723378" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Using.20lemma.20before.20proof.20by.20induction.20in.20Isar.20.2E.2E.2E.html#294723378">(Aug 22 2022 at 16:26)</a>:</h4>
+<p>From: Andreas Halkjær From &lt;<a href="mailto:andro.from@gmail.com">andro.from@gmail.com</a>&gt;<br>
+That makes good sense. Thank you.</p>
+<p>And thank you for the general remark!</p>
+<p>Andreas</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

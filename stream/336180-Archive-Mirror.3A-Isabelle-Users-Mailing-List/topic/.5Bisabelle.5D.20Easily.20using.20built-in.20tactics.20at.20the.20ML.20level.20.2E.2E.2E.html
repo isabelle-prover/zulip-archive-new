@@ -1,0 +1,361 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Easily using built-in tactics at the ML level ... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Easily.20using.20built-in.20tactics.20at.20the.20ML.20level.20.2E.2E.2E.html">[isabelle] Easily using built-in tactics at the ML level ...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294237990"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Easily%20using%20built-in%20tactics%20at%20the%20ML%20level%20.../near/294237990" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Easily.20using.20built-in.20tactics.20at.20the.20ML.20level.20.2E.2E.2E.html#294237990">(Aug 19 2022 at 10:40)</a>:</h4>
+<p>From: David Greenaway &lt;<a href="mailto:david.greenaway@nicta.com.au">david.greenaway@nicta.com.au</a>&gt;<br>
+Hi all,</p>
+<p>In an Isabelle theory file, I can write simple one-line tactics such as<br>
+the following:</p>
+<p>apply (clarsimp simp: split_def split: prod.splits)</p>
+<p>I find, however, when I start writing ML code to automate proofs,<br>
+producing a ML tactic object is far more verbose:</p>
+<p>clarsimp_tac (Context.proof_map (<br>
+      Simplifier.map_ss (fold Splitter.add_split @{thms prod.splits})<br>
+      #&gt; Simplifier.map_ss (fn ss =&gt; ss addsimps [@{thm split_def}]))<br>
+    @{context}) 1</p>
+<p>The background is that I am writing tools[1] to automatically convert<br>
+C code into an abstract(ish) monadic form with the goal of easing<br>
+reasoning. As part of this, I frequently need to write ML code that<br>
+dynamically generates theorems and then proceeds to prove them. A simple<br>
+way of writing tactics such as the one above would be helpful both in<br>
+quick-and-dirty prototyping of ML proof procedures, but ideally would<br>
+also be clean enough for "production quality code".</p>
+<p>Does anyone have any hints or tips?</p>
+<p>(This discussion was originally started at StackOverflow[2], but it was<br>
+suggested that I move it over here when the discussion became a little<br>
+more involved. It is also part of long-running bigger question as to<br>
+"what is the best way to interact with Isabelle at the ML level?", but<br>
+perhaps it is better to address this concrete issue for now.)</p>
+<p>[1]: <a href="http://ssrg.nicta.com.au/projects/TS/autocorres/">http://ssrg.nicta.com.au/projects/TS/autocorres/</a><br>
+  [2]: <a href="http://stackoverflow.com/questions/15217009/how-can-i-easily-write-simple-tactics-at-the-ml-level-of-isabelle">http://stackoverflow.com/questions/15217009/how-can-i-easily-write-simple-tactics-at-the-ml-level-of-isabelle</a></p>
+<p>Thanks so much,<br>
+David</p>
+
+
+
+<a name="294238122"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Easily%20using%20built-in%20tactics%20at%20the%20ML%20level%20.../near/294238122" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Easily.20using.20built-in.20tactics.20at.20the.20ML.20level.20.2E.2E.2E.html#294238122">(Aug 19 2022 at 10:41)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+The first hint is off-topic: ML has values and functions over values, not <br>
+"objects".  Someone else had also used the oo-term "method" for ML <br>
+functions, but this is only adding confusion, and working against the <br>
+intentions of the oo-guys some decades ago: the idea back then was to have <br>
+unusual terminology ("objects", "methods", "classes") for unusual and <br>
+groundbreaking concepts.</p>
+<p>Back to today's reality and the question how to work effectively and <br>
+smoothly with Isabelle/ML, and how to write proof procedures in it. Here <br>
+is part of my answer from the Stackoverflow thread again:</p>
+<p>ML {*<br>
+   (*foo_tac -- the payload of what you want to do,<br>
+     note the dependency on ctxt: Proof.context*)<br>
+   fun foo_tac ctxt =<br>
+     let<br>
+       val my_ctxt =<br>
+         ctxt |&gt; Simplifier.map_simpset<br>
+          (fold Splitter.add_split @{thms prod.splits} #&gt;<br>
+           Simplifier.add_simp @{thm split_def})<br>
+     in ALLGOALS (clarsimp_tac my_ctxt) end<br>
+*}</p>
+<p>method_setup foo = {*<br>
+   (<em>concrete syntax like "clarsimp", "auto" etc.</em>)<br>
+   Method.sections Clasimp.clasimp_modifiers &gt;&gt;<br>
+     (<em>Isar method boilerplate</em>)<br>
+     (fn _ =&gt; fn ctxt =&gt; SIMPLE_METHOD (CHANGED (foo_tac ctxt)))<br>
+*}</p>
+<p>Here I had already applied some peep-hole optimization to make your <br>
+initial version less awkward.  Instead of pasting together big ML <br>
+expressions (also with antiquotations) in "apply tactic {* ... *}" you <br>
+build up small ML tools like foo_tac and eventually wrap them up in <br>
+concrete Isar syntax via method_setup, for example.</p>
+<p>We still need to work out, why this direction did not look appealing to <br>
+your application.  I have browsed through the AutoCorres 0.1 sources, but <br>
+did not see the totally unusual problem that requires completely different <br>
+approaches to what people are already used to.  It might be there <br>
+nonetheless, and this is why be have switched to the more interactive <br>
+mailing list.</p>
+<p>In your second question (actually answer) on Stackoverflow, you've had a <br>
+function to parse strings into tactic values like this:</p>
+<p>mk_tac "metis Suc_eq_plus1 mult_Suc_right nat_add_commute"</p>
+<p>But that is better done at compile-time via ML antiquotations, <br>
+speculatively like this:</p>
+<p>@{metis Suc_eq_plus1 mult_Suc_right nat_add_commute}</p>
+<p>It is reasonably easy to implement such antiquotations -- they are part of <br>
+the Isar user space just like methods, attributes etc. -- I can also give <br>
+some examples.</p>
+<p>Although we first need to sort out what is conceptually the right way to <br>
+go.  Antiquotations are some kind of ML preprocessor macros, and that is <br>
+not something you do without thinking several times about it.</p>
+<p>Makarius</p>
+
+
+
+<a name="294238221"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Easily%20using%20built-in%20tactics%20at%20the%20ML%20level%20.../near/294238221" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Easily.20using.20built-in.20tactics.20at.20the.20ML.20level.20.2E.2E.2E.html#294238221">(Aug 19 2022 at 10:42)</a>:</h4>
+<p>From: David Greenaway &lt;<a href="mailto:david.greenaway@nicta.com.au">david.greenaway@nicta.com.au</a>&gt;<br>
+Hi Makarius,</p>
+<p>On 10/03/13 06:47, Makarius wrote:</p>
+<blockquote>
+<p>On Fri, 8 Mar 2013, David Greenaway wrote:</p>
+<blockquote>
+<p>In an Isabelle theory file, I can write simple one-line tactics such<br>
+as the following:</p>
+<p>apply (clarsimp simp: split_def split: prod.splits)</p>
+<p>I find, however, when I start writing ML code to automate proofs,<br>
+producing a ML tactic object is far more verbose:</p>
+<p>clarsimp_tac (Context.proof_map (<br>
+     Simplifier.map_ss (fold Splitter.add_split @{thms prod.splits})<br>
+     #&gt; Simplifier.map_ss (fn ss =&gt; ss addsimps [@{thm split_def}]))<br>
+   @{context}) 1</p>
+<p>[...]<br>
+The first hint is off-topic: ML has values and functions over values,<br>
+not "objects".  Someone else had also used the oo-term "method" for ML<br>
+functions, but this is only adding confusion, and working against the<br>
+intentions of the oo-guys some decades ago: the idea back then was to<br>
+have unusual terminology ("objects", "methods", "classes") for unusual<br>
+and groundbreaking concepts.</p>
+</blockquote>
+</blockquote>
+<p>Thank you for the correction. I did understand a tactic is simply a "thm<br>
+-&gt; thm Seq.seq", but have the bad habit of being imprecise in my<br>
+language.</p>
+<blockquote>
+<p>Back to today's reality and the question how to work effectively and<br>
+smoothly with Isabelle/ML, and how to write proof procedures in it.<br>
+Here is part of my answer from the Stackoverflow thread again:</p>
+<p>ML {*<br>
+   (*foo_tac -- the payload of what you want to do,<br>
+     note the dependency on ctxt: Proof.context*)<br>
+   fun foo_tac ctxt =<br>
+     let<br>
+       val my_ctxt =<br>
+         ctxt |&gt; Simplifier.map_simpset<br>
+          (fold Splitter.add_split @{thms prod.splits} #&gt;<br>
+           Simplifier.add_simp @{thm split_def})<br>
+     in ALLGOALS (clarsimp_tac my_ctxt) end<br>
+*}</p>
+<p>method_setup foo = {*<br>
+   (<em>concrete syntax like "clarsimp", "auto" etc.</em>)<br>
+   Method.sections Clasimp.clasimp_modifiers &gt;&gt;<br>
+     (<em>Isar method boilerplate</em>)<br>
+     (fn _ =&gt; fn ctxt =&gt; SIMPLE_METHOD (CHANGED (foo_tac ctxt)))<br>
+*}</p>
+<p>Here I had already applied some peep-hole optimization to make your<br>
+initial version less awkward.  Instead of pasting together big ML<br>
+expressions (also with antiquotations) in "apply tactic {* ... *}" you<br>
+build up small ML tools like foo_tac and eventually wrap them up in<br>
+concrete Isar syntax via method_setup, for example.</p>
+</blockquote>
+<p>Your version is indeed cleaner than mine, but still not quite what I am<br>
+looking for.</p>
+<p>I think the confusion comes from me not explaining fully what my goal<br>
+is. Your solution works well when 1 particular tactic needs to be used<br>
+in "n" locations. What I am trying to simplify is having "n" different<br>
+tactics each used in 1 single location (with that one location always<br>
+being inside an ML function).</p>
+<p>In short, I am looking for syntactic sugar to make writing proof scripts<br>
+in ML less verbose. While a lot of the heavy lifting of such proof<br>
+scripts can be done in Isar and the result used as a "thm", I still find<br>
+that I need to carry out proofs inside ML (such as when the proof goal<br>
+is not known in advance).</p>
+<blockquote>
+<p>In your second question (actually answer) on Stackoverflow, you've had<br>
+a function to parse strings into tactic values like this:</p>
+<p>mk_tac "metis Suc_eq_plus1 mult_Suc_right nat_add_commute"</p>
+<p>But that is better done at compile-time via ML antiquotations,<br>
+speculatively like this:</p>
+<p>@{metis Suc_eq_plus1 mult_Suc_right nat_add_commute}</p>
+<p>It is reasonably easy to implement such antiquotations -- they are<br>
+part of the Isar user space just like methods, attributes etc. --<br>
+I can also give some examples.</p>
+</blockquote>
+<p>An anti-quotation that generates code similar to what I original wrote<br>
+(or perhaps what you corrected it to :) would be ideal.</p>
+<p>Two problems that I have, though are:</p>
+<p>* I can't extract a list of valid methods names (or their associated<br>
+      tactic) from the "Method" structure;</p>
+<p>* Even if I could get a list of method names, I can't see a way of<br>
+      parsing method arguments into an AST without re-implementing the<br>
+      parsing logic of every single tactic. (Most tactics are not so<br>
+      bad, because they use one of three possible argument parsers.<br>
+      Nevertheless, as far as I can tell these would need to be<br>
+      reimplemented to produce an AST instead of directly modifying the<br>
+      proof context directly).</p>
+<p>If you have any suggestions for solving these problems, I would be keen<br>
+to hear.</p>
+<p>Thanks so much,<br>
+David</p>
+
+
+
+<a name="294238234"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Easily%20using%20built-in%20tactics%20at%20the%20ML%20level%20.../near/294238234" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Easily.20using.20built-in.20tactics.20at.20the.20ML.20level.20.2E.2E.2E.html#294238234">(Aug 19 2022 at 10:42)</a>:</h4>
+<p>From: David Greenaway &lt;<a href="mailto:david.greenaway@nicta.com.au">david.greenaway@nicta.com.au</a>&gt;<br>
+On 08/03/13 12:36, David Greenaway wrote:</p>
+<blockquote>
+<p>In an Isabelle theory file, I can write simple one-line tactics such<br>
+as the following:</p>
+<p>apply (clarsimp simp: split_def split: prod.splits)</p>
+<p>I find, however, when I start writing ML code to automate proofs,<br>
+producing a ML tactic object is far more verbose:<br>
+[...]<br>
+Does anyone have any hints or tips?</p>
+</blockquote>
+<p>With the help of Thomas Sewell, I came up with the following solution:</p>
+<p>The "Method" class provides an interface to both generate a "method"<br>
+from a list of tokens, and to generate a "cases_tactic" from a method.<br>
+These can be combined as follows:</p>
+<p>(*</p>
+<p>* Generate an ML tactic object of the given Isar string.<br>
+     *</p>
+<p>* For example,<br>
+     *</p>
+<p>*   mk_tac "auto simp: field_simps intro!: ext" @{context}<br>
+     *</p>
+<p>* will generate the corresponding "tactic" object.<br>
+     *)<br>
+    fun mk_tac str ctxt =<br>
+    let<br>
+      val parsed_str = Outer_Syntax.scan Position.start str<br>
+          |&gt; filter Token.is_proper<br>
+          |&gt; <a href="http://Args.name">Args.name</a><br>
+      val meth = Method.method (Proof_Context.theory_of ctxt)<br>
+          (Args.src (parsed_str, Position.start)) ctxt<br>
+    in<br>
+      Method.apply (K meth) ctxt [] #&gt; <a href="http://Seq.map">Seq.map</a> snd<br>
+    end</p>
+<p>or alternatively as an anti-quotation:</p>
+<p>(*</p>
+<p>* Setup an antiquotation of the form:<br>
+     *</p>
+<p>*    @{tactic "auto simp: foo intro!: bar"}<br>
+     *</p>
+<p>* which returns an object of type "context -&gt; tactic".<br>
+     *</p>
+<p>* While this doesn't provide any benefits over a direct call to "mk_tac" just<br>
+     * yet, in the future it may generate code to avoid parsing the tactic at<br>
+     * run-time.<br>
+     *)<br>
+    val tactic_antiquotation_setup =<br>
+    let<br>
+      val parse_string =<br>
+        ((Args.context -- Scan.lift <a href="http://Args.name">Args.name</a>) &gt;&gt; snd)<br>
+          #&gt;&gt; ML_Syntax.print_string<br>
+          #&gt;&gt; (fn s =&gt; "mk_tac " ^ s)<br>
+          #&gt;&gt; ML_Syntax.atomic<br>
+    in<br>
+      ML_Antiquote.inline @{binding "tactic"} parse_string<br>
+    end</p>
+<p>and setup in a theory file as follows:</p>
+<p>setup {*<br>
+      tactic_antiquotation_setup<br>
+    *}</p>
+<p>This can then be used in ML code to generate a tactic:</p>
+<p>lemma "(a :: nat) * (b + 1) = (a * b) + a"<br>
+      by (tactic {* @{tactic "metis Suc_eq_plus1 mult_Suc_right nat_add_commute"} @{context} *})</p>
+<p>Hopefully this helps somebody other than just me.</p>
+<p>Cheers,<br>
+David</p>
+
+
+
+<a name="294238240"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Easily%20using%20built-in%20tactics%20at%20the%20ML%20level%20.../near/294238240" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Easily.20using.20built-in.20tactics.20at.20the.20ML.20level.20.2E.2E.2E.html#294238240">(Aug 19 2022 at 10:42)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On Mon, 11 Mar 2013, David Greenaway wrote:</p>
+<blockquote>
+<p>On 08/03/13 12:36, David Greenaway wrote:</p>
+<blockquote>
+<p>In an Isabelle theory file, I can write simple one-line tactics such<br>
+as the following:</p>
+<p>apply (clarsimp simp: split_def split: prod.splits)</p>
+<p>I find, however, when I start writing ML code to automate proofs,<br>
+producing a ML tactic object is far more verbose:<br>
+[...]<br>
+Does anyone have any hints or tips?</p>
+</blockquote>
+<p>With the help of Thomas Sewell, I came up with the following solution:</p>
+<p>The "Method" class provides an interface</p>
+</blockquote>
+<p>That is the <em>structure</em> Method in Isabelle/ML.  SML is free from any <br>
+object-oriented concepts.  You should do justice to what the oo-guys tried <br>
+to do several decades ago by using their terminology properly.</p>
+<blockquote>
+<p>* While this doesn't provide any benefits over a direct call to "mk_tac" just<br>
+    * yet, in the future it may generate code to avoid parsing the tactic at<br>
+    * run-time.<br>
+    *)<br>
+   val tactic_antiquotation_setup =<br>
+   let<br>
+     val parse_string =<br>
+       ((Args.context -- Scan.lift <a href="http://Args.name">Args.name</a>) &gt;&gt; snd)<br>
+         #&gt;&gt; ML_Syntax.print_string<br>
+         #&gt;&gt; (fn s =&gt; "mk_tac " ^ s)<br>
+         #&gt;&gt; ML_Syntax.atomic<br>
+   in<br>
+     ML_Antiquote.inline @{binding "tactic"} parse_string<br>
+   end</p>
+</blockquote>
+<p>Parsing at runtime gets you back to LISP-style dynamic macro programming. <br>
+ML_Antiquote.value should do the job statically at compile time. <br>
+Sometimes this requires auxiliary data in the context, to transport <br>
+abstract values between the runtime/compile time of Isabelle/ML.  E.g. see <br>
+how the @{thm} antiquotation is done.  (To get to its implementation you <br>
+write something like ML {* @{thm refl} *} and use hover-click in <br>
+Isabelle/jEdit on "thm".)</p>
+<blockquote>
+<p>This can then be used in ML code to generate a tactic:</p>
+<p>lemma "(a :: nat) * (b + 1) = (a * b) + a"<br>
+     by (tactic {* @{tactic "metis Suc_eq_plus1 mult_Suc_right nat_add_commute"} @{context} *})</p>
+<p>Hopefully this helps somebody other than just me.</p>
+</blockquote>
+<p>The next one will ask for arguments that are not just constants like <br>
+Suc_eq_plus1, but ML expressions at run-time.</p>
+<p>Makarius</p>
+
+
+
+<a name="294238257"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Easily%20using%20built-in%20tactics%20at%20the%20ML%20level%20.../near/294238257" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Easily.20using.20built-in.20tactics.20at.20the.20ML.20level.20.2E.2E.2E.html#294238257">(Aug 19 2022 at 10:42)</a>:</h4>
+<p>From: Joachim Breitner &lt;<a href="mailto:breitner@kit.edu">breitner@kit.edu</a>&gt;<br>
+Hi,</p>
+<p>Nice!</p>
+<p>I can use this to somewhat emulate the [1!] feature¹ suggested on<br>
+isabelle-dev, without patching Isabelle:</p>
+<p>notepad <br>
+begin<br>
+  assume x: "B"<br>
+  assume y: "A ⟹ B"<br>
+  assume z: A<br>
+  have B<br>
+  apply ((tactic {* SOLVE (@{tactic "rule x"} @{context}) *})[1]) -- "solves the goal, so it works"<br>
+  done<br>
+  have B<br>
+  apply ((tactic {* SOLVE (@{tactic "rule y"} @{context}) *})[1]) -- "does not solve it, hence fails"<br>
+  sorry</p>
+<p>Unfortunately, it does not parse complete method text with , | + ...:<br>
+  have B<br>
+  apply ((tactic {* SOLVE (@{tactic "rule y, rule z"} @{context}) *})[1]) -- "should solve, but doesn't parse"<br>
+  done</p>
+<p>Do you think that would be possible as well?</p>
+<p>I tried to find a way, but a parsed sequence of proof methods is a<br>
+Method.text, which is interpreted by Proof.apply_text, and I did not<br>
+find a way to turn a aggregate Method.text to a Method.method to use<br>
+with Method.apply.</p>
+<p>Thanks,<br>
+Joachim</p>
+<p>¹ <a href="https://mailmanbroy.informatik.tu-muenchen.de/pipermail/isabelle-dev/2013-March/003911.html">https://mailmanbroy.informatik.tu-muenchen.de/pipermail/isabelle-dev/2013-March/003911.html</a><br>
+<a href="/user_uploads/14278/0Ab0RHEt2a3xJq-6rLtDK3cR/signature.asc">signature.asc</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

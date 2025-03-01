@@ -1,0 +1,151 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Experimental tweaks to make HOL intuitionistic... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Experimental.20tweaks.20to.20make.20HOL.20intuitionistic.2E.2E.2E.html">[isabelle] Experimental tweaks to make HOL intuitionistic...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294319621"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Experimental%20tweaks%20to%20make%20HOL%20intuitionistic.../near/294319621" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Experimental.20tweaks.20to.20make.20HOL.20intuitionistic.2E.2E.2E.html#294319621">(Aug 19 2022 at 16:27)</a>:</h4>
+<p>From: Josh Tilles &lt;<a href="mailto:merelyapseudonym@gmail.com">merelyapseudonym@gmail.com</a>&gt;<br>
+I've come across a few errors that are blocking my progress. I'm not sure<br>
+what to do besides trying to become familiar with <em>all</em> of Isabelle's<br>
+internals, so I'd appreciate any advice/direction—particularly on the two<br>
+specific errors I present below.</p>
+<p>Thank you,<br>
+--Josh Tilles</p>
+<p>These errors have arisen because I've returned to a task that I last<br>
+attempted a year or so ago: adapting HOL to make it possible to selectively<br>
+"opt-in" to classical logic. I've thought of a few approaches that would<br>
+work as initial proof-of-concepts. My intuition is that any of the below<br>
+<em>should</em> be possible, but one might be more tractable than the others.</p>
+<p>Extract HOL.True_or_False into a locale.</p>
+<p>- seems like the ideal solution<br>
+   - Ultimately, I think the locale <em>should</em> be named classical <em>but</em> I've<br>
+   currently named it NonIntuitionistic because there's a lemma that's also<br>
+   named classical and an ML structure named Classical. So if I wanted the<br>
+   locale usage to stand out in these prototypes, I needed a different name.</p>
+<p>- The problem is that the elim rules break:<br>
+      - on the line "declare NonIntuitionistic.iffCE [elim!]" we see the<br>
+      message:<br>
+      exception THM 1 raised (line 332 of "drule.ML"):</p>
+<p>RSN: no unifiers<br>
+      PROP NonIntuitionistic ⟹ ?P = ?Q ⟹ (?P ⟹ ?Q ⟹ ?R) ⟹ (¬ ?P ⟹ ¬ ?Q ⟹<br>
+      ?R) ⟹ ?R<br>
+      PROP NonIntuitionistic ⟹ (¬ ?P ⟹ ?P) ⟹ ?P</p>
+<p>Extract non-classical code into IHOL.thy, which the normal/classical HOL.thy<br>
+subsequently imports.</p>
+<p>- Took a lot of time the last time I tried it a year ago, so I don't<br>
+   have a demonstration patch (yet)</p>
+<p>- A major problem is that all future theories will need to be split<br>
+   similarly</p>
+<p>- For example, IOrderings.thy for all of the lemmas and theorems that<br>
+      work in an intuitionistic context, and Orderings.thy as the theory<br>
+      that contains everything in IOrderings.thy <em>plus</em> any lemmas/theories<br>
+      that actually depend on classical logic.</p>
+<p>Replace the global HOL.True_or_False axiomatization with many local<br>
+assumptions/dependencies on the individual lemmas and theorems.</p>
+<p>- probably the least amount of broad structural change (effectively,<br>
+   we're just adding one more assumption to any classical lemmas)</p>
+<p>- but tedious to make lots of minor changes to make to the proofs of the<br>
+   lemmas</p>
+<p>- you can see examples of this in my attached patch<br>
+      - I totally acknowledge that my updated proofs are super-hacky at the<br>
+      moment.</p>
+<p>- needed to move the declarations of a bunch of lemmas as elimination<br>
+   rules <em>before</em> the Hypsubst and Classical structures, otherwise I get an<br>
+   error:</p>
+<p>- on the line "declare iffCE [elim!]" we see the message:<br>
+      exception Option raised (line 81 of "General/basics.ML")</p>
+<p>- but if those particular errors go away if I relocate the<br>
+      declarations</p>
+<p>- unfortunately, anything elim-related fails with the same error</p>
+
+
+
+<a name="294323743"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Experimental%20tweaks%20to%20make%20HOL%20intuitionistic.../near/294323743" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Experimental.20tweaks.20to.20make.20HOL.20intuitionistic.2E.2E.2E.html#294323743">(Aug 19 2022 at 16:50)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+There is certainly something to learn from it: how proof assistants were <br>
+implemented in the early 1990-ies. See also the famous Handbook article by <br>
+Larry Paulson "Designing a theorem prover": <br>
+<a href="http://www.cl.cam.ac.uk/techreports/UCAM-CL-TR-192.html">http://www.cl.cam.ac.uk/techreports/UCAM-CL-TR-192.html</a></p>
+<p>The newer "Handbook of Practical Logic and Automated Reasoning" by John <br>
+Harrison also has a chapter on "Interactive theorem proving", see also <br>
+<a href="http://www.cl.cam.ac.uk/~jrh13/atp">http://www.cl.cam.ac.uk/~jrh13/atp</a> --- it describes HOL-Light, so the <br>
+prover architecture is very minimalistic.</p>
+<p>That won't help in the project to remove the classical principle from <br>
+Isabelle/HOL, which I would consider futile.  Why change the logic anyway? <br>
+Better use it (and its many ad-on tools) to model your own language and <br>
+logic inside it.</p>
+<p>Makarius</p>
+<hr>
+<p><a href="http://stop-ttip.org">http://stop-ttip.org</a>  1,152,367 people so far</p>
+<hr>
+
+
+
+<a name="294324200"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Experimental%20tweaks%20to%20make%20HOL%20intuitionistic.../near/294324200" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Experimental.20tweaks.20to.20make.20HOL.20intuitionistic.2E.2E.2E.html#294324200">(Aug 19 2022 at 16:52)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On Sat, 20 Dec 2014, Josh Tilles wrote:</p>
+<blockquote>
+<blockquote>
+<p>On Fri, 21 Nov 2014, Josh Tilles wrote:</p>
+<p>P.S. I'm about a hundred pages into <em>ML for the Working Programmer</em>, so I</p>
+<blockquote>
+<p>apologize if all of my questions are just a result of my not yet having<br>
+read the chapter about constructing a tactical theorem prover [?]<br>
+</p>
+</blockquote>
+<p>There is certainly something to learn from it: how proof assistants were<br>
+implemented in the early 1990-ies. See also the famous Handbook article by<br>
+Larry Paulson "Designing a theorem prover": <a href="http://www.cl.cam.ac.uk/">http://www.cl.cam.ac.uk/</a><br>
+techreports/UCAM-CL-TR-192.html</p>
+</blockquote>
+<p>Are you being tongue-in-cheek? I can't tell. Like, I wouldn't have <br>
+guessed that implementation techniques from twenty years ago are <br>
+relevant now...</p>
+</blockquote>
+<p>I did not intend to make jokes about old, but important articles.  There <br>
+is definitely something to learn from ancient times, where the concepts <br>
+are easier to see without all the rest around it that emerged over the <br>
+decades.  Of course, you need to put things into the historical <br>
+perspective, and see the key points of newer prover architecture -- <br>
+Isabelle is very rich in that respect.</p>
+<blockquote>
+<blockquote>
+<p>The newer "Handbook of Practical Logic and Automated Reasoning" by John <br>
+Harrison also has a chapter on "Interactive theorem proving", see also <br>
+<a href="http://www.cl.cam.ac.uk/~jrh13/atp">http://www.cl.cam.ac.uk/~jrh13/atp</a> --- it describes HOL-Light, so the <br>
+prover architecture is very minimalistic.</p>
+</blockquote>
+</blockquote>
+<p>Note that HOL-Light is interesting in being a minimalistic model of an <br>
+LCF-style prover that is in actual use.  That is part of its culture, and <br>
+in contrast to Isabelle, but contrast also helps to learn something.</p>
+<blockquote>
+<blockquote>
+<p>Better use it (and its many ad-on tools) to model your own language and <br>
+logic inside it.</p>
+<p>I'm not sure what you mean. Could you elaborate? Or perhaps point me <br>
+toward some examples or explanations by other people?</p>
+</blockquote>
+</blockquote>
+<p>See what Larry said about non-standard analysis.  When you want to do <br>
+realistic applications, it is better to keep the existing logical <br>
+foundations, and build within that huge building what you need in <br>
+addition.</p>
+<p>Makarius</p>
+<hr>
+<p><a href="http://stop-ttip.org">http://stop-ttip.org</a>  1,218,911 people so far</p>
+<hr>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

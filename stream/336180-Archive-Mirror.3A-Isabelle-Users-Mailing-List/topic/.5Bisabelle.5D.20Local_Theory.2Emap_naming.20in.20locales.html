@@ -1,0 +1,223 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Local_Theory.map_naming in locales · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Local_Theory.2Emap_naming.20in.20locales.html">[isabelle] Local_Theory.map_naming in locales</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294327727"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Local_Theory.map_naming%20in%20locales/near/294327727" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Local_Theory.2Emap_naming.20in.20locales.html#294327727">(Aug 19 2022 at 17:12)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear experts on name spaces and local theories,</p>
+<p>I use Local_Theory.map_naming in an unnamed context to add a mandatory prefix to some <br>
+theorems. For example,</p>
+<p>context begin<br>
+local_setup ‹ Local_Theory.map_naming (Name_Space.mandatory_path "foo") ›<br>
+lemma bar: "bar ⟹ True" ..<br>
+end</p>
+<p>Then, I get the theorem <a href="http://foo.bar">foo.bar</a>, but not bar. I picked this pattern up from <br>
+<a href="http://isabelle.in.tum.de/repos/isabelle/file/8f4a332500e4/src/HOL/Product_Type.thy#l1017">http://isabelle.in.tum.de/repos/isabelle/file/8f4a332500e4/src/HOL/Product_Type.thy#l1017</a></p>
+<p>Unfortunately, this does not seem to work when I am inside a locale.</p>
+<p>locale test = assumes *: True begin<br>
+context begin<br>
+local_setup ‹ Local_Theory.map_naming (Name_Space.mandatory_path "foo") ›<br>
+lemma bar: "bar ⟹ True" ..<br>
+end</p>
+<p>Now, the theorem names "bar", "<a href="http://local.bar">local.bar</a>", and "<a href="http://test.foo.bar">test.foo.bar</a>" are available. I would have <br>
+expected "<a href="http://foo.bar">foo.bar</a>", "<a href="http://local.foo.bar">local.foo.bar</a>", and "<a href="http://test.foo.bar">test.foo.bar</a>", but the first two do not exist.</p>
+<p>Moreover, when I later interpret test, the foo prefix does not show up either. What is the <br>
+recommended way to install such mandatory prefixes? What am I doing wrong here?</p>
+<p>Background: Why do I need this? The command inductive_set does not allow instantiations in <br>
+the parameters. Therefore, I first define my set foo as a predicate foop with inductive <br>
+and then manually perform the translation to sets as would be done with inductive_set. To <br>
+get the same names (foo.intros, foo.cases, ...), I open an unnamed context, add the <br>
+mandatory prefix foo to the name space with map_naming and transfer the theorems for foop <br>
+using [pred_to_set]. This works fine at the theory level.</p>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<a name="294328085"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Local_Theory.map_naming%20in%20locales/near/294328085" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Local_Theory.2Emap_naming.20in.20locales.html#294328085">(Aug 19 2022 at 17:14)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Andreas,</p>
+<blockquote>
+<p>context begin<br>
+local_setup ‹ Local_Theory.map_naming (Name_Space.mandatory_path "foo") ›<br>
+lemma bar: "bar ⟹ True" ..<br>
+end</p>
+<p>Unfortunately, this does not seem to work when I am inside a locale.</p>
+<p>locale test = assumes *: True begin<br>
+context begin<br>
+local_setup ‹ Local_Theory.map_naming (Name_Space.mandatory_path "foo") ›<br>
+lemma bar: "bar ⟹ True" ..<br>
+end</p>
+<p>Now, the theorem names "bar", "<a href="http://local.bar">local.bar</a>", and "<a href="http://test.foo.bar">test.foo.bar</a>" are<br>
+available. I would have expected "<a href="http://foo.bar">foo.bar</a>", "<a href="http://local.foo.bar">local.foo.bar</a>", and<br>
+"<a href="http://test.foo.bar">test.foo.bar</a>", but the first two do not exist.</p>
+</blockquote>
+<p>Having a look at Local_Theory.map_naming this is quite obvious</p>
+<p>fun map_naming f =<br>
+  map_top (fn (naming, operations, after_close, brittle, target) =&gt;<br>
+    (f naming, operations, after_close, brittle, target));</p>
+<p>I.e. only the topmost context in the stack of local theories is affected.</p>
+<p>It is unclear to me what can be done in our current infrastructure to<br>
+achieve the desired effect.  I will spend some time to understand this<br>
+occasionally.</p>
+<p>Florian</p>
+<blockquote>
+<p>Moreover, when I later interpret test, the foo prefix does not show up<br>
+either. What is the recommended way to install such mandatory prefixes?<br>
+What am I doing wrong here?</p>
+<p>Background: Why do I need this? The command inductive_set does not allow<br>
+instantiations in the parameters. Therefore, I first define my set foo<br>
+as a predicate foop with inductive and then manually perform the<br>
+translation to sets as would be done with inductive_set. To get the same<br>
+names (foo.intros, foo.cases, ...), I open an unnamed context, add the<br>
+mandatory prefix foo to the name space with map_naming and transfer the<br>
+theorems for foop using [pred_to_set]. This works fine at the theory level.</p>
+<p>Best,<br>
+Andreas</p>
+<p><a href="/user_uploads/14278/jQ3VcX0QWT1m0kx8rwGyTtC8/signature.asc">signature.asc</a></p>
+</blockquote>
+
+
+
+<a name="294328314"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Local_Theory.map_naming%20in%20locales/near/294328314" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Local_Theory.2Emap_naming.20in.20locales.html#294328314">(Aug 19 2022 at 17:16)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+So far, the "naming" of a local_theory only refers to the background <br>
+theory for foundation.  There is still no provision for more name space <br>
+control, but it is one of the important things in the pipeline for a very <br>
+long time. Over many years, there were just important ingredients missing <br>
+to move forward, e.g. unnamed context begin ... end blocks.  There were <br>
+also rather lame reasons like the inability to write "private definition <br>
+..." or "private theorem ..." with TTY/Proof General still around.</p>
+<p>There is a whole complex around name space policies, but I don't recall <br>
+all details on the spot.  Here are some aspects to rekindle a discussion <br>
+of what could be done eventually.</p>
+<p>* Some concrete syntax for bindings and namings (e.g. in context<br>
+     headers) to add name space qualification (with and without "mandatory"<br>
+     flag).</p>
+<p>* Likewise some syntax for certain flags, e.g. "concealed", "private",<br>
+     "hidden".</p>
+<p>* Reform of existing theories to eliminate all uses of "hide", "hide<br>
+     (open)", "map_naming" etc.</p>
+<p>* Session-qualified theory names.</p>
+<p>* Restoration of old tools that only cope with full names like<br>
+     "<a href="http://Theory.foo">Theory.foo</a>" or "<a href="http://Theory.local.foo">Theory.local.foo</a>" -- paradoxically, such "old" tools<br>
+     are sometimes only a few years old.</p>
+<p>Makarius</p>
+
+
+
+<a name="294638161"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Local_Theory.map_naming%20in%20locales/near/294638161" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Local_Theory.2Emap_naming.20in.20locales.html#294638161">(Aug 22 2022 at 09:36)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+This thread about Isabelle name space policies is continued on <br>
+isabelle-dev, just in the nick of time before the hot phase of the <br>
+Isabelle2015 process starts.</p>
+<p>The "lame reasons" due to TTY/Proof General no longer exist ...</p>
+<p>Makarius</p>
+
+
+
+<a name="294643164"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Local_Theory.map_naming%20in%20locales/near/294643164" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Local_Theory.2Emap_naming.20in.20locales.html#294643164">(Aug 22 2022 at 10:09)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On Thu, 12 Feb 2015, Andreas Lochbihler wrote:</p>
+<blockquote>
+<p>I use Local_Theory.map_naming in an unnamed context to add a mandatory <br>
+prefix to some theorems. For example,</p>
+<p>context begin<br>
+local_setup ‹ Local_Theory.map_naming (Name_Space.mandatory_path "foo") ›<br>
+lemma bar: "bar ⟹ True" ..<br>
+end</p>
+</blockquote>
+<blockquote>
+<p>Unfortunately, this does not seem to work when I am inside a locale.</p>
+<p>locale test = assumes *: True begin<br>
+context begin<br>
+local_setup ‹ Local_Theory.map_naming (Name_Space.mandatory_path "foo") ›<br>
+lemma bar: "bar ⟹ True" ..<br>
+end</p>
+<p>Now, the theorem names "bar", "<a href="http://local.bar">local.bar</a>", and "<a href="http://test.foo.bar">test.foo.bar</a>" are <br>
+available. I would have expected "<a href="http://foo.bar">foo.bar</a>", "<a href="http://local.foo.bar">local.foo.bar</a>", and <br>
+"<a href="http://test.foo.bar">test.foo.bar</a>", but the first two do not exist.</p>
+<p>Moreover, when I later interpret test, the foo prefix does not show up <br>
+either. What is the recommended way to install such mandatory prefixes? <br>
+What am I doing wrong here?</p>
+</blockquote>
+<p>When making some name space reforms for Isabelle2015, I also looked at <br>
+this case, but did not see a way to do it properly.</p>
+<p>Extra qualification of name bindings is possible in Isabelle/ML via <br>
+Binding.qualified, but there is no Isar syntax for it.  Naming prefixes in <br>
+the name space are used by the system in other situations.  Above the open <br>
+question is what happens with the naming under interpretation.</p>
+<p>Moreover, many tools break down when they see more name prefixes than <br>
+expected.  This is a problem of these tools, but the usual reason why the <br>
+system cannot move forward right now.</p>
+<p>Further reforms are in the pipeline (for approx. 10 years) and will get <br>
+through eventually.</p>
+<blockquote>
+<p>Background: Why do I need this? The command inductive_set does not allow <br>
+instantiations in the parameters. Therefore, I first define my set foo <br>
+as a predicate foop with inductive and then manually perform the <br>
+translation to sets as would be done with inductive_set.</p>
+</blockquote>
+<p>Can you point to the concrete definitions for this?</p>
+<p>Makarius</p>
+
+
+
+<a name="294643218"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Local_Theory.map_naming%20in%20locales/near/294643218" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Local_Theory.2Emap_naming.20in.20locales.html#294643218">(Aug 22 2022 at 10:09)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Makarius,</p>
+<p>Thanks for keeping this on the radar.</p>
+<p>On 07/05/15 11:54, Makarius wrote:</p>
+<blockquote>
+<p>Extra qualification of name bindings is possible in Isabelle/ML via Binding.qualified, but<br>
+there is no Isar syntax for it.  Naming prefixes in the name space are used by the system<br>
+in other situations.  Above the open question is what happens with the naming under<br>
+interpretation.</p>
+<p>Moreover, many tools break down when they see more name prefixes than expected.  This is a<br>
+problem of these tools, but the usual reason why the system cannot move forward right now.<br>
+In my use case, I am not adding more levels of prefixes than would be there anyway, <br>
+because I just want to emulate the effect of any other command.</p>
+</blockquote>
+<blockquote>
+<blockquote>
+<p>Background: Why do I need this? The command inductive_set does not allow instantiations<br>
+in the parameters. Therefore, I first define my set foo as a predicate foop with<br>
+inductive and then manually perform the translation to sets as would be done with<br>
+inductive_set.</p>
+</blockquote>
+<p>Can you point to the concrete definitions for this?<br>
+I stumbled over this limitation of inductive_set in JinjaThreads. In Isabelle2011-1, I <br>
+used an inductive to actually define an inductive set, because 'a set and 'a =&gt; bool were <br>
+the same at that time:<br>
+<a href="http://sourceforge.net/p/afp/afp-2011-1/ci/default/tree/thys/JinjaThreads/MM/JMM_Spec.thy#l113">http://sourceforge.net/p/afp/afp-2011-1/ci/default/tree/thys/JinjaThreads/MM/JMM_Spec.thy#l113</a></p>
+</blockquote>
+<p>When the two types were separated again, I converted the inductive into a function and <br>
+manually derived all the necessary theorems, as can be seen in<br>
+<a href="http://sourceforge.net/p/afp/afp-2014/ci/default/tree/thys/JinjaThreads/MM/JMM_Spec.thy#l111">http://sourceforge.net/p/afp/afp-2014/ci/default/tree/thys/JinjaThreads/MM/JMM_Spec.thy#l111</a></p>
+<p>Of course, it would be great if the names were action_loc_aux.intros instead of <br>
+action_loc_aux_intros etc.</p>
+<p>I do not have a public real example in a locale, but I have attached a stripped-down <br>
+version. By the way, it would be great if parameters for inductive(_set) that are always <br>
+the same could be declared with for even if they are not the first ones (such as the x in <br>
+the attached example).</p>
+<p>Best,<br>
+Andreas<br>
+<a href="/user_uploads/14278/wtK2_yP5w9uaamuJkiv2i_nr/Scratch.thy">Scratch.thy</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,86 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Strange errors involving locales · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Strange.20errors.20involving.20locales.html">[isabelle] Strange errors involving locales</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294330001"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Strange%20errors%20involving%20locales/near/294330001" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Strange.20errors.20involving.20locales.html#294330001">(Aug 19 2022 at 17:25)</a>:</h4>
+<p>From: "Eugene W. Stark" &lt;<a href="mailto:stark@cs.stonybrook.edu">stark@cs.stonybrook.edu</a>&gt;<br>
+Can anyone explain the strange error described in the final comment<br>
+in the code below?  It seems especially odd to me that the presence<br>
+of the error depends on the order of the preceding "interpret" lines.</p>
+<p>The strange type inference behavior described in the comment<br>
+after the "assumes" line is also a puzzle to me.</p>
+<p>In case my mailer has mutated the code, I've also attached the theory<br>
+file.  Thanks for any help.</p>
+<p>- Gene Stark</p>
+<p>theory Buggy<br>
+imports Main<br>
+begin</p>
+<p>locale sub =<br>
+   fixes a :: 'a<br>
+begin<br>
+   definition P :: "'a ⇒ bool"<br>
+   where "P x ≡ True"<br>
+end</p>
+<p>locale loc =<br>
+   X: sub a + Y: sub b<br>
+   for a and b +<br>
+   fixes f :: "'a ⇒ 'b"<br>
+   assumes "f a = b"<br>
+   (*</p>
+<p>* If the preceding line is removed, then constant "loc"<br>
+    * ends up having type "'a ⇒'a ⇒ ('b ⇒ 'b) ⇒ bool<br>
+    * instead of "'a ⇒ 'b ⇒ ('a ⇒ 'b) ⇒ bool<br>
+    *)</p>
+<p>lemma<br>
+assumes "loc a b f" and "loc b c g"<br>
+shows "loc a c (g o f)"<br>
+proof<br>
+   interpret F: loc a b f using assms(1) by auto<br>
+   interpret G: loc b c g using assms(2) by auto<br>
+   have "⋀x. F.X.P x" using F.X.P_def by auto<br>
+   have "⋀x. G.X.P x" using G.X.P_def by auto<br>
+   (*</p>
+<p>* Constant G.X.P is unrecognized in the preceding line.<br>
+    * If the "interpret" lines are interchanged,<br>
+    * there is no error.<br>
+    *)<br>
+qed</p>
+<p>end<br>
+<a href="/user_uploads/14278/PoikII9duxD1FtTMrZ-5LmgD/Buggy.thy">Buggy.thy</a></p>
+
+
+
+<a name="294330007"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Strange%20errors%20involving%20locales/near/294330007" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Strange.20errors.20involving.20locales.html#294330007">(Aug 19 2022 at 17:25)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear Gene,</p>
+<p>I do not understand what problem you refer to in the first comment (about removing the <br>
+previous line). If I remove the "assume" clause, no constant loc is generated at all, as <br>
+there are no assumptions in loc or its ancestors.</p>
+<p>Now to the problem with interpret. Interpretations (and also sublocale declarations) check <br>
+whether an interpretation of a locale with the same (or more general) parameters is <br>
+already present. If so, it does not interpret the locale, even if the name prefixes are <br>
+different. In your case,</p>
+<p>interpret F: loc a b f using assms(1) by auto</p>
+<p>introduces the interpretations</p>
+<p>F: loc a b f, F.X: sub a, F.Y: sub b</p>
+<p>Naively, the next interpret G: loc b c g generates the interpretations<br>
+   G: loc b c g, G.X: sub b, G.Y: sub c</p>
+<p>However, sub b has already been interpreted as F.X, so there is not another interpretation <br>
+for G.X. Consequently, you'd have to use the name F.Y to refer to G.X interpretations. If <br>
+you swap the declarations, you get G.X and F.X, but not F.Y by the analogous reasoning.</p>
+<p>Hope this helps,<br>
+Andreas</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,225 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Haskell code generation for Imperative/HOL · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Haskell.20code.20generation.20for.20Imperative.2FHOL.html">[isabelle] Haskell code generation for Imperative/HOL</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294691450"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Haskell%20code%20generation%20for%20Imperative/HOL/near/294691450" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Haskell.20code.20generation.20for.20Imperative.2FHOL.html#294691450">(Aug 22 2022 at 14:18)</a>:</h4>
+<p>From: "Thiemann, Rene" &lt;<a href="mailto:Rene.Thiemann@uibk.ac.at">Rene.Thiemann@uibk.ac.at</a>&gt;<br>
+Dear all,</p>
+<p>I just played a bit around with Imperative/HOL and got into the following problem:</p>
+<p>I want to use imperative HOL to run some imperative code within a functional program to increase the efficiency of some intermediate computation. So, in particular I need a function similar to Isabelle's “execute”<br>
+or Haskell’s “runST”. </p>
+<p>The following theory describes the problems I ran into, and I would be grateful for any hints.</p>
+<p>Cheers,<br>
+René</p>
+<p>theory Head_Imperative<br>
+  imports "~~/src/HOL/Imperative_HOL/Imperative_HOL"  <br>
+  "$AFP/Show/Show_Instances"<br>
+  "~~/src/HOL/Library/Code_Target_Numeral"<br>
+  "~~/src/HOL/Library/Code_Char"<br>
+begin</p>
+<p>(* example monadic function: compute the head of a list via arrays *)<br>
+definition "head (xs :: nat list) = do {<br>
+   a &lt;- Array.of_list xs;<br>
+   Array.nth a 0}" </p>
+<p>lemma head_sound_as_effect: "xs ≠ [] ⟹ effect (head xs) h (snd (Array.alloc xs h)) (hd xs)" <br>
+  unfolding head_def <br>
+  (* there clearly is a better proof by using the framework lemmas,<br>
+     but this is not the problem *)<br>
+  by (cases h, cases xs, auto simp: execute_simps effect_def<br>
+    Heap_Monad.heap_def Array.set_def Array.get_def<br>
+   Array.alloc_def o_def Let_def Array.nth_def Array.length_def guard_def)</p>
+<p>definition run_ST :: "'a Heap ⇒ 'a" where<br>
+  [code del]: "run_ST h = fst (the (execute h (undefined ''heap'')))" (* or Heap.empty *)</p>
+<p>(* run_ST admits to go outside the ST monad again and reason via the<br>
+   functional result of the computation  *)<br>
+lemma run_ST_effect: assumes "⋀ h. ∃ h'. effect c h h' r"<br>
+  shows "run_ST c = r" <br>
+proof -<br>
+  from assms obtain h' where "effect c (undefined ''heap'') h' r" by auto<br>
+  thus ?thesis unfolding run_ST_def effect_def by simp<br>
+qed</p>
+<p>definition "head_functional xs = run_ST (head xs)" </p>
+<p>lemma head_sound_as_functional_program: "xs ≠ [] ⟹ head_functional xs = hd xs" <br>
+  unfolding head_functional_def<br>
+  using run_ST_effect head_sound_as_effect by metis</p>
+<p>(* this code belongs into the code-setup for Heap, cf. the code-printing in Heap_Monad *)<br>
+code_printing constant run_ST ⇀ (Haskell) "RunST.runST"</p>
+<p>code_printing code_module "RunST" ⇀ (Haskell)<br>
+‹import qualified Control.Monad.ST; <br>
+runST = Control.Monad.ST.runST;›</p>
+<p>definition "test = show (head_functional [17,90,2])"<br>
+export_code test in Haskell module_name Head</p>
+<p>(* the problem now is the type-signature in the generated code of</p>
+<p>nth ::<br>
+  forall a.<br>
+    (Heapa a) =&gt; Heap.STArray Heap.RealWorld a -&gt;<br>
+                   Nat -&gt; Heap.ST Heap.RealWorld a;<br>
+nth a n = Heap.readArray a (integer_of_nat n);</p>
+<p>and</p>
+<p>head :: [Nat] -&gt; Heap.ST Heap.RealWorld Nat;<br>
+head xs = do { <br>
+            a &lt;- Heap.newListArray xs;<br>
+            nth a zero_nat<br>
+           };</p>
+<p>because of the code_printing setup in Heap_Monad</p>
+<p>type RealWorld = Control.Monad.ST.RealWorld; </p>
+<p>type_constructor Heap ⇀ (Haskell) "Heap.ST/ Heap.RealWorld/ _"</p>
+<p>The problem is that the type of the Haskell function runST is of<br>
+type forall a. ((forall s. ST s a) -&gt; a), so that in particular the<br>
+  state in the ST monad must be arbitrary, but not a fixed type like RealWorld.</p>
+<p>So, the proper code-printing would be </p>
+<p>type_constructor Heap ⇀ (Haskell) "Heap.ST/ s/ _" </p>
+<p>where "s" is some additional type variable. (ST in Haskell requires<br>
+two type parameters, one for state, the other for the return type). </p>
+<p>Now there is the problem, that I don't know how to tell the code-generator<br>
+to observe the heap/ST type as binary, although it is unary in Isabelle.</p>
+<p>In particular, the type of nth and head have to become</p>
+<p>nth ::<br>
+  forall a s.<br>
+    (Heapa a) =&gt; Heap.STArray s a -&gt; Nat -&gt; Heap.ST s a;</p>
+<p>head :: forall s. [Nat] -&gt; Heap.ST s Nat;</p>
+<p>where the s is quantified. Once one performs this change, compilation and<br>
+execution works as expected.</p>
+<p>*)<br>
+end</p>
+
+
+
+<a name="294691467"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Haskell%20code%20generation%20for%20Imperative/HOL/near/294691467" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Haskell.20code.20generation.20for.20Imperative.2FHOL.html#294691467">(Aug 22 2022 at 14:19)</a>:</h4>
+<p>From: "Thiemann, Rene" &lt;<a href="mailto:Rene.Thiemann@uibk.ac.at">Rene.Thiemann@uibk.ac.at</a>&gt;<br>
+A small update:</p>
+<p>one can use</p>
+<p>code_printing code_module "RunST" ⇀ (Haskell)<br>
+‹import qualified Control.Monad.ST; <br>
+import qualified System.IO.Unsafe;<br>
+runST = System.IO.Unsafe.unsafePerformIO . Control.Monad.ST.stToIO;›</p>
+<p>to make the generated code compile. However, this seems a bit odd to use<br>
+the unsafePerformIO-operation where there is the safe runST in Haskell.</p>
+<p>Cheers,<br>
+René</p>
+<p>PS: The problem appears both in Isabelle2016 and Isabelle2016-1-RC0</p>
+
+
+
+<a name="294701112"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Haskell%20code%20generation%20for%20Imperative/HOL/near/294701112" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Haskell.20code.20generation.20for.20Imperative.2FHOL.html#294701112">(Aug 22 2022 at 14:40)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Rene,</p>
+<p>Am 21.10.2016 um 08:16 schrieb Thiemann, Rene:</p>
+<blockquote>
+<p>A small update:</p>
+<p>one can use</p>
+<p>code_printing code_module "RunST" ⇀ (Haskell)<br>
+‹import qualified Control.Monad.ST; <br>
+import qualified System.IO.Unsafe;<br>
+runST = System.IO.Unsafe.unsafePerformIO . Control.Monad.ST.stToIO;›</p>
+<p>to make the generated code compile. However, this seems a bit odd to use<br>
+the unsafePerformIO-operation where there is the safe runST in Haskell.</p>
+</blockquote>
+<p>this indeed is the core of the problem: there is a safe runST in<br>
+Haskell, but I have found no way to express this adequately in the HOL<br>
+type system.  Early code generation setups for Imperative HOL attempted<br>
+this but that never worked out.</p>
+<p>Hope this helps,<br>
+    Florian</p>
+<blockquote>
+<p>Cheers,<br>
+René</p>
+<p>PS: The problem appears both in Isabelle2016 and Isabelle2016-1-RC0</p>
+<blockquote>
+<p>Am 20.10.2016 um 23:50 schrieb Thiemann, Rene &lt;<a href="mailto:Rene.Thiemann@uibk.ac.at">Rene.Thiemann@uibk.ac.at</a>&gt;:</p>
+<p>Dear all,</p>
+<p>I just played a bit around with Imperative/HOL and got into the following problem:</p>
+<p>I want to use imperative HOL to run some imperative code within a functional program to increase the efficiency of some intermediate computation. So, in particular I need a function similar to Isabelle's “execute”<br>
+or Haskell’s “runST”. </p>
+<p>The following theory describes the problems I ran into, and I would be grateful for any hints.</p>
+<p>Cheers,<br>
+René</p>
+<p>theory Head_Imperative<br>
+ imports "~~/src/HOL/Imperative_HOL/Imperative_HOL"  <br>
+ "$AFP/Show/Show_Instances"<br>
+ "~~/src/HOL/Library/Code_Target_Numeral"<br>
+ "~~/src/HOL/Library/Code_Char"<br>
+begin</p>
+<p>(* example monadic function: compute the head of a list via arrays *)<br>
+definition "head (xs :: nat list) = do {<br>
+  a &lt;- Array.of_list xs;<br>
+  Array.nth a 0}" </p>
+<p>lemma head_sound_as_effect: "xs ≠ [] ⟹ effect (head xs) h (snd (Array.alloc xs h)) (hd xs)" <br>
+ unfolding head_def <br>
+ (* there clearly is a better proof by using the framework lemmas,<br>
+    but this is not the problem *)<br>
+ by (cases h, cases xs, auto simp: execute_simps effect_def<br>
+   Heap_Monad.heap_def Array.set_def Array.get_def<br>
+  Array.alloc_def o_def Let_def Array.nth_def Array.length_def guard_def)</p>
+<p>definition run_ST :: "'a Heap ⇒ 'a" where<br>
+ [code del]: "run_ST h = fst (the (execute h (undefined ''heap'')))" (* or Heap.empty *)</p>
+<p>(* run_ST admits to go outside the ST monad again and reason via the<br>
+  functional result of the computation  *)<br>
+lemma run_ST_effect: assumes "⋀ h. ∃ h'. effect c h h' r"<br>
+ shows "run_ST c = r" <br>
+proof -<br>
+ from assms obtain h' where "effect c (undefined ''heap'') h' r" by auto<br>
+ thus ?thesis unfolding run_ST_def effect_def by simp<br>
+qed</p>
+<p>definition "head_functional xs = run_ST (head xs)" </p>
+<p>lemma head_sound_as_functional_program: "xs ≠ [] ⟹ head_functional xs = hd xs" <br>
+ unfolding head_functional_def<br>
+ using run_ST_effect head_sound_as_effect by metis</p>
+<p>(* this code belongs into the code-setup for Heap, cf. the code-printing in Heap_Monad *)<br>
+code_printing constant run_ST ⇀ (Haskell) "RunST.runST"</p>
+<p>code_printing code_module "RunST" ⇀ (Haskell)<br>
+‹import qualified Control.Monad.ST; <br>
+runST = Control.Monad.ST.runST;›</p>
+<p>definition "test = show (head_functional [17,90,2])"<br>
+export_code test in Haskell module_name Head</p>
+<p>(* the problem now is the type-signature in the generated code of</p>
+<p>nth ::<br>
+ forall a.<br>
+   (Heapa a) =&gt; Heap.STArray Heap.RealWorld a -&gt;<br>
+                  Nat -&gt; Heap.ST Heap.RealWorld a;<br>
+nth a n = Heap.readArray a (integer_of_nat n);</p>
+<p>and</p>
+<p>head :: [Nat] -&gt; Heap.ST Heap.RealWorld Nat;<br>
+head xs = do { <br>
+           a &lt;- Heap.newListArray xs;<br>
+           nth a zero_nat<br>
+          };</p>
+<p>because of the code_printing setup in Heap_Monad</p>
+<p>type RealWorld = Control.Monad.ST.RealWorld; </p>
+<p>type_constructor Heap ⇀ (Haskell) "Heap.ST/ Heap.RealWorld/ _"</p>
+<p>The problem is that the type of the Haskell function runST is of<br>
+type forall a. ((forall s. ST s a) -&gt; a), so that in particular the<br>
+ state in the ST monad must be arbitrary, but not a fixed type like RealWorld.</p>
+<p>So, the proper code-printing would be </p>
+<p>type_constructor Heap ⇀ (Haskell) "Heap.ST/ s/ _" </p>
+<p>where "s" is some additional type variable. (ST in Haskell requires<br>
+two type parameters, one for state, the other for the return type). </p>
+<p>Now there is the problem, that I don't know how to tell the code-generator<br>
+to observe the heap/ST type as binary, although it is unary in Isabelle.</p>
+<p>In particular, the type of nth and head have to become</p>
+<p>nth ::<br>
+ forall a s.<br>
+   (Heapa a) =&gt; Heap.STArray s a -&gt; Nat -&gt; Heap.ST s a;</p>
+<p>head :: forall s. [Nat] -&gt; Heap.ST s Nat;</p>
+<p>where the s is quantified. Once one performs this change, compilation and<br>
+execution works as expected.</p>
+<p>*)<br>
+end</p>
+</blockquote>
+<p><a href="/user_uploads/14278/gD84zk0z8xCW9N-ToZZ5yaq8/signature.asc">signature.asc</a></p>
+</blockquote>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

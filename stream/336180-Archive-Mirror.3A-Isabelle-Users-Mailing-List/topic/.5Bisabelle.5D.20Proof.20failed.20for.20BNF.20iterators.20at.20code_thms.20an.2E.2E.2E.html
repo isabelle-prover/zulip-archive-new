@@ -1,0 +1,183 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Proof failed for BNF iterators at code_thms an... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof.20failed.20for.20BNF.20iterators.20at.20code_thms.20an.2E.2E.2E.html">[isabelle] Proof failed for BNF iterators at code_thms an...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294255045"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof%20failed%20for%20BNF%20iterators%20at%20code_thms%20an.../near/294255045" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof.20failed.20for.20BNF.20iterators.20at.20code_thms.20an.2E.2E.2E.html#294255045">(Aug 19 2022 at 12:31)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear Isabelle developers,</p>
+<p>I usually find the commands code_thms and export_code very useful while I work on setting <br>
+up the code generator. In combination with the BNF codatatype command, however, they <br>
+sometimes abort with "Proof failed." It reliably happens if the iterator or recursor for <br>
+the codatatype is reachable in the code dependency graphs and I have forgotten to provide <br>
+code equations for them. Here's a minimal example for Isabelle2013-1:</p>
+<p>theory Scratch imports "~~/src/HOL/BNF/BNF" begin<br>
+codatatype foo = Foo | Bar foo<br>
+code_datatype Foo Bar<br>
+code_thms foo_unfold</p>
+<p>At code_thms, I get "Proof failed." and a huge goal state talking about the internal BNF <br>
+construction for the the foo instead of the usual list of theorems that I would like to <br>
+inspect. The same happens at export_code and value [code].</p>
+<p>I know that code generation for codatatypes is not yet set up in Isabelle2013-1, so it is <br>
+kind of my own fault that I have forgotten to declare the relevent code equations. <br>
+Nevertheless, why does the code generator even try to prove anything at all? And how can <br>
+this fail?</p>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<a name="294255085"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof%20failed%20for%20BNF%20iterators%20at%20code_thms%20an.../near/294255085" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof.20failed.20for.20BNF.20iterators.20at.20code_thms.20an.2E.2E.2E.html#294255085">(Aug 19 2022 at 12:31)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Andreas,</p>
+<p>I did not inspect the code, but I guess it happens since internal proofs<br>
+are forked, which are only forced when the code generator is invoked.<br>
+Maybe the BNF gurus can tell you more.</p>
+<p>Hope this helps,<br>
+    Florian<br>
+<a href="/user_uploads/14278/_w5En653QIuirr97uysAHOnk/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294255089"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof%20failed%20for%20BNF%20iterators%20at%20code_thms%20an.../near/294255089" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof.20failed.20for.20BNF.20iterators.20at.20code_thms.20an.2E.2E.2E.html#294255089">(Aug 19 2022 at 12:31)</a>:</h4>
+<p>From: Dmitriy Traytel &lt;<a href="mailto:traytel@in.tum.de">traytel@in.tum.de</a>&gt;<br>
+That would imply that with</p>
+<p>ML {* parallel_proofs := 0 *}</p>
+<p>the error should occur at the codatatype command already. This is not <br>
+the case.</p>
+<p>After some minimization it turns out that this has nothing to do with <br>
+codatatypes at all:</p>
+<p>consts c :: "nat ⇒ bool"<br>
+consts b :: "bool"<br>
+definition "X = {(Kl :: nat set, lab) |Kl lab. ((∀kl∈Kl. b) ∧ (∀kl. kl ∉ <br>
+Kl ⟶ b)) ∧ c lab}"<br>
+code_thms X</p>
+<p>What is code_thms actually trying to prove?</p>
+<p>Dmitriy</p>
+
+
+
+<a name="294255141"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof%20failed%20for%20BNF%20iterators%20at%20code_thms%20an.../near/294255141" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof.20failed.20for.20BNF.20iterators.20at.20code_thms.20an.2E.2E.2E.html#294255141">(Aug 19 2022 at 12:31)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+On 16.11.2013 13:14, Dmitriy Traytel wrote:</p>
+<blockquote>
+<p>Am 16.11.2013 09:57, schrieb Florian Haftmann:</p>
+<blockquote>
+<p>Hi Andreas,</p>
+<blockquote>
+<p>theory Scratch imports "~~/src/HOL/BNF/BNF" begin<br>
+codatatype foo = Foo | Bar foo<br>
+code_datatype Foo Bar<br>
+code_thms foo_unfold</p>
+<p>At code_thms, I get "Proof failed." and a huge goal state talking about<br>
+the internal BNF construction for the the foo instead of the usual list<br>
+of theorems that I would like to inspect. The same happens at<br>
+export_code and value [code].<br>
+I did not inspect the code, but I guess it happens since internal proofs<br>
+are forked, which are only forced when the code generator is invoked.<br>
+Maybe the BNF gurus can tell you more.<br>
+That would imply that with</p>
+</blockquote>
+</blockquote>
+<p>ML {* parallel_proofs := 0 *}</p>
+<p>the error should occur at the codatatype command already. This is not<br>
+the case.</p>
+<p>After some minimization it turns out that this has nothing to do with<br>
+codatatypes at all:</p>
+<p>consts c :: "nat ⇒ bool"<br>
+consts b :: "bool"<br>
+definition "X = {(Kl :: nat set, lab) |Kl lab. ((∀kl∈Kl. b) ∧ (∀kl. kl ∉<br>
+Kl ⟶ b)) ∧ c lab}"<br>
+code_thms X</p>
+<p>What is code_thms actually trying to prove?</p>
+</blockquote>
+<p>Interesting.  The code generator internally only does rewriting and<br>
+instantiation, no backward proofs, except for case certificates<br>
+(Pure/Isar/code.ML):</p>
+<blockquote>
+<p>fun case_cong thy case_const (num_args, (pos, _)) =<br>
+  let<br>
+    val ([x, y], ctxt) = fold_map Name.variant ["A", "A'"] Name.context;<br>
+    val (zs, _) = fold_map Name.variant (replicate (num_args - 1) "") ctxt;<br>
+    val (ws, vs) = chop pos zs;<br>
+    val T = Logic.unvarifyT_global (Sign.the_const_type thy case_const);<br>
+    val Ts = binder_types T;<br>
+    val T_cong = nth Ts pos;<br>
+    fun mk_prem z = Free (z, T_cong);<br>
+    fun mk_concl z = list_comb (Const (case_const, T), map2 (curry Free) (ws @ z :: vs) Ts);<br>
+    val (prem, concl) = pairself Logic.mk_equals (pairself mk_prem (x, y), pairself mk_concl (x, y));<br>
+    fun tac { context, prems } = Simplifier.rewrite_goals_tac prems<br>
+      THEN ALLGOALS (Proof_Context.fact_tac [Drule.reflexive_thm]);<br>
+  in Goal.prove_sorry_global thy (x :: y :: zs) [prem] concl tac end;</p>
+</blockquote>
+<p>But this should hold regardless of the logical properties of the case<br>
+combinator.</p>
+<p>Have you tried to obtain a traceback?</p>
+<p>Cheers,<br>
+    Florian<br>
+<a href="/user_uploads/14278/mqsFxmGwwBAR7xLbpq6qZjHK/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294255239"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Proof%20failed%20for%20BNF%20iterators%20at%20code_thms%20an.../near/294255239" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Proof.20failed.20for.20BNF.20iterators.20at.20code_thms.20an.2E.2E.2E.html#294255239">(Aug 19 2022 at 12:32)</a>:</h4>
+<p>From: Dmitriy Traytel &lt;<a href="mailto:traytel@in.tum.de">traytel@in.tum.de</a>&gt;<br>
+I tried to do it now (see below). It points to the <br>
+set_comprehension_simproc that is installed as a code preprocessor in <br>
+Product_Type:</p>
+<p>setup {*<br>
+   Code_Preproc.map_pre (fn ctxt =&gt; ctxt addsimprocs<br>
+     [Raw_Simplifier.make_simproc {name = "set comprehension", lhss = <br>
+[@{cpat "Collect ?P"}],<br>
+     proc = K Set_Comprehension_Pointfree.code_simproc, identifier = []}])<br>
+*}</p>
+<p>Dmitriy</p>
+<p>Exception trace - Proof failed.</p>
+<p>1. \&lt;And&gt;a ba aa baa. (aa, baa) \&lt;in&gt; (\&lt;lambda&gt;Kl. Kl) <code> 
+(\&lt;lambda&gt;Kl. Kl) </code> {Kl. \&lt;forall&gt;kl\&lt;in&gt;Kl. b} \&lt;times&gt; UNIV \&lt;inter&gt; <br>
+(\&lt;lambda&gt;Kl. Kl) <code> (\&lt;lambda&gt;Kl. Kl) </code> {Kl. \&lt;forall&gt;kl. kl \&lt;notin&gt; Kl <br>
+\&lt;longrightarrow&gt; b} \&lt;times&gt; UNIV \&lt;inter&gt; UNIV \&lt;times&gt; (\&lt;lambda&gt;lab. <br>
+lab) <code> Collect c \&lt;Longrightarrow&gt; c baa
+The error(s) above occurred for the goal statement:
+{(Kl, lab) |Kl lab. ((\&lt;forall&gt;kl\&lt;in&gt;Kl. b) \&lt;and&gt; (\&lt;forall&gt;kl. kl 
+\&lt;notin&gt; Kl \&lt;longrightarrow&gt; b)) \&lt;and&gt; c lab} =
+(\&lt;lambda&gt;(Kl, lab). (Kl, lab)) </code> ((\&lt;lambda&gt;Kl. Kl) <code> (\&lt;lambda&gt;Kl. Kl) 
+</code> {Kl. \&lt;forall&gt;kl\&lt;in&gt;Kl. b} \&lt;times&gt; UNIV \&lt;inter&gt; (\&lt;lambda&gt;Kl. Kl) <code> 
+(\&lt;lambda&gt;Kl. Kl) </code> {Kl. \&lt;forall&gt;kl. kl \&lt;notin&gt; Kl \&lt;longrightarrow&gt; <br>
+b} \&lt;times&gt; UNIV \&lt;inter&gt; UNIV \&lt;times&gt; (\&lt;lambda&gt;lab. lab) ` {lab. c lab})<br>
+  (line 10 of "/home/traytel/Scratch3.thy")<br>
+Goal.prove_common(7)result(1)<br>
+Goal.prove_common(7)<br>
+Set_Comprehension_Pointfree.conv(2)<br>
+Set_Comprehension_Pointfree.code_simproc(2)<br>
+Raw_Simplifier.rewritec(4)proc_rews(1)<br>
+Raw_Simplifier.rewritec(4)<br>
+Raw_Simplifier.bottomc(3)botc(3)<br>
+Raw_Simplifier.bottomc(3)try_botc(1)(1)<br>
+Code.eqn_conv(2)<br>
+Conv.fconv_rule(2)<br>
+List.map(2)()<br>
+Library.singleton(1)(1)<br>
+List.map(2)()<br>
+Basics.#&gt;(1)(1)<br>
+Code_Preproc.obtain_eqns(3)<br>
+Code_Preproc.ensure_fun(5)<br>
+Code_Preproc.extend_arities_eqngr(5)<br>
+Code_Thingol.code_depgr(2)<br>
+Code_Thingol.code_thms(1)<br>
+Toplevel.apply_tr(3)(1)</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

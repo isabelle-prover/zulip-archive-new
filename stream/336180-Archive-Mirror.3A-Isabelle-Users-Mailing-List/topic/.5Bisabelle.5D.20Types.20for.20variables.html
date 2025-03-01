@@ -1,0 +1,198 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Types for variables · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Types.20for.20variables.html">[isabelle] Types for variables</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294082562"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Types%20for%20variables/near/294082562" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Types.20for.20variables.html#294082562">(Aug 18 2022 at 13:59)</a>:</h4>
+<p>From: John Munroe &lt;<a href="mailto:munddr@googlemail.com">munddr@googlemail.com</a>&gt;<br>
+Thanks for that. I'm trying this at the moment:</p>
+<p>consts<br>
+A :: "[nat,int] =&gt; int"<br>
+B :: "[nat,int] =&gt; int"<br>
+C :: "[nat,int] =&gt; int"</p>
+<p>axioms<br>
+ax: "A p t = B p t + C p t"</p>
+<p>lemma lem1: "EX func x y.func x y = B x y + C x y"<br>
+using ax<br>
+by blast</p>
+<p>It can infer the types of all func, x and y and blast resolves it. However,<br>
+if I change the LHS to a free variable:</p>
+<p>lemma lem1: "EX func x y.func x y = v"<br>
+using ax<br>
+by blast</p>
+<p>I wasn't so lucky. How come it can't unify v with B x y + C x y? What more<br>
+do I need?</p>
+<p>Thanks again<br>
+John</p>
+
+
+
+<a name="294082707"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Types%20for%20variables/near/294082707" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Types.20for.20variables.html#294082707">(Aug 18 2022 at 14:00)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:peter.lammich@uni-muenster.de">peter.lammich@uni-muenster.de</a>&gt;<br>
+John Munroe wrote:</p>
+<blockquote>
+<p>Thanks for that. I'm trying this at the moment:</p>
+<p>consts<br>
+A :: "[nat,int] =&gt; int"<br>
+B :: "[nat,int] =&gt; int"<br>
+C :: "[nat,int] =&gt; int"</p>
+<p>axioms<br>
+ax: "A p t = B p t + C p t"</p>
+<p>lemma lem1: "EX func x y.func x y = B x y + C x y"<br>
+using ax<br>
+by blast</p>
+<p>It can infer the types of all func, x and y and blast resolves it. However,<br>
+if I change the LHS to a free variable:</p>
+<p>lemma lem1: "EX func x y.func x y = v"<br>
+using ax<br>
+by blast</p>
+<p>Have a look at the typing of your lemma (Switch on<br>
+Settings-&gt;Show-Types), it is: func::'a =&gt; 'b =&gt; 'c, x::'a, y::'b, v::'c.<br>
+As there are no type constraints specified, Isabelle infers the most<br>
+generic type. However,<br>
+your axiom ax only works for nat and int.</p>
+</blockquote>
+<p>To solve your problem, you have to explicitely constrain the type of,<br>
+say, func:<br>
+  EX (func::nat=&gt;int=&gt;int) x y. ...</p>
+<p>However, your lemma means not what you seem to intend. The free variable<br>
+(v) will be implicitely universally quantified,<br>
+i.e. your lemma means that, for each v, there is a function func and<br>
+arguments x and y such that func x y = v.<br>
+To prove your lemma (even with the generic types), try e.g.</p>
+<p>lemma lem2: "EX func x y. func x y = v"<br>
+  apply (rule_tac x="%x y. v" in exI)<br>
+  apply blast<br>
+done</p>
+<p>This always works, because types in Isabelle are not empty, such there<br>
+is always some x and y that the function (%x y. v) can be applied to.</p>
+<p>Regards,<br>
+  Peter</p>
+<blockquote>
+<p>I wasn't so lucky. How come it can't unify v with B x y + C x y? What more<br>
+do I need?</p>
+<p>Thanks again<br>
+John</p>
+<p>On Wed, Sep 2, 2009 at 10:03 AM, Peter Lammich &lt;<br>
+<a href="mailto:peter.lammich@uni-muenster.de">peter.lammich@uni-muenster.de</a>&gt; wrote:</p>
+<blockquote>
+<p>John Munroe wrote:</p>
+<blockquote>
+<p>Hi,</p>
+<p>I got a question about types for variables: can they have types? For<br>
+example, if I want to prove if a binary function that takes in a Natural</p>
+<p>and</p>
+</blockquote>
+<blockquote>
+<p>an Integer can be instantiated:</p>
+<p>consts<br>
+F :: "[nat,int] =&gt; int"<br>
+axioms<br>
+ax: "F p t = G p t"</p>
+<p>lemma lem1: "EX f.f x y = G p t"<br>
+using ax</p>
+<p>Isabelle infers the type automatically to the most generic type in an<br>
+ML-like fashion.<br>
+You can constrain the type of any expression and variable by:<br>
+ exp :: type, i.e.<br>
+ EX f :: nat =&gt; int =&gt; int. f x y = G p t</p>
+</blockquote>
+<p>the types of x and y are then inferred automatically to nat and int.<br>
+Usually you will have to put parenthesis around the type constraint, i.e.<br>
+ EX f. f (x::nat) (y::int) = G p t</p>
+<p>If you are unsure about the actual types, activate the option "Show<br>
+types" (In the Isabelle-&gt;Settings menu of PG)</p>
+<p>Hope this helps,<br>
+  Peter</p>
+<blockquote>
+<p>where f should be typed (perhaps x and y as well).</p>
+<p>Thanks very much<br>
+John</p>
+</blockquote>
+</blockquote>
+</blockquote>
+
+
+
+<a name="294082829"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Types%20for%20variables/near/294082829" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Types.20for.20variables.html#294082829">(Aug 18 2022 at 14:00)</a>:</h4>
+<p>From: Christian Doczkal &lt;<a href="mailto:c.doczkal@stud.uni-saarland.de">c.doczkal@stud.uni-saarland.de</a>&gt;<br>
+Hello</p>
+<p>The free variable is to become a free/schematic variable of the theorem.<br>
+Hence its logically some arbitrary but fixed value which need not be<br>
+related to B and C.</p>
+<p>On the other hand the claim is trivially true since there is the<br>
+constant v function (% is a lambda)</p>
+<p>lemma lem2: "EX func x y. func x y = v"<br>
+apply (rule exI[where x="% x y . v"])<br>
+by simp<br>
+<a href="/user_uploads/14278/dvmnHc9XwB2OKdGfgm_RbTlR/smime.p7s">smime.p7s</a></p>
+
+
+
+<a name="294084043"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Types%20for%20variables/near/294084043" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Types.20for.20variables.html#294084043">(Aug 18 2022 at 14:06)</a>:</h4>
+<p>From: John Munroe &lt;<a href="mailto:munddr@googlemail.com">munddr@googlemail.com</a>&gt;<br>
+Hi,</p>
+<p>I got a question about types for variables: can they have types? For<br>
+example, if I want to prove if a binary function that takes in a Natural and<br>
+an Integer can be instantiated:</p>
+<p>consts<br>
+F :: "[nat,int] =&gt; int"<br>
+axioms<br>
+ax: "F p t = G p t"</p>
+<p>lemma lem1: "EX f.f x y = G p t"<br>
+using ax</p>
+<p>where f should be typed (perhaps x and y as well).</p>
+<p>Thanks very much<br>
+John</p>
+
+
+
+<a name="294084256"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Types%20for%20variables/near/294084256" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Types.20for.20variables.html#294084256">(Aug 18 2022 at 14:07)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:peter.lammich@uni-muenster.de">peter.lammich@uni-muenster.de</a>&gt;<br>
+John Munroe wrote:</p>
+<blockquote>
+<p>Hi,</p>
+<p>I got a question about types for variables: can they have types? For<br>
+example, if I want to prove if a binary function that takes in a Natural and<br>
+an Integer can be instantiated:</p>
+<p>consts<br>
+F :: "[nat,int] =&gt; int"<br>
+axioms<br>
+ax: "F p t = G p t"</p>
+<p>lemma lem1: "EX f.f x y = G p t"<br>
+using ax</p>
+<p>Isabelle infers the type automatically to the most generic type in an<br>
+ML-like fashion.<br>
+You can constrain the type of any expression and variable by:<br>
+  exp :: type, i.e.<br>
+  EX f :: nat =&gt; int =&gt; int. f x y = G p t</p>
+</blockquote>
+<p>the types of x and y are then inferred automatically to nat and int.<br>
+Usually you will have to put parenthesis around the type constraint, i.e.<br>
+  EX f. f (x::nat) (y::int) = G p t</p>
+<p>If you are unsure about the actual types, activate the option "Show<br>
+types" (In the Isabelle-&gt;Settings menu of PG)</p>
+<p>Hope this helps,<br>
+  Peter</p>
+<blockquote>
+<p>where f should be typed (perhaps x and y as well).</p>
+<p>Thanks very much<br>
+John<br>
+</p>
+</blockquote>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,444 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Surprising `simp` behaviour for image-sets · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Surprising.20.60simp.60.20behaviour.20for.20image-sets.html">[isabelle] Surprising `simp` behaviour for image-sets</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="436756178"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Surprising%20%60simp%60%20behaviour%20for%20image-sets/near/436756178" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Surprising.20.60simp.60.20behaviour.20for.20image-sets.html#436756178">(May 02 2024 at 18:49)</a>:</h4>
+<p>From: <a href="mailto:hannobecker@posteo.de">hannobecker@posteo.de</a><br>
+Hi,</p>
+<p>I observe the following unexpected behaviour of the simplifier (both in <br>
+Isabelle2023 and in Isabelle2024-RC2):</p>
+<p>The following goal solves <code>by simp</code>:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="n">schematic_goal</span>
+<span class="w">   </span><span class="s">‹(⋂(r :: 'a). let bar = ?foo r in bar) = ⋂ (range ?foo)›</span>
+<span class="w">   </span><span class="k">by</span><span class="w"> </span><span class="n">simp</span>
+</code></pre></div>
+<p>However, when specializing <code>'a</code> to <code>unit</code>, it does no longer. The simp <br>
+trace indicates that the issue may be related to the <code>unit</code> parameter <br>
+being elided from the schematic variable.</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="n">schematic_goal</span>
+<span class="w">   </span><span class="s">‹(⋂(r :: unit). let bar = ?foo r in bar) = ⋂ (range ?foo)›</span>
+<span class="w">   </span><span class="kp">apply</span><span class="w"> </span><span class="n">simp</span><span class="w"> </span><span class="c">(* No luck *)</span>
+<span class="w">   </span><span class="k">using</span><span class="w"> </span><span class="o">[[</span><span class="n">simp_trace</span><span class="o">]]</span>
+<span class="w">   </span><span class="kp">apply</span><span class="w"> </span><span class="n">simp</span>
+<span class="w">   </span><span class="c">(* [1]Proved wrong theorem (bad subgoaler?)</span>
+<span class="c">        range (λr. let bar = ?g7 in bar) ≡ range (λa. ?g7)</span>
+<span class="c">      Should have proved:</span>
+<span class="c">        range (λr. let bar = ?foo r in bar)</span>
+<span class="c">      [1]Congruence proof failed.  Should not have proved</span>
+<span class="c">        range (λr. let bar = ?g7 in bar) ≡ range (λa. ?g7)</span>
+<span class="c">      [1]Applying congruence rule:</span>
+<span class="c">        UNIV ≡ ?N1 ⟹ (⋀x. x ∈ ?N1 =simp=&gt; ?foo x ≡ ?g1 x) ⟹ range ?foo ≡</span>
+<span class="c">?g1 ` ?N1 *)</span>
+<span class="w">   </span><span class="kp">apply</span><span class="w"> </span><span class="o">(</span><span class="n">simp</span><span class="w"> </span><span class="n">cong</span><span class="w"> </span><span class="n">del</span><span class="o">:</span><span class="w"> </span><span class="n">image_cong</span><span class="o">)</span>
+<span class="w">   </span><span class="k">done</span>
+</code></pre></div>
+<p>The above is a minimal example derived from a real-world instance <br>
+arising in our large-scale application of Isabelle. As indicated, the <br>
+problem disappears when removing the <code>image_cong</code> congruence rule, but <br>
+that may cause us surprises elsewhere, so I would prefer an alternative <br>
+solution if possible.</p>
+<p>As always, thanks for help,<br>
+Hanno</p>
+
+
+
+<a name="437211342"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Surprising%20%60simp%60%20behaviour%20for%20image-sets/near/437211342" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Surprising.20.60simp.60.20behaviour.20for.20image-sets.html#437211342">(May 06 2024 at 07:49)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+Hanno,</p>
+<p>Thanks for the notification. I will look into this, but not before the release.</p>
+<p>Tobias</p>
+<p><a href="/user_uploads/14278/5bX_0ySRNqwayKKmjyjA6gMu/smime.p7s">smime.p7s</a></p>
+
+
+
+<a name="500615579"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Surprising%20%60simp%60%20behaviour%20for%20image-sets/near/500615579" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Surprising.20.60simp.60.20behaviour.20for.20image-sets.html#500615579">(Feb 19 2025 at 10:30)</a>:</h4>
+<p>From: hannobecker &lt;<a href="mailto:hannobecker@posteo.de">hannobecker@posteo.de</a>&gt;<br>
+Tobias, all,The above seems to persist in Isabelle2025-RC2 -- any chance it can be fixed before the release?Best,Hanno<br>
+-------- Original message --------From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt; Date: 06/05/2024  08:49  (GMT+00:00) To: <a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a> Subject: Re: [isabelle] Surprising <code>simp</code> behaviour for image-sets Hanno,Thanks for the notification. I will look into this, but not before the release.TobiasOn 02/05/2024 20:42, <a href="mailto:hannobecker@posteo.de">hannobecker@posteo.de</a> wrote:&gt; Hi,&gt; &gt; I observe the following unexpected behaviour of the simplifier (both in &gt; Isabelle2023 and in Isabelle2024-RC2):&gt; &gt; The following goal solves <code>by simp</code>:&gt; &gt; <code>&gt; schematic_goal&gt;    ‹(⋂(r :: 'a). let bar = ?foo r in bar) = ⋂ (range ?foo)›&gt;    by simp&gt; </code>&gt; &gt; However, when specializing <code>'a</code> to <code>unit</code>, it does no longer. The simp trace &gt; indicates that the issue may be related to the <code>unit</code> parameter being elided &gt; from the schematic variable.&gt; &gt; <code>&gt; schematic_goal&gt;    ‹(⋂(r :: unit). let bar = ?foo r in bar) = ⋂ (range ?foo)›&gt;    apply simp (* No luck *)&gt;    using [[simp_trace]]&gt;    apply simp&gt;    (* [1]Proved wrong theorem (bad subgoaler?)&gt;         range (λr. let bar = ?g7 in bar) ≡ range (λa. ?g7)&gt;       Should have proved:&gt;         range (λr. let bar = ?foo r in bar)&gt;       [1]Congruence proof failed.  Should not have proved&gt;         range (λr. let bar = ?g7 in bar) ≡ range (λa. ?g7)&gt;       [1]Applying congruence rule:&gt;         UNIV ≡ ?N1 ⟹ (⋀x. x ∈ ?N1 =simp=&gt; ?foo x ≡ ?g1 x) ⟹ range ?foo ≡ ?g1 ` &gt; ?N1 *)&gt;    apply (simp cong del: image_cong)&gt;    done&gt; </code>&gt; &gt; The above is a minimal example derived from a real-world instance arising in our &gt; large-scale application of Isabelle. As indicated, the problem disappears when &gt; removing the <code>image_cong</code> congruence rule, but that may cause us surprises &gt; elsewhere, so I would prefer an alternative solution if possible.&gt; &gt; As always, thanks for help,&gt; Hanno&gt; &gt; &gt;</p>
+
+
+
+<a name="500618157"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Surprising%20%60simp%60%20behaviour%20for%20image-sets/near/500618157" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Surprising.20.60simp.60.20behaviour.20for.20image-sets.html#500618157">(Feb 19 2025 at 10:42)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On 19/02/2025 11:21, hannobecker wrote:</p>
+<blockquote>
+<p>The above seems to persist in Isabelle2025-RC2 -- any chance it can be fixed <br>
+before the release?</p>
+</blockquote>
+<blockquote>
+<blockquote>
+<p>I observe the following unexpected behaviour of the simplifier (both in<br>
+Isabelle2023 and in Isabelle2024-RC2):</p>
+</blockquote>
+</blockquote>
+<p>Since that is not a regression wrt. Isabelle2023 and Isabelle2024, it is now <br>
+too late for Isabelle2025.</p>
+<p>Makarius</p>
+
+
+
+<a name="500671819"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Surprising%20%60simp%60%20behaviour%20for%20image-sets/near/500671819" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Surprising.20.60simp.60.20behaviour.20for.20image-sets.html#500671819">(Feb 19 2025 at 15:02)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+Hanno,</p>
+<p>I had forgotten about this but took a look now. However, I could not really <br>
+figure out precisely what is going on. The problem is obviously the schamtic <br>
+variable - the "let" is innocent. This goal already shows the effect:</p>
+<p>sschematic_goal ‹P((λr :: unit. ?foo r) ` UNIV)›</p>
+<p>I would need to study the code in more detail to figure out where and why "?foo <br>
+()" becomes ?g7 ...</p>
+<p>Tobias</p>
+<p>On 19/02/2025 11:21, hannobecker wrote:</p>
+<blockquote>
+<p>Tobias, all,</p>
+<p>The above seems to persist in Isabelle2025-RC2 -- any chance it can be fixed <br>
+before the release?</p>
+<p>Best,<br>
+Hanno</p>
+<p>-------- Original message --------<br>
+From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+Date: 06/05/2024 08:49 (GMT+00:00)<br>
+To: <a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a><br>
+Subject: Re: [isabelle] Surprising <code>simp</code> behaviour for image-sets</p>
+<p>Hanno,</p>
+<p>Thanks for the notification. I will look into this, but not before the release.</p>
+<p>Tobias</p>
+<p>On 02/05/2024 20:42, <a href="mailto:hannobecker@posteo.de">hannobecker@posteo.de</a> wrote:</p>
+<blockquote>
+<p>Hi,</p>
+<p>I observe the following unexpected behaviour of the simplifier (both in<br>
+Isabelle2023 and in Isabelle2024-RC2):</p>
+<p>The following goal solves <code>by simp</code>:</p>
+<p><code>
+schematic_goal
+    ‹(⋂(r :: 'a). let bar = ?foo r in bar) = ⋂ (range ?foo)›
+    by simp
+</code></p>
+<p>However, when specializing <code>'a</code> to <code>unit</code>, it does no longer. The simp trace<br>
+indicates that the issue may be related to the <code>unit</code> parameter being elided<br>
+from the schematic variable.</p>
+<p><code>
+schematic_goal
+    ‹(⋂(r :: unit). let bar = ?foo r in bar) = ⋂ (range ?foo)›
+    apply simp (* No luck *)
+    using [[simp_trace]]
+    apply simp
+    (* [1]Proved wrong theorem (bad subgoaler?)
+         range (λr. let bar = ?g7 in bar) ≡ range (λa. ?g7)
+       Should have proved:
+         range (λr. let bar = ?foo r in bar)
+       [1]Congruence proof failed.  Should not have proved
+         range (λr. let bar = ?g7 in bar) ≡ range (λa. ?g7)
+       [1]Applying congruence rule:
+         UNIV ≡ ?N1 ⟹ (⋀x. x ∈ ?N1 =simp=&gt; ?foo x ≡ ?g1 x) ⟹ range ?foo ≡ ?g1 `
+?N1 *)
+    apply (simp cong del: image_cong)
+    done
+</code></p>
+<p>The above is a minimal example derived from a real-world instance arising in our<br>
+large-scale application of Isabelle. As indicated, the problem disappears when<br>
+removing the <code>image_cong</code> congruence rule, but that may cause us surprises<br>
+elsewhere, so I would prefer an alternative solution if possible.</p>
+<p>As always, thanks for help,<br>
+Hanno</p>
+</blockquote>
+</blockquote>
+<p><a href="/user_uploads/14278/-b6T6bNy6YeU4q1ufOr39DHF/smime.p7s">smime.p7s</a></p>
+
+
+
+<a name="500691759"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Surprising%20%60simp%60%20behaviour%20for%20image-sets/near/500691759" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Surprising.20.60simp.60.20behaviour.20for.20image-sets.html#500691759">(Feb 19 2025 at 16:27)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;</p>
+<p>On 19/02/2025 16:27, Norbert Schirmer wrote:</p>
+<blockquote>
+<p>Hi,</p>
+<p>The simproc unit_eq seems to be responsible:</p>
+</blockquote>
+<p>Yes, unit and (thus that simproc) triggers it, as Hanno already pointed out, but <br>
+I don't understand why it is responsible for that replacement of "?foo ()" by <br>
+this new ?g7 that breaks things. But maybe I am barking up the wrong tree.</p>
+<p>Tobias</p>
+<blockquote>
+<p>schematic_goal<br>
+  ‹(⋂(r :: unit). let bar = ?foo r in bar) = ⋂ (range ?foo)›<br>
+  supply [[simproc del: unit_eq]]<br>
+   apply simp<br>
+   done</p>
+<p>Regards,<br>
+Norbert</p>
+<p>--</p>
+<p>Norbert Schirmer (<a href="mailto:nschirmer@apple.com">nschirmer@apple.com</a>)<br>
+ SEG Formal Verification</p>
+<blockquote>
+<p>On 19. Feb 2025, at 16:02, Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt; wrote:</p>
+<p>Hanno,</p>
+<p>I had forgotten about this but took a look now. However, I could not really <br>
+figure out precisely what is going on. The problem is obviously the schamtic <br>
+variable - the "let" is innocent. This goal already shows the effect:</p>
+<p>sschematic_goal ‹P((λr :: unit. ?foo r) ` UNIV)›</p>
+<p>I would need to study the code in more detail to figure out where and why "? <br>
+foo ()" becomes ?g7 ...</p>
+<p>Tobias</p>
+<p>On 19/02/2025 11:21, hannobecker wrote:</p>
+<blockquote>
+<p>Tobias, all,<br>
+The above seems to persist in Isabelle2025-RC2 -- any chance it can be fixed <br>
+before the release?<br>
+Best,<br>
+Hanno<br>
+-------- Original message --------<br>
+From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+Date: 06/05/2024 08:49 (GMT+00:00)<br>
+To: <a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a><br>
+Subject: Re: [isabelle] Surprising <code>simp</code> behaviour for image-sets<br>
+Hanno,<br>
+Thanks for the notification. I will look into this, but not before the release.<br>
+Tobias<br>
+On 02/05/2024 20:42, <a href="mailto:hannobecker@posteo.de">hannobecker@posteo.de</a> wrote:</p>
+<blockquote>
+<p>Hi,</p>
+<p>I observe the following unexpected behaviour of the simplifier (both in<br>
+Isabelle2023 and in Isabelle2024-RC2):</p>
+<p>The following goal solves <code>by simp</code>:</p>
+<p><code>
+schematic_goal
+    ‹(⋂(r :: 'a). let bar = ?foo r in bar) = ⋂ (range ?foo)›
+    by simp
+</code></p>
+<p>However, when specializing <code>'a</code> to <code>unit</code>, it does no longer. The simp trace<br>
+indicates that the issue may be related to the <code>unit</code> parameter being elided<br>
+from the schematic variable.</p>
+<p><code>
+schematic_goal
+    ‹(⋂(r :: unit). let bar = ?foo r in bar) = ⋂ (range ?foo)›
+    apply simp (* No luck *)
+    using [[simp_trace]]
+    apply simp
+    (* [1]Proved wrong theorem (bad subgoaler?)
+         range (λr. let bar = ?g7 in bar) ≡ range (λa. ?g7)
+       Should have proved:
+         range (λr. let bar = ?foo r in bar)
+       [1]Congruence proof failed.  Should not have proved
+         range (λr. let bar = ?g7 in bar) ≡ range (λa. ?g7)
+       [1]Applying congruence rule:
+         UNIV ≡ ?N1 ⟹ (⋀x. x ∈ ?N1 =simp=&gt; ?foo x ≡ ?g1 x) ⟹ range ?foo ≡ ?g1 `
+?N1 *)
+    apply (simp cong del: image_cong)
+    done
+</code></p>
+<p>The above is a minimal example derived from a real-world instance arising <br>
+in our<br>
+large-scale application of Isabelle. As indicated, the problem disappears when<br>
+removing the <code>image_cong</code> congruence rule, but that may cause us surprises<br>
+elsewhere, so I would prefer an alternative solution if possible.</p>
+<p>As always, thanks for help,<br>
+Hanno</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+<p><a href="/user_uploads/14278/FYrj-6xDsBqvSZic1NSVtClQ/smime.p7s">smime.p7s</a></p>
+
+
+
+<a name="500691932"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Surprising%20%60simp%60%20behaviour%20for%20image-sets/near/500691932" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Surprising.20.60simp.60.20behaviour.20for.20image-sets.html#500691932">(Feb 19 2025 at 16:28)</a>:</h4>
+<p>From: Norbert Schirmer &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Hi,</p>
+<p>The simproc unit_eq seems to be responsible:</p>
+<p>schematic_goal<br>
+ ‹(⋂(r :: unit). let bar = ?foo r in bar) = ⋂ (range ?foo)›<br>
+ supply [[simproc del: unit_eq]]<br>
+  apply simp<br>
+  done</p>
+<p>Regards,<br>
+Norbert</p>
+<p>--</p>
+<p>Norbert Schirmer (<a href="mailto:nschirmer@apple.com">nschirmer@apple.com</a>)<br>
+ SEG Formal Verification</p>
+<blockquote>
+<p>On 19. Feb 2025, at 16:02, Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt; wrote:</p>
+<p>Hanno,</p>
+<p>I had forgotten about this but took a look now. However, I could not really figure out precisely what is going on. The problem is obviously the schamtic variable - the "let" is innocent. This goal already shows the effect:</p>
+<p>sschematic_goal ‹P((λr :: unit. ?foo r) ` UNIV)›</p>
+<p>I would need to study the code in more detail to figure out where and why "?foo ()" becomes ?g7 ...</p>
+<p>Tobias</p>
+<p>On 19/02/2025 11:21, hannobecker wrote:</p>
+<blockquote>
+<p>Tobias, all,<br>
+The above seems to persist in Isabelle2025-RC2 -- any chance it can be fixed before the release?<br>
+Best,<br>
+Hanno<br>
+-------- Original message --------<br>
+From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+Date: 06/05/2024 08:49 (GMT+00:00)<br>
+To: <a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a><br>
+Subject: Re: [isabelle] Surprising <code>simp</code> behaviour for image-sets<br>
+Hanno,<br>
+Thanks for the notification. I will look into this, but not before the release.<br>
+Tobias<br>
+On 02/05/2024 20:42, <a href="mailto:hannobecker@posteo.de">hannobecker@posteo.de</a> wrote:</p>
+<blockquote>
+<p>Hi,</p>
+<p>I observe the following unexpected behaviour of the simplifier (both in<br>
+Isabelle2023 and in Isabelle2024-RC2):</p>
+<p>The following goal solves <code>by simp</code>:</p>
+<p><code>
+schematic_goal
+   ‹(⋂(r :: 'a). let bar = ?foo r in bar) = ⋂ (range ?foo)›
+   by simp
+</code></p>
+<p>However, when specializing <code>'a</code> to <code>unit</code>, it does no longer. The simp trace<br>
+indicates that the issue may be related to the <code>unit</code> parameter being elided<br>
+from the schematic variable.</p>
+<p><code>
+schematic_goal
+   ‹(⋂(r :: unit). let bar = ?foo r in bar) = ⋂ (range ?foo)›
+   apply simp (* No luck *)
+   using [[simp_trace]]
+   apply simp
+   (* [1]Proved wrong theorem (bad subgoaler?)
+        range (λr. let bar = ?g7 in bar) ≡ range (λa. ?g7)
+      Should have proved:
+        range (λr. let bar = ?foo r in bar)
+      [1]Congruence proof failed.  Should not have proved
+        range (λr. let bar = ?g7 in bar) ≡ range (λa. ?g7)
+      [1]Applying congruence rule:
+        UNIV ≡ ?N1 ⟹ (⋀x. x ∈ ?N1 =simp=&gt; ?foo x ≡ ?g1 x) ⟹ range ?foo ≡ ?g1 `
+?N1 *)
+   apply (simp cong del: image_cong)
+   done
+</code></p>
+<p>The above is a minimal example derived from a real-world instance arising in our<br>
+large-scale application of Isabelle. As indicated, the problem disappears when<br>
+removing the <code>image_cong</code> congruence rule, but that may cause us surprises<br>
+elsewhere, so I would prefer an alternative solution if possible.</p>
+<p>As always, thanks for help,<br>
+Hanno</p>
+</blockquote>
+</blockquote>
+</blockquote>
+
+
+
+<a name="500864968"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Surprising%20%60simp%60%20behaviour%20for%20image-sets/near/500864968" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Surprising.20.60simp.60.20behaviour.20for.20image-sets.html#500864968">(Feb 20 2025 at 12:22)</a>:</h4>
+<p>From: Norbert Schirmer &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;</p>
+<blockquote>
+<p>On 19. Feb 2025, at 17:27, Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt; wrote:</p>
+<p>Yes, unit and (thus that simproc) triggers it, as Hanno already pointed out, but I don't understand why it is responsible for that replacement of "?foo ()" by this new ?g7 that breaks things. But maybe I am barking up the wrong tree.<br>
+</p>
+</blockquote>
+<p>I took a closer look and the reason is the combination of solving the preconditions of a congruence rule and the simproc unit_eq:</p>
+<p>schematic_goal ‹P((λr :: unit. ?foo r) ` UNIV)›<br>
+  supply [[simp_trace, simp_trace_depth_limit=10]]<br>
+  apply simp</p>
+<p>[1]Applying congruence rule:<br>
+UNIV ≡ ?N1 ⟹<br>
+(⋀x. x ∈ ?N1 =simp=&gt; ?foo x ≡ ?g1 x) ⟹ range ?foo ≡ ?g1 ` ?N1 </p>
+<p>When the simplifier is invoked on the precondition of the congruence rule:</p>
+<p>(1)  (⋀x. x ∈ ?N1 =simp=&gt; ?foo x ≡ ?g1 x)</p>
+<p>the simproc unit_eq rewrites x to ()</p>
+<p>so it ultimately comes up with this equation for the precondition:</p>
+<p>(⋀x. True =simp=&gt; ?foo () ≡ ?g1 ()) ≡ (True =simp=&gt; ?foo () ≡ ?g1 ()) </p>
+<p>Now the RHS of that meta equality is unified with (1) which seems to <br>
+introduce instantiations ?foo: (λr. ?g7) and ?g1:  (λa. ?g7)  </p>
+<p>Regards,<br>
+Norbert</p>
+<p>--</p>
+<p>Norbert Schirmer (<a href="mailto:nschirmer@apple.com">nschirmer@apple.com</a>)<br>
+ SEG Formal Verification</p>
+<blockquote>
+<p>Tobias</p>
+<blockquote>
+<p>schematic_goal<br>
+ ‹(⋂(r :: unit). let bar = ?foo r in bar) = ⋂ (range ?foo)›<br>
+ supply [[simproc del: unit_eq]]<br>
+  apply simp<br>
+  done<br>
+Regards,<br>
+Norbert<br>
+--<br>
+Norbert Schirmer (<a href="mailto:nschirmer@apple.com">nschirmer@apple.com</a>)<br>
+ SEG Formal Verification</p>
+<blockquote>
+<p>On 19. Feb 2025, at 16:02, Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt; wrote:</p>
+<p>Hanno,</p>
+<p>I had forgotten about this but took a look now. However, I could not really figure out precisely what is going on. The problem is obviously the schamtic variable - the "let" is innocent. This goal already shows the effect:</p>
+<p>sschematic_goal ‹P((λr :: unit. ?foo r) ` UNIV)›</p>
+<p>I would need to study the code in more detail to figure out where and why "? foo ()" becomes ?g7 ...</p>
+<p>Tobias</p>
+<p>On 19/02/2025 11:21, hannobecker wrote:</p>
+<blockquote>
+<p>Tobias, all,<br>
+The above seems to persist in Isabelle2025-RC2 -- any chance it can be fixed before the release?<br>
+Best,<br>
+Hanno<br>
+-------- Original message --------<br>
+From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+Date: 06/05/2024 08:49 (GMT+00:00)<br>
+To: <a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a><br>
+Subject: Re: [isabelle] Surprising <code>simp</code> behaviour for image-sets<br>
+Hanno,<br>
+Thanks for the notification. I will look into this, but not before the release.<br>
+Tobias<br>
+On 02/05/2024 20:42, <a href="mailto:hannobecker@posteo.de">hannobecker@posteo.de</a> wrote:</p>
+<blockquote>
+<p>Hi,</p>
+<p>I observe the following unexpected behaviour of the simplifier (both in<br>
+Isabelle2023 and in Isabelle2024-RC2):</p>
+<p>The following goal solves <code>by simp</code>:</p>
+<p><code>
+schematic_goal
+   ‹(⋂(r :: 'a). let bar = ?foo r in bar) = ⋂ (range ?foo)›
+   by simp
+</code></p>
+<p>However, when specializing <code>'a</code> to <code>unit</code>, it does no longer. The simp trace<br>
+indicates that the issue may be related to the <code>unit</code> parameter being elided<br>
+from the schematic variable.</p>
+<p><code>
+schematic_goal
+   ‹(⋂(r :: unit). let bar = ?foo r in bar) = ⋂ (range ?foo)›
+   apply simp (* No luck *)
+   using [[simp_trace]]
+   apply simp
+   (* [1]Proved wrong theorem (bad subgoaler?)
+        range (λr. let bar = ?g7 in bar) ≡ range (λa. ?g7)
+      Should have proved:
+        range (λr. let bar = ?foo r in bar)
+      [1]Congruence proof failed.  Should not have proved
+        range (λr. let bar = ?g7 in bar) ≡ range (λa. ?g7)
+      [1]Applying congruence rule:
+        UNIV ≡ ?N1 ⟹ (⋀x. x ∈ ?N1 =simp=&gt; ?foo x ≡ ?g1 x) ⟹ range ?foo ≡ ?g1 `
+?N1 *)
+   apply (simp cong del: image_cong)
+   done
+</code></p>
+<p>The above is a minimal example derived from a real-world instance arising in our<br>
+large-scale application of Isabelle. As indicated, the problem disappears when<br>
+removing the <code>image_cong</code> congruence rule, but that may cause us surprises<br>
+elsewhere, so I would prefer an alternative solution if possible.</p>
+<p>As always, thanks for help,<br>
+Hanno</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+</blockquote>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

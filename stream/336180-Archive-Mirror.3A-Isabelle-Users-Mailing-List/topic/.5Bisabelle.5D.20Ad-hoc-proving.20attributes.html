@@ -1,0 +1,159 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Ad-hoc-proving attributes · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Ad-hoc-proving.20attributes.html">[isabelle] Ad-hoc-proving attributes</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294320518"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Ad-hoc-proving%20attributes/near/294320518" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Ad-hoc-proving.20attributes.html#294320518">(Aug 19 2022 at 16:32)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+(My apologies for the somewhat mysterious subject line.)</p>
+<p>I was wondering whether it'd make sense to unify the mechanisms behind<br>
+"inductive_cases", "inductive_simps", "fun_cases" etc.; namely, commands<br>
+which prove some theorems on the spot, but apart from binding them to a<br>
+name, have no further side effects on the theory.</p>
+<p>My main motivation for this is that, sometimes, I need "ad hoc"<br>
+elimination rules, and since "inductive_cases" doesn't work in proof<br>
+blocks, I end up with the rather awkward pattern of declaring them<br>
+outside the proof and hiding them afterwards again. My initial thought<br>
+was to make a variant of the command which works in a proof block (c.f.<br>
+"lemmas" vs "note", "interpretation" vs "interpret"), but if<br>
+Isabelle/HOL doesn't need more of one things, it's keywords.</p>
+<p>So, here's my proposal: Instead of an "inductive_cases" command, have an<br>
+"inductive_cases" attribute. It could be used like this:</p>
+<p>lemmas fooE[elim] = [[inductive_cases "R (T x) (T y)"]]</p>
+<p>or this:</p>
+<p>then have "R a b"<br>
+    using [[inductive_cases "R (T x) (T y)"]]</p>
+<p>This would already work out of the box by declaring a "rule_attribute"<br>
+which ignores its incoming "thm" argument.</p>
+<p>Is that something people would be interested in?</p>
+<p>(NB: What follows are some technical details which would probably belong<br>
+to [isabelle-dev], but I don't want to split this thread.)</p>
+<p>Cheers<br>
+Lars</p>
+<hr>
+<p>Making my case for "inductive_cases" is easy, because I could implement<br>
+it with the existing tools, because it always proves a single theorem.<br>
+If we want to be fully general though, it gets more complicated, because<br>
+the current "attribute" mechanism doesn't allow to return more than one<br>
+theorem.</p>
+<p>Looking at how attributes are implemented, I found this:</p>
+<p>type attribute =<br>
+    Context.generic * thm -&gt; Context.generic option * thm option</p>
+<p>Modifying this to return a "thm list option" would certainly allow<br>
+multiple theorems. To make it easy to use, one could create a new "smart<br>
+constructor" for that type, e.g.</p>
+<p>val ad_hoc_proof_attribute: (Context.generic -&gt; thm list) -&gt; attribute</p>
+<p>which leaves the incoming context untouched and ignores the incoming<br>
+theorem.</p>
+<p>I couldn't predict what more needed to be changed, so I decided to<br>
+"apply some pressure and see what starts wobbling". I changed the type<br>
+in "more_thm.ML". Then, the tricky bit is "apply_attributes", which is<br>
+in some way a glorified fold left over a list of attributes. There, I<br>
+ran into a problem: suppose we have</p>
+<p>thm _[inductive_cases "...", simp]</p>
+<p>In this case, the first part of the attribute sequence might produce<br>
+more than theorem, which means that the second part needs to be applied<br>
+to all of them. Peter pointed out to me that we already have precendent<br>
+for that:</p>
+<p>thm foo.intros[simp]</p>
+<p>... works in exactly the same way: "simp" is applied to all theorems in<br>
+"foo.intros" (this is handled in "Isar/attrib.ML"). However, so far the<br>
+full "attribute pipeline" only transformed one pair of theorem and<br>
+context into another pair of theorem and context, and now it would need<br>
+to deal with potentially multiple and traverse them in some manner<br>
+(Depth first? Breadth first? That choice matters for non-commutative<br>
+attributes, e.g. [simp, simplified]).</p>
+<p>I have attached a patch which _only_ attempts to change the definition<br>
+in "more_thm.ML" and fix what breaks in "global_theory.ML" and<br>
+"Isar/proof_context.ML" (in both files only minor changes were needed).<br>
+A bit more thought is required for "Isar/attrib.ML", where I aborted my<br>
+exploration.<br>
+<a href="/user_uploads/14278/fIEc6VDRB_xVlIWcF_tTn_eK/patch">patch</a></p>
+
+
+
+<a name="294321046"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Ad-hoc-proving%20attributes/near/294321046" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Ad-hoc-proving.20attributes.html#294321046">(Aug 19 2022 at 16:34)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Lars,</p>
+<p>I understand that your proposal is more general than the proof method ind_cases, but could <br>
+you comment on how they relate to each other?</p>
+<p>Andreas</p>
+
+
+
+<a name="294321112"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Ad-hoc-proving%20attributes/near/294321112" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Ad-hoc-proving.20attributes.html#294321112">(Aug 19 2022 at 16:35)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+Hi,</p>
+<blockquote>
+<p>I understand that your proposal is more general than the proof method<br>
+ind_cases, but could you comment on how they relate to each other?</p>
+</blockquote>
+<p>I actually didn't know about that proof method, but it looks similar.<br>
+The difference is that I would actually need to spell out the rule I<br>
+want, and then continue to prove it with that method. With my proposal,<br>
+you just get the theorem generated on the spot, without having to spell<br>
+it out. It's very nice in proofs where you obtain variables. From my<br>
+current work:</p>
+<p>obtain x1 x2<br>
+  where "x = x1 $ x2"<br>
+    and "rs, compile rs ⊢ x1 ≈ t1"<br>
+    and "rs, compile rs ⊢ x2 ≈ t2"<br>
+  by (auto elim: [[summon_ind_cases "rs, compile rs ⊢ x ≈ t1 $$ t2"]])</p>
+<p>I could have expressed that equally well with</p>
+<p>inductive_cases need_to_make_up_a_name: "rs, compile rs ..."</p>
+<p>lemma ...<br>
+proof ...</p>
+<p>obtain ...<br>
+    by (auto elim: ...)</p>
+<p>qed</p>
+<p>hide_fact ...</p>
+<p>The reason why I prefer an attribute over a command is that I don't need<br>
+to make up a name for something which only makes sense in the context of<br>
+a particular proof. Here, the "compile rs" is an artifact from the lemma<br>
+I'm proving. Another reason is that I think attributes are vastly<br>
+underrated – as opposed to commands, they can be used uniformly in a lot<br>
+of different situations.</p>
+<p>I have attached a working example of that "summon_ind_cases" attribute.<br>
+(As an aside, I realize that my handling of variables is not canonical<br>
+here; presumably, I need to parse "for" fixes as well. Grepping the<br>
+sources for occurrences of "Parse.for_fixes" didn't reveal any canonical<br>
+use cases, though.)</p>
+<p>Cheers<br>
+Lars<br>
+<a href="/user_uploads/14278/8zG6yYB4cll_b1KyLASpWj3Y/Summon.thy">Summon.thy</a></p>
+
+
+
+<a name="294321131"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Ad-hoc-proving%20attributes/near/294321131" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Ad-hoc-proving.20attributes.html#294321131">(Aug 19 2022 at 16:35)</a>:</h4>
+<p>From: Lars Hupel &lt;<a href="mailto:hupel@in.tum.de">hupel@in.tum.de</a>&gt;<br>
+Lars just pointed out another candidate: "case_of_simps",<br>
+"simps_of_case". With my proposal, one could write</p>
+<p>thm foo_case = [[case_of_simps foo.simps]]<br>
+  note foo_case = [[case_of_simps foo.simps]]</p>
+<p>instead of using the specialized command</p>
+<p>case_of_simps foo_case: foo.simps</p>
+<p>This attribute could be implemented right now, but not "simps_of_case",<br>
+because the latter would need to return multiple theorems.</p>
+
+
+
+<a name="294321149"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Ad-hoc-proving%20attributes/near/294321149" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Ad-hoc-proving.20attributes.html#294321149">(Aug 19 2022 at 16:35)</a>:</h4>
+<p>From: Peter Lammich &lt;<a href="mailto:lammich@in.tum.de">lammich@in.tum.de</a>&gt;<br>
+I would appreciate an attribute [[inductive_cases &lt;term&gt;]] instead of<br>
+the command.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

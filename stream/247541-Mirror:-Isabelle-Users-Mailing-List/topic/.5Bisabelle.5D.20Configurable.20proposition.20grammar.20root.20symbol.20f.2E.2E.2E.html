@@ -1,0 +1,107 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Configurable proposition grammar root symbol f... · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Configurable.20proposition.20grammar.20root.20symbol.20f.2E.2E.2E.html">[isabelle] Configurable proposition grammar root symbol f...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="224366340"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Configurable%20proposition%20grammar%20root%20symbol%20f.../near/224366340" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Configurable.20proposition.20grammar.20root.20symbol.20f.2E.2E.2E.html#224366340">(Jan 28 2021 at 17:55)</a>:</h4>
+<p>From: Daniel Kirchner &lt;<a href="mailto:daniel@ekpyron.org">daniel@ekpyron.org</a>&gt;<br>
+Dear all,</p>
+<p>First some background information:</p>
+<p>I'm working at embedding a non-classical logic with non-classical<br>
+syntax into the Isabelle/HOL logic using a shallow semantical embedding.<br>
+I.e. I have a custom proposition type o and a custom grammar starting<br>
+at a nonterminal my_prop to parse propositions of that type written in<br>
+the target theory's "native" syntax (which is quite different from<br>
+Isabelle's usual term/prop syntax, so this involves some non-trivial<br>
+parse translations on the grammar tree starting at my_prop).</p>
+<p>This proposition type is connected to the HOL logic using a semantic<br>
+validity function <code>is_valid_in semanticContext proposition</code> (using<br>
+some complex HOL semantics for the target theory's logic).</p>
+<p>Now I do define syntax for <code>is_valid_in</code> that parses its<br>
+<code>proposition</code> part starting from the nonterminal <code>my_prop</code>. But to<br>
+make life easier and lower entry barriers for people used to the target<br>
+theory's syntax, but not to Isabelle's term syntax, I'm also<br>
+introducing copies of outer theory commands to directly act on<br>
+<code>my_prop</code>-propositions and among other things hide the semantic<br>
+context in the proof state. I.e. <code>my_theorem</code> accepts both short and<br>
+long theorem specifications, but parses propositions starting from<br>
+my_prop as grammar root. It internally sets up a fixed<br>
+"semanticContext" and can thereby transparently translate these<br>
+"my_prop"-propositions to regular "prop"-propositions. Furthermore,<br>
+that semanticContext is stored in the Proof_Context and I define<br>
+further outer syntax commands like <code>my_assume</code>, <code>my_have</code>,<br>
+<code>my_show</code> (and some custom ones specific to reasoning mechanisms in<br>
+the target logic) that again directly parse my_prop syntax and can<br>
+transparently pick up (or sometimes manipulate) the semanticContext in<br>
+the proof context, etc.</p>
+<p>Independently, I set up different "printing modes" (i.e. configurable<br>
+sets of print translations), s.t. it's possible to either view the proof<br>
+state relative to the custom commands and "my_prop" or to view the<br>
+translation to Isabelle's native logic and to easily switch between<br>
+those viewing mode, s.t. people familiar with either syntax can easily<br>
+get used to the other and in order to be transparent about the<br>
+transformations automatically done by the custom commands.</p>
+<p>Now all of this is working quite nicely and most of the complexity of<br>
+this nicely lives in the grammar and parse and print translations for<br>
+my_prop.</p>
+<p>However, currently, I also have to parse full long statement and theorem<br>
+outer syntax in the custom commands, replacing reading propositions by<br>
+custom logic that reads <code>my_prop</code> terms (by constructing a temporary<br>
+proof context with <code>Syntax.root</code> replaced by <code>my_prop</code> and parsing<br>
+them as terms instead of propositions), which involves quite some<br>
+additional complexity that I am not particularly happy with (I'm<br>
+basically roughly reimplementing parts of Expression.read_statement to<br>
+read the theorem specification to then pass it on to<br>
+Specification.theorem with some additional postprocessing, but the<br>
+process is quite complex and I would like to avoid this as much as<br>
+possible to keep things maintainable in the long run).</p>
+<p>So now to the actual question:</p>
+<p>In the situation described above I think I could avoid almost all<br>
+complexity in the custom outer syntax commands, if I could replace the<br>
+grammar root symbol used to parse propositions in a Proof_Context.<br>
+While there is <code>Syntax.root</code> that can be used to replace the grammar<br>
+root symbol for parsing terms, there currently seems to be no way to do<br>
+the same for "prop" when parsing propositions (looking at the<br>
+implementation of parse_term in the syntax phases, "prop" is<br>
+hard-coded, whereas the term root is read from the Syntax.root config<br>
+option in the respective proof context; I see no obvious reason why<br>
+the proposition root could not symmetrically be a config option as<br>
+well).</p>
+<p>So to cut a long story short: is there any particular reason why the<br>
+proposition root grammar symbol "prop" cannot or should not be a config<br>
+option in the proof context, similarly to the term root symbol? Or is<br>
+there an entirely different, simpler approach to achieving the same<br>
+thing without having the proposition root symbol configurable, but also<br>
+without having to replicate major parts of the logic used to parse long<br>
+statement/theorem outer syntax for the custom commands I want to define?<br>
+Also how "abusive" of Isabelle's internals does my current approach<br>
+(e.g. temporarily changing Syntax.root for parsing the<br>
+custom propositions as terms) sound in general ;-)? (It does seem to<br>
+work quite perfectly, but I may be missing good reasons for not doing<br>
+things like this in general).</p>
+<p>I do realize that I could probably avoid a good part of the complexity,<br>
+if I just wrapped all propositions in some special bracket syntax<br>
+everywhere and only had parse translations do the work e.g. of<br>
+extracting a stored semantic context, but ideally I would generally<br>
+like to avoid that and keep syntactic overhead for statements in the<br>
+target logic's syntax at an absolute minimum (although I'm not sure how<br>
+sane of a desire that is ;-)) and I still need custom outer syntax<br>
+commands anyways to properly "initialize"/create and manipulate the<br>
+implicit semantic context in some cases, plus I e.g. also intend to<br>
+automatically post-process theorems and potentially extract "rulified"<br>
+versions of them to be used for improved automated reasoning, etc.</p>
+<p>Thank you very much for your time and your replies!</p>
+<p>Best wishes,<br>
+Daniel Kirchner</p>
+
+
+
+<hr><p>Last updated: Jul 15 2022 at 23:21 UTC</p>
+</html>

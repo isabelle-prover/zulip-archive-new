@@ -1,0 +1,638 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Isabelle/ML - Theorem and Local Theories · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle.2FML.20-.20Theorem.20and.20Local.20Theories.html">[isabelle] Isabelle/ML - Theorem and Local Theories</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="477219276"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle/ML%20-%20Theorem%20and%20Local%20Theories/near/477219276" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle.2FML.20-.20Theorem.20and.20Local.20Theories.html#477219276">(Oct 16 2024 at 13:46)</a>:</h4>
+<p>From: "\"Marmsoler, Diego\"" &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Hi Makarius,</p>
+<p>Thank you very much for your answer. It clarifies a lot.</p>
+<p>I do have a follow up question, and I was wondering if someone could help me with that.</p>
+<p>I am currently using the following function to retrieve the morphism:</p>
+<p>fun get_morphism source target thy =<br>
+    let<br>
+      val dep = List.filter (fn x =&gt; #source x = source andalso #target x = target) (Locale.dest_dependencies [@{theory Main}] thy);<br>
+    in<br>
+      if (length dep) &lt;&gt; 1 then<br>
+        error "Wrong number of dependencies"<br>
+      else<br>
+        #morphism (hd dep) |&gt; Morphism.set_context thy<br>
+    End</p>
+<p>Basically, I use Locale.dest_dependencies to obtain all morphisms which are available in my theory (minus the once available in Main) and then I filter the one out with the correct source and destination.</p>
+<p>This works for my purpose, but it does not feel like it is the correct way to do it, so I was wondering if there is a better way to do this?</p>
+<p>In particular, I was wondering if there is an exposed function which does something like: "give me the morphism (dependency) of locale x for source y".</p>
+<p>If there is no such function available, I was wondering if it could be useful to add one in the future?</p>
+<p>Thanks for your help.</p>
+<p>All the best,</p>
+<p>Diego</p>
+<blockquote>
+<p>-----Original Message-----<br>
+From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Sent: 12 August 2024 09:46<br>
+To: Marmsoler, Diego &lt;<a href="mailto:D.Marmsoler@exeter.ac.uk">D.Marmsoler@exeter.ac.uk</a>&gt;; isabelle-<br>
+<a href="mailto:users@cl.cam.ac.uk">users@cl.cam.ac.uk</a><br>
+Subject: Re: [isabelle] Isabelle/ML - Theorem and Local Theories</p>
+<p>CAUTION: This email originated from outside of the organisation. Do not click<br>
+links or open attachments unless you recognise the sender and know the<br>
+content is safe.</p>
+<p>On 09/08/2024 10:56, "Marmsoler, Diego" (via cl-isabelle-users Mailing List)<br>
+wrote:</p>
+<blockquote>
+<p>I think I found what I was looking for in my previous question.</p>
+<p>I was looking for the dependency morphism stored in the dependencies<br>
+field of a locale.</p>
+</blockquote>
+<p>Morphisms are indeed the proper approach. How to get them is a different<br>
+question, though. My guess from a distance is that some of the locale<br>
+interpretation operations will do the job abstractly and robustly.</p>
+<blockquote>
+<p>I guess it is often the case that a package generates some terms and<br>
+theorems and uses them later on to create some new terms and theorems.</p>
+<p>From my limited experience with Isabelle/ML I can see at least the<br>
+following approaches to do so:</p>
+<ol>
+<li>I can keep references to the terms and theorems and use morphisms to<br>
+later<br>
+    transfer them into my current context.</li>
+</ol>
+</blockquote>
+<p>#1 sounds fine, but where did the original types/terms/theorems come from?<br>
+Was that the original user input? If so, it often helps to maintain private<br>
+Theory_Data/Generic_Data for the package.</p>
+<blockquote>
+<ol start="2">
+<li>I can use Proof_Context.read_term_abbrev / Proof_Context.get_thm to<br>
+obtain<br>
+    a reference by name.</li>
+</ol>
+</blockquote>
+<p>#2 is very bad: it leads to fragile implementations. A proper value is a constant,<br>
+not some source text (or name) whose interpretation depends a lot on the<br>
+context.</p>
+<blockquote>
+<ol start="3">
+<li>At least for terms I can construct them manually using term constructors<br>
+    (Const / Free / …)</li>
+</ol>
+</blockquote>
+<p>#3 is ok in principle, but the proper way is to use ML antiquotations to produce<br>
+constants for types and terms, see also §2.2 in the "implementation"<br>
+manual with examples at the end of that section. There are also older forms of<br>
+direct use of Const with the "const_name" antiquotation: one day that might<br>
+become legacy.</p>
+<p>A more ambitious form is the "instantiate" antiquotation (for<br>
+types/terms/props, certified types/terms/props, and thms). I did not find that<br>
+in the documentation on the spot, so the NEWS entry from Isabelle2022-1<br>
+needs to suffice:</p>
+<p>"""<br>
+* ML antiquotation "instantiate" allows to instantiate formal entities (types,<br>
+terms, theorems) with values given ML. This works uniformly for "typ", "term",<br>
+"prop", "ctyp", "cterm", "cprop", "lemma" --- given as a keyword after the<br>
+instantiation.</p>
+<p>(etc. including a few examples)<br>
+"""</p>
+<blockquote>
+<ol start="4">
+<li>Also for terms I could use Syntax.read_term to obtain a reference.</li>
+</ol>
+</blockquote>
+<p>#4 is as bad like #2. Read/check operations are only valid for user input in the<br>
+application context.</p>
+<p>Makarius</p>
+</blockquote>
+
+
+
+<a name="477244469"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle/ML%20-%20Theorem%20and%20Local%20Theories/near/477244469" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle.2FML.20-.20Theorem.20and.20Local.20Theories.html#477244469">(Oct 16 2024 at 15:29)</a>:</h4>
+<p>From: Norbert Schirmer &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Dear Diego,</p>
+<p>One standard use case that works out of the box can be thought of as viewing the problem from "inside out”. Where by “inside” I mean inside of the locale.</p>
+<ol>
+<li>You enter the locale you are interested in. There you operate and think relative to the “fixes” and “assumes” of that locale (including all ancestors).</li>
+<li>Within that locale you write our Isabelle/ML code, which on the Isar toplevel could be via commands like “declaration” or for example “simproc_setup”. Those commands expect your Isabelle/ML code do be a function depending on a morphism “phi". Whenever you want to refer to some abstract entity of the locale, e.g. the fixes and assumes (or theorems) you can and usually should make use of “phi" to transform them from the abstract version to the concrete interpretation. E.g. if you have an assumption (or theorem) named foo in your locale you can transform it by "Morphism.thm phi @{thm foo}”. Note that as you are within the locale you can use the antiquotation mechanisms like @{thm …} to have static checks that you actually refer to what you mean.</li>
+<li>Whenever the locale is interpreted (e.g. by “sublocale", “interpretation", new locales that have this locale as ancestor,  …), the locale infrastructure of Isabelle automatically activates all the declarations (and simprocs) by supplying the proper “phi" to your declaration, simproc… So in case of the simproc there may be a lot of instances of the same simproc active at the same moment with different phi. That’s why it is important that you transform all abstract entities in step 2 by using Morphism.thm, Morphism.term etc. </li>
+</ol>
+<p>So when your use case fits into this model of thinking, there is no need to worry about where to get the phi from. Generating all the necessary phi’s and applying them to all the “declarations” is done by the infrastructure. In this context a simproc is just a special kind of declaration. The more general “declaration” can also be used to work with custom Theory_Data / Generic_Data, as Makarius has pointed out. The core idea here is that in step 2 above you also use the phi at hand to transform that custom data.</p>
+<p>Here is a small example from the AFP that illustrates this approach:</p>
+<p><a href="https://www.isa-afp.org/sessions/autocorres2_test/#Match_Cterm_Ex.html">https://www.isa-afp.org/sessions/autocorres2_test/#Match_Cterm_Ex.html</a></p>
+<p>Regards,<br>
+Norbert</p>
+<p>--</p>
+<p>Norbert Schirmer (<a href="mailto:nschirmer@apple.com">nschirmer@apple.com</a>)<br>
+ SEG Formal Verification</p>
+<blockquote>
+<p>On 16. Oct 2024, at 11:54, Marmsoler, Diego (via cl-isabelle-users Mailing List) &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt; wrote:</p>
+<p>Hi Makarius,</p>
+<p>Thank you very much for your answer. It clarifies a lot.</p>
+<p>I do have a follow up question, and I was wondering if someone could help me with that.</p>
+<p>I am currently using the following function to retrieve the morphism:</p>
+<p>fun get_morphism source target thy =<br>
+   let<br>
+     val dep = List.filter (fn x =&gt; #source x = source andalso #target x = target) (Locale.dest_dependencies [@{theory Main}] thy);<br>
+   in<br>
+     if (length dep) &lt;&gt; 1 then<br>
+       error "Wrong number of dependencies"<br>
+     else<br>
+       #morphism (hd dep) |&gt; Morphism.set_context thy<br>
+   End</p>
+<p>Basically, I use Locale.dest_dependencies to obtain all morphisms which are available in my theory (minus the once available in Main) and then I filter the one out with the correct source and destination.</p>
+<p>This works for my purpose, but it does not feel like it is the correct way to do it, so I was wondering if there is a better way to do this?</p>
+<p>In particular, I was wondering if there is an exposed function which does something like: "give me the morphism (dependency) of locale x for source y".</p>
+<p>If there is no such function available, I was wondering if it could be useful to add one in the future?</p>
+<p>Thanks for your help.</p>
+<p>All the best,</p>
+<p>Diego</p>
+<blockquote>
+<p>-----Original Message-----<br>
+From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Sent: 12 August 2024 09:46<br>
+To: Marmsoler, Diego &lt;<a href="mailto:D.Marmsoler@exeter.ac.uk">D.Marmsoler@exeter.ac.uk</a>&gt;; isabelle-<br>
+<a href="mailto:users@cl.cam.ac.uk">users@cl.cam.ac.uk</a><br>
+Subject: Re: [isabelle] Isabelle/ML - Theorem and Local Theories</p>
+<p>CAUTION: This email originated from outside of the organisation. Do not click<br>
+links or open attachments unless you recognise the sender and know the<br>
+content is safe.</p>
+<p>On 09/08/2024 10:56, "Marmsoler, Diego" (via cl-isabelle-users Mailing List)<br>
+wrote:</p>
+<blockquote>
+<p>I think I found what I was looking for in my previous question.</p>
+<p>I was looking for the dependency morphism stored in the dependencies<br>
+field of a locale.</p>
+</blockquote>
+<p>Morphisms are indeed the proper approach. How to get them is a different<br>
+question, though. My guess from a distance is that some of the locale<br>
+interpretation operations will do the job abstractly and robustly.</p>
+<blockquote>
+<p>I guess it is often the case that a package generates some terms and<br>
+theorems and uses them later on to create some new terms and theorems.</p>
+<p>From my limited experience with Isabelle/ML I can see at least the<br>
+following approaches to do so:</p>
+<ol>
+<li>I can keep references to the terms and theorems and use morphisms to<br>
+later<br>
+   transfer them into my current context.</li>
+</ol>
+</blockquote>
+<p>#1 sounds fine, but where did the original types/terms/theorems come from?<br>
+Was that the original user input? If so, it often helps to maintain private<br>
+Theory_Data/Generic_Data for the package.</p>
+<blockquote>
+<ol start="2">
+<li>I can use Proof_Context.read_term_abbrev / Proof_Context.get_thm to<br>
+obtain<br>
+   a reference by name.</li>
+</ol>
+</blockquote>
+<p>#2 is very bad: it leads to fragile implementations. A proper value is a constant,<br>
+not some source text (or name) whose interpretation depends a lot on the<br>
+context.</p>
+<blockquote>
+<ol start="3">
+<li>At least for terms I can construct them manually using term constructors<br>
+   (Const / Free / …)</li>
+</ol>
+</blockquote>
+<p>#3 is ok in principle, but the proper way is to use ML antiquotations to produce<br>
+constants for types and terms, see also §2.2 in the "implementation"<br>
+manual with examples at the end of that section. There are also older forms of<br>
+direct use of Const with the "const_name" antiquotation: one day that might<br>
+become legacy.</p>
+<p>A more ambitious form is the "instantiate" antiquotation (for<br>
+types/terms/props, certified types/terms/props, and thms). I did not find that<br>
+in the documentation on the spot, so the NEWS entry from Isabelle2022-1<br>
+needs to suffice:</p>
+<p>"""<br>
+* ML antiquotation "instantiate" allows to instantiate formal entities (types,<br>
+terms, theorems) with values given ML. This works uniformly for "typ", "term",<br>
+"prop", "ctyp", "cterm", "cprop", "lemma" --- given as a keyword after the<br>
+instantiation.</p>
+<p>(etc. including a few examples)<br>
+"""</p>
+<blockquote>
+<ol start="4">
+<li>Also for terms I could use Syntax.read_term to obtain a reference.</li>
+</ol>
+</blockquote>
+<p>#4 is as bad like #2. Read/check operations are only valid for user input in the<br>
+application context.</p>
+<p>Makarius<br>
+</p>
+</blockquote>
+</blockquote>
+
+
+
+<a name="477300966"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle/ML%20-%20Theorem%20and%20Local%20Theories/near/477300966" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle.2FML.20-.20Theorem.20and.20Local.20Theories.html#477300966">(Oct 16 2024 at 21:09)</a>:</h4>
+<p>From: "\"Marmsoler, Diego\"" &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Hi Norbert,</p>
+<p>Thank you very much for your detailed answer.<br>
+I was just wondering if this use case also works if the locale is generated in Isabelle/ML using Expression.add_locale.</p>
+<p>To be more precise, in my case the flow is roughly as follows:</p>
+<p>*   Proof a theorem using Goal.prove. This returns a reference to the proven theorem thm.<br>
+  *   Create a new locale using Expression.add_locale<br>
+  *   Use the original theorem reference thm to proof a new theorem within the context of the locale</p>
+<p>When I tried this first, the proof in step 3 did not work but I got it to work by using the dependency morphism to transfer the original thm theorem into the context of the newly created locale.</p>
+<p>All the best,</p>
+<p>Diego</p>
+<p>From: Norbert Schirmer &lt;<a href="mailto:nschirmer@apple.com">nschirmer@apple.com</a>&gt;<br>
+Sent: 16 October 2024 16:22<br>
+To: Marmsoler, Diego &lt;<a href="mailto:D.Marmsoler@exeter.ac.uk">D.Marmsoler@exeter.ac.uk</a>&gt;<br>
+Cc: <a href="mailto:isabelle-users@cl.cam.ac.uk">isabelle-users@cl.cam.ac.uk</a><br>
+Subject: Re: [isabelle] Isabelle/ML - Theorem and Local Theories</p>
+<p>CAUTION: This email originated from outside of the organisation. Do not click links or open attachments unless you recognise the sender and know the content is safe.</p>
+<p>Dear Diego,</p>
+<p>One standard use case that works out of the box can be thought of as viewing the problem from "inside out”. Where by “inside” I mean inside of the locale.</p>
+<ol>
+<li>You enter the locale you are interested in. There you operate and think relative to the “fixes” and “assumes” of that locale (including all ancestors).</li>
+<li>Within that locale you write our Isabelle/ML code, which on the Isar toplevel could be via commands like “declaration” or for example “simproc_setup”. Those commands expect your Isabelle/ML code do be a function depending on a morphism “phi". Whenever you want to refer to some abstract entity of the locale, e.g. the fixes and assumes (or theorems) you can and usually should make use of “phi" to transform them from the abstract version to the concrete interpretation. E.g. if you have an assumption (or theorem) named foo in your locale you can transform it by "Morphism.thm phi @{thm foo}”. Note that as you are within the locale you can use the antiquotation mechanisms like @{thm …} to have static checks that you actually refer to what you mean.</li>
+<li>Whenever the locale is interpreted (e.g. by “sublocale", “interpretation", new locales that have this locale as ancestor,  …), the locale infrastructure of Isabelle automatically activates all the declarations (and simprocs) by supplying the proper “phi" to your declaration, simproc… So in case of the simproc there may be a lot of instances of the same simproc active at the same moment with different phi. That’s why it is important that you transform all abstract entities in step 2 by using Morphism.thm, Morphism.term etc.</li>
+</ol>
+<p>So when your use case fits into this model of thinking, there is no need to worry about where to get the phi from. Generating all the necessary phi’s and applying them to all the “declarations” is done by the infrastructure. In this context a simproc is just a special kind of declaration. The more general “declaration” can also be used to work with custom Theory_Data / Generic_Data, as Makarius has pointed out. The core idea here is that in step 2 above you also use the phi at hand to transform that custom data.</p>
+<p>Here is a small example from the AFP that illustrates this approach:</p>
+<p><a href="https://www.isa-afp.org/sessions/autocorres2_test/#Match_Cterm_Ex.html">https://www.isa-afp.org/sessions/autocorres2_test/#Match_Cterm_Ex.html</a></p>
+<p>Regards,<br>
+Norbert</p>
+<p>--</p>
+<p>Norbert Schirmer (nschirmer@apple.com&lt;mailto:<a href="mailto:nschirmer@apple.com">nschirmer@apple.com</a>&gt;)<br>
+ SEG Formal Verification</p>
+<p>On 16. Oct 2024, at 11:54, Marmsoler, Diego (via cl-isabelle-users Mailing List) &lt;cl-isabelle-users@lists.cam.ac.uk&lt;mailto:<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;&gt; wrote:</p>
+<p>Hi Makarius,</p>
+<p>Thank you very much for your answer. It clarifies a lot.</p>
+<p>I do have a follow up question, and I was wondering if someone could help me with that.</p>
+<p>I am currently using the following function to retrieve the morphism:</p>
+<p>fun get_morphism source target thy =<br>
+   let<br>
+     val dep = List.filter (fn x =&gt; #source x = source andalso #target x = target) (Locale.dest_dependencies [@{theory Main}] thy);<br>
+   in<br>
+     if (length dep) &lt;&gt; 1 then<br>
+       error "Wrong number of dependencies"<br>
+     else<br>
+       #morphism (hd dep) |&gt; Morphism.set_context thy<br>
+   End</p>
+<p>Basically, I use Locale.dest_dependencies to obtain all morphisms which are available in my theory (minus the once available in Main) and then I filter the one out with the correct source and destination.</p>
+<p>This works for my purpose, but it does not feel like it is the correct way to do it, so I was wondering if there is a better way to do this?</p>
+<p>In particular, I was wondering if there is an exposed function which does something like: "give me the morphism (dependency) of locale x for source y".</p>
+<p>If there is no such function available, I was wondering if it could be useful to add one in the future?</p>
+<p>Thanks for your help.</p>
+<p>All the best,</p>
+<p>Diego</p>
+<p>-----Original Message-----<br>
+From: Makarius &lt;makarius@sketis.net&lt;mailto:<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;&gt;<br>
+Sent: 12 August 2024 09:46<br>
+To: Marmsoler, Diego &lt;D.Marmsoler@exeter.ac.uk&lt;mailto:<a href="mailto:D.Marmsoler@exeter.ac.uk">D.Marmsoler@exeter.ac.uk</a>&gt;&gt;; isabelle-<br>
+users@cl.cam.ac.uk&lt;mailto:<a href="mailto:users@cl.cam.ac.uk">users@cl.cam.ac.uk</a>&gt;<br>
+Subject: Re: [isabelle] Isabelle/ML - Theorem and Local Theories</p>
+<p>CAUTION: This email originated from outside of the organisation. Do not click<br>
+links or open attachments unless you recognise the sender and know the<br>
+content is safe.</p>
+<p>On 09/08/2024 10:56, "Marmsoler, Diego" (via cl-isabelle-users Mailing List)<br>
+wrote:</p>
+<p>I think I found what I was looking for in my previous question.</p>
+<p>I was looking for the dependency morphism stored in the dependencies<br>
+field of a locale.</p>
+<p>Morphisms are indeed the proper approach. How to get them is a different<br>
+question, though. My guess from a distance is that some of the locale<br>
+interpretation operations will do the job abstractly and robustly.</p>
+<p>I guess it is often the case that a package generates some terms and<br>
+theorems and uses them later on to create some new terms and theorems.</p>
+<p>From my limited experience with Isabelle/ML I can see at least the<br>
+following approaches to do so:</p>
+<ol>
+<li>
+<p>I can keep references to the terms and theorems and use morphisms to<br>
+later</p>
+<p>transfer them into my current context.</p>
+</li>
+</ol>
+<p>#1 sounds fine, but where did the original types/terms/theorems come from?<br>
+Was that the original user input? If so, it often helps to maintain private<br>
+Theory_Data/Generic_Data for the package.</p>
+<ol start="2">
+<li>
+<p>I can use Proof_Context.read_term_abbrev / Proof_Context.get_thm to<br>
+obtain</p>
+<p>a reference by name.</p>
+</li>
+</ol>
+<p>#2 is very bad: it leads to fragile implementations. A proper value is a constant,<br>
+not some source text (or name) whose interpretation depends a lot on the<br>
+context.</p>
+<ol start="3">
+<li>At least for terms I can construct them manually using term constructors<br>
+   (Const / Free / …)</li>
+</ol>
+<p>#3 is ok in principle, but the proper way is to use ML antiquotations to produce<br>
+constants for types and terms, see also §2.2 in the "implementation"<br>
+manual with examples at the end of that section. There are also older forms of<br>
+direct use of Const with the "const_name" antiquotation: one day that might<br>
+become legacy.</p>
+<p>A more ambitious form is the "instantiate" antiquotation (for<br>
+types/terms/props, certified types/terms/props, and thms). I did not find that<br>
+in the documentation on the spot, so the NEWS entry from Isabelle2022-1<br>
+needs to suffice:</p>
+<p>"""</p>
+<ul>
+<li>ML antiquotation "instantiate" allows to instantiate formal entities (types,<br>
+terms, theorems) with values given ML. This works uniformly for "typ", "term",<br>
+"prop", "ctyp", "cterm", "cprop", "lemma" --- given as a keyword after the<br>
+instantiation.</li>
+</ul>
+<p>(etc. including a few examples)<br>
+"""</p>
+<ol start="4">
+<li>Also for terms I could use Syntax.read_term to obtain a reference.</li>
+</ol>
+<p>#4 is as bad like #2. Read/check operations are only valid for user input in the<br>
+application context.</p>
+<p>Makarius</p>
+
+
+
+<a name="477384013"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle/ML%20-%20Theorem%20and%20Local%20Theories/near/477384013" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle.2FML.20-.20Theorem.20and.20Local.20Theories.html#477384013">(Oct 17 2024 at 08:22)</a>:</h4>
+<p>From: Norbert Schirmer &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Hi Diego,</p>
+<p>I see. Indeed, in case the locale is not yet there in your Isar theory, it is not obvious how to put Isabelle/ML text within that locale. So you loose the convenience of antiquotations to refer to locale content at that point.</p>
+<p>But the scenario you describe seems to be different. One central question is in which context “ctxt” do you make the Goal.prove.Is this also a locale context?<br>
+Note that the theorem you get out of Goal.prove lives within that ctxt that you supplied. So it depends very much on the ctxt to know where you can immediately use it. When you want to use that theorem in another context ctxt1 (like the locale you generate in step 2) the idea is that you first <em>export</em> the theorem from ctxt to the theory level and then <em>import</em> it to ctxt1. For the export there is Proof_Context.export but for the import there is no obvious Isabelle/ML API (as far as I know). My understanding of the current state of Isabelle is that the “import” is something that should be implicitly handled by the locale infrastructure. So here some ideas how to use what is there to do the import. One way I usually think about this is to think about how I would write down an example in the Isar top-level and then think about what happens in the background.</p>
+<p>Here some sketch:</p>
+<p>context some_locale_one<br>
+begin<br>
+ …<br>
+  lemma foo: ...<br>
+end</p>
+<p>locale my_new_locale<br>
+begin</p>
+<p>… here I want to use foo<br>
+end</p>
+<p>You cannot directly use theorem foo in my_new_locale. What technically is available is the theory-level version <a href="http://some_locale_one.foo">some_locale_one.foo</a>, which is a generalised version of foo with respect to the fixes / assumes of some_locale_one. So you can use that one, but then you have to discharge the assumptions by yourself.</p>
+<p>The canonical way to access foo in my_new_locale is to do some kind of interpretation (or sublocale, …) command of some_locale_one inside my_new_locale. As a result you can access the interpreted version of foo potentially with a qualified name that you supplied with the interpretation. So this interpretation is the kind of automatic import of the theorem foo that the infrastructure provides.</p>
+<p>Note that one important ingredient in the background is that the lemma foo above is not just a Goal.prove but more importantly  it “notes” the theorem to the local theory, via a derivative of Local_Theory.note. This Local_Theory.note is one kind of “declaration” that I referred to in my last mail. Everything that is noted will then also be subject to interpretation and be automatically imported.</p>
+<p>I routinely use the following idiom for such things in Isabelle/ML where I use named theorems and attributes to store the theorems.</p>
+<p>named_theorems my_collection</p>
+<p>context some_locale_one<br>
+begin<br>
+ …<br>
+  lemma foo[my_collection]: ...<br>
+end</p>
+<p>locale my_new_locale<br>
+begin</p>
+<p>… here I want to use foo<br>
+  So I interprete some_locale_one and then use </p>
+<p>Named_Theorems.get ctxt @{named_theorems my_collection}<br>
+end</p>
+<p>Instead of the theorem name I use the more robust named theorems (via antiquotation named_theorems) to access the theorems in Isabelle/ML. You can also directly supply attributes like my_collection to Local_Theory.note.</p>
+<p>This illustrates the general principle with the existing ingredients like named theorems and attributes. <br>
+For more ambitious and custom use cases there is the Local_Thoery.declaration which is more general than Local_Theory.note. With it you can implement your own approach to “store” and “retrieve” data. There are various applications of this technique in the AFP entry of AutoCorres2. </p>
+<p>Regards,<br>
+Norbert</p>
+<p>--</p>
+<p>Norbert Schirmer (<a href="mailto:nschirmer@apple.com">nschirmer@apple.com</a>)<br>
+ SEG Formal Verification</p>
+<blockquote>
+<p>On 16. Oct 2024, at 23:08, Marmsoler, Diego &lt;<a href="mailto:D.Marmsoler@exeter.ac.uk">D.Marmsoler@exeter.ac.uk</a>&gt; wrote:</p>
+<p>Hi Norbert,</p>
+<p>Thank you very much for your detailed answer.<br>
+I was just wondering if this use case also works if the locale is generated in Isabelle/ML using Expression.add_locale.</p>
+<p>To be more precise, in my case the flow is roughly as follows:<br>
+Proof a theorem using Goal.prove. This returns a reference to the proven theorem thm.<br>
+Create a new locale using Expression.add_locale<br>
+Use the original theorem reference thm to proof a new theorem within the context of the locale</p>
+<p>When I tried this first, the proof in step 3 did not work but I got it to work by using the dependency morphism to transfer the original thm theorem into the context of the newly created locale.</p>
+<p>All the best,</p>
+<p>Diego</p>
+<p>From: Norbert Schirmer &lt;<a href="mailto:nschirmer@apple.com">nschirmer@apple.com</a> &lt;mailto:<a href="mailto:nschirmer@apple.com">nschirmer@apple.com</a>&gt;&gt;<br>
+Sent: 16 October 2024 16:22<br>
+To: Marmsoler, Diego &lt;<a href="mailto:D.Marmsoler@exeter.ac.uk">D.Marmsoler@exeter.ac.uk</a> &lt;mailto:<a href="mailto:D.Marmsoler@exeter.ac.uk">D.Marmsoler@exeter.ac.uk</a>&gt;&gt;<br>
+Cc: <a href="mailto:isabelle-users@cl.cam.ac.uk">isabelle-users@cl.cam.ac.uk</a> &lt;mailto:<a href="mailto:isabelle-users@cl.cam.ac.uk">isabelle-users@cl.cam.ac.uk</a>&gt;<br>
+Subject: Re: [isabelle] Isabelle/ML - Theorem and Local Theories</p>
+<p>CAUTION: This email originated from outside of the organisation. Do not click links or open attachments unless you recognise the sender and know the content is safe.</p>
+<p>Dear Diego, </p>
+<p>One standard use case that works out of the box can be thought of as viewing the problem from "inside out”. Where by “inside” I mean inside of the locale.<br>
+1. You enter the locale you are interested in. There you operate and think relative to the “fixes” and “assumes” of that locale (including all ancestors).<br>
+2. Within that locale you write our Isabelle/ML code, which on the Isar toplevel could be via commands like “declaration” or for example “simproc_setup”. Those commands expect your Isabelle/ML code do be a function depending on a morphism “phi". Whenever you want to refer to some abstract entity of the locale, e.g. the fixes and assumes (or theorems) you can and usually should make use of “phi" to transform them from the abstract version to the concrete interpretation. E.g. if you have an assumption (or theorem) named foo in your locale you can transform it by "Morphism.thm phi @{thm foo}”. Note that as you are within the locale you can use the antiquotation mechanisms like @{thm …} to have static checks that you actually refer to what you mean.<br>
+3. Whenever the locale is interpreted (e.g. by “sublocale", “interpretation", new locales that have this locale as ancestor,  …), the locale infrastructure of Isabelle automatically activates all the declarations (and simprocs) by supplying the proper “phi" to your declaration, simproc… So in case of the simproc there may be a lot of instances of the same simproc active at the same moment with different phi. That’s why it is important that you transform all abstract entities in step 2 by using Morphism.thm, Morphism.term etc. </p>
+<p>So when your use case fits into this model of thinking, there is no need to worry about where to get the phi from. Generating all the necessary phi’s and applying them to all the “declarations” is done by the infrastructure. In this context a simproc is just a special kind of declaration. The more general “declaration” can also be used to work with custom Theory_Data / Generic_Data, as Makarius has pointed out. The core idea here is that in step 2 above you also use the phi at hand to transform that custom data.</p>
+<p>Here is a small example from the AFP that illustrates this approach:</p>
+<p><a href="https://www.isa-afp.org/sessions/autocorres2_test/#Match_Cterm_Ex.html">https://www.isa-afp.org/sessions/autocorres2_test/#Match_Cterm_Ex.html</a></p>
+<p>Regards,<br>
+Norbert</p>
+<p>--</p>
+<p>Norbert Schirmer (<a href="mailto:nschirmer@apple.com">nschirmer@apple.com</a> &lt;mailto:<a href="mailto:nschirmer@apple.com">nschirmer@apple.com</a>&gt;)<br>
+ SEG Formal Verification</p>
+<p>On 16. Oct 2024, at 11:54, Marmsoler, Diego (via cl-isabelle-users Mailing List) &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a> &lt;mailto:<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;&gt; wrote:</p>
+<p>Hi Makarius,</p>
+<p>Thank you very much for your answer. It clarifies a lot.</p>
+<p>I do have a follow up question, and I was wondering if someone could help me with that.</p>
+<p>I am currently using the following function to retrieve the morphism:</p>
+<p>fun get_morphism source target thy =<br>
+   let<br>
+     val dep = List.filter (fn x =&gt; #source x = source andalso #target x = target) (Locale.dest_dependencies [@{theory Main}] thy);<br>
+   in<br>
+     if (length dep) &lt;&gt; 1 then<br>
+       error "Wrong number of dependencies"<br>
+     else<br>
+       #morphism (hd dep) |&gt; Morphism.set_context thy<br>
+   End</p>
+<p>Basically, I use Locale.dest_dependencies to obtain all morphisms which are available in my theory (minus the once available in Main) and then I filter the one out with the correct source and destination.</p>
+<p>This works for my purpose, but it does not feel like it is the correct way to do it, so I was wondering if there is a better way to do this?</p>
+<p>In particular, I was wondering if there is an exposed function which does something like: "give me the morphism (dependency) of locale x for source y".</p>
+<p>If there is no such function available, I was wondering if it could be useful to add one in the future?</p>
+<p>Thanks for your help.</p>
+<p>All the best,</p>
+<p>Diego</p>
+<p>-----Original Message-----<br>
+From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a> &lt;mailto:<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;&gt;<br>
+Sent: 12 August 2024 09:46<br>
+To: Marmsoler, Diego &lt;<a href="mailto:D.Marmsoler@exeter.ac.uk">D.Marmsoler@exeter.ac.uk</a> &lt;mailto:<a href="mailto:D.Marmsoler@exeter.ac.uk">D.Marmsoler@exeter.ac.uk</a>&gt;&gt;; isabelle-<br>
+<a href="mailto:users@cl.cam.ac.uk">users@cl.cam.ac.uk</a> &lt;mailto:<a href="mailto:users@cl.cam.ac.uk">users@cl.cam.ac.uk</a>&gt;<br>
+Subject: Re: [isabelle] Isabelle/ML - Theorem and Local Theories</p>
+<p>CAUTION: This email originated from outside of the organisation. Do not click<br>
+links or open attachments unless you recognise the sender and know the<br>
+content is safe.</p>
+<p>On 09/08/2024 10:56, "Marmsoler, Diego" (via cl-isabelle-users Mailing List)<br>
+wrote:</p>
+<p>I think I found what I was looking for in my previous question.</p>
+<p>I was looking for the dependency morphism stored in the dependencies<br>
+field of a locale.</p>
+<p>Morphisms are indeed the proper approach. How to get them is a different<br>
+question, though. My guess from a distance is that some of the locale<br>
+interpretation operations will do the job abstractly and robustly.</p>
+<p>I guess it is often the case that a package generates some terms<br>
+[message truncated]</p>
+</blockquote>
+
+
+
+<a name="477530093"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle/ML%20-%20Theorem%20and%20Local%20Theories/near/477530093" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle.2FML.20-.20Theorem.20and.20Local.20Theories.html#477530093">(Oct 17 2024 at 21:56)</a>:</h4>
+<p>From: "\"Marmsoler, Diego\"" &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Hi Norbert,</p>
+<p>Ok, that is very useful, and indeed a solution to my problem (my situation is similar as you described just that my_new_locale actually imports some_locale_one which, however, should not make a big different here).</p>
+<p>My solution so far is more in the direction of your first description: importing the theorem in my_new_locale using the dependency morphism from some_locale_one to my_new_locale (which in my case is possible since my_new_locale imports some_locale_one and thus there is a corresponding dependency morphism).<br>
+Now, the reason why I did it this way is that both, Goal.prove as well as Local_Theory.note, return the proven theorem which I then wanted to use as the reference for the theorem (instead of the name ecc).</p>
+<p>However, if I understand your comments correctly, you suggest not to do this, but rather use the name (theorem name or, for more robust solution, Named_Theorem).<br>
+Is this correct?</p>
+<p>Thanks again for all your comments!</p>
+<p>All the best,</p>
+<p>Diego</p>
+<p>From: Norbert Schirmer &lt;<a href="mailto:nschirmer@apple.com">nschirmer@apple.com</a>&gt;<br>
+Sent: 17 October 2024 09:22<br>
+To: Marmsoler, Diego &lt;<a href="mailto:D.Marmsoler@exeter.ac.uk">D.Marmsoler@exeter.ac.uk</a>&gt;<br>
+Cc: <a href="mailto:isabelle-users@cl.cam.ac.uk">isabelle-users@cl.cam.ac.uk</a><br>
+Subject: Re: [isabelle] Isabelle/ML - Theorem and Local Theories</p>
+<p>CAUTION: This email originated from outside of the organisation. Do not click links or open attachments unless you recognise the sender and know the content is safe.</p>
+<p>Hi Diego,</p>
+<p>I see. Indeed, in case the locale is not yet there in your Isar theory, it is not obvious how to put Isabelle/ML text within that locale. So you loose the convenience of antiquotations to refer to locale content at that point.</p>
+<p>But the scenario you describe seems to be different. One central question is in which context “ctxt” do you make the Goal.prove.Is this also a locale context?<br>
+Note that the theorem you get out of Goal.prove lives within that ctxt that you supplied. So it depends very much on the ctxt to know where you can immediately use it. When you want to use that theorem in another context ctxt1 (like the locale you generate in step 2) the idea is that you first <em>export</em> the theorem from ctxt to the theory level and then <em>import</em> it to ctxt1. For the export there is Proof_Context.export but for the import there is no obvious Isabelle/ML API (as far as I know). My understanding of the current state of Isabelle is that the “import” is something that should be implicitly handled by the locale infrastructure. So here some ideas how to use what is there to do the import. One way I usually think about this is to think about how I would write down an example in the Isar top-level and then think about what happens in the background.</p>
+<p>Here some sketch:</p>
+<p>context some_locale_one<br>
+begin<br>
+ …<br>
+  lemma foo: ...<br>
+end</p>
+<p>locale my_new_locale<br>
+begin</p>
+<p>… here I want to use foo<br>
+end</p>
+<p>You cannot directly use theorem foo in my_new_locale. What technically is available is the theory-level version <a href="http://some_locale_one.foo">some_locale_one.foo</a>, which is a generalised version of foo with respect to the fixes / assumes of some_locale_one. So you can use that one, but then you have to discharge the assumptions by yourself.</p>
+<p>The canonical way to access foo in my_new_locale is to do some kind of interpretation (or sublocale, …) command of some_locale_one inside my_new_locale. As a result you can access the interpreted version of foo potentially with a qualified name that you supplied with the interpretation. So this interpretation is the kind of automatic import of the theorem foo that the infrastructure provides.</p>
+<p>Note that one important ingredient in the background is that the lemma foo above is not just a Goal.prove but more importantly  it “notes” the theorem to the local theory, via a derivative of Local_Theory.note. This Local_Theory.note is one kind of “declaration” that I referred to in my last mail. Everything that is noted will then also be subject to interpretation and be automatically imported.</p>
+<p>I routinely use the following idiom for such things in Isabelle/ML where I use named theorems and attributes to store the theorems.</p>
+<p>named_theorems my_collection</p>
+<p>context some_locale_one<br>
+begin<br>
+ …<br>
+  lemma foo[my_collection]: ...<br>
+end</p>
+<p>locale my_new_locale<br>
+begin</p>
+<p>… here I want to use foo<br>
+  So I interprete some_locale_one and then use</p>
+<p>Named_Theorems.get ctxt @{named_theorems my_collection}<br>
+end</p>
+<p>Instead of the theorem name I use the more robust named theorems (via antiquotation named_theorems) to access the theorems in Isabelle/ML. You can also directly supply attributes like my_collection to Local_Theory.note.</p>
+<p>This illustrates the general principle with the existing ingredients like named theorems and attributes.<br>
+For more ambitious and custom use cases there is the Local_Thoery.declaration which is more general than Local_Theory.note. With it you can implement your own approach to “store” and “retrieve” data. There are various applications of this technique in the AFP entry of AutoCorres2.</p>
+<p>Regards,<br>
+Norbert</p>
+<p>--</p>
+<p>Norbert Schirmer (nschirmer@apple.com&lt;mailto:<a href="mailto:nschirmer@apple.com">nschirmer@apple.com</a>&gt;)<br>
+ SEG Formal Verification</p>
+<p>On 16. Oct 2024, at 23:08, Marmsoler, Diego &lt;D.Marmsoler@exeter.ac.uk&lt;mailto:<a href="mailto:D.Marmsoler@exeter.ac.uk">D.Marmsoler@exeter.ac.uk</a>&gt;&gt; wrote:</p>
+<p>Hi Norbert,</p>
+<p>Thank you very much for your detailed answer.<br>
+I was just wondering if this use case also works if the locale is generated in Isabelle/ML using Expression.add_locale.</p>
+<p>To be more precise, in my case the flow is roughly as follows:</p>
+<p>*   Proof a theorem using Goal.prove. This returns a reference to the proven theorem thm.<br>
+  *   Create a new locale using Expression.add_locale<br>
+  *   Use the original theorem reference thm to proof a new theorem within the context of the locale</p>
+<p>When I tried this first, the proof in step 3 did not work but I got it to work by using the dependency morphism to transfer the original thm theorem into the context of the newly created locale.</p>
+<p>All the best,</p>
+<p>Diego</p>
+<p>From: Norbert Schirmer &lt;nschirmer@apple.com&lt;mailto:<a href="mailto:nschirmer@apple.com">nschirmer@apple.com</a>&gt;&gt;<br>
+Sent: 16 October 2024 16:22<br>
+To: Marmsoler, Diego &lt;D.Marmsoler@exeter.ac.uk&lt;mailto:<a href="mailto:D.Marmsoler@exeter.ac.uk">D.Marmsoler@exeter.ac.uk</a>&gt;&gt;<br>
+Cc: isabelle-users@cl.cam.ac.uk&lt;mailto:<a href="mailto:isabelle-users@cl.cam.ac.uk">isabelle-users@cl.cam.ac.uk</a>&gt;<br>
+Subject: Re: [isabelle] Isabelle/ML - Theorem and Local Theories</p>
+<p>CAUTION: This email originated from outside of the organisation. Do not click links or open attachments unless you recognise the sender and know the content is safe.</p>
+<p>Dear Diego,</p>
+<p>One standard use case that works out of the box can be thought of as viewing the problem from "inside out”. Where by “inside” I mean inside of the locale.</p>
+<ol>
+<li>You enter the locale you are interested in. There you operate and think relative to the “fixes” and “assumes” of that locale (including all ancestors).</li>
+<li>Within that locale you write our Isabelle/ML code, which on the Isar toplevel could be via commands like “declaration” or for example “simproc_setup”. Those commands expect your Isabelle/ML code do be a function depending on a morphism “phi". Whenever you want to refer to some abstract entity of the locale, e.g. the fixes and assumes (or theorems) you can and usually should make use of “phi" to transform them from the abstract version to the concrete interpretation. E.g. if you have an assumption (or theorem) named foo in your locale you can transform it by "Morphism.thm phi @{thm foo}”. Note that as you are within the locale you can use the antiquotation mechanisms like @{thm …} to have static checks that you actually refer to what you mean.</li>
+<li>Whenever the locale is interpreted (e.g. by “sublocale", “interpretation", new locales that have this locale as ancestor,  …), the locale infrastructure of Isabelle automatically activates all the declarations (and simprocs) by supplying the proper “phi" to your declaration, simproc… So in case of the simproc there may be a lot of instances of the same simproc active at the same moment with different phi. That’s why it is important that you transform all abstract entities in step 2 by using Morphism.thm, Morphism.term etc.</li>
+</ol>
+<p>So when your use case fits into this model of thinking, there is no need to worry about where to get the phi from. Generating all the necessary phi’s and applying them to all the “declarations” is done by the infrastructure. In this context a simproc is just a special kind of declaration. The more general “declaration” can also be used to work with custom Theory_Data / Generic_Data, as Makarius has pointed out. The core idea here is that in step 2 above you also use the phi at hand to transform that custom data.</p>
+<p>Here is a small example from the AFP that illustrates this approach:</p>
+<p><a href="https://www.isa-afp.org/sessions/autocorres2_test/#Match_Cterm_Ex.html">https://www.isa-afp.org/sessions/autocorres2_test/#Match_Cterm_Ex.html</a></p>
+<p>Regards,<br>
+Norbert</p>
+<p>--</p>
+<p>Norbert Schirmer (nschirmer@apple.com&lt;mailto:<a href="mailto:nschirmer@apple.com">nschirmer@apple.com</a>&gt;)<br>
+ SEG Formal Verification</p>
+<p>On 16. Oct 2024, at 11:54, Marmsoler, Diego (via cl-isabelle-users Mailing List) &lt;cl-isabelle-users@lists.cam.ac.uk&lt;mailto:<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;&gt; wrote:</p>
+<p>Hi Makarius,</p>
+<p>Thank you very much for your answer. It clarifies a lot.</p>
+<p>I do have a follow up question, and I was wondering if someone could help me with that.</p>
+<p>I am currently using the following function to retrieve the morphism:</p>
+<p>fun get_morphism source target thy =<br>
+   let<br>
+     val dep = List.filter (fn x =&gt; #source x = source andalso #target x = target) (Locale.dest_dependencies [@{theory Main}] thy);<br>
+   in<br>
+     if (length dep) &lt;&gt; 1 then<br>
+       error "Wrong number of dependencies"<br>
+     else<br>
+       #morphism (hd dep) |&gt; Morphism.set_context thy<br>
+   End</p>
+<p>Basically, I use Locale.dest_dependencies to obtain all morphisms which are available in my theory (minus the once available in Main) and then I filter the one out with the correct source and destination.</p>
+<p>This works for my purpose, but it does not feel like it is the correct way to do it, so I was wondering if <br>
+[message truncated]</p>
+
+
+
+<a name="477596263"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle/ML%20-%20Theorem%20and%20Local%20Theories/near/477596263" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle.2FML.20-.20Theorem.20and.20Local.20Theories.html#477596263">(Oct 18 2024 at 07:48)</a>:</h4>
+<p>From: Norbert Schirmer &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Hi Diego,</p>
+<blockquote>
+<p>On 17. Oct 2024, at 23:56, Marmsoler, Diego (via cl-isabelle-users Mailing List) &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt; wrote:</p>
+<p>However, if I understand your comments correctly, you suggest not to do this, but rather use the name (theorem name or, for more robust solution, Named_Theorem).<br>
+Is this correct?<br>
+</p>
+</blockquote>
+<p>This is the way that I figured out to by quite robust. My rational here being that this is how the Isar-Toplevel works so it should be a well established roundtrip. However, I fully understand your point that it is somehow feels quite indirect. You already have a theorem as ML value at hand and then kind of fall back to names or named theorems to refetch the “same” theorem but in another context.</p>
+<p>My impression is that the Isabelle/ML API of this portion of Isabelle is very much motivated and tailored towards the Isar top-level. So everything that you need for that is well established and available. Other use cases might just not (yet) be equally well supported by Isabelle/ML. In your case you achieved to retrieve the Morphism phi you were interested in from some low level data, but as you have written it does not feel to be the intended way. So I agree that there seems to be some opportunities for more Isabelle/ML API at that point.</p>
+<p>One further side remark from my experiences with working with those Morphisms. It can be quite costly to apply those morphisms. So when writing Isabelle/ML one should make deliberate choices when to apply them and avoid repeated applications. So when you already have an interpretation at hand (like in case of your locale) it might indeed be “cheaper” to just refetch it from the context via its (name / named theorems) as to apply the Morphism by hand.</p>
+<p>Regards,<br>
+Norbert</p>
+<p>--</p>
+<p>Norbert Schirmer (<a href="mailto:nschirmer@apple.com">nschirmer@apple.com</a>)<br>
+ SEG Formal Verification</p>
+
+
+
+<a name="477740075"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle/ML%20-%20Theorem%20and%20Local%20Theories/near/477740075" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle.2FML.20-.20Theorem.20and.20Local.20Theories.html#477740075">(Oct 18 2024 at 21:59)</a>:</h4>
+<p>From: "\"Marmsoler, Diego\"" &lt;<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;<br>
+Hi Norbert,</p>
+<blockquote>
+<p>You already have a theorem as ML value at hand and then kind of fall back to names or named theorems to refetch the “same” theorem but in another context.</p>
+</blockquote>
+<p>Indeed, this was my main concern, but your answer now clarified a lot.</p>
+<p>In general, all your comments were very helpful and much appreciated!</p>
+<p>Thanks, and all the best,</p>
+<p>Diego</p>
+<p>From: Norbert Schirmer &lt;<a href="mailto:nschirmer@apple.com">nschirmer@apple.com</a>&gt;<br>
+Sent: 18 October 2024 08:48<br>
+To: Marmsoler, Diego &lt;<a href="mailto:D.Marmsoler@exeter.ac.uk">D.Marmsoler@exeter.ac.uk</a>&gt;<br>
+Cc: <a href="mailto:isabelle-users@cl.cam.ac.uk">isabelle-users@cl.cam.ac.uk</a><br>
+Subject: Re: [isabelle] Isabelle/ML - Theorem and Local Theories</p>
+<p>CAUTION: This email originated from outside of the organisation. Do not click links or open attachments unless you recognise the sender and know the content is safe.</p>
+<p>Hi Diego,</p>
+<p>On 17. Oct 2024, at 23:56, Marmsoler, Diego (via cl-isabelle-users Mailing List) &lt;cl-isabelle-users@lists.cam.ac.uk&lt;mailto:<a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a>&gt;&gt; wrote:</p>
+<p>However, if I understand your comments correctly, you suggest not to do this, but rather use the name (theorem name or, for more robust solution, Named_Theorem).<br>
+Is this correct?</p>
+<p>This is the way that I figured out to by quite robust. My rational here being that this is how the Isar-Toplevel works so it should be a well established roundtrip. However, I fully understand your point that it is somehow feels quite indirect. You already have a theorem as ML value at hand and then kind of fall back to names or named theorems to refetch the “same” theorem but in another context.</p>
+<p>My impression is that the Isabelle/ML API of this portion of Isabelle is very much motivated and tailored towards the Isar top-level. So everything that you need for that is well established and available. Other use cases might just not (yet) be equally well supported by Isabelle/ML. In your case you achieved to retrieve the Morphism phi you were interested in from some low level data, but as you have written it does not feel to be the intended way. So I agree that there seems to be some opportunities for more Isabelle/ML API at that point.</p>
+<p>One further side remark from my experiences with working with those Morphisms. It can be quite costly to apply those morphisms. So when writing Isabelle/ML one should make deliberate choices when to apply them and avoid repeated applications. So when you already have an interpretation at hand (like in case of your locale) it might indeed be “cheaper” to just refetch it from the context via its (name / named theorems) as to apply the Morphism by hand.</p>
+<p>Regards,<br>
+Norbert</p>
+<p>--</p>
+<p>Norbert Schirmer (nschirmer@apple.com&lt;mailto:<a href="mailto:nschirmer@apple.com">nschirmer@apple.com</a>&gt;)<br>
+ SEG Formal Verification</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

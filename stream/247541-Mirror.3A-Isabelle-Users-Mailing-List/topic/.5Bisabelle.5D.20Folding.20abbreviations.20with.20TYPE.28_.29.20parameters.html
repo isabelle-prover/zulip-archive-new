@@ -1,0 +1,75 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Folding abbreviations with TYPE(_) parameters · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Folding.20abbreviations.20with.20TYPE.28_.29.20parameters.html">[isabelle] Folding abbreviations with TYPE(_) parameters</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="203826928"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Folding%20abbreviations%20with%20TYPE%28_%29%20parameters/near/203826928" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Folding.20abbreviations.20with.20TYPE.28_.29.20parameters.html#203826928">(Jul 14 2020 at 12:29)</a>:</h4>
+<p>From: Mikhail Mandrykin &lt;<a href="mailto:mandrykin@ispras.ru">mandrykin@ispras.ru</a>&gt;<br>
+Hello!</p>
+<p>I have a question about the current situation regarding abbreviations <br>
+with dummy parameters of type "'a itself" e.g.<br>
+⬚‹abbreviation "to_bounds TYPE('a::len) x ≡ uint (word_of_int x :: 'a <br>
+word)"›<br>
+Here "TYPE('a)" is used to pass the length of the machine word <br>
+represented by the corresponding numeral type. It looks like a more or <br>
+less proper way to define and use such abbreviations, in particular it's <br>
+what Isabelle automatically does for abbreviations with hidden <br>
+polymorphism: for<br>
+⬚‹<br>
+abbreviation "to_bounds' x ≡ uint (word_of_int x)"<br>
+term to_bounds'<br>
+›<br>
+Isabelle gives ▩‹"to_bounds'" :: "'a itself ⇒ int ⇒ int"›.<br>
+However, when I try to use such an abbreviation, it's not folded back <br>
+when pretty-printing:<br>
+⬚‹term "to_bounds TYPE(8) 534"›<br>
+simply prints ▩‹"uint (word_of_int 534)" :: "int"› instead of <br>
+▩‹"to_bounds TYPE(8) 534" :: "int"›. The question is whether there's <br>
+some pragmatic reason for not fully supporting such abbreviations?</p>
+<p>From technical point if view I looked at the implementation of constant <br>
+abbreviation folding in Pure and the code looks somewhat dubious about <br>
+that. On the one hand, Consts.abbreviate calls <br>
+Term.close_schematic_term, which adds dummy "TYPE(_)" parameters to <br>
+expose the hidden polymorphism in the RHS of the abbreviation. On the <br>
+other hand, a local function strip_abss, which is used by <br>
+Consts.abbreviate only strips parameters that occur in the RHS as term <br>
+variables and does not take into account type variables. But those <br>
+variables of type "'a itself" usually don't occur directly in the RHS <br>
+and therefore the reverse abbreviation mechanism tries to fold an <br>
+abstraction of the form "λ (_ :: 'a itself). t" instead of the term "t" <br>
+and this is not how the unfolded abbreviation is actually represented. I <br>
+though it might be better to explicitly support those parameters of type <br>
+"'a itself" as instances of the singleton type Pure.type and try to fold <br>
+"RHS ('a)" → "LHS v_1 ... v_n (Pure.type :: 'a) v_{n+1} ... v_m" (i.e. <br>
+instantiate the LHS and RHS with the singleton Pure.type instead of the <br>
+variable, if it does not occur in RHS as a variable), which is supported <br>
+by Pattern.match_rew used in Proof_Context.contract_abbrevs. I <br>
+implemented a patch based on this idea (attached as <br>
+contract_TYPE_abbrevs.patch). It works for the example given above, some <br>
+more examples that we have in our formalizations and also passes <br>
+"regular" tests of building with "isabelle build -a" on my machine. A <br>
+notable quirk of this approach is that it would also fold abbreviations <br>
+even if the type does not occur in the RHS by introducing fresh type <br>
+variables e.g. folding "f x" to "u TYPE(?'a) TYPE(?'b)" when given "u <br>
+TYPE('a) TYPE('b) x ≡ f x". This can be prevented by checking occurrence <br>
+of the type variable in the RHS, but I'm not sure how to treat such <br>
+cases since they are quite strange anyway. So doesn't this approach have <br>
+some undesirable pitfalls or the support was simply missing due to lack <br>
+of use cases? The feature seems useful for handling types with phantom <br>
+parameters that represent some additional information such as word or <br>
+pointer type size.</p>
+<p>Regards,<br>
+Mikhail<br>
+<a href="/user_uploads/14278/IkjL4u_iGO1y0fNXzGTk7KJo/contract_TYPE_abbrevs.patch">contract_TYPE_abbrevs.patch</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,106 @@
+<html>
+<head><meta charset="utf-8"><title>safely doing a evaluation of ml evaluation · Isabelle/ML · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/index.html">Isabelle/ML</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/safely.20doing.20a.20evaluation.20of.20ml.20evaluation.html">safely doing a evaluation of ml evaluation</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="484853793"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/safely%20doing%20a%20evaluation%20of%20ml%20evaluation/near/484853793" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> irvin <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/safely.20doing.20a.20evaluation.20of.20ml.20evaluation.html#484853793">(Nov 28 2024 at 07:21)</a>:</h4>
+<p>I kinda want to do an evaluation of some stuff without keeping name bindings only keeping context data similar to how it works in ml_prf</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">context</span><span class="w"> </span><span class="kp">notes</span><span class="w"> </span><span class="o">[[</span><span class="n">ML_environment</span><span class="o">=</span><span class="s">"Isabelle"</span><span class="o">]]</span><span class="w"> </span><span class="k">begin</span>
+<span class="k">ML</span><span class="s">‹val a = "1"›</span>
+<span class="k">notepad</span>
+<span class="k">begin</span>
+<span class="w">  </span><span class="k">ML_prf</span><span class="s">‹</span>
+<span class="s">val a = "2"</span>
+
+<span class="s">›</span>
+
+<span class="k">end</span>
+<span class="k">ML</span><span class="s">‹val _ = @{print} a›</span><span class="w"> </span><span class="n">―‹"1"›</span>
+</code></pre></div>
+<p>right now its using code that does </p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">ML</span><span class="w"> </span><span class="s">‹fun with_temp_ML_env f x =</span>
+<span class="s">  let</span>
+<span class="s">    val context = Context.the_generic_context()</span>
+<span class="s">    val res = f x</span>
+<span class="s">    val () = Context.&gt;&gt; (ML_Env.inherit [context])</span>
+<span class="s">  in res end</span>
+<span class="s">›</span>
+</code></pre></div>
+<p>which messes up synchronized variables</p>
+
+
+
+<a name="484922275"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/safely%20doing%20a%20evaluation%20of%20ml%20evaluation/near/484922275" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> irvin <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/safely.20doing.20a.20evaluation.20of.20ml.20evaluation.html#484922275">(Nov 28 2024 at 13:34)</a>:</h4>
+<p><span class="user-mention silent" data-user-id="714722">irvin</span> <a href="#narrow/channel/211483-Isabelle.2FML/topic/safely.20doing.20a.20evaluation.20of.20ml.20evaluation/near/484853793">said</a>:</p>
+<blockquote>
+<p>I kinda want to do an evaluation of some stuff without keeping name bindings only keeping context data similar to how it works in ml_prf</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">context</span><span class="w"> </span><span class="kp">notes</span><span class="w"> </span><span class="o">[[</span><span class="n">ML_environment</span><span class="o">=</span><span class="s">"Isabelle"</span><span class="o">]]</span><span class="w"> </span><span class="k">begin</span>
+<span class="k">ML</span><span class="s">‹val a = "1"›</span>
+<span class="k">notepad</span>
+<span class="k">begin</span>
+<span class="w">  </span><span class="k">ML_prf</span><span class="s">‹</span>
+<span class="s">val a = "2"</span>
+
+<span class="s">›</span>
+
+<span class="k">end</span>
+<span class="k">ML</span><span class="s">‹val _ = @{print} a›</span><span class="w"> </span><span class="n">―‹"1"›</span>
+</code></pre></div>
+<p>right now its using code that does </p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">ML</span><span class="w"> </span><span class="s">‹fun with_temp_ML_env f x =</span>
+<span class="s">  let</span>
+<span class="s">    val context = Context.the_generic_context()</span>
+<span class="s">    val res = f x</span>
+<span class="s">    val () = Context.&gt;&gt; (ML_Env.inherit [context])</span>
+<span class="s">  in res end</span>
+<span class="s">›</span>
+</code></pre></div>
+<p>which messes up synchronized variables</p>
+</blockquote>
+<p>Oh I found out that the code kinda is just kinda of doing where Data is the ML_env and somehow the values for synchronized variables are stored in nonce is rolled back.</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">ML</span><span class="w"> </span><span class="s">‹fun with_temp_ML_env f x =</span>
+<span class="s">  let</span>
+<span class="s">    val context = Context.the_generic_context()</span>
+<span class="s">    val res = f x</span>
+<span class="s">    val () = Context.&gt;&gt; (Data.put (Data.get [context]))</span>
+<span class="s">  in res end</span>
+<span class="s">›</span>
+</code></pre></div>
+
+
+
+<a name="485212859"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/safely%20doing%20a%20evaluation%20of%20ml%20evaluation/near/485212859" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> irvin <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/safely.20doing.20a.20evaluation.20of.20ml.20evaluation.html#485212859">(Nov 30 2024 at 09:53)</a>:</h4>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="k">theory</span><span class="w"> </span><span class="n">Scratch</span>
+<span class="w">  </span><span class="kp">imports</span><span class="w"> </span><span class="n">Main</span>
+<span class="k">begin</span>
+
+<span class="k">ML</span><span class="s">‹val a = Synchronized.var "test" "hi"›</span>
+<span class="k">ML</span><span class="s">‹    val context = Context.the_generic_context()›</span>
+
+<span class="k">ML</span><span class="s">‹</span>
+<span class="s">val _ = Synchronized.assign a "oops"</span>
+
+
+
+<span class="s">›</span>
+<span class="k">ML</span><span class="s">‹    val _ = Context.&gt;&gt; (ML_Env.inherit [context])›</span>
+
+<span class="k">ML</span><span class="s">‹Synchronized.value a›</span>
+<span class="k">end</span>
+</code></pre></div>
+<p>(<em>Oh this is my issue more simply explained</em>)<br>
+(*Im not sure how is one meant to do this properly *)</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,59 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] &quot;using [[...]]&quot; with Isabelle/Eisbach or Isabe... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20.22using.20.5B.5B.2E.2E.2E.5D.5D.22.20with.20Isabelle.2FEisbach.20or.20Isabe.2E.2E.2E.html">[isabelle] &quot;using [[...]]&quot; with Isabelle/Eisbach or Isabe...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294670835"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20%22using%20%5B%5B...%5D%5D%22%20with%20Isabelle/Eisbach%20or%20Isabe.../near/294670835" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20.22using.20.5B.5B.2E.2E.2E.5D.5D.22.20with.20Isabelle.2FEisbach.20or.20Isabe.2E.2E.2E.html#294670835">(Aug 22 2022 at 13:02)</a>:</h4>
+<p>From: Christian Sternagel &lt;<a href="mailto:c.sternagel@gmail.com">c.sternagel@gmail.com</a>&gt;<br>
+Dear all,</p>
+<p>what is the equivalent to e.g.</p>
+<p>lemma "..."<br>
+  ...<br>
+  using [[simproc del: s]]<br>
+  ...</p>
+<p>in Eisbach methods (or if that doesn't work with Isabelle/ML).</p>
+<p>cheers</p>
+<p>chris</p>
+
+
+
+<a name="294670942"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20%22using%20%5B%5B...%5D%5D%22%20with%20Isabelle/Eisbach%20or%20Isabe.../near/294670942" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20.22using.20.5B.5B.2E.2E.2E.5D.5D.22.20with.20Isabelle.2FEisbach.20or.20Isabe.2E.2E.2E.html#294670942">(Aug 22 2022 at 13:02)</a>:</h4>
+<p>From: Daniel Matichuk &lt;<a href="mailto:Daniel.Matichuk@nicta.com.au">Daniel.Matichuk@nicta.com.au</a>&gt;<br>
+Hi Christian,</p>
+<p>The match method can be slightly abused to get the desired effect:</p>
+<p>method my_simproc_env methods m =<br>
+  (match termI in H[simproc del: bad_simproc]:_ ⇒ ‹m›)</p>
+<p>Here the match against the “termI” fact only produces one result, which we name and then use as a handle for making our “simproc del:” declaration.</p>
+<p>We can then use this as a usual higher-order method:</p>
+<p>apply (my_simproc_env ‹simp›)</p>
+<p>However, it is relatively straightforward to write a method in ML that will accomplish this a bit more generically.</p>
+<p>method_setup noting =<br>
+ ‹Scan.lift (Parse.and_list1 Parse.xthms1  --| Args.$$$ "in") --  Method_Closure.method_text &gt;&gt; (fn (args, m) =&gt; fn ctxt =&gt;<br>
+   let<br>
+     fun no_binding args = map (pair (Binding.empty, [])) args;</p>
+<p>val ctxt' = ctxt<br>
+       |&gt; Proof_Context.note_thmss ""<br>
+        (Attrib.map_facts_refs (map (Attrib.attribute_cmd ctxt)) (Proof_Context.get_fact ctxt) (no_binding args))<br>
+       |&gt; snd</p>
+<p>in Method_Closure.method_evaluate m ctxt' end)<br>
+›</p>
+<p>Which then looks a bit like the “note” command:</p>
+<p>apply (noting [[simproc del: bad_simproc]]<br>
+            in ‹simp›)</p>
+<p>Regards,<br>
+Dan</p>
+<hr>
+<p>The information in this e-mail may be confidential and subject to legal professional privilege and/or copyright. National ICT Australia Limited accepts no liability for any damage caused by this email or its attachments.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

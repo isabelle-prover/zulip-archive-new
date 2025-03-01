@@ -1,0 +1,81 @@
+<html>
+<head><meta charset="utf-8"><title>Finishing a proof · Beginner Questions · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/index.html">Beginner Questions</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Finishing.20a.20proof.html">Finishing a proof</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="206231105"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Finishing%20a%20proof/near/206231105" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Gergely Buday <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Finishing.20a.20proof.html#206231105">(Aug 07 2020 at 07:40)</a>:</h4>
+<p>I am to finish a subproof in this</p>
+<p>locale sig =<br>
+  fixes le:: "'a ⇒ 'a ⇒ bool" (infixl "≤" 50)<br>
+  assumes refl:    "x ≤ x"<br>
+      and antisym: "x ≤ y ⟹ y ≤ x ⟹ x = y"<br>
+      and trans:   "x ≤ y ⟹ y ≤ z ⟹ x ≤ z"<br>
+      and total:   "x ≤ y ∨ y ≤ x"</p>
+<p>begin</p>
+<p>fun min :: "'a ⇒ 'a ⇒ 'a" where <br>
+  "min a b = (if (a ≤ b) then a else b)"</p>
+<p>lemma "min a b = a ∨ min a b = b"<br>
+proof -<br>
+  have "m = (if (a ≤ b) then a else b) ⟹ m = a ∨ m = b" by auto<br>
+  from this show ?thesis by simp<br>
+qed</p>
+<p>lemma (in sig) case_min: <br>
+  assumes less: "(x ≤ y ⟹ P x)" <br>
+  assumes greater: "(y ≤ x ⟹ P y)" <br>
+  shows "P (min x y)"<br>
+proof -<br>
+  have uf: "P (if (x ≤ y) then x else y) ⟹ P (min x y)" unfolding min_def by simp<br>
+  from less greater have "P (if (x ≤ y) then x else y)" <br>
+  proof (cases "x ≤ y")<br>
+    case True<br>
+      note xlessy = this<br>
+      from xlessy have "P x" by (rule less)<br>
+      from this xlessy less greater show "?thesis" by (simp )<br>
+    case False  <br>
+      note not_xlessy = this<br>
+      have not_imp_rev: "y ≤ x" using not_xlessy local.total by auto<br>
+      from not_imp_rev have py: "P y" using greater by simp<br>
+      have not_imp_y: "¬ x ≤ y ⟹ (if (x ≤ y) then x else y) = y" by simp<br>
+      from this  have "P(if (x ≤ y) then x else y)" using not_xlessy py by simp<br>
+      from this show "?thesis" by simp</p>
+<p>For this last line, I get</p>
+<p>Illegal application of proof command in "chain" mode</p>
+<p>Do Isabelle say this for the last "show"? In my understanding, "from" shifts the virtual machine into "chain" mode.</p>
+
+
+
+<a name="206231827"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Finishing%20a%20proof/near/206231827" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Finishing.20a.20proof.html#206231827">(Aug 07 2020 at 07:53)</a>:</h4>
+<p>When there is more than one error message, you should always look at the first one. In this case, the first error message is</p>
+<div class="codehilite"><pre><span></span><code>Failed to refine any pending goal
+Local statement fails to refine any pending goal
+Failed attempt to solve goal by exported rule:
+  (x ≤ y) ⟹ (¬ x ≤ y) ⟹ P (if x ≤ y then x else y)
+</code></pre></div>
+
+
+<p>Essentially, what you are trying to <code>show</code> does not correspond to any of your actual goals. Usually, it's quite obvious why that is the case, although there are some cases where one has to look very closely (e.g. when types of polymorphic functions don't match up). In this case, it is simply because you forgot to add a <code>next</code> after you concluded the <code>True</code> case. Without a <code>next</code>, all the fixed variables and assumptions from the <code>True</code> case are still around.</p>
+
+
+
+<a name="206231929"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Finishing%20a%20proof/near/206231929" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Manuel Eberl <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Finishing.20a.20proof.html#206231929">(Aug 07 2020 at 07:55)</a>:</h4>
+<p>By the way, your other lemma about <code>min</code> above can be done with <code>by simp</code>. I very much doubt that your Isar proof for it actually does anything because that variable <code>m</code> that you use in it is not fixed anywhere (that's why it is with an orange background). So I'm pretty sure Isabelle will basically ignore that statement in the final step and just prove the goal directly.</p>
+
+
+
+<a name="206232290"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/238552-Beginner%20Questions/topic/Finishing%20a%20proof/near/206232290" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Gergely Buday <a href="http://isabelle.systems/zulip-archive/stream/238552-Beginner-Questions/topic/Finishing.20a.20proof.html#206232290">(Aug 07 2020 at 08:00)</a>:</h4>
+<p>Thanks.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

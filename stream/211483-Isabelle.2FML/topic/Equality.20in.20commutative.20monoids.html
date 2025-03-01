@@ -1,0 +1,87 @@
+<html>
+<head><meta charset="utf-8"><title>Equality in commutative monoids · Isabelle/ML · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/index.html">Isabelle/ML</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Equality.20in.20commutative.20monoids.html">Equality in commutative monoids</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="348612779"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Equality%20in%20commutative%20monoids/near/348612779" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Hanno Becker <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Equality.20in.20commutative.20monoids.html#348612779">(Apr 12 2023 at 04:51)</a>:</h4>
+<p>Hi. What is the <del>best</del> fastest way of proving the equality of two permuted expressions in a commutative monoid, under the additional assumption that the underlying permutation is actually known? </p>
+<p>So far, I'm just passing the desired equality to the simplifier alongside the associativity + commutativity laws, but (a) this does not benefit from the knowledge of what the permutation is, and (b) I sometimes have schematic entries in the expression, and the simplifier will generate lots of flex-flex pairs when proving the permutation. This seems unnecessary, and has moreover led to infinite loops in other places where e.g. <code>clarify</code> would indefinitely succeed because it keeps renaming flex-flex pairs but not actually changing anything.</p>
+<p>I considered applying the permutation explicitly using conversions, but was put off somewhat by the tedious nature of doing this (the number of 'atomic' conversions one has to apply is actually pretty large...) and the comment from the cookbook that conversions are "often much less efficient than the simplifier"</p>
+<p>A third option which I pondered but didn't yet implement was to lift LHS and RHS to folds of multisets and then hope that there's a fast way of proving equality of two multisets. But here, too, I don't know if I should expect this to be any better than the raw simplifier approach.</p>
+<p>Any experience / expectations / suggestions? Thanks!</p>
+
+
+
+<a name="348615194"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Equality%20in%20commutative%20monoids/near/348615194" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Equality.20in.20commutative.20monoids.html#348615194">(Apr 12 2023 at 05:11)</a>:</h4>
+<p>Just for the schematics, doesn't using Subgoal.FOCUS fixes all the schematics avoiding all problems of possible unification?</p>
+
+
+
+<a name="348646651"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Equality%20in%20commutative%20monoids/near/348646651" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jan van Brügge <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Equality.20in.20commutative.20monoids.html#348646651">(Apr 12 2023 at 08:04)</a>:</h4>
+<p>I am pretty sure that it only fixes the forall-bound parameters, not the schematics</p>
+
+
+
+<a name="348658003"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Equality%20in%20commutative%20monoids/near/348658003" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Equality.20in.20commutative.20monoids.html#348658003">(Apr 12 2023 at 08:55)</a>:</h4>
+<p>Maybe we are not talking about the same thing:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="c">(*f is just for printing*)</span>
+<span class="k">ML</span><span class="w"> </span><span class="ss">\&lt;open&gt;</span>
+<span class="s">fun f ctxt (x:Subgoal.focus) = (@{print} (x); simp_tac ctxt 0)</span><span class="ss">\&lt;close&gt;</span>
+
+<span class="n">schematic_goal</span><span class="w"> </span><span class="s">"2*2 = ?a"</span><span class="w"> </span><span class="kp">for</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="n">nat</span>
+<span class="w">  </span><span class="kp">apply</span><span class="w"> </span><span class="o">(</span><span class="n">tactic</span><span class="w"> </span><span class="ss">\&lt;open&gt;</span><span class="s">HEADGOAL (Subgoal.FOCUS_PREMS (fn _ =&gt; simp_tac @{context} 0) @{context})</span><span class="ss">\&lt;close&gt;</span><span class="o">)</span>
+<span class="w">   </span><span class="c">(*fails to do anything and cannot instantiate ?a*)</span>
+<span class="w">  </span><span class="kp">apply</span><span class="w"> </span><span class="o">(</span><span class="n">tactic</span><span class="w"> </span><span class="ss">\&lt;open&gt;</span><span class="s">HEADGOAL (simp_tac @{context})</span><span class="ss">\&lt;close&gt;</span><span class="o">)</span>
+<span class="w">   </span><span class="c">(*succeeds*)</span>
+</code></pre></div>
+
+
+
+<a name="348674261"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Equality%20in%20commutative%20monoids/near/348674261" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jan van Brügge <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Equality.20in.20commutative.20monoids.html#348674261">(Apr 12 2023 at 09:48)</a>:</h4>
+<p>Yes, I was confusing it with <code>FOCUS_PARAMS</code>, that does also not fix them. I never realized that <code>FOCUS_PREMS</code> does, I rarely use that one</p>
+
+
+
+<a name="348683089"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Equality%20in%20commutative%20monoids/near/348683089" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Mathias Fleury <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Equality.20in.20commutative.20monoids.html#348683089">(Apr 12 2023 at 10:22)</a>:</h4>
+<p>I don't see a difference between FOCUS and FOCUS_PREMS on this example (and in the code <code> Thm.instantiate_cterm schematics concl</code> is unconditional)</p>
+
+
+
+<a name="350115309"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Equality%20in%20commutative%20monoids/near/350115309" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Jan van Brügge <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Equality.20in.20commutative.20monoids.html#350115309">(Apr 15 2023 at 09:03)</a>:</h4>
+<p>That is weird, because this:</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="n">schematic_goal</span><span class="w"> </span><span class="s">"2 * 2 = ?a"</span><span class="w"> </span><span class="kp">for</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="n">nat</span>
+<span class="w">  </span><span class="kp">apply</span><span class="w"> </span><span class="o">(</span><span class="n">tactic</span><span class="w"> </span><span class="s">‹HEADGOAL (Subgoal.FOCUS (fn {context=ctxt,...} =&gt;</span>
+<span class="s">    resolve_tac @{context} [refl] 1</span>
+<span class="s">  ) @{context})›</span><span class="o">)</span>
+</code></pre></div>
+<p>does not solve the goal, while</p>
+<div class="codehilite" data-code-language="Isabelle"><pre><span></span><code><span class="n">schematic_goal</span><span class="w"> </span><span class="s">"2 * 2 = ?a"</span><span class="w"> </span><span class="kp">for</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">::</span><span class="w"> </span><span class="n">nat</span>
+<span class="w">  </span><span class="kp">apply</span><span class="w"> </span><span class="o">(</span><span class="n">tactic</span><span class="w"> </span><span class="s">‹HEADGOAL (Subgoal.FOCUS_PREMS (fn {context=ctxt,...} =&gt;</span>
+<span class="s">    resolve_tac @{context} [refl] 1</span>
+<span class="s">  ) @{context})›</span><span class="o">)</span>
+</code></pre></div>
+<p>works (<code>FOCUS_PARAMS</code> also works).</p>
+
+
+
+<a name="351587624"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/211483-Isabelle/ML/topic/Equality%20in%20commutative%20monoids/near/351587624" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Hanno Becker <a href="http://isabelle.systems/zulip-archive/stream/211483-Isabelle.2FML/topic/Equality.20in.20commutative.20monoids.html#351587624">(Apr 21 2023 at 11:08)</a>:</h4>
+<p>Hey! I went with pre-generating a bunch of equality theorems for 'picker'-permutations <code>(1,2,...,n) -&gt; (i,1,2,...,)</code>, and then building the desired permutations from those explicitly via conversions. That seems to be working OK.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,69 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Code generator forgets type constraint on lite... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generator.20forgets.20type.20constraint.20on.20lite.2E.2E.2E.html">[isabelle] Code generator forgets type constraint on lite...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294289207"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generator%20forgets%20type%20constraint%20on%20lite.../near/294289207" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generator.20forgets.20type.20constraint.20on.20lite.2E.2E.2E.html#294289207">(Aug 19 2022 at 15:28)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear experts of the code generator,</p>
+<p>The code serialiser for Haskell forgets to print a type constraint on literal integers in <br>
+a polymorphic context that requires a type class instance. I have attached a minimal <br>
+example. The generated Haskell code does not compiler. Rather, it produces the following <br>
+error message.</p>
+<p>Generated_Code.hs:29:14:<br>
+     Ambiguous type variable <code>a0' in the constraints:
+       (Prelude.Num a0)
+         arising from the literal </code>42' at Generated_Code.hs:29:14-15<br>
+       (Foo a0) arising from a use of <code>bar' at Generated_Code.hs:29:10-12
+     Probable fix: add a type signature that fixes these type variable(s)
+     In the first argument of </code>bar', namely <code>42'
+     In the expression: bar 42
+     In an equation for </code>foobar': foobar = bar 42</p>
+<p>How can I tell the code generator to print the type constraint for literal integers?</p>
+<p>Andreas<br>
+<a href="/user_uploads/14278/MB_F5IrPBp8n-zFr_hKJIiBN/Test.thy">Test.thy</a></p>
+
+
+
+<a name="294289913"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generator%20forgets%20type%20constraint%20on%20lite.../near/294289913" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generator.20forgets.20type.20constraint.20on.20lite.2E.2E.2E.html#294289913">(Aug 19 2022 at 15:31)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Andreas,</p>
+<p>this seem to be an instance of the »type class variables in<br>
+contravariant position« issue; it has been resolved in general by Lukas<br>
+Bulwahn, but, alas, these annotations are not printed for custom<br>
+serializations.  I will have a look at this and refine it accordingly.</p>
+<p>Until, then, you can help yourself by an auxiliary definition:</p>
+<p>definition aux where "aux = (42 :: integer)"<br>
+definition foobar where "foobar = bar (42 :: integer)"<br>
+lemma [code]: "foobar = bar aux" by (simp add: foobar_def aux_def)</p>
+<p>This works unless you have a considerable number of literals in critical<br>
+positions (but even then workarounds are possible using auxiliary<br>
+constants, the preprocessor and custom serialization).</p>
+<p>Hope this helps,<br>
+    Florian<br>
+<a href="/user_uploads/14278/JRJhs68umt-Pu0poBTPQ1SD7/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294290015"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Code%20generator%20forgets%20type%20constraint%20on%20lite.../near/294290015" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Code.20generator.20forgets.20type.20constraint.20on.20lite.2E.2E.2E.html#294290015">(Aug 19 2022 at 15:32)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Florian,</p>
+<p>Thanks for looking into this and the hint about defining constants for the literals. <br>
+Playing with this a little bit further, I found out that it suffices to define one <br>
+identity function on integer and apply it to all problematic integer literals.</p>
+<p>Best,<br>
+Andreas</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

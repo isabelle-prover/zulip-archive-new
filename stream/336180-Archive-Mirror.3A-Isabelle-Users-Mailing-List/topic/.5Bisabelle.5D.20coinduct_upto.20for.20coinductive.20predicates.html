@@ -1,0 +1,340 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] coinduct_upto for coinductive predicates · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20coinduct_upto.20for.20coinductive.20predicates.html">[isabelle] coinduct_upto for coinductive predicates</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294700009"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20coinduct_upto%20for%20coinductive%20predicates/near/294700009" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20coinduct_upto.20for.20coinductive.20predicates.html#294700009">(Aug 22 2022 at 14:34)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:eberlm@in.tum.de">eberlm@in.tum.de</a>&gt;<br>
+Hallo,</p>
+<p>I have a coinductive predicate P and I want to show that "P s" holds, <br>
+where "s" is a corecursively-defined stream whose definition uses a <br>
+friendly function, i.e. something like "s = 0 ## g s" where g is <br>
+friendly. (see also attached theory)</p>
+<p>The problem is that P.coinduct then only allows me to use "P s" in the <br>
+coinduction proof, but I need "P (g s)". I suppose what I really need <br>
+here is something like "coinduction up to friends for coinductive <br>
+predicates"; from what I read, something like this is already available <br>
+for "normal" coinduction w.r.t. equality.</p>
+<p>How do I do something like this? (my actual coinductive predicate is, of <br>
+course, much more complicated than this, so working with "normal" <br>
+coinduction w.r.t. equality is not an option)</p>
+<p>Cheers,</p>
+<p>Manuel<br>
+<a href="/user_uploads/14278/y-xsPeDO2jcuj6l9ewjZqjfq/Test.thy">Test.thy</a></p>
+
+
+
+<a name="294700020"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20coinduct_upto%20for%20coinductive%20predicates/near/294700020" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20coinduct_upto.20for.20coinductive.20predicates.html#294700020">(Aug 22 2022 at 14:34)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Manuel,</p>
+<p>You have to manually derive a coinduction up-to rule for your coinductive predicates. <br>
+BNF_Corec only proves coinduction up-to rules for equality. User-defined predicates are <br>
+not supported and probably will not be in the foreseeable future, because one would need a <br>
+lot of properties of the predicate. I've sketched the derivation of such an coinduction <br>
+up-to rule for your unary predicate P and the friend g below. It roughly corresponds to <br>
+what the BNF_Corec package does internally. Basically, you first define a closure operator <br>
+for the set of friends that you are interested in and then prove the upto rule by <br>
+coinduction with a nested induction on the closure.</p>
+<p>inductive g_closure :: "(int stream ⇒ bool) ⇒ int stream ⇒ bool" for P where<br>
+     embed: "P xs ⟹ g_closure P xs"<br>
+   | step: "g_closure P xs ⟹ g_closure P (g xs)"</p>
+<p>lemma P_coinduct_upto_g:<br>
+   assumes *: "X xs"<br>
+   and step: "⋀xs. X xs ⟹ ∃x xs'. xs = x ## xs' ∧ g_closure X xs' ∧ 0 ≤ x"<br>
+   shows "P xs"<br>
+proof -<br>
+   from * have "g_closure X xs" by(rule g_closure.intros)<br>
+   then show ?thesis<br>
+   proof(coinduction arbitrary: xs)<br>
+     case (P xs)<br>
+     then have "∃x xs'. xs = x ## xs' ∧ g_closure X xs' ∧ 0 ≤ x"<br>
+     proof induction<br>
+       case (embed xs)<br>
+       from step[OF embed] show ?case by(auto)<br>
+     next<br>
+       case (step xs)<br>
+       then show ?case<br>
+         by(subst g.code)(auto intro: g_closure.step)<br>
+     qed<br>
+     then show ?case by blast<br>
+   qed<br>
+qed</p>
+<p>A few more comments:</p>
+<ol>
+<li>
+<p>This rule is somewhat weaker than P.coinduct, because I've omitted the case "\/ P xs'", <br>
+which coinductive automatically adds. You can re-add it if you replace</p>
+<p>from * have "g_closure X xs" by(rule g_closure.intros)</p>
+</li>
+</ol>
+<p>with</p>
+<p>from * have "g_closure (%xs. X xs \/ P xs) xs" by(rule g_closure.intros)</p>
+<p>and adjust the proof accordingly.</p>
+<ol start="2">
+<li>
+<p>You may want to include SCons as another intro rule for g_closure such that SCons is <br>
+treated as a friend. The problem there is that SCons does not in general preserve the <br>
+coinductive predicate P, but only if the new head is non-negative. That means that you <br>
+need a separate closure predicate for every coinductive predicate. This is also one of the <br>
+reasons why there's no support for user-defined coinductive predicates yet.</p>
+</li>
+<li>
+<p>If you use friends in the context of the constructor guard for your corecursive <br>
+definitions, then you want to have an even stronger coinduction rule, namely</p>
+</li>
+</ol>
+<p>lemma P_coinduct_upto_g:<br>
+   assumes *: "X xs"<br>
+   and step: "⋀xs. X xs ⟹<br>
+    g_closure (%xs. ∃x xs'. xs = x ## xs' ∧ g_closure X xs' ∧ 0 ≤ x) xs"<br>
+   shows "P xs"</p>
+<p>You can derive that one from mine above by another induction.</p>
+<p>Hope this helps,<br>
+Andreas</p>
+
+
+
+<a name="294700065"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20coinduct_upto%20for%20coinductive%20predicates/near/294700065" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20coinduct_upto.20for.20coinductive.20predicates.html#294700065">(Aug 22 2022 at 14:34)</a>:</h4>
+<p>From: Andrei Popescu &lt;<a href="mailto:A.Popescu@mdx.ac.uk">A.Popescu@mdx.ac.uk</a>&gt;<br>
+Hi guys,</p>
+<p>Nice uniform description, Andreas!  We should have this for friends and other "up-to" operators at some point.</p>
+<p>(Coq has a tool for "up-to" coinduction called Paco -- they are ahead of us on coinduction but behind us corecursion.)</p>
+<p>Btw, here is my more ad hoc solution, which also illustrates the currently available friend structural corecursion -- theory also attached. Please pardon my unpolished scripts. Essentially, I follow "s" wherever it unfolds, which suggests a generalization.</p>
+<p>corec s_gen :: "int ⇒ int stream" where<br>
+  "s_gen i = i ## g (s_gen i)"</p>
+<p>inductive gs :: "int stream  ⇒ bool" where<br>
+  s_gen: "i ≥ 0 ⟹ gs (s_gen i)"<br>
+ |g: "gs xs ⟹ gs (g xs)"</p>
+<p>(* Can use the existing structural friend corecursion here: *)<br>
+lemma s_gen_s: "s = s_gen 0"<br>
+proof-<br>
+  {fix xs ys assume "xs = s ∧ ys = s_gen 0" hence "xs = ys"<br>
+   apply (coinduct rule: s_gen.corec.coinduct)<br>
+   using s.unique s_gen.code s_gen.cong_refl by force<br>
+   }<br>
+  thus ?thesis by auto<br>
+qed</p>
+<p>lemma gs_shd:<br>
+assumes "gs xs" shows "shd xs ≥ 0"<br>
+using assms apply (induct) by (subst s_gen.code) auto</p>
+<p>lemma gs_stl:<br>
+assumes "gs xs" shows "gs (stl xs)"<br>
+using assms apply (induct)<br>
+by (subst s_gen.code) (auto intro: gs.intros)</p>
+<p>lemma P_gs: assumes "gs xs" shows "P xs"<br>
+using assms proof (coinduct rule: P.coinduct)<br>
+  case (P xs)<br>
+  thus ?case proof cases<br>
+    case (s_gen i) thus ?thesis apply(intro exI[of _ "g (s_gen i)"] exI[of _ i])<br>
+    apply simp apply (subst s_gen.code) by (auto intro: gs.intros)<br>
+  next<br>
+    case (g xss) thus ?thesis<br>
+    apply(intro exI[of _ "g (stl xss)"] exI[of _ "shd xss + 1"])<br>
+    apply simp apply (subst g.code)<br>
+    by (auto intro: gs.intros  gs_stl simp: gs_shd)<br>
+  qed<br>
+qed</p>
+<p>lemma P_s: "P s"<br>
+by (simp add: s_gen s_gen_s  P_gs)</p>
+<p>Best,</p>
+<p>Andrei<br>
+<a href="/user_uploads/14278/uDM-DXI-0VdFzq1nrTrSPwof/Test.thy">Test.thy</a></p>
+
+
+
+<a name="294700087"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20coinduct_upto%20for%20coinductive%20predicates/near/294700087" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20coinduct_upto.20for.20coinductive.20predicates.html#294700087">(Aug 22 2022 at 14:35)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:eberlm@in.tum.de">eberlm@in.tum.de</a>&gt;<br>
+Hallo,</p>
+<p>thanks for the explanation. I think I now managed to define the closure <br>
+that I need and prove the corresponding coinduct_upto rule.</p>
+<p>I noticed that during the proof of this rule, I essentially needed to <br>
+prove that all the friendly functions in the closure preserve the <br>
+inductive predicate, i.e. in terms of the example theory from earlier, I <br>
+needed to prove some generalised version of "P s ==&gt; P (g s)".</p>
+<p>I then thought that once I have proven the coinduct_upto rule, I should <br>
+be able to easily derive the fact "P s ==&gt; P (g s)" from that, but I <br>
+cannot see how. If I want to prove "P s ==&gt; P (g s)", do I really have <br>
+to do all the proof work again?</p>
+<p>Cheers,</p>
+<p>Manuel</p>
+
+
+
+<a name="294700155"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20coinduct_upto%20for%20coinductive%20predicates/near/294700155" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20coinduct_upto.20for.20coinductive.20predicates.html#294700155">(Aug 22 2022 at 14:35)</a>:</h4>
+<p>From: Andrei Popescu &lt;<a href="mailto:A.Popescu@mdx.ac.uk">A.Popescu@mdx.ac.uk</a>&gt;<br>
+Hi Manuel,</p>
+<p>You can use Andreas's rule to prove that fact for any xs:</p>
+<p>lemma P_s: assumes "P xs" shows "P( g xs)"<br>
+using assms apply(coinduction arbitrary: xs rule: P_coinduct_upto_g)<br>
+by (smt P.cases embed g.code stream.sel(1) stream.sel(2))</p>
+<p>(and, of course, you can also use it to immediately prove P(s), your original motivation)</p>
+<p>Andrei</p>
+
+
+
+<a name="294700164"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20coinduct_upto%20for%20coinductive%20predicates/near/294700164" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20coinduct_upto.20for.20coinductive.20predicates.html#294700164">(Aug 22 2022 at 14:35)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:eberlm@in.tum.de">eberlm@in.tum.de</a>&gt;<br>
+Hallo Andrei,</p>
+<p>yes, but the new coinduction rule doesn't help with that; I can do the <br>
+same proof using the old one:</p>
+<p>lemma P_s: assumes "P xs" shows "P( g xs)"<br>
+using assms apply(coinduction arbitrary: xs)<br>
+by (smt P.cases embed g.code stream.sel(1) stream.sel(2))</p>
+<p>It is a bit difficult to illustrate my problem because my actual <br>
+predicate is quite complicated, but the above minimal example is so <br>
+trivial that it is difficult to see what my point is.</p>
+<p>Anyway, I attached my theory. The relevant coinductive predicate is <br>
+"is_expansion_aux". The corresponding closure predicate is "ms_closure". <br>
+The coinduct_upto theorem is "is_expansion_aux_coinduct_upto".</p>
+<p>Note that the coinduct_upto theorem contains a lengthy proof for the <br>
+ms_closure_add case involving the friendly ms_plus_aux function. Later, <br>
+when I want to prove "is_expansion_aux_add", I have to do pretty much <br>
+the same proof again. I wonder if there is some way to get rid of that <br>
+duplication.</p>
+<p>Cheers,</p>
+<p>Manuel<br>
+<a href="/user_uploads/14278/4H1EKuyeCV0zRyE0m8znDCSD/Bar.thy">Bar.thy</a></p>
+
+
+
+<a name="294700186"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20coinduct_upto%20for%20coinductive%20predicates/near/294700186" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20coinduct_upto.20for.20coinductive.20predicates.html#294700186">(Aug 22 2022 at 14:35)</a>:</h4>
+<p>From: Andrei Popescu &lt;<a href="mailto:A.Popescu@mdx.ac.uk">A.Popescu@mdx.ac.uk</a>&gt;<br>
+OK, let me see if I understand what you have here. I will speak in terms of sets since it will be nicer for the concepts involved here (but it works the same for predicates).</p>
+<p>Essentially, you have a set of operations on a type T. (In your case, T is 'a llist * (real-&gt;real) * scale.)</p>
+<p>For any set X on that type, let Cl(X) be the closure of X under the operations. (This is essentially your ms_closure).</p>
+<p>You also have a predicate (is_expansion_aux) defined coinductively,  i.e., as gfp F, where</p>
+<p>F : T set -&gt; T set is a monotonic operator.</p>
+<p>Your up-to coinduction rule says:</p>
+<p>(1) For all X, X &lt;= F (Cl X) implies X &lt;= gfp F.</p>
+<p>On the other hand, you prove that "gfp F" is closed under each of the operations, i.e.:</p>
+<p>(2) for each n-ary operation f and all x, if x is in (gfp F)^n then "f x" is in "gfp F".</p>
+<p>And the question is whether you can use aspects of (1) to prove (2), as opposed to replicating proofs -- is this correct?</p>
+<p>I don't think (2) follows from (1). However, for proving (1) you typically need something stronger, namely (something at least as strong as)</p>
+<p>the following "distributive law":</p>
+<p>(3) For all X, Cl (F X /\ X) &lt;= F (Cl X)   (where /\ is intersection)</p>
+<p>So if from (1) you can extract (3) as a lemma, you can reuse (3) for proving (2):</p>
+<p>(2) is immediately implied by Cl (gfp F) &lt;= gfp F, which in turn follows from (1) and (3): To prove</p>
+<p>Cl (gfp F) &lt;= gfp F, by (1) it suffices that Cl (gfp F) &lt;= F (Cl (Cl (gfp F))), i.e., Cl (gfp F) &lt;= F (Cl (gfp F)).</p>
+<p>The last is true by (3): Cl (gfp F) = Cl (F(gfp F) /\ gfp F) &lt;= F(Cl (gfp F)).</p>
+<p>I preferred to use an algebraic language since I find it clearest. Of course, for your concrete problem</p>
+<p>you will not have to invoke F explicitly, but inline everything inside (co)induction.</p>
+<p>Andrei</p>
+
+
+
+<a name="294700252"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20coinduct_upto%20for%20coinductive%20predicates/near/294700252" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20coinduct_upto.20for.20coinductive.20predicates.html#294700252">(Aug 22 2022 at 14:35)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:eberlm@in.tum.de">eberlm@in.tum.de</a>&gt;<br>
+I think this probably answers my question.</p>
+<p>I have decided not to look into this any further at the moment, seeing <br>
+as 1. it gives me a headache, 2. I have working proofs for now and 3. <br>
+I'm quite eager to continue my formalisation elsewhere.</p>
+<p>Thanks a lot for your help (also to Andreas). I still have no idea what <br>
+I actually did with these closures, but the proofs went relatively <br>
+smoothly and everything works out.</p>
+<p>Cheers,</p>
+<p>Manuel</p>
+
+
+
+<a name="294700379"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20coinduct_upto%20for%20coinductive%20predicates/near/294700379" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20coinduct_upto.20for.20coinductive.20predicates.html#294700379">(Aug 22 2022 at 14:36)</a>:</h4>
+<p>From: Andrei Popescu &lt;<a href="mailto:A.Popescu@mdx.ac.uk">A.Popescu@mdx.ac.uk</a>&gt;<br>
+Hi Manuel,</p>
+<p>I am sorry for the headache. But since you've come this far, I suggest giving the proof reuse idea another chance (at some point).  :-)</p>
+<p>Here is what my previously stated facts (1)-(3) become for your simple example (theory also attached). The only considered operation here is g, but the closure can potentially have any set of operations (including the constant s). Notice how (3) is the mother of all interesting facts -- and how everything else is absolute routine. Looking into what most people call "the low level", e.g., the operators behind (co)inductive definitions, can be rewarding for reducing proof complexity.</p>
+<p>theory Test<br>
+imports<br>
+  Main<br>
+  "~~/src/HOL/Library/BNF_Corec"<br>
+  "~~/src/HOL/Library/Stream"<br>
+begin</p>
+<p>coinductive P :: "int stream ? bool" where<br>
+  "P xs ? x ? 0 ? P (x ## xs)"</p>
+<p>definition F :: "(int stream ? bool) ? int stream ? bool" where<br>
+"F X xs ? ?xs' x. xs = x ## xs' ? X xs' ? x ? 0"</p>
+<p>lemma F_mono: "mono F"<br>
+unfolding mono_def F_def by blast</p>
+<p>(* Note: *) lemma P: "P = gfp F"<br>
+unfolding HOL.nitpick_unfold F_def ..</p>
+<p>corec (friend) g :: "int stream ? int stream" where<br>
+  "g x = (shd x + 1) ## g (stl x)"</p>
+<p>inductive g_closure ::<br>
+"(int stream ? bool) ? int stream ? bool" for X where<br>
+ embed: "X xs ? g_closure X xs"<br>
+|step: "g_closure X xs ? g_closure X (g xs)"</p>
+<p>(* The following three facts are all trivial: *)<br>
+lemma g_closure_mono:<br>
+assumes "X ? Y"<br>
+shows "g_closure X ? g_closure Y"<br>
+proof<br>
+  fix xs assume "g_closure X xs"<br>
+  thus "g_closure Y xs"<br>
+  using assms by (induct) (auto intro: g_closure.intros)<br>
+qed</p>
+<p>lemma g_closure_ext: "X ? g_closure X"<br>
+  by (auto intro: embed)</p>
+<p>lemma g_closure_idem: "g_closure (g_closure X) = g_closure X"<br>
+proof-<br>
+  {fix xs assume "g_closure (g_closure X) xs"<br>
+   hence "g_closure X xs"<br>
+     by (induction) (auto intro: g_closure.intros)<br>
+  }<br>
+  thus ?thesis<br>
+  by (simp add: antisym g_closure_ext predicate1I)<br>
+qed</p>
+<p>(* The <em>only</em> non-routine fact: *)<br>
+lemma 3: "g_closure (F X) ? F (g_closure X)"<br>
+proof clarify<br>
+  fix xs<br>
+  assume "g_closure (F X) xs"<br>
+  thus "F (g_closure X) xs"<br>
+  apply induct<br>
+  using F_def embed apply auto[1]<br>
+  by (smt F_def g.code g_closure.step stream.sel)<br>
+qed</p>
+<p>lemma 1: (* Follows routinely from 3 *)<br>
+assumes "X ? F (g_closure X)"<br>
+shows "X ? gfp F"<br>
+proof-<br>
+  note g_closure_mono[OF assms]<br>
+  also have "g_closure (F (g_closure X)) ? F (g_closure (g_closure X))"<br>
+  using 3 by simp<br>
+  also have "... = F (g_closure X)" unfolding g_closure_idem ..<br>
+  finally have "g_closure X ? F (g_closure X)" .<br>
+  with gfp_upperbound have "g_closure X ? gfp F" by auto<br>
+  thus ?thesis by(auto intro: g_closure.intros)<br>
+qed</p>
+<p>lemma P_coinduct_upto_g: (* is just the concrete version on 1 *)<br>
+assumes *: "X xs"<br>
+and step: "?xs. X xs ? ?xs' x. xs = x ## xs' ? g_closure X xs' ? x ? 0"<br>
+shows "P xs"<br>
+  using 1 assms unfolding P F_def using predicate1I by blast</p>
+<p>(* Follows routinely from 1 and 3: *)<br>
+lemma g_closure_P: "g_closure P ? P"<br>
+unfolding P apply(rule 1) unfolding g_closure_idem<br>
+apply(subst gfp_unfold[OF F_mono]) using 3 .</p>
+<p>(* An immediate consequence of g_closure_P *)<br>
+lemma 2: "P xs ? P (g xs)"<br>
+using g_closure_P by (auto intro: g_closure.intros)</p>
+<p>end</p>
+<p>Andrei<br>
+<a href="/user_uploads/14278/NJzXjAI57XqDkhSBHQd_RVzL/Test.thy">Test.thy</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

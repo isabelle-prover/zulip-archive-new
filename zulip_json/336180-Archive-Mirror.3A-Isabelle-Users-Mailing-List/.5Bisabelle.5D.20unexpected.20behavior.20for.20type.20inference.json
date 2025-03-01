@@ -1,0 +1,98 @@
+[
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nOn 29/11/2019 13:51, Yakoub Nemouchi wrote:</p>\n<blockquote>\n<p>What I tried to point out in the the other topic thread is the following:<br>\nIsabelle= Functional programming + HOL + PIDE (including PIDE document<br>\nmodel and PIDE protcol)</p>\n</blockquote>\n<p>Of course PIDE is part of the core Isabelle concepts, and you always need to<br>\nbe open for further inclusions. Thus you better say \"Isabelle = A + B + C +<br>\n...\" with the literal dots.</p>\n<blockquote>\n<p>What I am saying in the other thread is: It is odd that in the same proof<br>\ncontext we have the same visual semantics, ie. the blue color, to a free<br>\nvariable with two different types!</p>\n<p>My question on how relaxed or restricted Isabelle system is! Hides the<br>\nfollowing: Is it the case that PIDE visual semantics which decides about<br>\nthe kind of Isabelle's type system at the very end?</p>\n</blockquote>\n<p>Isabelle is both relaxed and restricted in many ways. Sometimes too relaxed<br>\nand/or too restricted, which can lead to confusing situations. PIDE provides<br>\nextra visual clues to sort this out, but it is also approximative.</p>\n<p>To return to the initial question: here is a perfectly normal Isar proof text<br>\nwhere a locally fixed variable occurs with different types.</p>\n<p>theory Scratch<br>\n  imports Main<br>\nbegin</p>\n<p>notepad<br>\nbegin</p>\n<p>fix x<br>\n  { have \"(x::nat) = x\" .. }<br>\n  moreover<br>\n  { have \"(x::int) = x\" .. }<br>\n  ultimately have True<br>\n    apply - ML_val ‹Thm.add_frees (#goal @{Isar.goal}) []›<br>\n    apply (rule TrueI)<br>\n    done</p>\n<p>end</p>\n<p>end</p>\n<p>The ML snippet is merely for illustration: it shows how proper tool<br>\nimplementations work with variables, such they don't break down just because<br>\nthis legal but unusual situation happens: the two occurrences of x are distinct.</p>\n<p>(Side remark: I keep ignoring the anonymous dummy, so I can't say about the<br>\nother thread.)</p>\n<p>Makarius</p>",
+        "id": 294764930,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661201492
+    },
+    {
+        "content": "<p>From: Yakoub Nemouchi &lt;<a href=\"mailto:y.nemouchi@gmail.com\">y.nemouchi@gmail.com</a>&gt;<br>\nDear list,</p>\n<p>I ended up with a free variable X with two different types within the same<br>\nproof goal:</p>\n<p>For example:</p>\n<p>F (X:::: ('d, 'c) my_type)==&gt; G (X:: ('b, 'a) my_type)</p>\n<p>Is that an expected type inference behavior from Isabelle?</p>\n<p>Best wishes,</p>\n<p>Yakoub.</p>",
+        "id": 294766448,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661202186
+    },
+    {
+        "content": "<p>From: Peter Lammich &lt;<a href=\"mailto:lammich@in.tum.de\">lammich@in.tum.de</a>&gt;<br>\nHi Yakoub,</p>\n<p>while this is legal in the (low-level) kernel (vars are identified by<br>\nname AND type), it's definitely going to cause some trouble in higher<br>\nlevel tools. I don't think this is intended to happen (unless you have<br>\ndone something really odd on ML-level). </p>\n<p>Can you give a (small) example how to produce this goal?</p>",
+        "id": 294766455,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661202192
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nIn principle, the observation is correct, but the spin is too strong<br>\ntowards a genuine problem.</p>\n<p>Variables with the same name and different types are normal, they can<br>\noccur occasionally and most tools should be able to cope with them.</p>\n<p>In practice such situations are very rare, so one could get the<br>\nimpression that this should not happen at all.</p>\n<p>BTW \"The ML-level of Isabelle\" was discontinued approx. 20 years ago; it<br>\nis time to get rid of this misleading terminology.</p>\n<p>Makarius</p>",
+        "id": 294766472,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661202198
+    },
+    {
+        "content": "<p>From: Yakoub Nemouchi &lt;<a href=\"mailto:y.nemouchi@gmail.com\">y.nemouchi@gmail.com</a>&gt;<br>\nHi Peter,</p>\n<p>I think your observation is correct. It is a high level tool, ie. Eisbach,<br>\nwhich helped me to reveal this odd type inference.<br>\nAt the very end it is my Eisbach script which did something odd. however it<br>\nis odd that Isabelle did not deny this odd type inference and allowed it to<br>\nhappen.</p>\n<blockquote>\n<p>Can you give a (small) example how to produce this goal?</p>\n</blockquote>\n<p>The main idea is to automate splitting rules using an Eisbach script, for<br>\nexample:</p>\n<p>lemma X_SPLIT:<br>\nassumes \"Q (X)\"<br>\nobtains Y where X = P (Y)<br>\nproof&lt;&gt;</p>\n<p>My Eisbach script looks like the following:</p>\n<p>SCRIPT 1: ((match conclusion in ‹my_pattern_matching (X) for X ⇒<br>\n‹succeed›), rule ACTION_SPLITTER[where X=X])<br>\nThis caused the problem, since the X after the Eisbach \"sequential<br>\ncomposition\" is not anymore the one bounded by the \"for\".</p>\n<p>The correction was :</p>\n<p>SCRIPT 2: ((match conclusion in ‹my_pattern_matching (X) for X ⇒ ‹rule<br>\nACTION_SPLITTER[where X=X]›))</p>\n<p>When using SCRIPT 2 the odd type inference does not happen.</p>\n<p>Now the remaining questions are:</p>\n<p>Is it the responsibility of Isabelle to deny  such a type inference?<br>\nAre bounded variables with \"for\" within an Eisbach script have a larger<br>\nscope than the expected one?</p>\n<p>Best wishes,</p>\n<p>Yakoub</p>",
+        "id": 294766482,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661202204
+    },
+    {
+        "content": "<p>From: Yakoub Nemouchi &lt;<a href=\"mailto:y.nemouchi@gmail.com\">y.nemouchi@gmail.com</a>&gt;<br>\nHi Makarius,</p>\n<p>I think your comment is correct in the sense that it is a high level tool,<br>\nie Eisbach, which does not cope with this!</p>\n<p>However, this use case reveals an interesting question:</p>\n<p>How much is restricted or how much is relaxed Isabelle's type system?</p>\n<p>As an active member of this thread I already know your opinion which is<br>\n\"Isabelle is not HOL nor HOL4. So things in Isabelle may behave<br>\nslightly differently.\"</p>\n<p>I admit that I do not have a strong background in type inference, however,<br>\njust using my intuition, this use case reveals an odd type inference to me.</p>\n<p>I will leave type inference experts to comment on that.</p>\n<p>Best wishes,</p>\n<p>Yakoub.</p>",
+        "id": 294766497,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661202211
+    },
+    {
+        "content": "<p>From: Yakoub Nemouchi &lt;<a href=\"mailto:y.nemouchi@gmail.com\">y.nemouchi@gmail.com</a>&gt;<br>\nSorry, any occurrence of ACTION_SPLITTER should be replaced by X_SPLIT<br>\nwithin SCRIPT 1 and SCRIPT 2.</p>",
+        "id": 294766508,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661202217
+    },
+    {
+        "content": "<p>From: mailing-list anonymous &lt;<a href=\"mailto:mailing.list.anonymous@gmail.com\">mailing.list.anonymous@gmail.com</a>&gt;<br>\nDear Yakoub Nemouchi/All,</p>\n<p>I would like to mention that I started a similar thread (but with a<br>\nslightly different context) several months ago:<br>\n<a href=\"https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2019-July/msg00066.html\">https://lists.cam.ac.uk/pipermail/cl-isabelle-users/2019-July/msg00066.html</a>.<br>\nThe thread had three follow-ups.</p>\n<p>Thank you</p>",
+        "id": 294766520,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661202223
+    },
+    {
+        "content": "<p>From: Yakoub Nemouchi &lt;<a href=\"mailto:y.nemouchi@gmail.com\">y.nemouchi@gmail.com</a>&gt;<br>\nHi,</p>\n<p>Thank you for the pointer. Indeed, it is related.</p>\n<p>What I tried to point out in the the other topic thread is the following:<br>\nIsabelle= Functional programming + HOL + PIDE (including PIDE document<br>\nmodel and PIDE protcol)</p>\n<p>After using Isabelle for the several years I came to the conclusion that<br>\nPIDE is not just a feature it is a part of Isabelle's logic anyways.<br>\nI know that some people will think that it is crazy,  but this is the<br>\nreality in some sens. PIDE actually add a visual semantics that helps<br>\nIsabelle users to understand better their logical formulas.<br>\nThe users get very hooked to this visual semantics, Blue variable, Dark<br>\nBlue variables, Green variables, Orange variables, etc...</p>\n<p>What I am saying in the other thread is: It is odd that in the same proof<br>\ncontext we have the same visual semantics, ie. the blue color, to a free<br>\nvariable with two different types!</p>\n<p>My question on how relaxed or restricted Isabelle system is! Hides the<br>\nfollowing: Is it the case that PIDE visual semantics which decides about<br>\nthe kind of Isabelle's type system at the very end?</p>\n<p>Best wishes,</p>\n<p>Yakoub.</p>",
+        "id": 294766542,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661202235
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nThis thread is still pending. Can you please post a self-contained example<br>\nwith Eisbach where the unexpected behaviour happens?</p>\n<p>I would like to see if this is really just unexpected to end-users or if<br>\nEisbach (or one of its supporting proof methods) treats variables with the<br>\nsame name but different types incorrectly.</p>\n<p>Makarius</p>",
+        "id": 294766711,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661202290
+    },
+    {
+        "content": "<p>From: Yakoub Nemouchi &lt;<a href=\"mailto:y.nemouchi@gmail.com\">y.nemouchi@gmail.com</a>&gt;<br>\nHi Makrius,</p>\n<p>You can see the example in the sequel. In SCRIPT 1 there are: a red X and a<br>\nblue X.<br>\nIn SCRIPT 1, the blue X is fixed with the Eisbach keyword \"for\". The red X<br>\nis not fixed.<br>\nFor this reason the application of SCRIPT 1 on a proof context, that have<br>\nthe same pattern matching in the conclusion, leads to  2 variables with<br>\nsame name and different types.<br>\nThe application of SCRIPT 2 on a proof context, that have the same pattern<br>\nmatching in the conclusion, leads to the expected behavior since the X<br>\nfixed by \"for\" is the same used by the rule.</p>\n<p>It looks like that on Eisbach level the red X and the blue X have the same<br>\nvisual semantics, ie. they are both blue.<br>\nTherefore, a user can easily think it is the same variable. Especially if<br>\nthe Eisbach script is a bit long and complicated.<br>\nNamely, Either Eisbach brakes PIDE feature, which usually add a visual<br>\nsemantics to distinguish both variable in the document model,<br>\nor the visual semantics added by PIDE uses a color that a human eye can not<br>\ncapture easily.</p>\n<p>(I do not know why this topic thread was divided to two bits, which<br>\nconfused me. I do not know where to reply.<br>\n I will reply to your example you provided in the other bit of this topic<br>\nthread. I have a suggestion for PIDE that I will share with you.)</p>\n<p><em><strong><em>Eample</em></strong></em>*</p>\n<hr>\n<p>lemma X_SPLIT:<br>\nassumes \"Q (X)\"<br>\nobtains Y where X = P (Y)<br>\nproof&lt;&gt;</p>\n<p>My Eisbach script looks like the following:</p>\n<p>SCRIPT 1: ((match conclusion in ‹my_pattern_matching (X) for X ⇒<br>\n‹succeed›), rule X_SPLIT[where X=X])<br>\nThis caused the problem, since the X after the Eisbach \"sequential<br>\ncomposition\" is not anymore the one bounded by the \"for\".</p>\n<p>The correction was :</p>\n<p>SCRIPT 2: ((match conclusion in ‹my_pattern_matching (X) for X ⇒ ‹rule<br>\nX_SPLIT[where X=X]›))</p>\n<p>Best wishes,</p>\n<p>Yakoub.</p>",
+        "id": 294766763,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661202315
+    },
+    {
+        "content": "<p>From: Makarius &lt;<a href=\"mailto:makarius@sketis.net\">makarius@sketis.net</a>&gt;<br>\nI have difficulties to assemble this into a working example, and after trying<br>\nlong enough it is likely to be something else than your application.</p>\n<p>Can you produce a full .thy file where such a situation that you describe happens?</p>\n<p>Makarius</p>",
+        "id": 294766783,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661202327
+    },
+    {
+        "content": "<p>From: Yakoub Nemouchi &lt;<a href=\"mailto:y.nemouchi@gmail.com\">y.nemouchi@gmail.com</a>&gt;<br>\nHi Makarius,</p>\n<p>Attached is the .thy file.</p>\n<p>Best wishes,</p>\n<p>Yakoub<br>\n<a href=\"/user_uploads/14278/JCy3y3NRr8ndh4s51dgFVPQ0/Scratch.thy\">Scratch.thy</a></p>",
+        "id": 294766808,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661202340
+    },
+    {
+        "content": "<p>From: Yakoub Nemouchi &lt;<a href=\"mailto:y.nemouchi@gmail.com\">y.nemouchi@gmail.com</a>&gt;<br>\nIf the two occurrences of X are distinct then the pretty printer should add<br>\na visual semantics to distinguish them.<br>\nBut adding such a visual semantics will end with the following question:<br>\n+<br>\nBlue is for free variables.<br>\nGreen is for bounded variables.<br>\nOrange is for fixed variables.<br>\n?DarkBlue is for meta variables.</p>\n<p>the new visual semantics is for what? Namely, what is the mapping of this<br>\nsituation in the logic.</p>\n<p>Best wishes,</p>\n<p>Yakoub.</p>",
+        "id": 294766910,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661202370
+    },
+    {
+        "content": "<p>From: Yakoub Nemouchi &lt;<a href=\"mailto:y.nemouchi@gmail.com\">y.nemouchi@gmail.com</a>&gt;<br>\nHi list,</p>\n<p>This topic is still pending!</p>\n<p>Yakoub,</p>",
+        "id": 294767925,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661202806
+    },
+    {
+        "content": "<p>From: Yakoub Nemouchi &lt;<a href=\"mailto:y.nemouchi@gmail.com\">y.nemouchi@gmail.com</a>&gt;<br>\nHi list,</p>\n<p>This topic is still pending too!</p>\n<p>Yakoub.</p>",
+        "id": 294768068,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1661202873
+    }
+]

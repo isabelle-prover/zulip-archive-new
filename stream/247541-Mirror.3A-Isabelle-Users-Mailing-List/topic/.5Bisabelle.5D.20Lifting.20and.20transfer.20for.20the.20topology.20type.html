@@ -1,0 +1,292 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Lifting and transfer for the topology type · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Lifting.20and.20transfer.20for.20the.20topology.20type.html">[isabelle] Lifting and transfer for the topology type</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="281333489"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Lifting%20and%20transfer%20for%20the%20topology%20type/near/281333489" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Lifting.20and.20transfer.20for.20the.20topology.20type.html#281333489">(May 05 2022 at 17:39)</a>:</h4>
+<p>From: Wenda Li &lt;<a href="mailto:wl302@cam.ac.uk">wl302@cam.ac.uk</a>&gt;<br>
+Dear lifting-and-transfer experts,</p>
+<p>I am considering to set up the lifting-and-transfer package for the topology type in “HOL-Analysis.Abstract_Topology”. This requires defining a “relator” to relate two topologies under some relation:</p>
+<p>definition rel_topology:: "('a ⇒ 'b ⇒ bool) ⇒<br>
+    'a topology ⇒ 'b topology ⇒ bool" where<br>
+  "rel_topology R T1 T2 = undefined”</p>
+<p>And this relator should ideally satisfy the following properties:</p>
+<p>lemma rel_topology_eq [relator_eq]: "rel_topology (=) = (=)"<br>
+  sorry</p>
+<p>lemma rel_topology_mono [relator_mono]: "rel_topology A ≤ rel_topology B"<br>
+  if le: "A ≤ B"<br>
+  sorry</p>
+<p>lemma rel_topology_distr [relator_distr]:<br>
+  "rel_topology A OO rel_topology B = rel_topology (A OO B)"<br>
+  sorry</p>
+<p>definition topo_map::"('a ⇒ 'b) ⇒ 'a topology ⇒ 'b topology" where<br>
+  "topo_map f T1 = undefined"</p>
+<p>lemma Quotient_topology[quot_map]:<br>
+  assumes "Quotient R Abs Rep T"<br>
+  shows "Quotient (rel_topology R) (topo_map Abs) (topo_map Rep) (rel_topology T)"<br>
+  sorry</p>
+<p>I have been attempting to imitate the lifting setup for filters:</p>
+<p>definition map_filter_on :: "'a set ⇒ ('a ⇒ 'b) ⇒ 'a filter ⇒ 'b filter" where<br>
+  "map_filter_on X f F = Abs_filter (λP. eventually (λx. P (f x) ∧ x ∈ X) F)”</p>
+<p>inductive rel_filter :: "('a ⇒ 'b ⇒ bool) ⇒ 'a filter ⇒ 'b filter ⇒ bool" for R F G where<br>
+ "rel_filter R F G”<br>
+if "eventually (case_prod R) Z" "map_filter_on {(x, y). R x y} fst Z = F" "map_filter_on {(x, y). R x y} snd Z = G”</p>
+<p>because both ‘a topology and ‘a filter are constructed from ‘a set set but with different constraints. However, unlike filters it appears quite hard to define a map from one topology to another while satisfying the map compositionality as on filters:</p>
+<p>lemma map_filter_on_comp: "map_filter_on X f (map_filter_on Y g F) = map_filter_on Y (f ∘ g) F"<br>
+  if "g ` Y ⊆ X" and "eventually (λx. x ∈ Y) F"</p>
+<p>I was wondering if it is at all possible to define a relator for the topology type.</p>
+<p>Any hint or comment would be highly appreciated.</p>
+<p>Best,<br>
+Wenda</p>
+
+
+
+<a name="281334653"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Lifting%20and%20transfer%20for%20the%20topology%20type/near/281334653" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Lifting.20and.20transfer.20for.20the.20topology.20type.html#281334653">(May 05 2022 at 17:50)</a>:</h4>
+<p>From: Dominique Unruh &lt;<a href="mailto:unruh@ut.ee">unruh@ut.ee</a>&gt;<br>
+Dear Wenda,</p>
+<p>I had the same need recently, and I wrote the definition of <br>
+"rel_topology" (together with various transfer and parametricity <br>
+theorems) for it:</p>
+<p>definition rel_topology :: ‹('a ⇒ 'b ⇒ bool) ⇒ ('a topology ⇒ 'b<br>
+    topology ⇒ bool)› where<br>
+       ‹rel_topology R S T ⟷ (rel_fun (rel_set R) (=)) (openin S) (openin T)<br>
+      ∧ (∀U. openin S U ⟶ Domainp (rel_set R) U) ∧ (∀U. openin T U ⟶<br>
+    Rangep (rel_set R) U)›</p>
+<p>The first condition on the rhs says that the "openin" predictate relates <br>
+as one would expect.</p>
+<p>However, that turned out to be insufficient (e.g., for proving <br>
+‹(rel_topology R ===&gt; rel_set R) topspace topspace›). So I am <br>
+additionally requiring that the open sets are in the domain/range of the <br>
+underlying relation. (Your email is quite timely, I added this <br>
+correction yesterday evening! :) )</p>
+<p>This definition seems to work (in the sense that I have managed to prove <br>
+various nontrivial transfer theorems, including for infinite sums w.r.t. <br>
+different topologies.</p>
+<p>You can find the whole thing here:</p>
+<p><a href="https://github.com/dominique-unruh/afp/blob/registers-infinite/thys/Hilbert_Space_Tensor_Product/Misc_Tensor_Product.thy">https://github.com/dominique-unruh/afp/blob/registers-infinite/thys/Hilbert_Space_Tensor_Product/Misc_Tensor_Product.thy</a></p>
+<p>(This is work in progress. But the part relating to rel_topology does <br>
+not have any sorry's as far as I can tell (since yesterday! :D). The <br>
+repo is a clone of the AFP but I think you can just extract the <br>
+Hilbert_Space_Tensor_Product directory on its own and it should work <br>
+with the normal release AFP.)</p>
+<p>I have not tried to prove the lemmas you write below yet.</p>
+<p>Best wishes,<br>
+Dominique.</p>
+
+
+
+<a name="281423062"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Lifting%20and%20transfer%20for%20the%20topology%20type/near/281423062" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Lifting.20and.20transfer.20for.20the.20topology.20type.html#281423062">(May 06 2022 at 11:05)</a>:</h4>
+<p>From: Wenda Li &lt;<a href="mailto:wl302@cam.ac.uk">wl302@cam.ac.uk</a>&gt;<br>
+Dear Dominique,</p>
+<p>Thanks a lot for your prompt reply! And I am so lucky to have you happen to think about the same problem :-)</p>
+<p>Your definition of rel_topology is awesome, but I am afraid that with it we still cannot derive the monotonicity lemma: "A ≤ B ⟹ rel_topology A ≤ rel_topology B”.</p>
+<p>My intention with the list of properties I described in the previous email is that we can then freely lift from the topology type similar to set/list:</p>
+<p>typedef (overloaded) ('a, 'b) poly_inst ("(_ ⇒⇩p /_)" [1, 0] 0) =<br>
+  "UNIV:: ('a ⇒ 'b) set"<br>
+  by auto<br>
+setup_lifting type_definition_poly_inst</p>
+<p>lift_definition PiE⇩p :: "'a set ⇒ ('a ⇒ 'b set) ⇒ ('a ⇒⇩p 'b) set" is<br>
+  "λs f. PiE s f" .</p>
+<p>text ‹This definition is only possible if we have @{thm Quotient_topology}›<br>
+lift_definition product_topology⇩p<br>
+  :: "('a ⇒ 'b topology) ⇒ 'a set ⇒ ('a ⇒⇩p 'b) topology" is<br>
+  "λf s. product_topology f s" .</p>
+<p>Nevertheless, being able to prove this number of non-trivial transfer theorems is perhaps the best we can do for now...</p>
+<p>Best,<br>
+Wenda</p>
+
+
+
+<a name="281423219"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Lifting%20and%20transfer%20for%20the%20topology%20type/near/281423219" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Lifting.20and.20transfer.20for.20the.20topology.20type.html#281423219">(May 06 2022 at 11:08)</a>:</h4>
+<p>From: Lawrence Paulson &lt;<a href="mailto:lp15@cam.ac.uk">lp15@cam.ac.uk</a>&gt;<br>
+My own attempt at this was hopeless. If there is anyone out there who really has a good feel for how to define these things, it would be great if they could write a small tutorial…</p>
+<p>Larry Paulson</p>
+
+
+
+<a name="281435626"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Lifting%20and%20transfer%20for%20the%20topology%20type/near/281435626" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Lifting.20and.20transfer.20for.20the.20topology.20type.html#281435626">(May 06 2022 at 13:07)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:manuel@pruvisto.org">manuel@pruvisto.org</a>&gt;<br>
+I also failed miserably trying to define one for the "measure" type once.</p>
+<p>I mean, I could define one that works for two types that are completely <br>
+isomorphic, but that's probably not as general as what we really want to <br>
+have.</p>
+<p>Manuel</p>
+
+
+
+<a name="281596729"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Lifting%20and%20transfer%20for%20the%20topology%20type/near/281596729" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Lifting.20and.20transfer.20for.20the.20topology.20type.html#281596729">(May 08 2022 at 12:27)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:mail@andreas-lochbihler.de">mail@andreas-lochbihler.de</a>&gt;<br>
+Hi Wenda, Dominique and Manuel,</p>
+<p>The first attempt at defining a relator for a type is usually to follow the structure of <br>
+the types it is built from. Joshua Schneider and I had an ITP paper on that topic a few <br>
+years ago: Relational parametricity and quotient preservation for modular (co)datatypes <br>
+<a href="http://dx.doi.org/10.1007/978-3-319-94821-8_24">http://dx.doi.org/10.1007/978-3-319-94821-8_24</a></p>
+<p>For rel_topology, we'd get what was Dominique's first attempt:</p>
+<p>rel_topology R S T = (rel_fun (rel_set R) (=)) (openin S) (openin T)</p>
+<p>since openin is the representation morphism of type 'a set =&gt; bool. The above paper gives <br>
+sufficient conditions on when Wenda's desired properties are satisfied (especially section <br>
+5 on subtypes). However, rel_topology_mono will certainly not hold with this definition. <br>
+The reason is that the type variable 'a in <code>'a set =&gt; bool</code> occurs in a negative position, <br>
+  so this approach will yield a contravariant functor, for which the relator is anti-monotone:</p>
+<p>R &lt;= S ==&gt; rel_topology S &lt;= rel_topology R</p>
+<p>Accordingly, you'd be looking for a contravariant map function for the quotient <br>
+preservation theorem.</p>
+<p>Unfortunately, this approach sometimes does not give the right relator. For example, I <br>
+originally defined rel_filter following this approach: <br>
+<a href="https://isabelle.in.tum.de/repos/isabelle/annotate/5431e1392b14/src/HOL/Topological_Spaces.thy#l2285">https://isabelle.in.tum.de/repos/isabelle/annotate/5431e1392b14/src/HOL/Topological_Spaces.thy#l2285</a><br>
+However, this did not give the nice theorems for rel_filter that we have today in <br>
+Isabelle. As discussed at the end of Section 5 in the above paper, the current relator is <br>
+stronger and thereby eliminates some junk. In <br>
+<a href="https://isabelle.in.tum.de/repos/isabelle/rev/1d005f514417">https://isabelle.in.tum.de/repos/isabelle/rev/1d005f514417</a>, I've switched out the old <br>
+definition for the new one.</p>
+<p>In particular, the definition via a mapper gives the desired properties a lot more <br>
+directly than if we try to define the relator directly. So it may be worth to look for a <br>
+suitable map function (and decide whether it should be co- or contravariant).</p>
+<p>On 06.05.22 15:07, Manuel Eberl wrote:</p>
+<blockquote>
+<p>I also failed miserably trying to define one for the "measure" type once.</p>
+<p>I can well imagine that. <code>'a measure</code> consists of the sigma algebra <code>sets</code> and the measure <br>
+function <code>emeasure</code>. Let's just look at the types:</p>
+</blockquote>
+<p>sets :: "'a measure =&gt; 'a set set"<br>
+emeasure :: "'a measure =&gt; 'a set =&gt; ennreal"</p>
+<p>Here, the type variable 'a occurs in <code>sets</code> in a positive position and in <code>emeasure</code> in a <br>
+negative position. This means that if we define the relator according to the types, we're <br>
+setup for failure. We get neither monotonicity nor anti-monotonicity and the mapper will <br>
+only work for isomorphism:</p>
+<blockquote>
+<p>I mean, I could define one that works for two types that are completely isomorphic, but <br>
+that's probably not as general as what we really want to have.<br>
+</p>
+</blockquote>
+<p>One could try to get out of this problem via the isomorphism between sets and predicates. <br>
+If we understood the set to be measured as a predicate, i.e., the indicator function, then <br>
+all occurrences of 'a would be covariant again and there would be hope.</p>
+<p>emeasure' :: "'a measure =&gt; ('a =&gt; bool) =&gt; ennreal"</p>
+<p>This duality between sets and predicates w.r.t. co/contravariance was one of the main <br>
+reasons why we have re-introduces a separate type <code>set</code> for sets about 10 years ago. (In <br>
+2008, the set type constructor had been replaces as a type synonym: 'a set = 'a =&gt; bool) <br>
+Unfortunately, when a new definition is made involving sets or predicates, we typically do <br>
+  not consider the co/contravariance aspect when we make a decision whether a parameter <br>
+should be a set or a predicate. We are mostly guided by the mathematical practice or <br>
+convenience of the notation. Of course, it's possible to define a relator on <code>'a set</code> that <br>
+treats sets like predicates (see rel_pred in SPMF.thy), but that doesn't work well with <br>
+the transfer and lifting packages. They do not support several relators for a type, and <br>
+that's usually where my attempts in this direction have hit a wall. Proper support for <br>
+this duality would require a substantial rewrite of these packages.</p>
+<p>I haven't yet thought about how a mapper or relator for topologies or measures could look <br>
+like. However, both topologies and measures typically consider only a well-behaved <br>
+functions (continuous or measurable) whereas the transfer and lifting packages always work <br>
+with the full function space, i.e., over the category SET. I don't know what complication <br>
+this brings along.</p>
+<p>I hope that the above thoughts give you some inspiration where to look for solutions.</p>
+<p>Andreas</p>
+
+
+
+<a name="281609727"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Lifting%20and%20transfer%20for%20the%20topology%20type/near/281609727" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Lifting.20and.20transfer.20for.20the.20topology.20type.html#281609727">(May 08 2022 at 17:32)</a>:</h4>
+<p>From: Dominique Unruh &lt;<a href="mailto:unruh@ut.ee">unruh@ut.ee</a>&gt;<br>
+Dear Wenda,</p>
+<p>Your definition of rel_topology is awesome, but I am afraid that with it we<br>
+still cannot derive the monotonicity lemma: "A ≤ B ⟹ rel_topology A ≤<br>
+rel_topology B”.</p>
+<p>I think that specific problem should be relatively easy to fix by replacing<br>
+"(rel_fun (rel_set R) (=)) (openin S) (openin T)" by "rel_set (rel_set R)<br>
+(Collect (openin S)) (Collect (openin T))". (I.e., we see the topology not<br>
+as a predicate over sets but a set of sets (which is anyway more in line<br>
+with usual language.) This would be monotonous.</p>
+<p>However, that would not address the other lemmas you wanted.</p>
+<p>I worked on it some more since your reply, and I think I have a much more<br>
+satisfactory approach.</p>
+<p>Caveat: I have not formalized anything of what I write below in Isabelle. I<br>
+have handwritten proofs for the claims but they are not carefully checked<br>
+so the claims I am giving might not be correct. I am not including the<br>
+proofs in this email because is would take too long to write them in a<br>
+readable form. (But I can of course provide them if we need them.)</p>
+<p>The first step was to define a <em>map_topology</em> function. I believe the<br>
+natural way to map topologies is the following (e.g. here<br>
+&lt;<a href="https://en.wikipedia.org/wiki/Topological_space#Topological_constructions">https://en.wikipedia.org/wiki/Topological_space#Topological_constructions</a>&gt;):<br>
+For a surjective function [image: f:X\to Y], given a topology T on X, you<br>
+get a topology f(X) on Y by defining: [image: U\in f\left(X\right)] iff [image:<br>
+f^{-1}\in X].</p>
+<p>However, the requirement that [image: f] is surjective is awkward in our<br>
+context because we do not want to add conditions in the various relator<br>
+theorems. So my solution is to [image: f\left(T\right)] be not a topology<br>
+on [image: Y] but a topology on [image: \text{im}f]. (I.e., with<br>
+topspace [image:<br>
+\text{im}f].) More precisely, for [image: f:X\to Y] we define [image:<br>
+\overline{f}] as follows:</p>
+<p>[image: U\in\overline{f}\left(T\right)]   iff   [image:<br>
+f^{-1}\left(U\right)\cap\text{top}\left(T\right)\in T] and [image:<br>
+U\subseteq f\left(\text{top}\left(T\right)\right)].</p>
+<p>(In Isabelle, we would write [image: \overline{f}] as *map_topology<br>
+f*.) ([image:<br>
+\text{top}\left(T\right)] denotes the topspace of [image: T].)</p>
+<p>This construction has the following desired properties:  [image:<br>
+\overline{\text{id}}=\text{id}].   [image: \overline{f\circ<br>
+g}=\overline{f}\circ\overline{g}].    [image:<br>
+\text{top}\left(\overline{f}\left(T\right)\right)=f\left(\text{top}\left(T\right)\right)].<br>
+  If [image: f=g] on [image: \text{top}\left(T\right)], then [image:<br>
+\overline{f}\left(T\right)=\overline{g}\left(T\right)].</p>
+<p>We can not define <em>rel_topology.</em> The idea how to do it is inspired by the<br>
+way relations on sets are lifted to relations on probability distributions<br>
+(e.g., in probabilistic relational Hoare logic). It is also similar to how<br>
+<em>rel_filter</em> is defined. The basic idea is to say that two topologies are<br>
+related (for some relation [image: R]) if there is a topology on pairs (I<br>
+call it the witness-topology) such that the witness-topology in a certain<br>
+sense satisfies [image: R] and the two topologies are the left/right<br>
+projection of the joint-topology. Specifically, we define:</p>
+<p>For topologies [image: A,B],    [image: \left(A,B\right)\in R]     iff<br>
+   [image:<br>
+\exists T^{\ast}.\ \ \ \text{top}\left(T^{\ast}\right)\subseteq R\ \<br>
+\wedge\ \ \ \overline{\text{fst}}\left(T^{\ast}\right)=A\ \ \ \wedge\ \<br>
+\overline{\text{snd}}\left(T^{\ast}\right)=B]</p>
+<p>Concerning the properties you desired:</p>
+<p>lemma rel_topology_eq [relator_eq]: "rel_topology (=) = (=)"<br>
+  sorry</p>
+<p>Holds. (Witness-topology for the [image: \Leftarrow]-direction is [image:<br>
+\overline{\text{double}}\left(A\right)] where [image:<br>
+\text{double}\left(x\right):=\left(x,x\right)].)</p>
+<p>lemma rel_topology_mono [relator_mono]: "rel_topology A ≤ rel_topology B"<br>
+  if le: "A ≤ B"</p>
+<p>Holds trivially by definition.</p>
+<p>lemma rel_topology_distr [relator_distr]:<br>
+  "rel_topology A OO rel_topology B = rel_topology (A OO B)"</p>
+<p>I do not know whether it holds. It looks like a difficult one to me. Is it<br>
+an important property?</p>
+<p>lemma Quotient_topology[quot_map]:<br>
+  assumes "Quotient R Abs Rep T"<br>
+  shows "Quotient (rel_topology R) (topo_map Abs) (topo_map Rep)<br>
+(rel_topology T)"</p>
+<p>Holds. The proof is more involved. (Quotient involves a number of<br>
+properties, and for most of them one has to choose the witness-topology<br>
+suitably.) But if I am not mistaken, it all works fine with a bit of work.</p>
+<p>[For my own reference: Quicknotes 2022, p.95–100.]</p>
+<p>I think this is better than the definition that I am currently using. (The<br>
+definition I use right now works for my purposes, but it may not be<br>
+sufficient for other purposes. And since one cannot use two relators for<br>
+the same typo (I think), it would be good to have only one (good)<br>
+definition of *rel_topology *throughout all Isabelle theories.</p>
+<p>So if you feel that this is worth pursuing, maybe we can coordinate further<br>
+off-list? (I would also like to avoid duplicating work if we both develop<br>
+lifting of topologies.)</p>
+<p>Best wishes,<br>
+Dominique.</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

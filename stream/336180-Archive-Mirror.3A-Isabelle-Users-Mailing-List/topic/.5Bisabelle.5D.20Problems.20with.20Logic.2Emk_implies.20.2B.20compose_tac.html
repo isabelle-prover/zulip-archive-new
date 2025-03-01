@@ -1,0 +1,387 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Problems with Logic.mk_implies + compose_tac · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20Logic.2Emk_implies.20.2B.20compose_tac.html">[isabelle] Problems with Logic.mk_implies + compose_tac</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294140988"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20Logic.mk_implies%20%2B%20compose_tac/near/294140988" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20Logic.2Emk_implies.20.2B.20compose_tac.html#294140988">(Aug 18 2022 at 18:03)</a>:</h4>
+<p>From: Matej Urbas &lt;<a href="mailto:mu232@cam.ac.uk">mu232@cam.ac.uk</a>&gt;<br>
+Dear all,</p>
+<p>I am having a bit of problems using 'compose_tac' with an intermediate<br>
+theorem (produced with mk_implies + Goal.prove). I hope you do not mind<br>
+if I ask for a hint.</p>
+<p>Here is the problematic example:</p>
+<p>I have this subgoal (call it sg1):</p>
+<p>⋀s1 s2. ⟦distinct [s1, s2]; s1 ∈ A; s1 ∈ B; s2 ∈ A; s2 ∉ B⟧ ⟹<br>
+        ∃s1 s2. distinct [s1, s2] ∧ s1 ∈ A ∧ s2 ∈ B</p>
+<p>Then an external tool is invoked, which returns another goal (call it<br>
+sg2):</p>
+<p>⋀s1 s2. ⟦distinct[s1, s2]; s1 ∈ A ∩ B; s2 ∈ A - B⟧ ⟹ (∃s1 s2.<br>
+        distinct[s1, s2] ∧ s1 ∈ A ∧ s2 ∈ B)</p>
+<p>I want to 'replace' the current subgoal sg1 with sg2. Therefore I make a<br>
+meta-implication and prove it with 'Goal.prove':</p>
+<p>val intert = Logic.mk_implies (sg2, sg1)<br>
+        val interThm = Goal.prove ctxt [] [] inter1 (K ((auto_tac<br>
+        (clasimpset_of ctxt)) THEN (ALLGOALS (Intuitionistic.prover_tac<br>
+        ctxt NONE))))</p>
+<p>where interThm becomes:</p>
+<p>⟦⋀s1 s2. ⟦distinct [s1, s2]; s1 ∈ A ∩ B; s2 ∈ A - B⟧ ⟹ ∃s1 s2.<br>
+        distinct [s1, s2] ∧ s1 ∈ A ∧ s2 ∈ B; distinct<br>
+        [?s1.0, ?s2.0]; ?s1.0 ∈ A; ?s1.0 ∈ B; ?s2.0 ∈ A; ?s2.0 ∉ B⟧ ⟹<br>
+        ∃s1 s2. distinct [s1, s2] ∧ s1 ∈ A ∧ s2 ∈ B</p>
+<p>The next step is to use interThm in 'compose_tac', which is applied on<br>
+the original goal sg1:</p>
+<p>compose_tac (false, interThm, 1) i</p>
+<p>which fails.</p>
+<p>Does it fail because of schematic variables? Is it possible to tell<br>
+'Goal.prove' to not produce them?</p>
+<p>Apologies for the length, and thank you in advance for your help.</p>
+<p>Best,</p>
+<hr>
+<p>Matej<br>
+<a href="/user_uploads/14278/SWxXu9pnoNqY48uMiEyLA9pW/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294141303"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20Logic.mk_implies%20%2B%20compose_tac/near/294141303" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20Logic.2Emk_implies.20.2B.20compose_tac.html#294141303">(Aug 18 2022 at 18:05)</a>:</h4>
+<p>From: Thomas Sewell &lt;<a href="mailto:Thomas.Sewell@nicta.com.au">Thomas.Sewell@nicta.com.au</a>&gt;<br>
+Hi Matej,</p>
+<p>Two interesting things have happened. The first is that Goal.prove has lifted your meta-quantified conclusion (/\s1 s2. P s1 s2) into a schematically quantified theorem (P ?s1 ?s2). The internal ==&gt; implications within your conclusion sg2 are now treated together with the sg1 ==&gt; sg2 implication as a group of assumptions. This may make compose_tac surprise you. You've told it you want to have only 1 new goal - if I recall correctly that will be the final assumption of the supplied theorem, so try rotating the sg1 assumption to the end.</p>
+<p>If that fails, you could try to stop Goal.prove lifting your meta-quantification. Playing around with the (invisible) protect constant might help you - look up protectI or protectD, No promises. Alternatively you could sidestep Goal.prove entirely by creating Thm.trivial from sg1 ==&gt; sg2 and applying your tactic to eliminate the first assumption.</p>
+<p>Can't be bothered firing up Isabelle on a weekend to test any of these strategies for you. Good luck.</p>
+<p>Yours,<br>
+    Thomas.</p>
+
+
+
+<a name="294141348"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20Logic.mk_implies%20%2B%20compose_tac/near/294141348" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20Logic.2Emk_implies.20.2B.20compose_tac.html#294141348">(Aug 18 2022 at 18:05)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+This is all a bit indirect -- working against the natural flow of <br>
+reasoning in Isabelle/Pure.  Note that compose_tac is outside the normal <br>
+rule composition paradigm, i.e. you are standing naked in the cold rain.</p>
+<p>When you have a structured goal with its own !! and ==&gt; the canonical <br>
+proof enters that context and establishes the conclusion, e.g. see <br>
+SUBGOAL.FOCUS and similar (which are mentioned in the "implementation" <br>
+manual).</p>
+<p>There are sometimes reasons to bypass the primary structure, but it should <br>
+be only done if there are explicit reasons for it.  My favourite internal <br>
+operation for that is Thm.compose_no_flatten, but that is not for the <br>
+faint-hearted.</p>
+<p>Makarius</p>
+
+
+
+<a name="294141366"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20Logic.mk_implies%20%2B%20compose_tac/near/294141366" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20Logic.2Emk_implies.20.2B.20compose_tac.html#294141366">(Aug 18 2022 at 18:05)</a>:</h4>
+<p>From: Matej Urbas &lt;<a href="mailto:mu232@cam.ac.uk">mu232@cam.ac.uk</a>&gt;<br>
+On Sun, 2011-07-10 at 21:43 +0200, Makarius wrote:</p>
+<blockquote>
+<p>This is all a bit indirect -- working against the natural flow of <br>
+reasoning in Isabelle/Pure.</p>
+</blockquote>
+<p>Sadly, there is specific demand for it. An external reasoner produces an<br>
+'inference step instance' of the form:</p>
+<p>sg2<br>
+        ------- (magic)<br>
+          sg1</p>
+<p>and I have to 'replace' sg1 with sg2, as it were. (While verifying this<br>
+inference step instance with Isabelle's tactics.)</p>
+<blockquote>
+<p>Note that compose_tac is outside the normal <br>
+rule composition paradigm, i.e. you are standing naked in the cold rain.</p>
+</blockquote>
+<p>I am sorry, but I do not understand this analogy. Could you please<br>
+elaborate on why compose_tac is fragile?</p>
+<blockquote>
+<p>When you have a structured goal with its own !! and ==&gt; the canonical <br>
+proof enters that context and establishes the conclusion, e.g. see <br>
+SUBGOAL.FOCUS and similar (which are mentioned in the "implementation" <br>
+manual).</p>
+</blockquote>
+<p>Thank you very much. I will try and use this.</p>
+<p>Sadly, however, a quick glance at the documentation did not reveal a way<br>
+to 'inject' my 'target term' (sg2) into the clockwork of FOCUS et al. It<br>
+could be possible if I constructed my own instance of the 'focus'<br>
+record. However, I would suspect expert users to frown at that thought<br>
+-- am I right in assuming this? Still, why would be the type 'focus'<br>
+specified concretely in the SUBGOAL signature if not intended for users<br>
+to use?</p>
+<blockquote>
+<p>There are sometimes reasons to bypass the primary structure, but it should <br>
+be only done if there are explicit reasons for it.  My favourite internal <br>
+operation for that is Thm.compose_no_flatten, but that is not for the <br>
+faint-hearted.</p>
+</blockquote>
+<p>My particular use case dictates behaviour as was previously described.<br>
+Frankly, I do not mind how I achieve it. The initially mentioned method<br>
+(with compose_tac) was just the first one I discovered. I must admit, it<br>
+is hard to see right for wrong -- especially since there are no hints<br>
+that could steer me away from the wrong path.</p>
+<p>Also, do you mind if I ask for a pointer to some documentation regarding<br>
+the 'compose_no_flatten' function. It seems that Thomas' suggestion with<br>
+'protect' could be related to this one.</p>
+<p>Apologies for the length.</p>
+<p>Best,</p>
+<hr>
+<p>Matej<br>
+<a href="/user_uploads/14278/MyB8IP7uDS0ZhWUq9DDC9iNX/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294141385"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20Logic.mk_implies%20%2B%20compose_tac/near/294141385" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20Logic.2Emk_implies.20.2B.20compose_tac.html#294141385">(Aug 18 2022 at 18:05)</a>:</h4>
+<p>From: Matej Urbas &lt;<a href="mailto:mu232@cam.ac.uk">mu232@cam.ac.uk</a>&gt;<br>
+On Sun, 2011-07-10 at 20:16 +1000, Thomas Sewell wrote:</p>
+<blockquote>
+<p>Hi Matej,</p>
+<p>Two interesting things have happened. The first is that Goal.prove has lifted your meta-quantified conclusion (/\s1 s2. P s1 s2) into a schematically quantified theorem (P ?s1 ?s2). The internal ==&gt; implications within your conclusion sg2 are now treated together with the sg1 ==&gt; sg2 implication as a group of assumptions. This may make compose_tac surprise you. You've told it you want to have only 1 new goal - if I recall correctly that will be the final assumption of the supplied theorem, so try rotating the sg1 assumption to the end.</p>
+<p>If that fails, you could try to stop Goal.prove lifting your meta-quantification. Playing around with the (invisible) protect constant might help you - look up protectI or protectD, No promises. Alternatively you could sidestep Goal.prove entirely by creating Thm.trivial from sg1 ==&gt; sg2 and applying your tactic to eliminate the first assumption.</p>
+</blockquote>
+<p>Thank you very much Thomas. I will try both.</p>
+<p>Do you think using 'Goal.protect' or 'Goal.conclude' would do the job?</p>
+<blockquote>
+<p>Can't be bothered firing up Isabelle on a weekend to test any of these strategies for you. Good luck.</p>
+</blockquote>
+<p>Still, thank you very much for the pointers. :)</p>
+<p>Best,</p>
+<hr>
+<p>Matej<br>
+<a href="/user_uploads/14278/2bAaY__7HT1stOYUhHp4ejQz/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294141397"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20Logic.mk_implies%20%2B%20compose_tac/near/294141397" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20Logic.2Emk_implies.20.2B.20compose_tac.html#294141397">(Aug 18 2022 at 18:05)</a>:</h4>
+<p>From: Holger Gast &lt;<a href="mailto:gast@informatik.uni-tuebingen.de">gast@informatik.uni-tuebingen.de</a>&gt;<br>
+Hi Matej,</p>
+<p>The short answer is: If you use Goal.prove_internal instead of Goal.prove,<br>
+your approach works just fine. (See the code below.)</p>
+<p>The function Goal.prove_internal is merely a wrapper for Goal.init /<br>
+Goal.conclude (+ introducing &amp; discharging assumptions), and init/conclude<br>
+perform the internal fiddling with the invisible protect constant for you.<br>
+A quick grep over the sources shows that prove_internal and compose_tac are<br>
+used by tools and internal code, presumably to do similar low-level goal<br>
+manipulations.</p>
+<p>I'm sure this solution is not entirely orthodox, but since it worked<br>
+for me in many similar situations where I needed precise control over<br>
+the entire subgoal structure, I thought I'd share it none the less.</p>
+<p>Holger</p>
+<p>lemma sg1:<br>
+  "⋀s1 s2. ⟦distinct [s1, s2]; s1 ∈ A; s1 ∈ B; s2 ∈ A; s2 ∉ B⟧ ⟹<br>
+        ∃s1 s2. distinct [s1, s2] ∧ s1 ∈ A ∧ s2 ∈ B"<br>
+  apply (tactic {*<br>
+    SUBGOAL<br>
+     (fn (sg1,i) =&gt;<br>
+       let val ctxt = @{context}<br>
+           val sg2 = @{term "⋀s1 s2. ⟦distinct[s1, s2]; s1 ∈ A ∩ B; s2 ∈ A - B⟧<br>
+⟹ (∃s1 s2.<br>
+                       distinct[s1, s2] ∧ s1 ∈ A ∧ s2 ∈ B)"}<br>
+           val intert = Logic.mk_implies (sg2, sg1)<br>
+           val intert_cterm = Thm.cterm_of (ProofContext.theory_of ctxt) intert<br>
+           val _ = tracing ("Have "^Syntax.string_of_term @{context} intert)<br>
+           val interThm = Goal.prove_internal [] intert_cterm<br>
+                (K ((auto_tac (clasimpset_of ctxt)) THEN (ALLGOALS<br>
+(Intuitionistic.prover_tac<br>
+                    ctxt NONE))))<br>
+           val _ = tracing ("Interm: "^Display.string_of_thm @{context} interThm)<br>
+       in<br>
+          compose_tac (false, interThm, 1) i<br>
+      end) 1<br>
+  *})</p>
+
+
+
+<a name="294141418"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20Logic.mk_implies%20%2B%20compose_tac/near/294141418" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20Logic.2Emk_implies.20.2B.20compose_tac.html#294141418">(Aug 18 2022 at 18:05)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On Sun, 10 Jul 2011, Matej Urbas wrote:</p>
+<blockquote>
+<p>My particular use case dictates behaviour as was previously described. <br>
+Frankly, I do not mind how I achieve it. The initially mentioned method <br>
+(with compose_tac) was just the first one I discovered. I must admit, it <br>
+is hard to see right for wrong -- especially since there are no hints <br>
+that could steer me away from the wrong path.</p>
+<p>Also, do you mind if I ask for a pointer to some documentation regarding <br>
+the 'compose_no_flatten' function. It seems that Thomas' suggestion with <br>
+'protect' could be related to this one.</p>
+</blockquote>
+<p>When I hear "dictates", I am almost certain that it only accidental to the <br>
+attempts so far to get this done quickly, and not inherent to the problem. <br>
+I reckon that we can safely forget any tricks with "compose_no_flatten" or <br>
+"protect" for the rest of this thread, and use the natural Isabelle rule <br>
+composition schemes instead.</p>
+<blockquote>
+<p>Sadly, there is specific demand for it. An external reasoner produces an <br>
+'inference step instance' of the form:</p>
+<p>sg2<br>
+       ------- (magic)<br>
+         sg1</p>
+<p>and I have to 'replace' sg1 with sg2, as it were. (While verifying this <br>
+inference step instance with Isabelle's tactics.)</p>
+</blockquote>
+<blockquote>
+<p>I am having a bit of problems using 'compose_tac' with an intermediate<br>
+theorem (produced with mk_implies + Goal.prove).</p>
+</blockquote>
+<blockquote>
+<p>The next step is to use interThm in 'compose_tac', which is applied on<br>
+the original goal sg1:</p>
+<p>compose_tac (false, interThm, 1) i</p>
+<p>which fails.</p>
+</blockquote>
+<p>Above you say "While verifying this inference step instance with <br>
+Isabelle's tactics".  If this is so, then it is natural to stay within the <br>
+regular framework, as these tactics do anyway.  What is the purpose of <br>
+mk_implies + Goal.prove?  Normally you can just work in-place, by <br>
+addressing the subgoal using SUBGOAL, or on an isolated state via <br>
+SELECT_GOAL or Subgoal.FOCUS.</p>
+<p>If the "magic" above is by a totally alien tool, you can also apply <br>
+Object_Logic.full_atomize_tac first, then work on a close HOL proposition, <br>
+then apply the result using plain resolve_tac. (A common trap is to get <br>
+types too general in examples, then the statement cannot be internalized <br>
+into HOL.)</p>
+<p>Makarius</p>
+
+
+
+<a name="294141430"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20Logic.mk_implies%20%2B%20compose_tac/near/294141430" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20Logic.2Emk_implies.20.2B.20compose_tac.html#294141430">(Aug 18 2022 at 18:06)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Grepping through the sources (or using hypersearch in jEdit) is indeed <br>
+very important to get an idea how common certain operations are.</p>
+<p>Goal.prove_internal shows up very rarely, in special situations or ported <br>
+versions of quite old tools (the latter aspect can be seen from the <br>
+Mercurial history, if this extra time is spent with it).</p>
+<p>We are getting at an interesting collection of odds and ends of internal <br>
+system tools.  I maintain that it is possible to ignore all this for <br>
+regular applications, and just use the standard system structures around <br>
+the Pure rule calculus and its goal format, without lots of workarounds.</p>
+<p>Makarius</p>
+
+
+
+<a name="294141497"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20Logic.mk_implies%20%2B%20compose_tac/near/294141497" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20Logic.2Emk_implies.20.2B.20compose_tac.html#294141497">(Aug 18 2022 at 18:06)</a>:</h4>
+<p>From: Matej Urbas &lt;<a href="mailto:mu232@cam.ac.uk">mu232@cam.ac.uk</a>&gt;<br>
+Fantastic, thank you very much, Holger. This solved my problems<br>
+perfectly.</p>
+<p>Kind regards,</p>
+<hr>
+<p>Matej<br>
+<a href="/user_uploads/14278/MgXSP4N7hnoVsDMHOvFzO1xh/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294141505"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20Logic.mk_implies%20%2B%20compose_tac/near/294141505" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20Logic.2Emk_implies.20.2B.20compose_tac.html#294141505">(Aug 18 2022 at 18:06)</a>:</h4>
+<p>From: Matej Urbas &lt;<a href="mailto:mu232@cam.ac.uk">mu232@cam.ac.uk</a>&gt;<br>
+I see. It makes perfect sense (under the assumption that the definition<br>
+of 'regular applications' leans favourably and reasonably towards users'<br>
+requirements).</p>
+<p>In any case, is it possible to get the same fine-grained control (and<br>
+exactly the same behaviour) as Holger's proposal using the standard<br>
+workflow?</p>
+<p>Best,</p>
+<hr>
+<p>Matej<br>
+<a href="/user_uploads/14278/nqjF8LXofrzomFZ-BouqMTlD/signature.asc">signature.asc</a></p>
+
+
+
+<a name="294141513"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20Logic.mk_implies%20%2B%20compose_tac/near/294141513" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20Logic.2Emk_implies.20.2B.20compose_tac.html#294141513">(Aug 18 2022 at 18:06)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On Mon, 11 Jul 2011, Matej Urbas wrote:</p>
+<blockquote>
+<p>I see. It makes perfect sense (under the assumption that the definition <br>
+of 'regular applications' leans favourably and reasonably towards users' <br>
+requirements).</p>
+</blockquote>
+<p>Yes it does.  These things have taken a certain form over many years. It <br>
+is unwise to ignore all the experience behind it.  By doing this the <br>
+"canonical way", it is easier to get them right, and easier to read and <br>
+maintain.  All the obvious things ...</p>
+<blockquote>
+<p>In any case, is it possible to get the same fine-grained control (and <br>
+exactly the same behaviour) as Holger's proposal using the standard <br>
+workflow?</p>
+</blockquote>
+<p>You still did not explain what you are trying to do exactly.  I was about <br>
+to disprove your assumptions.</p>
+<p>There are <em>rare</em> situations where one needs to step outside the standard <br>
+framework, e.g. when implementing new infrastructure.  Empirically it is <br>
+very unlikely that this is the situation here, unless you prove it <br>
+otherwise.</p>
+<p>Makarius</p>
+
+
+
+<a name="294141559"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20Logic.mk_implies%20%2B%20compose_tac/near/294141559" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20Logic.2Emk_implies.20.2B.20compose_tac.html#294141559">(Aug 18 2022 at 18:06)</a>:</h4>
+<p>From: Sascha Boehme &lt;<a href="mailto:boehmes@in.tum.de">boehmes@in.tum.de</a>&gt;<br>
+Makarius wrote:<br>
+It would be of much help if you further clarified your application,<br>
+especially what kind of problems you are solving and how you connect<br>
+the external tool (i.e., how you feed the subgoal to the external tool<br>
+and what comes of out it afterwards).  As Makarius already pointed<br>
+out, it is likely that your integration can be tuned towards standard<br>
+operations (which won't be deprecated in the next Isabelle release).</p>
+<p>In the meantime, here is a somewhat more standard approach to solve<br>
+your issue, although still using the odd detour via Goal.prove:</p>
+<p>ML {*<br>
+  fun replace_subgoal_tac ctxt t =<br>
+    Object_Logic.full_atomize_tac<br>
+    THEN' SUBGOAL (fn (u, i) =&gt;<br>
+      let<br>
+        val thm = Goal.prove ctxt [] [] (Logic.mk_implies (t, u))<br>
+          (fn {context, ...} =&gt; auto_tac (clasimpset_of context))<br>
+      in Tactic.rtac thm i end)<br>
+*}</p>
+<p>lemma<br>
+  "\&lt;And&gt;s1 s2.<br>
+     \&lt;lbrakk&gt;distinct [s1, s2]; s1 \&lt;in&gt; A; s1 \&lt;in&gt; B; s2 \&lt;in&gt; A;<br>
+       s2 \&lt;notin&gt; B\&lt;rbrakk&gt; \&lt;Longrightarrow&gt;<br>
+     \&lt;exists&gt;s1 s2. distinct [s1, s2] \&lt;and&gt; s1 \&lt;in&gt; A \&lt;and&gt;<br>
+       s2 \&lt;in&gt; B"<br>
+  apply (tactic {* replace_subgoal_tac @{context} @{term<br>
+    "\&lt;And&gt;s1 s2.<br>
+       \&lt;lbrakk&gt;distinct[s1, s2]; s1 \&lt;in&gt; A \&lt;inter&gt; B;<br>
+         s2 \&lt;in&gt; A - B\&lt;rbrakk&gt; \&lt;Longrightarrow&gt;<br>
+       \&lt;exists&gt;s1 s2. distinct[s1, s2] \&lt;and&gt; s1 \&lt;in&gt; A \&lt;and&gt;<br>
+         s2 \&lt;in&gt; B"} 1 *})</p>
+<p>Cheers,<br>
+Sascha</p>
+
+
+
+<a name="294141566"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problems%20with%20Logic.mk_implies%20%2B%20compose_tac/near/294141566" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problems.20with.20Logic.2Emk_implies.20.2B.20compose_tac.html#294141566">(Aug 18 2022 at 18:06)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Here is one more trick using more modern concepts -- I have just seen in <br>
+an incoming changset by Florian Haftmann:</p>
+<p>notepad<br>
+begin</p>
+<p>have "!!x y. x = y ==&gt; y = x"<br>
+     apply (fact sym)<br>
+     done</p>
+<p>end</p>
+<p>In ML this is ProofContext.fact_tac.  It unifies rules against each other, <br>
+without taking the implication structure apart.</p>
+<p>The nice thing about using "canonical" soluations is that you can switch <br>
+between Isar source language and ML back and forth in the exploration. <br>
+In contrast, odd things like Goal.prove_internal are not part of the Isar <br>
+infrastructure.  This is what I meant by "standing naked in the rain".</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

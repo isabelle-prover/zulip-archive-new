@@ -1,0 +1,56 @@
+[
+    {
+        "content": "<p>I'm trying to prove <code>P ∨ (Q ∧ R)</code> from the premises <code>P ∨ Q</code> and <code>P ∨ R</code>.  When I write</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"kn\">lemma</span><span class=\"w\"> </span><span class=\"s\">\"(P ∨ Q) ⟹ (P ∨ R) ⟹ (P ∨ (Q ∧ R))\"</span>\n<span class=\"k\">proof</span>\n</code></pre></div>\n<p>the goal gets simplified to <code>P ∨ Q ⟹ P ∨ R ⟹ P</code>. What proof method is being applied automatically and why? Clearly I can't show <code>P</code> from <code>P ∨ Q</code> and <code>P ∨ R</code>.</p>",
+        "id": 473187759,
+        "sender_full_name": "Alexandre Soares",
+        "timestamp": 1727463763
+    },
+    {
+        "content": "<p>The default proof method is called standard. If you want no proof method, you need <code>proof -</code> instead of <code>proof standard</code> or <code>proof</code></p>",
+        "id": 473188669,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1727464189
+    },
+    {
+        "content": "<p>The default method seems to be applying <code>disjI1</code> here (try <code>lemma ‹P ⟹ P ∨ Q›</code> and see what <code>solves_direct</code> gives you)</p>",
+        "id": 473189507,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1727464377
+    },
+    {
+        "content": "<p><span class=\"user-mention silent\" data-user-id=\"233198\">Mathias Fleury</span> <a href=\"#narrow/stream/238552-Beginner-Questions/topic/Default.20proof.20method.20creates.20an.20unprovable.20goal/near/473189507\">said</a>:</p>\n<blockquote>\n<p>(try <code>lemma ‹P ⟹ P ∨ Q›</code> and see what <code>solves_direct</code> gives you)</p>\n</blockquote>\n<p>I don't how to implement this suggestion, I'm still learning Isar and I'm trying to prove simple theorems to get more used to the language.</p>\n<p>I tried to do it using <code>prove -</code> at the beginning:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"w\">  </span><span class=\"kn\">lemma</span><span class=\"w\"> </span><span class=\"s\">\"(P ∨ Q) ⟹ (P ∨ R) ⟹ (P ∨ (Q ∧ R))\"</span>\n<span class=\"w\">  </span><span class=\"k\">proof</span><span class=\"w\"> </span><span class=\"o\">-</span>\n<span class=\"w\">    </span><span class=\"k\">assume</span><span class=\"w\"> </span><span class=\"s\">\"P ∨ Q\"</span><span class=\"w\">           </span><span class=\"c\">(* 1 *)</span>\n<span class=\"w\">    </span><span class=\"k\">then</span><span class=\"w\"> </span><span class=\"k\">show</span><span class=\"w\"> </span><span class=\"s\">\"P ∨ Q ∧ R\"</span>\n<span class=\"w\">    </span><span class=\"k\">proof</span><span class=\"w\">                    </span><span class=\"c\">(* 2 *)</span>\n<span class=\"w\">      </span><span class=\"k\">assume</span><span class=\"w\"> </span><span class=\"s\">\"P\"</span>\n<span class=\"w\">      </span><span class=\"k\">thus</span><span class=\"w\"> </span><span class=\"s\">\"P ∨ Q ∧ R\"</span><span class=\"w\"> </span><span class=\"k\">by</span><span class=\"w\"> </span><span class=\"n\">simp</span>\n<span class=\"w\">    </span><span class=\"k\">next</span>\n<span class=\"w\">      </span><span class=\"k\">assume</span><span class=\"w\"> </span><span class=\"s\">\"Q\"</span>\n<span class=\"w\">      </span><span class=\"k\">show</span><span class=\"w\"> </span><span class=\"s\">\"P ∨ Q ∧ R\"</span>\n<span class=\"w\">      </span><span class=\"k\">proof</span><span class=\"w\"> </span><span class=\"o\">-</span>\n</code></pre></div>\n<p>My intent was to split the proof in two cases with the hypothesis <code>P ∨ Q</code>, and then on <code>Q</code> split it further using the hypothesis <code>P ∨ R</code>. So I assumed <code>P ∨ Q</code> at line <code>(* 1 *)</code> and split the proof at line <code>(* 2 *)</code>. The <code>P</code> case goes smoothly. To continue in the <code>Q</code> case I need to use the hypothesis <code>P ∨ R</code> to split again, but it's not available to me, I assume because I did not include it at line <code>(* 1 *)</code>; if I do include it there, then it doesn't let me split with <code>disjE</code> at line <code>(* 2 *)</code> (even if I explicitly try <code>proof (rule disjE [of \"P\" \"R\"])</code>), so I'm stuck.</p>",
+        "id": 473197888,
+        "sender_full_name": "Alexandre Soares",
+        "timestamp": 1727466608
+    },
+    {
+        "content": "<p>Try setting up your proof assuming both P v Q and P v R.  E.g.</p>\n<p>lemma \"(P ∨ Q) ⟹ (P ∨ R) ⟹ (P ∨ (Q ∧ R))\"<br>\n  proof -<br>\n    assume p_or_q: \"P ∨ Q\"          <br>\n    assume p_or_r: \"P ∨ R\"<br>\n    show \"(P ∨ (Q ∧ R))\"<br>\n         sorry<br>\nqed</p>\n<p>Notice that I've labeled these facts as p_or_q and p_or_r, respectively, to make it easier to use them later on in the proof.</p>\n<p>Then you can further split the proof to assume P and Q individually, e.g. </p>\n<p>lemma \"(P ∨ Q) ⟹ (P ∨ R) ⟹ (P ∨ (Q ∧ R))\"<br>\n  proof -<br>\n    assume \"P ∨ Q\"          <br>\n    assume \"P ∨ R\"<br>\n    {assume p: \"P\"<br>\n          have \"(P ∨ (Q ∧ R))\"<br>\n               sorry<br>\n    } moreover {assume q: \"Q\"<br>\n       have \"(P ∨ (Q ∧ R))\"<br>\n               sorry<br>\n    }<br>\n    ultimately show \"(P ∨ (Q ∧ R))\"<br>\n         sorry<br>\nqed</p>\n<p>where again I've labeled these as \"p\" and \"q\" respectively.  This should get you unstuck!  The proof by cases structure is very useful, so I'd recommend investing into learning how to use it.</p>",
+        "id": 474105385,
+        "sender_full_name": "Katherine Kosaian",
+        "timestamp": 1727808912
+    },
+    {
+        "content": "<p><span class=\"user-mention\" data-user-id=\"664245\">@Katherine Kosaian</span> Thanks! I actually managed to get unstuck in my original problem by removing the <code>then</code> at the line before line <code>(* 2 *)</code> and using <code>proof (rule disjE)</code> at line  <code>(* 2 *)</code>. Surely the method wasn't being accepted due to some conflict of assumptions. I guess I don't yet fully understand the interplay between assumptions contained in the goal and assumptions that are inside the proof context.</p>\n<p>I will try to do it using your suggestion as well.</p>",
+        "id": 474132108,
+        "sender_full_name": "Alexandre Soares",
+        "timestamp": 1727818641
+    },
+    {
+        "content": "<p>Assumptions in the proof context do not exist for proof methods. You must pass them via <code>using assms</code>. This is why many induction proofs look like:</p>\n<div class=\"codehilite\" data-code-language=\"Isabelle\"><pre><span></span><code><span class=\"w\">  </span><span class=\"k\">using</span><span class=\"w\"> </span><span class=\"n\">assms</span>\n<span class=\"k\">proof</span><span class=\"w\"> </span><span class=\"o\">(</span><span class=\"n\">induction</span><span class=\"w\"> </span><span class=\"ow\">...</span><span class=\"o\">)</span>\n</code></pre></div>\n<p>because the assumption do not exist for <code>induction</code> otherwise. There is nothing implicit in Isar.</p>",
+        "id": 474190664,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1727844050
+    },
+    {
+        "content": "<p>In this case it was the opposite, there were assumptions from the proof context being carried by <code>then</code> that I didn't think would affect the applicability of the method, but they did.</p>",
+        "id": 474316564,
+        "sender_full_name": "Alexandre Soares",
+        "timestamp": 1727880081
+    },
+    {
+        "content": "<p>Yeah stuff like <code>rule X</code> assumes that the assumptions are passed in the same order as needed for X</p>",
+        "id": 474317415,
+        "sender_full_name": "Mathias Fleury",
+        "timestamp": 1727880323
+    }
+]

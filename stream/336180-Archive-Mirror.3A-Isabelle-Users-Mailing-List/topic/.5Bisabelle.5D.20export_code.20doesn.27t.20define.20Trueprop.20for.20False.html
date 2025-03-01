@@ -1,0 +1,303 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] export_code doesn&#x27;t define Trueprop for False · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20export_code.20doesn.27t.20define.20Trueprop.20for.20False.html">[isabelle] export_code doesn&#x27;t define Trueprop for False</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294256155"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20export_code%20doesn%27t%20define%20Trueprop%20for%20False/near/294256155" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20export_code.20doesn.27t.20define.20Trueprop.20for.20False.html#294256155">(Aug 19 2022 at 12:37)</a>:</h4>
+<p>From: Gottfried Barrow &lt;<a href="mailto:gottfried.barrow@gmx.com">gottfried.barrow@gmx.com</a>&gt;<br>
+Hi,</p>
+<p>This is the result of my making comparisons between Scala and Haskell. <br>
+I'd like to generate a little code for whatever I'm doing, and messing <br>
+around with the meta-logic is something I eventually want to do. It <br>
+could be I'm doing things which aren't intended to be done.</p>
+<p>I start with a hybrid version of "not" named "Hnot", (PROP P ==&gt; False), <br>
+and I export it.</p>
+<p>definition MFalse :: "prop" ("MFalse") where "MFalse == (!!P. PROP P)"<br>
+    definition Hnot :: "prop =&gt; prop" where "Hnot P == (PROP P ==&gt; False)"<br>
+    value "Hnot(Trueprop False)"<br>
+    export_code Hnot in Scala file "i131123a.scala"<br>
+    export_code Hnot in Haskell file "."</p>
+<p>I actually wanted to use "(PROP P ==&gt; MFalse)", but MFalse uses "!!", so <br>
+I get the export_code error message "No code equations for all".</p>
+<p>QUESTION: Are there some magic code equations for "all", or is this a <br>
+fundamental limitation?</p>
+<p>Starting here, I make some comments about the Haskell code, since it's <br>
+almost like reading the Isar.</p>
+<p>From the generated code, HOL "prop" is converted to a data type "Prop", <br>
+which has only one value, "Holds".</p>
+<p>data Prop = Holds;</p>
+<p>I guess it makes sense that "Prop" can only be true, but consequently, <br>
+it makes the use of variables in "follows", the meta-implication, rather <br>
+meaningless:</p>
+<p>follows :: Prop -&gt; Prop -&gt; Prop;<br>
+    follows p Holds = Holds;<br>
+    follows Holds p = p;</p>
+<p>I set that aside because the use of HOL is the main objective for most <br>
+people. This brings us to "trueprop", which is the code for "Trueprop".</p>
+<p>trueprop :: Bool -&gt; Prop;<br>
+    trueprop True = Holds;</p>
+<p>This shows that "trueprop" is only defined for "true". I set that aside, <br>
+as a solitary issue, and talk about "hnot", which seems like it should <br>
+be a valid function:</p>
+<p>hnot :: HOL.Prop -&gt; HOL.Prop;<br>
+    hnot p = HOL.follows p (HOL.trueprop False);</p>
+<p>Here, I've reached the limits of knowing what the limits of code <br>
+generation is supposed to be, when it comes to the meta-logic.</p>
+<p>In Isabelle I can do this, and I get a value of True:</p>
+<p>value "Hnot(Trueprop False)"</p>
+<p>I'm actually using the Scala code to test the functions in simple ways, <br>
+and I can't do that. The function "trueprop" is not defined for "false", <br>
+so both "trueprop" and "hnot" throw an exception.</p>
+<p>This is kind of contrary to the following four statements in HOL.thy, <br>
+where, by necessity, Trueprop is defined for both True and False:</p>
+<p>typedecl bool<br>
+    Trueprop  :: "bool =&gt; prop"<br>
+    consts<br>
+       True :: bool<br>
+       False :: bool</p>
+<p>As I said, it could be that none of this was intended to be used like this.</p>
+<p>Thanks,<br>
+GB</p>
+<p>theory i131123a<br>
+imports Complex_Main<br>
+begin</p>
+<p>definition MFalse :: "prop" ("MFalse") where<br>
+   "MFalse == (!!P. PROP P)"</p>
+<p>definition Hnot_try :: "prop =&gt; prop" where<br>
+   "Hnot_try P == (PROP P ==&gt; MFalse)"<br>
+export_code Hnot_try in Scala file "i131123a.scala"<br>
+(<em>ERROR: No code equations for all</em>)</p>
+<p>definition Hnot :: "prop =&gt; prop" where<br>
+   "Hnot P == (PROP P ==&gt; False)"</p>
+<p>value "Hnot(Trueprop False)"</p>
+<p>export_code Hnot in Scala file "i131123a.scala"<br>
+export_code Hnot in Haskell file "."</p>
+<p>end<br>
+<a href="/user_uploads/14278/IjdDPrgRbGvL6lhZORGn1JvS/i131123a.thy">i131123a.thy</a></p>
+
+
+
+<a name="294256412"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20export_code%20doesn%27t%20define%20Trueprop%20for%20False/near/294256412" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20export_code.20doesn.27t.20define.20Trueprop.20for.20False.html#294256412">(Aug 19 2022 at 12:39)</a>:</h4>
+<p>From: Gottfried Barrow &lt;<a href="mailto:gottfried.barrow@gmx.com">gottfried.barrow@gmx.com</a>&gt;<br>
+Code generation has been an excellent tutor. Seeing "data prop Holds" by <br>
+the code generator has drove home a simple idea, that I can never make a <br>
+false statement at the prop level of logic. Sounds simple, but until <br>
+now, I've always consider true and false to both be available to me.</p>
+<p>However, my "hnot(false)" doesn't attempt to make a false statement. It <br>
+makes the statement "False ==&gt; False", which is true, and so it <br>
+shouldn't throw an exception.</p>
+<p>I don't know if this is good enough for the future, but for the moment, <br>
+I made "trueprop" part of the "prop" data type, and defined "follows" so <br>
+that an exception is thrown there when a false meta-implication is <br>
+attempted.</p>
+<p>The Scala objects below, "HOL2" and "HOL" are a combination of the Scala <br>
+objects that were exported for the source in my last email. "HOL2" is my <br>
+modification.</p>
+<p>If one says, "Is not an exception thrown semantically equivalent to a <br>
+meta-logic false?" I reply, "I know nothing about semantics or <br>
+predicates. Those computer scientists, that is what they talk about, but <br>
+me, I know nothing about semantics or predicates."</p>
+<p>Regards,<br>
+GB</p>
+<p>// FIXED FOR NOW, MAYBE.<br>
+object HOL2 {<br>
+   sealed abstract class prop<br>
+   final case class      Holds() extends prop<br>
+   final case class      trueprop(x0: Boolean) extends prop</p>
+<p>// ECLIPSE WARNING: match may not be exhaustive. It would fail on the<br>
+   // following input:<br>
+   //   (trueprop(true), trueprop(false))<br>
+   // Dude, exactly, it's impossible to make a false statement at the prop<br>
+   // level of logic. Exceptions are acceptable, but meta-logic false is<br>
+   // semantically offensive to those in the know.<br>
+   def follows(p: prop, pa: prop): prop = (p, pa) match {<br>
+     case (p, Holds()) =&gt; Holds()<br>
+     case (Holds(), trueprop(true)) =&gt; Holds()<br>
+     case (trueprop(false), trueprop(true)) =&gt; Holds()<br>
+     case (trueprop(true), trueprop(true)) =&gt; Holds()<br>
+     case (trueprop(false), trueprop(false)) =&gt; Holds()<br>
+   }</p>
+<p>def hnot(p: prop): prop = follows(p, trueprop(false))</p>
+<p>// Return value of Holds(). It's legit, is it not?<br>
+   val x = hnot(trueprop(false))</p>
+<p>// No error. Simple assignment. I'm not making any logical claim.<br>
+   val y = trueprop(false)</p>
+<p>// Throws exception. Not because or "trueprop", but because of <br>
+"follows".<br>
+   // That's what I want for now. Concerning the future, maybe not.<br>
+   val z = hnot(trueprop(true))<br>
+}</p>
+<p>// ORIGINAL: THROWS EXCEPTION FOR A LEGIT STATEMENT.<br>
+object HOL {<br>
+     sealed abstract class prop<br>
+     final case class      Holds extends prop</p>
+<p>def trueprop(x0: Boolean): prop = x0 match {<br>
+     case true =&gt; Holds()<br>
+   }</p>
+<p>def follows(p: prop, pa: prop): prop = (p, pa) match {<br>
+     case (p, Holds()) =&gt; Holds()<br>
+     case (Holds(), p) =&gt; p<br>
+   }</p>
+<p>def hnot(p: prop): prop = follows(p, trueprop(false))</p>
+<p>// Throws exception. This is not where it should throw the exception, <br>
+because<br>
+   // hnot(false) should be an acceptable statement.<br>
+   val x = trueprop(false)<br>
+}<br>
+<a href="/user_uploads/14278/DUNHxarz9KZr9vqVhrvsP1fY/i131123a__mod_to_throw_exception_at_follows.scala">i131123a__mod_to_throw_exception_at_follows.scala</a></p>
+
+
+
+<a name="294256869"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20export_code%20doesn%27t%20define%20Trueprop%20for%20False/near/294256869" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20export_code.20doesn.27t.20define.20Trueprop.20for.20False.html#294256869">(Aug 19 2022 at 12:41)</a>:</h4>
+<p>From: Gottfried Barrow &lt;<a href="mailto:gottfried.barrow@gmx.com">gottfried.barrow@gmx.com</a>&gt;<br>
+This is my last email on this, unless someone wants to straighten me out <br>
+on anything, but in about 2 to 3 months from now, I'm going to start <br>
+trying to use the concept that I outlined in last email, where I made an <br>
+attempt to fix the exception problem, unless someone wants to explain <br>
+why I'm off track.</p>
+<p>Its taken me a while to get to the code generator, where I specifically <br>
+learned about "export_code" from a tip given to me here several weeks <br>
+ago by Florian. It pays to ask questions, and get a tip here and there <br>
+for some of them.</p>
+<p>There are "huge" parts of Isabelle, and I'll now put the code generator <br>
+in with those huge parts, like Isar as a high-level language, the <br>
+meta-logic of Pure, the object logic of HOL, Sledgehammer, the PIDE <br>
+interface, and other auto tools.</p>
+<p>Complements from a mere user are now out of the way.</p>
+<p>Here, I'm thinking about whether "prop" and "==&gt;" are supposed to get <br>
+their meaning from their use with "value" or from their use with <br>
+"theorem". I guess I'm stating the obvious in saying that Isabelle/Pure <br>
+can't be exported as about 10 lines of Scala or Haskell code, and so <br>
+something has to be lost.</p>
+<p>Essentially, "value", which I understand is related to the code <br>
+generator, doesn't return a "prop" value of "so-called-meta-true" or <br>
+"so-called-meta-false", as shown by these examples:</p>
+<p>value "True ==&gt; False" (* returns (Trueprop False)::prop *)<br>
+value "False ==&gt; True" (* returns (Trueprop True)::prop *)<br>
+value "!!P. PROP P"    (* returns (!!u::prop. PROP u)::prop *)</p>
+<p>The short story is that the Haskell line of code "data prop Holds" is my <br>
+guiding principle, and that the meaning of "prop" and "==&gt;" should come <br>
+from "theorem" and not "value", otherwise, the meta-logic, when <br>
+exported, will be no different from the object logic (which may be <br>
+inescapable). That's the way it appears to me.</p>
+<p>I look to the software to teach me logic. I look to it to give me, as an <br>
+enforcer, the years of knowledge the programmers have, who have written <br>
+the software.</p>
+<p>When the software doesn't give me strict guidance, I'm willing to get <br>
+creative, but I'd rather waste less of of my time than more of it by <br>
+going off track.</p>
+<p>Regards,<br>
+GB</p>
+
+
+
+<a name="294257406"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20export_code%20doesn%27t%20define%20Trueprop%20for%20False/near/294257406" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20export_code.20doesn.27t.20define.20Trueprop.20for.20False.html#294257406">(Aug 19 2022 at 12:44)</a>:</h4>
+<p>From: Florian Haftmann &lt;<a href="mailto:florian.haftmann@informatik.tu-muenchen.de">florian.haftmann@informatik.tu-muenchen.de</a>&gt;<br>
+Hi Gottfried,</p>
+<p>the trick of the definition "holds == Trueprop True" and the related<br>
+stuff is just used to allow the code generator (code_runtime.ML) to<br>
+evaluate expressions of the form (P) "Trueprop _" and check whether they<br>
+result in "Trueprop True" aka "holds" and then certify the result as<br>
+theorem (P).  It has no further significance.</p>
+<p>Maybe this answers you abundant questions.</p>
+<p>Cheers,<br>
+    Florian</p>
+
+
+
+<a name="294261730"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20export_code%20doesn%27t%20define%20Trueprop%20for%20False/near/294261730" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20export_code.20doesn.27t.20define.20Trueprop.20for.20False.html#294261730">(Aug 19 2022 at 13:10)</a>:</h4>
+<p>From: Gottfried Barrow &lt;<a href="mailto:gottfried.barrow@gmx.com">gottfried.barrow@gmx.com</a>&gt;<br>
+Exposure to tricks can still result in light-bulb moments. It's more <br>
+clear to me now that an expression like<code>value "!!P. PROP P"</code> and <code>value 
+"Trueprop False"</code> never get simplified to some meta-logic false <br>
+constant. I take that as meaning there is no meta-logic false that's <br>
+been defined. If there is, maybe someone will tell me where it is.</p>
+<p>I guess no one but me cares about exporting functions of type "prop =&gt; <br>
+prop" and "prop =&gt; prop =&gt; prop".</p>
+<p>I decided that Scala "val" should mimic Isar "value" with functions <br>
+based on type prop.</p>
+<p>It should produce something that looks like these:</p>
+<p>value "True"           (* True::bool *)<br>
+value "False"          (* False::bool *)<br>
+value "Trueprop True"  (* (Trueprop True)::prop *)<br>
+value "Trueprop False" (* (Trueprop False)::prop *)<br>
+value "hNot(True)"     (* (Trueprop False)::prop *)<br>
+value "hNot(False)"    (* (Trueprop True)::prop *)</p>
+<p>In the exported code, I changed "trueprop" from a function to a datatype <br>
+and got rid of "Holds". Until the day I can figure out how to export <br>
+"!!P. PROP P", or "(op ==&gt;) == (op &amp;&amp;&amp;)", I don't see a need for it, but <br>
+I could be wrong.</p>
+<p>Based on my limited knowledge, I think the modified "trueprop" and <br>
+"follows" should work as a drop-in replacement for any exported <br>
+functions of type "prop =&gt; prop =&gt; prop".</p>
+<p>Thanks,<br>
+GB</p>
+<p>// Modification to get Scala "val" to work like Isar "value"<br>
+object I_131123b_mod {</p>
+<p>abstract sealed class prop<br>
+final case class trueprop(b: Boolean) extends prop</p>
+<p>def follows(p: prop, pa: prop): prop = (p, pa) match {<br>
+   case (p, trueprop(true)) =&gt; trueprop(true)<br>
+   case (trueprop(false), trueprop(false)) =&gt; trueprop(true)<br>
+   case (trueprop(true), trueprop(false)) =&gt; trueprop(false)<br>
+}</p>
+<p>def hNot(p: prop): prop = follows(p, trueprop(false))</p>
+<p>val x1 = true            // x1: Boolean = true<br>
+val x2 = false           // x2: Boolean = false<br>
+val x3 = trueprop(true)  // x3: trueprop = trueprop(true)<br>
+val x4 = trueprop(false) // x4: trueprop = trueprop(false)<br>
+val x5 = hNot(trueprop(true))  // x5: prop = trueprop(false)<br>
+val x6 = hNot(trueprop(false)) // x6: prop = trueprop(true)</p>
+<p>// HOL functions (bool =&gt; bool) are just Scala (Boolean =&gt; Boolean).<br>
+def bNot(b: Boolean): Boolean = !b</p>
+<p>} /* object I_131123b */</p>
+<p>theory i131123b__scala_val_should_match_isa_value<br>
+imports Complex_Main<br>
+begin</p>
+<p>definition hNot :: "prop =&gt; prop" where<br>
+   "hNot P == (PROP P ==&gt; False)"<br>
+notation hNot ("hNot _" [5] 5)</p>
+<p>value "True"           (* True::bool *)<br>
+value "False"          (* False::bool *)<br>
+value "Trueprop True"  (* (Trueprop True)::prop *)<br>
+value "Trueprop False" (* (Trueprop False)::prop *)<br>
+value "hNot(True)"     (* (Trueprop False)::prop *)<br>
+value "hNot(False)"    (* (Trueprop True)::prop *)</p>
+<p>theorem "hNot(False)"<br>
+by(unfold hNot_def, simp)</p>
+<p>definition bNot :: "bool =&gt; bool" where<br>
+   "bNot b = (~b)"</p>
+<p>no_notation hNot ("hNot _" [5] 5)<br>
+export_code hNot bNot Not in Scala module_name "I_131123b" file <br>
+"i131123b.scala"</p>
+<p>end</p>
+<p>// ORIGINAL EXPORT<br>
+object I_131123b {</p>
+<p>abstract sealed class prop<br>
+final case class Holds() extends prop</p>
+<p>def trueprop(x0: Boolean): prop = x0 match {<br>
+   case true =&gt; Holds()<br>
+}</p>
+<p>def follows(p: prop, pa: prop): prop = (p, pa) match {<br>
+   case (p, Holds()) =&gt; Holds()<br>
+   case (Holds(), p) =&gt; p<br>
+}</p>
+<p>def bNot(b: Boolean): Boolean = ! b</p>
+<p>def hNot(p: prop): prop = follows(p, trueprop(false))</p>
+<p>} /* object I_131123b */</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

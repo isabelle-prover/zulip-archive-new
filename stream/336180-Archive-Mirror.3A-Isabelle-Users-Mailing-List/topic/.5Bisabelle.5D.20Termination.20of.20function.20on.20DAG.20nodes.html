@@ -1,0 +1,90 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Termination of function on DAG nodes · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Termination.20of.20function.20on.20DAG.20nodes.html">[isabelle] Termination of function on DAG nodes</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294675883"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Termination%20of%20function%20on%20DAG%20nodes/near/294675883" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Termination.20of.20function.20on.20DAG.20nodes.html#294675883">(Aug 22 2022 at 13:28)</a>:</h4>
+<p>From: Rupert Swarbrick &lt;<a href="mailto:rswarbrick@gmail.com">rswarbrick@gmail.com</a>&gt;<br>
+Hi there,</p>
+<p>I have a DAG (directed acyclic graph) with an associated height function<br>
+(a function from nodes to nat such that children have a lower height<br>
+than their parents). It's easy enough to prove that this gives an<br>
+induction rule of the form "(P on every child =&gt; P on parent) =&gt; P".</p>
+<p>What I want to do, however, is to define a function on graph nodes of<br>
+the form:</p>
+<p>foo x = bar x + setsum foo (children x)</p>
+<p>Informally, this is well defined because I can define it for each height<br>
+inductively. However, I can't see how to prove this using<br>
+function/termination.</p>
+<p>Here's a cut down example:</p>
+<p>theory foo<br>
+    imports Main<br>
+  begin</p>
+<p>text {*<br>
+    A really simple locale that represents a DAG by requiring it to have a<br>
+    height function. The nodes of the graph are the universe of 'a.<br>
+  *}<br>
+  locale dag =<br>
+    fixes children :: "'a ⇒ 'a set"<br>
+    fixes height :: "'a ⇒ nat"<br>
+    assumes "x ∈ children y ⟹ height x &lt; height y"<br>
+    fixes label :: "'a ⇒ nat"</p>
+<p>context dag begin</p>
+<p>function foo :: "'a ⇒ nat" where<br>
+    "foo x = label x + setsum foo (children x)"<br>
+    by auto<br>
+  termination<br>
+    apply (relation "measure (λ x. height x)")</p>
+<p>This isn't looking promising. Ignoring the fact that I might have chosen<br>
+a slightly wrong measure, I end up with the following goals:</p>
+<p>proof (prove)<br>
+  goal (2 subgoals):</p>
+<p>1. wf (measure height)<br>
+   2. ⋀x xa. (xa, x) ∈ measure height</p>
+<p>Note that the second goal doesn't say anything about xa being a child of<br>
+x.</p>
+<p>Am I doing something wrong? How can I tell the function/termination<br>
+machinery what I'm trying to say?</p>
+<p>Also, a meta-question: I couldn't figure out the answer from the<br>
+otherwise extremely helpful "Defining Recursive Functions in<br>
+Isabelle/HOL" document. Is there somewhere else I should be looking for<br>
+such things?</p>
+<p>Many thanks,</p>
+<p>Rupert</p>
+
+
+
+<a name="294675892"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Termination%20of%20function%20on%20DAG%20nodes/near/294675892" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Termination.20of.20function.20on.20DAG.20nodes.html#294675892">(Aug 22 2022 at 13:28)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+You are in luck, the solution is easy, once you understand what's missing:</p>
+<p>declare setsum.cong[fundef_cong]</p>
+<p>You definition uses higher-order recursion, i.e. the recursive function foo is <br>
+not applied directly to any arguments but passed to setsum, and who knows what <br>
+setsum might be doing with it. The congruence rule setsum.cong explains that <br>
+setsum applies foo only to elements of the set. The attribute [fundef_cong] <br>
+passes this information on to fun/function. I will enable it in the distribution <br>
+to prevent other people stumbling over it again.</p>
+<p>Tobias<br>
+<a href="/user_uploads/14278/u1bDYguH_z65BLee3y3pvpI3/smime.p7s">smime.p7s</a></p>
+
+
+
+<a name="294675961"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Termination%20of%20function%20on%20DAG%20nodes/near/294675961" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Termination.20of.20function.20on.20DAG.20nodes.html#294675961">(Aug 22 2022 at 13:29)</a>:</h4>
+<p>From: Rupert Swarbrick &lt;<a href="mailto:rswarbrick@gmail.com">rswarbrick@gmail.com</a>&gt;<br>
+That's brilliant. Thank you very much for the explanation.</p>
+<p>Rupert</p>
+<p>Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt; writes:</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

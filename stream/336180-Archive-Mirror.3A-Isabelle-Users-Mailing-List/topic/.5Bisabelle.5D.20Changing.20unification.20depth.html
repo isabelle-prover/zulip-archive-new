@@ -1,0 +1,412 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Changing unification depth · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Changing.20unification.20depth.html">[isabelle] Changing unification depth</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294120076"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Changing%20unification%20depth/near/294120076" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Changing.20unification.20depth.html#294120076">(Aug 18 2022 at 16:18)</a>:</h4>
+<p>From: John Munroe &lt;<a href="mailto:munddr@gmail.com">munddr@gmail.com</a>&gt;<br>
+Hi all,</p>
+<p>I'm trying to increase the unification depth in the theory using<br>
+declare [[unification_search_bound = 70]], but it seems there's no<br>
+effect and stays at 60.</p>
+<p>theory Test<br>
+imports Complex_Main<br>
+begin</p>
+<p>declare [[unification_search_bound = 70]]<br>
+...</p>
+<p>Using an unsynchronized reference, changing the last line of Unify.hounifiers to</p>
+<p>in (ref := search_bnd; add_unify 1 ((env,dps), Seq.empty)) end;</p>
+<p>and reading off ref, it still shows 60.</p>
+<p>It seems that Unify.search_bound is fixed to the value of<br>
+Unify.search_bound_value, which is default to 60 due to</p>
+<p>val search_bound_value = Config.declare true "unify_search_bound" (K<br>
+(Config.Int 60));<br>
+val search_bound = <a href="http://Config.int">Config.int</a> search_bound_value;<br>
+...<br>
+fun hounifiers...<br>
+   val search_bnd = Config.get_global thy search_bound<br>
+   ...<br>
+   if tdepth &gt; search_bnd then<br>
+        (warning "Unification bound exceeded"; (Seq.pull reseq))<br>
+   ...</p>
+<p>Any help will be appreciated.</p>
+<p>Thanks</p>
+<p>John</p>
+
+
+
+<a name="294120094"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Changing%20unification%20depth/near/294120094" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Changing.20unification.20depth.html#294120094">(Aug 18 2022 at 16:18)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Did you really try it as above?  The configuration option is called <br>
+"unify_search_bound".  Here is an example in Isabelle2009-2:</p>
+<p>declare [[unify_search_bound = 70]]</p>
+<p>ML {* Config.get_global @{theory} Unify.search_bound *}<br>
+   ML {* Config.get @{context} Unify.search_bound *}</p>
+<p>For historical reasons there is a snag: unify options can only be modified <br>
+in a global context.  E.g. consider:</p>
+<p>lemma A<br>
+     using [[unify_search_bound = 42]]</p>
+<p>### Ignoring local change of global option "unify_search_bound"</p>
+<p>As usual in Proof General, such warnings are easily overlooked.  As usual, <br>
+it will be much more visible in the Isabelle/jEdit prover IDE, although <br>
+I've already had some complaints that warnings are too prominent there.</p>
+<p>Makarius</p>
+
+
+
+<a name="294120137"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Changing%20unification%20depth/near/294120137" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Changing.20unification.20depth.html#294120137">(Aug 18 2022 at 16:19)</a>:</h4>
+<p>From: John Munroe &lt;<a href="mailto:munddr@gmail.com">munddr@gmail.com</a>&gt;<br>
+Sorry, my mistake. Indeed I tried unify_search_bound = 5. I see that<br>
+the configuration itself has changed, but the function hounifiers<br>
+doesn't seem to see the update:</p>
+<p>If I do:</p>
+<p>declare [[unify_search_bound = 70]]</p>
+<p>ML {* Config.get_global @{theory} Unify.search_bound *}<br>
+ML {* Config.get @{context} Unify.search_bound *}</p>
+<p>I do see 70 for both.</p>
+<p>But if I do</p>
+<p>ML {<em>!Unify.ref</em>}</p>
+<p>even after having run hounifiers, via, e.g., Unify.matchers, I see 60.<br>
+Here's how ref is assigned:</p>
+<p>fun hounifiers (thy,env, tus : (term*term)list)<br>
+  : (Envir.env * (term*term)list)Seq.seq =<br>
+  let<br>
+   ...<br>
+  in (ref := search_bnd; add_unify 1 ((env, dps), Seq.empty)) end;</p>
+<p>So It seems hounifiers can't see the update. If I change it to<br>
+something more extreme, like 5, the unifier itself doesn't behave as<br>
+if it was 5 but as if it was 60.</p>
+<p>Thanks<br>
+John</p>
+
+
+
+<a name="294120308"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Changing%20unification%20depth/near/294120308" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Changing.20unification.20depth.html#294120308">(Aug 18 2022 at 16:20)</a>:</h4>
+<p>From: <a href="mailto:munddr@gmail.com">munddr@gmail.com</a></p>
+<blockquote>
+<p>Here's how ref is assigned:</p>
+</blockquote>
+<blockquote>
+<p>fun hounifiers (thy,env, tus : (term*term)list)</p>
+</blockquote>
+<blockquote>
+<p>: (Envir.env * (term*term)list)Seq.seq =</p>
+</blockquote>
+<blockquote>
+<p>let</p>
+</blockquote>
+<blockquote>
+<p>...</p>
+</blockquote>
+<blockquote>
+<p>in (ref := search_bnd; add_unify 1 ((env, dps), Seq.empty)) end;</p>
+</blockquote>
+<p>Just a follow-up question: If unify_search_bound is updated, I should  <br>
+expect to see ref to be updated there, right?</p>
+<p>Thanks<br>
+John</p>
+<blockquote>
+<p>So It seems hounifiers can't see the update. If I change it to</p>
+</blockquote>
+<blockquote>
+<p>something more extreme, like 5, the unifier itself doesn't behave as</p>
+</blockquote>
+<blockquote>
+<p>if it was 5 but as if it was 60.</p>
+</blockquote>
+<blockquote>
+<p>Thanks</p>
+</blockquote>
+<blockquote>
+<p>John</p>
+</blockquote>
+<blockquote>
+<p>On Fri, Nov 26, 2010 at 1:00 PM, Makarius <a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt; wrote:</p>
+</blockquote>
+<blockquote>
+<blockquote>
+<p>On Fri, 26 Nov 2010, John Munroe wrote:</p>
+</blockquote>
+</blockquote>
+<blockquote>
+<p>&gt;</p>
+</blockquote>
+<blockquote>
+<blockquote>
+<blockquote>
+<p>theory Test</p>
+</blockquote>
+</blockquote>
+</blockquote>
+<blockquote>
+<blockquote>
+<blockquote>
+<p>imports Complex_Main</p>
+</blockquote>
+</blockquote>
+</blockquote>
+<blockquote>
+<blockquote>
+<blockquote>
+<p>begin</p>
+</blockquote>
+</blockquote>
+</blockquote>
+<blockquote>
+<blockquote>
+<p>&gt;</p>
+</blockquote>
+</blockquote>
+<blockquote>
+<blockquote>
+<blockquote>
+<p>declare [[unification_search_bound = 70]]</p>
+</blockquote>
+</blockquote>
+</blockquote>
+<blockquote>
+<blockquote>
+<blockquote>
+<p>...</p>
+</blockquote>
+</blockquote>
+</blockquote>
+<blockquote>
+<p>&gt;</p>
+</blockquote>
+<blockquote>
+<blockquote>
+<blockquote>
+<p>It seems that Unify.search_bound is fixed to the value of</p>
+</blockquote>
+</blockquote>
+</blockquote>
+<blockquote>
+<blockquote>
+<blockquote>
+<p>Unify.search_bound_value, which is default to 60 due to</p>
+</blockquote>
+</blockquote>
+</blockquote>
+<blockquote>
+<p>&gt;</p>
+</blockquote>
+<blockquote>
+<blockquote>
+<p>Did you really try it as above? The configuration option is called</p>
+</blockquote>
+</blockquote>
+<blockquote>
+<blockquote>
+<p>"unify_search_bound". Here is an example in Isabelle2009-2:</p>
+</blockquote>
+</blockquote>
+<blockquote>
+<p>&gt;</p>
+</blockquote>
+<blockquote>
+<blockquote>
+<p>declare [[unify_search_bound = 70]]</p>
+</blockquote>
+</blockquote>
+<blockquote>
+<p>&gt;</p>
+</blockquote>
+<blockquote>
+<blockquote>
+<p>ML {* Config.get_global @{theory} Unify.search_bound *}</p>
+</blockquote>
+</blockquote>
+<blockquote>
+<blockquote>
+<p>ML {* Config.get @{context} Unify.search_bound *}</p>
+</blockquote>
+</blockquote>
+<blockquote>
+<p>&gt;</p>
+</blockquote>
+<blockquote>
+<blockquote>
+<p>For historical reasons there is a snag: unify options can only be  <br>
+modified</p>
+</blockquote>
+</blockquote>
+<blockquote>
+<blockquote>
+<p>in a global context. Eg consider:</p>
+</blockquote>
+</blockquote>
+<blockquote>
+<p>&gt;</p>
+</blockquote>
+<blockquote>
+<blockquote>
+<p>lemma A</p>
+</blockquote>
+</blockquote>
+<blockquote>
+<blockquote>
+<p>using [[unify_search_bound = 42]]</p>
+</blockquote>
+</blockquote>
+<blockquote>
+<p>&gt;</p>
+</blockquote>
+<blockquote>
+<blockquote>
+<h3>Ignoring local change of global option "unify_search_bound"</h3>
+</blockquote>
+</blockquote>
+<blockquote>
+<p>&gt;</p>
+</blockquote>
+<blockquote>
+<blockquote>
+<p>As usual in Proof General, such warnings are easily overlooked. As  <br>
+usual,</p>
+</blockquote>
+</blockquote>
+<blockquote>
+<blockquote>
+<p>it will be much more visible in the Isabelle/jEdit prover IDE, although  <br>
+I've</p>
+</blockquote>
+</blockquote>
+<blockquote>
+<blockquote>
+<p>already had some complaints that warnings are too prominent there.</p>
+</blockquote>
+</blockquote>
+<blockquote>
+<p>&gt;</p>
+</blockquote>
+<blockquote>
+<p>&gt;</p>
+</blockquote>
+<blockquote>
+<blockquote>
+<p>Makarius</p>
+</blockquote>
+</blockquote>
+<blockquote>
+<p>&gt;</p>
+</blockquote>
+
+
+
+<a name="294120440"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Changing%20unification%20depth/near/294120440" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Changing.20unification.20depth.html#294120440">(Aug 18 2022 at 16:20)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Hard to say from this tiny extract of the source above.  There could be <br>
+some unexpected effects due to lazy evaluation or parallelism. Mutable <br>
+references are a source of many problems and being gradually removed from <br>
+the system.</p>
+<p>For experimentation, it is usually easier to print out something using <br>
+writeln or similar.</p>
+<p>Makarius</p>
+
+
+
+<a name="294120498"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Changing%20unification%20depth/near/294120498" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Changing.20unification.20depth.html#294120498">(Aug 18 2022 at 16:21)</a>:</h4>
+<p>From: John Munroe &lt;<a href="mailto:munddr@gmail.com">munddr@gmail.com</a>&gt;</p>
+<blockquote>
+<p>Hard to say from this tiny extract of the source above.  There could be some<br>
+unexpected effects due to lazy evaluation or parallelism. Mutable references<br>
+are a source of many problems and being gradually removed from the system.</p>
+<p>For experimentation, it is usually easier to print out something using<br>
+writeln or similar.<br>
+</p>
+</blockquote>
+<p>OK. I've tried it with "writeln (Int.toString search_bnd)" instead and<br>
+I get a reading of 60 as well, even after I've changed it to 5 with<br>
+"declare [[unify_search_bound=5]]". I've looked at some of the<br>
+unifiers and they are definitely deeper than 5 levels, e.g.,</p>
+<p>%a::nat =&gt; nat.<br>
+                       a (a (a (a (a (a<br>
+ (a (a (a (a (a (a (a (a (a (a (a (a (a<br>
+ (a (a (a (a (a (a (a (a (a (a (a (a (a<br>
+ (a (a (a (a (a (a (a (a (a (a (a (a (a<br>
+ (a (a (a (a (a (a (a (a (a (a (a (a ((h::(nat =&gt; bool) =&gt; nat)<br>
+ (s::nat =&gt; bool))))))))))))))))))))))))))))))))))))))))))))))))))))))))))</p>
+<p>Thanks</p>
+<p>John</p>
+<blockquote>
+<p>Makarius<br>
+</p>
+</blockquote>
+
+
+
+<a name="294120571"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Changing%20unification%20depth/near/294120571" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Changing.20unification.20depth.html#294120571">(Aug 18 2022 at 16:21)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+That's very strange.  Are you sure you have the correct context in your <br>
+example?  One where the "declare [[unify_search_bound=5]]" is effective?</p>
+<p>Can you show a self-contained snippet of theory source text?</p>
+<p>Makarius</p>
+
+
+
+<a name="294120747"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Changing%20unification%20depth/near/294120747" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Changing.20unification.20depth.html#294120747">(Aug 18 2022 at 16:22)</a>:</h4>
+<p>From: <a href="mailto:munddr@gmail.com">munddr@gmail.com</a><br>
+On Nov 28, 2010 4:22pm, Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt; wrote:</p>
+<blockquote>
+<p>On Sun, 28 Nov 2010, John Munroe wrote:</p>
+</blockquote>
+<blockquote>
+<p>I've tried it with "writeln (Int.toString search_bnd)" instead and I get  <br>
+a reading of 60 as well, even after I've changed it to 5 with "declare  <br>
+[[unify_search_bound=5]]". I've looked at some of the unifiers and they  <br>
+are definitely deeper than 5 levels, eg,</p>
+</blockquote>
+<blockquote>
+<p>%a::nat =&gt; nat.</p>
+</blockquote>
+<blockquote>
+<p>a (a (a (a (a (a</p>
+</blockquote>
+<blockquote>
+<p>(a (a (a (a (a (a (a (a (a (a (a (a (a</p>
+</blockquote>
+<blockquote>
+<p>(a (a (a (a (a (a (a (a (a (a (a (a (a</p>
+</blockquote>
+<blockquote>
+<p>(a (a (a (a (a (a (a (a (a (a (a (a (a</p>
+</blockquote>
+<blockquote>
+<p>(a (a (a (a (a (a (a (a (a (a (a (a ((h::(nat =&gt; bool) =&gt; nat)</p>
+</blockquote>
+<blockquote>
+<p>(s::nat =&gt; bool))))))))))))))))))))))))))))))))))))))))))))))))))))))))))</p>
+</blockquote>
+<blockquote>
+<p>That's very strange. Are you sure you have the correct context in your  <br>
+example? One where the "declare [[unify_search_bound=5]]" is effective?</p>
+</blockquote>
+<p>Indeed, it was a problem with my context.</p>
+<p>Thanks<br>
+John</p>
+<blockquote>
+<p>Can you show a self-contained snippet of theory source text?</p>
+</blockquote>
+<blockquote>
+<p>Makarius</p>
+</blockquote>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

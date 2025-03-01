@@ -1,0 +1,137 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Problem with sort constraints · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problem.20with.20sort.20constraints.html">[isabelle] Problem with sort constraints</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294163594"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problem%20with%20sort%20constraints/near/294163594" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problem.20with.20sort.20constraints.html#294163594">(Aug 18 2022 at 20:22)</a>:</h4>
+<p>From: René Thiemann &lt;<a href="mailto:rene.thiemann@uibk.ac.at">rene.thiemann@uibk.ac.at</a>&gt;<br>
+Dear all,</p>
+<p>I'm currently having a question concerning class-constraints:</p>
+<p>In a locale where I just fix some constants without assuming anything about them, it<br>
+is always possible to get rid of the "locale-constraint".</p>
+<p>So my question is, whether this is also possible for class-constraints? I.e., if I just<br>
+fix some function (emb in the example below) without making any assumptions about it, <br>
+can one get rid of the sort constraint (i.e., replace the "('a :: embed)list by ('a list)").</p>
+<p>In the proof below, I just require the exakt definition of emb for lists, but it does not matter how emb<br>
+is defined on type 'a for the elements of the list.</p>
+<p>In principle, I have shown "!! xs :: ('a :: embed) list. len_dom xs", and I would like to derive<br>
+"!! xs :: 'a list. len_dom xs" without the embed sort-constraint.</p>
+<p>class embed =<br>
+  fixes emb :: "'a ⇒ nat"</p>
+<p>instantiation list :: (embed) embed <br>
+begin<br>
+  fun emb_list where <br>
+    "emb_list [] = 0" <br>
+  | "emb_list (x # xs) = emb x + 2 * emb xs + 1"<br>
+instance ..<br>
+end</p>
+<p>function len :: "('a :: embed) list =&gt; nat"<br>
+  where "len [] = 0"<br>
+      | "len (x # xs) = Suc (len xs)"<br>
+  by pat_completeness auto</p>
+<p>termination len (* goal: All len_dom *)<br>
+proof <br>
+  let ?r = "inv_image ({(x,y). x &lt; y}) (emb :: 'a list =&gt; nat)"<br>
+  show "wf ?r"<br>
+    by (rule wf_inv_image[OF wf_less])<br>
+  fix x xs<br>
+  show "(xs, x # xs) ∈ ?r" by simp<br>
+qed</p>
+<p>Best regards,<br>
+René</p>
+
+
+
+<a name="294163627"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problem%20with%20sort%20constraints/near/294163627" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problem.20with.20sort.20constraints.html#294163627">(Aug 18 2022 at 20:22)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@kit.edu">andreas.lochbihler@kit.edu</a>&gt;<br>
+Dear René,</p>
+<blockquote>
+<p>So my question is, whether this is also possible for class-constraints?<br>
+No. Type classes are explicitly made to prevent applications of overloaded <br>
+constants when it is not clear that there is an instantiation.</p>
+</blockquote>
+<blockquote>
+<p>I.e., if I just<br>
+fix some function (emb in the example below) without making any assumptions<br>
+about it, can one get rid of the sort constraint (i.e., replace the<br>
+"('a :: embed)list by ('a list)").</p>
+<p>In the proof below, I just require the exakt definition of emb for lists, but<br>
+it does not matter how emb is defined on type 'a for the elements of the list.<br>
+I do not see why you need a type class in this case at all. You could equally <br>
+well define emb_list inside the proof itself and not introduce the type <br>
+constraint at all:</p>
+</blockquote>
+<p>function len :: "'a list =&gt; nat"<br>
+   where "len [] = 0"<br>
+       | "len (x # xs) = Suc (len xs)"<br>
+   by pat_completeness auto</p>
+<p>termination len (* goal: All len_dom *)<br>
+proof<br>
+   def emb == "list_rec 0 (%x xs res. undefined + 2 * res + 1) :: 'a list =&gt; nat"<br>
+   let ?r = "inv_image ({(x,y). x &lt; y}) emb"<br>
+   show "wf ?r"<br>
+     by (rule wf_inv_image[OF wf_less])<br>
+   fix x xs<br>
+   show "(xs, x # xs) : ?r" by(simp add: emb_def)<br>
+qed</p>
+<p>Obviously, definitions inside proofs are not as convenient as top-level <br>
+definitions. You could also define emb_list only for lists and use that, but <br>
+possibly, your real use case is more complex and you do want to use the global emb.</p>
+<p>If you want to do overloading without sort constraints, there's the overloading <br>
+command (Isar-Ref manual 5.8) or the old-fashioned consts+defs (overloaded) <br>
+pattern, without type classes at all. Note, however, that you then will lose the <br>
+ability to generate code for whatever is to be implemented in terms of emb. To <br>
+that end, you would have reintroduce the type class for code generation as follows:</p>
+<p>(* not tested *)<br>
+consts emb :: "'a =&gt; nat"<br>
+defs (overloaded) emb_list_def:<br>
+   "emb = list_rec 0 (%x xs res. emb x + 2 * res + 1)"</p>
+<p>class emb_code =<br>
+   fixes emb_code :: "'a =&gt; nat"<br>
+   assumes emb_code: "emb = emb_code"</p>
+<p>declare emb_code[code]</p>
+<p>instantiation list :: (emb) emb begin<br>
+definition "emb_code :: 'a list =&gt; nat == emb"<br>
+instance by(intro_locales)(simp add: emb_code_def)<br>
+end</p>
+<p>Hope this helps,<br>
+Andreas</p>
+
+
+
+<a name="294163636"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Problem%20with%20sort%20constraints/near/294163636" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Problem.20with.20sort.20constraints.html#294163636">(Aug 18 2022 at 20:22)</a>:</h4>
+<p>From: René Thiemann &lt;<a href="mailto:rene.thiemann@uibk.ac.at">rene.thiemann@uibk.ac.at</a>&gt;<br>
+Dear Andreas,</p>
+<blockquote>
+<p>Dear René,</p>
+<blockquote>
+<p>So my question is, whether this is also possible for class-constraints?<br>
+No. Type classes are explicitly made to prevent applications of overloaded constants when it is not clear that there is an instantiation.</p>
+</blockquote>
+</blockquote>
+<p>thanks, this was the expected answer, which tells me that I have to do some work.</p>
+<blockquote>
+<p>I do not see why you need a type class in this case at all. You could equally well define emb_list inside the proof itself and not introduce the type constraint at all:<br>
+Obviously, definitions inside proofs are not as convenient as top-level definitions. You could also define emb_list only for lists and use that, but possibly, your real use case is more complex and you do want to use the global emb.</p>
+</blockquote>
+<p>Exactly, for my presented (short) proof, it is easy to do it within the proof. In the general setting, I'll have to think about how to solve this problem.</p>
+<blockquote>
+<p>If you want to do overloading without sort constraints, there's the overloading command (Isar-Ref manual 5.8) or the old-fashioned consts+defs (overloaded) pattern, without type classes at all. Note, however, that you then will lose the ability to generate code for whatever is to be implemented in terms of emb. To that end, you would have reintroduce the type class for code generation as follows:</p>
+</blockquote>
+<p>Thanks for the pointers. I'll have a look into it whether these techniques can be utilized to solve my problem.</p>
+<p>Cheers,<br>
+René</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

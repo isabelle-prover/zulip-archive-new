@@ -1,0 +1,190 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Printing constants · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Printing.20constants.html">[isabelle] Printing constants</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="479829307"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Printing%20constants/near/479829307" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Printing.20constants.html#479829307">(Oct 31 2024 at 08:47)</a>:</h4>
+<p>From: Tobias Nipkow &lt;<a href="mailto:nipkow@in.tum.de">nipkow@in.tum.de</a>&gt;<br>
+Dear List,</p>
+<p>Is there a hook where one can modify the way that names of constants are printed?</p>
+<p>Thanks<br>
+Tobias</p>
+<p><a href="/user_uploads/14278/K4rH5dVAfZ19RagfFbTSA-fe/smime.p7s">smime.p7s</a></p>
+
+
+
+<a name="479856547"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Printing%20constants/near/479856547" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Printing.20constants.html#479856547">(Oct 31 2024 at 11:31)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:manuel@pruvisto.org">manuel@pruvisto.org</a>&gt;<br>
+One simple thing that you could do that allows you great freedom is to <br>
+just add an unchecking phase that tags all constants (or, probably <br>
+better, all the constants you care about) with something. Then you can <br>
+manipulate the printing of this tag in whatever way you want: <br>
+"notation", "syntax", "print_translation", "print_ast_translation", etc.</p>
+<p>Here's an example that prints all constants of type "nat ⇒ nat ⇒ nat" in <br>
+angle brackets:</p>
+<p>definition DUMMY :: "'a ⇒ 'a" where "DUMMY x = x"</p>
+<p>ML ‹<br>
+local<br>
+   val tag_consts_switch = Attrib.setup_config_bool <br>
+\&lt;^binding&gt;‹tag_consts› (K false)</p>
+<p>fun tag_consts (t as Const (\&lt;^const_name&gt;‹DUMMY›, _) $ _) = t<br>
+     | tag_consts (f $ x) = tag_consts f $ tag_consts x<br>
+     | tag_consts (Abs (x, T, t)) = Abs (x, T, tag_consts t)<br>
+     | tag_consts (t as Const (c, T)) =<br>
+         if c = \&lt;^const_name&gt;‹DUMMY› orelse T &lt;&gt; \&lt;^typ&gt;‹nat ⇒ nat ⇒ <br>
+nat› then t<br>
+         else \&lt;^instantiate&gt;‹'a = ‹T› in term ‹DUMMY :: 'a ⇒ 'a›› $ t<br>
+     | tag_consts t = t<br>
+in<br>
+val _ =<br>
+   Context.&gt;&gt; (Syntax_Phases.term_uncheck 0 "foo"<br>
+     (fn ctxt =&gt; fn ts =&gt; if Config.get ctxt tag_consts_switch then map <br>
+tag_consts ts else ts))<br>
+end<br>
+›</p>
+<p>notation (output) DUMMY ("⟨_⟩")</p>
+<p>lemma "(∑k≤n. k * k) = n * (n+1) * (2*n+1) div (6::nat)"<br>
+   using [[tag_consts]]</p>
+<p>(* Output: (∑k≤n. ⟨(<em>)⟩ k k) = ⟨(div)⟩ (⟨(</em>)⟩ (⟨(*)⟩ n (⟨(+)⟩ n 1)) <br>
+(⟨(+)⟩ (⟨(*)⟩ 2 n) 1)) 6 *)</p>
+<p>Since there's no way to remove unchecking phases (as far as I am aware) <br>
+I added an attribute to switch the special printing on and off. I'm a <br>
+bit unsure about adding this unchecking phase with priority 0 (like the <br>
+internal ones), but the abbreviation phase runs with priority 1 and <br>
+might interfere with the tagging. So I guess it depends on what <br>
+behaviour you want: if in the case of e.g. "x ^ 2" want to see the <br>
+underlying constant "^" and modify that, you want to use priority 0 like <br>
+I did. If you want to see the abbreviation "power2 x" instead, use <br>
+priority 2 or higher.</p>
+<p>With something like a print translation or AST print translation you <br>
+could probably do much nastier things like reversing the names of <br>
+particular constants, or switching out one constant for another.</p>
+<p>Manuel</p>
+<p>On 31/10/2024 09:46, Tobias Nipkow wrote:</p>
+<blockquote>
+<p>Dear List,</p>
+<p>Is there a hook where one can modify the way that names of constants <br>
+are printed?</p>
+<p>Thanks<br>
+Tobias</p>
+</blockquote>
+
+
+
+<a name="480800738"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Printing%20constants/near/480800738" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Printing.20constants.html#480800738">(Nov 05 2024 at 21:11)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On 31/10/2024 09:46, Tobias Nipkow wrote:</p>
+<blockquote>
+<p>Is there a hook where one can modify the way that names of constants are printed?</p>
+</blockquote>
+<p>You did not say much about the purpose of the exercise.</p>
+<p>Here is another possible answer:</p>
+<p>alias flatMap = List.map_filter<br>
+   term List.map_filter</p>
+<p>Makarius</p>
+
+
+
+<a name="480888979"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Printing%20constants/near/480888979" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Printing.20constants.html#480888979">(Nov 06 2024 at 10:31)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:manuel@pruvisto.org">manuel@pruvisto.org</a>&gt;<br>
+I know a little bit about Tobias's use case: the idea is that he wants <br>
+to print some constants in different ways in the LaTeX output. For <br>
+example, constants like "T_foo" should be printed as something like <br>
+"\textsf{T}_{\textsf{foo}}" and other constants "bar" should be printed <br>
+as "\textsf{bar}".</p>
+<p>Right now we do roughly what I outlined in my last email, i.e. tagging <br>
+the constants with a print_translation and then having a bunch of <br>
+"notation (latex)" commands to modify the way the tagged constants get <br>
+printed.</p>
+<p>A better way to address this would probably be to somehow hook into <br>
+document preparation, but I don't know how to do that.</p>
+<p>Manuel</p>
+<p>On 05/11/2024 22:11, Makarius wrote:</p>
+<blockquote>
+<p>On 31/10/2024 09:46, Tobias Nipkow wrote:</p>
+<blockquote>
+<p>Is there a hook where one can modify the way that names of constants <br>
+are printed?</p>
+</blockquote>
+<p>You did not say much about the purpose of the exercise.</p>
+<p>Here is another possible answer:</p>
+<p>alias flatMap = List.map_filter<br>
+  term List.map_filter</p>
+<p>Makarius</p>
+</blockquote>
+
+
+
+<a name="481139423"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Printing%20constants/near/481139423" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Printing.20constants.html#481139423">(Nov 07 2024 at 15:01)</a>:</h4>
+<p>From: Manuel Eberl &lt;<a href="mailto:manuel@pruvisto.org">manuel@pruvisto.org</a>&gt;<br>
+I guess the most robust option would be if the document system were to <br>
+output constant names as something like "\isaconst{length}" instead of <br>
+just "length", and perhaps similarly for free/bound variables, schematic <br>
+variables, etc. This is already done e.g. for \isadigit. Then one could <br>
+simply tweak the definition of the \isa* LaTeX macros to achieve <br>
+whatever effect one wants.</p>
+<p>However, I don't know how this would work with more complex constant <br>
+names including e.g. Greek letters or subscripts.</p>
+<p>Manuel</p>
+<p>On 06/11/2024 11:00, Manuel Eberl wrote:</p>
+<blockquote>
+<p>I know a little bit about Tobias's use case: the idea is that he wants <br>
+to print some constants in different ways in the LaTeX output. For <br>
+example, constants like "T_foo" should be printed as something like <br>
+"\textsf{T}_{\textsf{foo}}" and other constants "bar" should be <br>
+printed as "\textsf{bar}".</p>
+<p>Right now we do roughly what I outlined in my last email, i.e. tagging <br>
+the constants with a print_translation and then having a bunch of <br>
+"notation (latex)" commands to modify the way the tagged constants get <br>
+printed.</p>
+<p>A better way to address this would probably be to somehow hook into <br>
+document preparation, but I don't know how to do that.</p>
+<p>Manuel</p>
+<p>On 05/11/2024 22:11, Makarius wrote:</p>
+<blockquote>
+<p>On 31/10/2024 09:46, Tobias Nipkow wrote:</p>
+<blockquote>
+<p>Is there a hook where one can modify the way that names of constants <br>
+are printed?</p>
+</blockquote>
+<p>You did not say much about the purpose of the exercise.</p>
+<p>Here is another possible answer:</p>
+<p>alias flatMap = List.map_filter<br>
+  term List.map_filter</p>
+<p>Makarius</p>
+</blockquote>
+</blockquote>
+
+
+
+<a name="481303420"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Printing%20constants/near/481303420" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Printing.20constants.html#481303420">(Nov 08 2024 at 12:22)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On 07/11/2024 15:52, Manuel Eberl wrote:</p>
+<blockquote>
+<p>I guess the most robust option would be if the document system were to output <br>
+constant names as something like "\isaconst{length}" instead of just "length", <br>
+and perhaps similarly for free/bound variables, schematic variables, etc. This <br>
+is already done e.g. for \isadigit. Then one could simply tweak the definition <br>
+of the \isa* LaTeX macros to achieve whatever effect one wants.</p>
+</blockquote>
+<p>Yes, this observation is correct. I will take a look before the Isabelle2025 <br>
+process starts, to see if it can be done properly now --- after so many <br>
+changes of the inner-syntax engine.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,50 @@
+[
+    {
+        "content": "<p>From: John Munroe &lt;<a href=\"mailto:munddr@gmail.com\">munddr@gmail.com</a>&gt;<br>\nHi,</p>\n<p>I have a rather urgent question about asserting relationships between<br>\ntypes in a locale. Suppose I have the following 3 locales:</p>\n<p>locale T =<br>\n  fixes f :: 'a<br>\n  assumes ax: \"\\&lt;forall&gt; (a :: 'a) b. a = b\"</p>\n<p>locale S =<br>\n  fixes g :: 'b<br>\n  and h :: 'b</p>\n<p>locale R =<br>\n  T f +<br>\n  S g h<br>\n  for f g h<br>\n  ...</p>\n<p>I want to prove the following</p>\n<p>lemma (in R) \"g = h\"</p>\n<p>using 'ax'. I want to assert in R that 'b in S is a subtype of 'a in<br>\nT. With that asserted, the above lemma can be resolved, right? If I<br>\nunderstand correctly, types are not first class citizens in<br>\nIsabelle/HOL, but is there a work around?</p>\n<p>Thanks in advance for the help!</p>\n<p>John</p>",
+        "id": 294154593,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660850678
+    },
+    {
+        "content": "<p>From: Thomas Sewell &lt;<a href=\"mailto:Thomas.Sewell@nicta.com.au\">Thomas.Sewell@nicta.com.au</a>&gt;<br>\nThere isn't really a subtype notion for you to work with here, unless <br>\nI've dramatically misunderstood. Types are equal or they aren't.</p>\n<p>To make matters clearer, what T really does is fix 'a and f, and S fixes <br>\nboth 'b and g. R inherits two type parameters, 'a and 'b, and there is <br>\nno reason for them to be related.</p>\n<p>Perhaps what you wanted to do was identify 'a from T with 'b from S in <br>\nR? This can be done with the locale expression:</p>\n<p>locale R =<br>\n   T \"f :: 'a\" +<br>\n   S \"g :: 'a\" h<br>\n   for f g h<br>\nbegin</p>\n<p>lemma \"g = h\"<br>\n   by (rule ax[rule_format])</p>\n<p>end</p>\n<p>Is that what you want?</p>\n<p>Yours,<br>\n    Thomas.</p>",
+        "id": 294154889,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660850818
+    },
+    {
+        "content": "<p>From: John Munroe &lt;<a href=\"mailto:munddr@gmail.com\">munddr@gmail.com</a>&gt;<br>\nHi,</p>\n<p>So does your locale expression seems to instantiate 'a in T and 'b in<br>\nS to the same type?</p>\n<p>I was indeed hoping to only say 'b in S is a subtype of 'a in T rather<br>\nthan they the same type. Can I do that outside of locales?</p>\n<p>Thanks</p>\n<p>John</p>",
+        "id": 294155127,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660850910
+    },
+    {
+        "content": "<p>From: John Munroe &lt;<a href=\"mailto:munddr@gmail.com\">munddr@gmail.com</a>&gt;<br>\nThanks.</p>\n<p>That's one thing I don't quite understand: isn't a sort a collection<br>\nof types? What does it actually mean to have a value assigned to a<br>\n'type' declared in a typeclass?</p>\n<p>Thanks</p>\n<p>John</p>",
+        "id": 294156740,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660851501
+    },
+    {
+        "content": "<p>From: Elsa L Gunter &lt;<a href=\"mailto:egunter@illinois.edu\">egunter@illinois.edu</a>&gt;<br>\nWith a subtype, you have a \"is_a\" relation.  If t1 is a subtype of t2, <br>\nan x is of type t1 (x \"is a\" t1), then x is of type t2 (x \"is a\" t2), <br>\nand x can be used anywhere a t2 is required.  With sorts, you can group <br>\ntypes together having some common features, such as having an <br>\nassociative, commutative binary operator.  You may then prove facts for <br>\nall the types in this class, based on the additional information that <br>\nthey have these features.  However, no \"is a\" relationship exists <br>\nbetween different types of a type class.  Naturals with + are have sort <br>\nassociative-commutative, and lists with append have sort <br>\nassociative-commutative, but you can't use a list when you want a nat, <br>\nand you can't use a nat when you want a list.  Neither is a subtype of <br>\nthe other.  We do have a subsort relation among type classes, however.  <br>\nSo associative-commutative-with-identity is a subsort of <br>\nassociative-commutative.  This may be, at least in part, the source of <br>\nyour confusion, and also why you can sometimes use type classes instead <br>\nof subtyping.<br>\n---Elsa</p>",
+        "id": 294156869,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660851567
+    },
+    {
+        "content": "<p>From: Brian Huffman &lt;<a href=\"mailto:huffman@in.tum.de\">huffman@in.tum.de</a>&gt;<br>\nOn Mon, Apr 30, 2012 at 11:08 PM, John Munroe &lt;<a href=\"mailto:munddr@gmail.com\">munddr@gmail.com</a>&gt; wrote:</p>\n<blockquote>\n<p>I was indeed hoping to only say 'b in S is a subtype of 'a in T rather<br>\nthan they the same type. Can I do that outside of locales?</p>\n</blockquote>\n<p>Isabelle's type system does not have a notion of \"subtypes\". It seems<br>\nlike you really have two choices here: 1) Identify types 'b from S and<br>\n'a from T, as Thomas suggested; or 2) fix an injective function from<br>\ntype 'b into type 'a, as shown below.</p>\n<p>locale R =<br>\n T \"f :: 'a\" +<br>\n S \"g :: 'b\" h<br>\n for f g h +<br>\n fixes c :: \"'b =&gt; 'a\"<br>\n assumes inj_c: \"inj c\"<br>\nbegin</p>\n<p>lemma \"g = h\"<br>\n  apply (rule inj_c [THEN injD])<br>\n  apply (rule ax[rule_format])<br>\n  done</p>\n<p>end</p>\n<p>Hope this helps,</p>\n<ul>\n<li>Brian</li>\n</ul>\n<blockquote>\n<p>On Mon, Apr 30, 2012 at 4:06 AM, Thomas Sewell<br>\n&lt;<a href=\"mailto:Thomas.Sewell@nicta.com.au\">Thomas.Sewell@nicta.com.au</a>&gt; wrote:</p>\n<blockquote>\n<p>There isn't really a subtype notion for you to work with here, unless I've<br>\ndramatically misunderstood. Types are equal or they aren't.</p>\n<p>To make matters clearer, what T really does is fix 'a and f, and S fixes<br>\nboth 'b and g. R inherits two type parameters, 'a and 'b, and there is no<br>\nreason for them to be related.</p>\n<p>Perhaps what you wanted to do was identify 'a from T with 'b from S in R?<br>\nThis can be done with the locale expression:</p>\n<p>locale R =<br>\n T \"f :: 'a\" +<br>\n S \"g :: 'a\" h<br>\n for f g h<br>\nbegin</p>\n<p>lemma \"g = h\"<br>\n by (rule ax[rule_format])</p>\n<p>end</p>\n<p>Is that what you want?</p>\n<p>Yours,<br>\n  Thomas.</p>\n</blockquote>\n<p>On 28/04/12 13:03, John Munroe wrote:</p>\n<blockquote>\n<blockquote>\n<p>Hi,</p>\n<p>I have a rather urgent question about asserting relationships between<br>\ntypes in a locale. Suppose I have the following 3 locales:</p>\n<p>locale T =<br>\n  fixes f :: 'a<br>\n  assumes ax: \"\\&lt;forall&gt;  (a :: 'a) b. a = b\"</p>\n<p>locale S =<br>\n  fixes g :: 'b<br>\n  and h :: 'b</p>\n<p>locale R =<br>\n  T f +<br>\n  S g h<br>\n  for f g h<br>\n  ...</p>\n<p>I want to prove the following</p>\n<p>lemma (in R) \"g = h\"</p>\n<p>using 'ax'. I want to assert in R that 'b in S is a subtype of 'a in<br>\nT. With that asserted, the above lemma can be resolved, right? If I<br>\nunderstand correctly, types are not first class citizens in<br>\nIsabelle/HOL, but is there a work around?</p>\n<p>Thanks in advance for the help!</p>\n<p>John<br>\n</p>\n</blockquote>\n</blockquote>\n</blockquote>",
+        "id": 294160557,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660852984
+    },
+    {
+        "content": "<p>From: John Munroe &lt;<a href=\"mailto:munddr@gmail.com\">munddr@gmail.com</a>&gt;<br>\nThanks.</p>\n<p>Doesn't Isabelle's type system have type classes? Are they not like subtypes?</p>\n<p>Thanks</p>\n<p>John</p>",
+        "id": 294160948,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660853118
+    },
+    {
+        "content": "<p>From: Elsa L Gunter &lt;<a href=\"mailto:egunter@illinois.edu\">egunter@illinois.edu</a>&gt;<br>\nIsabelle's type classes allow for sub-sorts, not subclasses.  While you <br>\ncan often achieve essentially that same effects with subsorts, they are <br>\nnot the same thing as subclassses.<br>\n---Elsa</p>",
+        "id": 294161362,
+        "sender_full_name": "Email Gateway",
+        "timestamp": 1660853255
+    }
+]

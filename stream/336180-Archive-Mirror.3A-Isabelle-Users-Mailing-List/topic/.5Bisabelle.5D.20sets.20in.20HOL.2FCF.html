@@ -1,0 +1,205 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] sets in HOL/CF · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20sets.20in.20HOL.2FCF.html">[isabelle] sets in HOL/CF</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294115584"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20sets%20in%20HOL/CF/near/294115584" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20sets.20in.20HOL.2FCF.html#294115584">(Aug 18 2022 at 15:56)</a>:</h4>
+<p>From: Brian Huffman &lt;<a href="mailto:brianh@cs.pdx.edu">brianh@cs.pdx.edu</a>&gt;<br>
+On Thu, Sep 2, 2010 at 2:49 AM, Joachim Breitner<br>
+&lt;<a href="mailto:mail@joachim-breitner.de">mail@joachim-breitner.de</a>&gt; wrote:</p>
+<blockquote>
+<p>Dear Isabelle community,</p>
+<p>I am exploring HOLCF at the moment. As a starting point, I tried to<br>
+define this function with fixrec:<br>
+       f :: nat → nat set<br>
+       f b = {b} ∪ f b<br>
+I’d expect to find that "f b = {b}".<br>
+[...]<br>
+But I’m wondering: Why can I not write:</p>
+<hr>
+<p>fixrec f :: "int lift → int set" where<br>
+ "f⋅b = (case b of ⊥ ⇒ ⊥ | Def a ⇒ {a} ∪ (f⋅b)"<br>
+declare f.simps[simp del]</p>
+<hr>
+<p>The error message<br>
+*** Type unification failed: No type arity bool :: cpo<br>
+seems to indicate that fixrec has a problem with me using "int set" as a<br>
+pcpo. I assume the reason is that "int set" is just an abbreviation for<br>
+"int ⇒ bool", therefore my above work-around. But I’m missing the<br>
+convenient syntax of sets in Isabelle.</p>
+<p>Is this really the correct way to work with sets in HOL/CF or am I just<br>
+overlooking something?</p>
+<p>Thank you,<br>
+Joachim</p>
+</blockquote>
+<p>Hi Joachim,</p>
+<p>If you want to be able to define a function of type "nat -&gt; nat set"<br>
+with fixrec, it turns out that fixrec can do it, but it requires you<br>
+to do some work to set things up first.</p>
+<p>The first requirement is that the return type "nat set" needs to be in<br>
+the pcpo class. As you pointed out, "nat set" is an abbreviation<br>
+for "nat =&gt; bool", so this means you will need an instance bool ::<br>
+pcpo. For \sqsubseteq to coincide with the subset relation on sets,<br>
+you will need to define \sqsubseteq as implication on booleans. (I've<br>
+pasted a copy of the necessary proof scripts at the end of this<br>
+email.)</p>
+<p>The standard HOLCF library doesn't define this pcpo instance for type<br>
+bool, because in many cases HOL types make more sense with a discrete<br>
+ordering, and I didn't want to prevent users from defining bool as a<br>
+discrete cpo. The bool :: pcpo instance might be a good thing to put<br>
+in HOLCF/Library though, so users can import it if they want to.</p>
+<p>To write a continuous function type like "nat -&gt; nat set", the<br>
+argument type "nat" also needs to be in class cpo. The easiest way to<br>
+do this is to define a discrete ordering on type nat, and prove an<br>
+instance of the "discrete_cpo" class. It might be useful to put this<br>
+definition in another theory in HOLCF/Library.</p>
+<p>The next requirement for fixrec is that it needs to be able to prove<br>
+continuity. In this case the body of your function uses "union" and<br>
+"insert", so you will need to prove continuity for those, at least.<br>
+(Proofs below)</p>
+<p>If you'd like to see a theory in HOLCF/Library that configures HOLCF<br>
+to work better with set types, I would welcome any suggestions that<br>
+you may have.</p>
+<p>Hope this helps,</p>
+<ul>
+<li>Brian</li>
+</ul>
+<hr>
+<p>instantiation bool :: finite_po<br>
+begin</p>
+<p>definition<br>
+  "x \&lt;sqsubseteq&gt; y \&lt;longleftrightarrow&gt; (x \&lt;longrightarrow&gt; y)"</p>
+<p>instance<br>
+by (default, unfold below_bool_def, fast+)</p>
+<p>end</p>
+<p>instance bool :: pcpo<br>
+proof<br>
+  have "\&lt;forall&gt;y. False \&lt;sqsubseteq&gt; y" by (simp add: below_bool_def)<br>
+  thus "\&lt;exists&gt;x::bool. \&lt;forall&gt;y. x \&lt;sqsubseteq&gt; y" ..<br>
+qed</p>
+<p>lemma bottom_eq_False: "\&lt;bottom&gt; = False"<br>
+apply (rule below_antisym [OF minimal])<br>
+apply (simp add: below_bool_def)<br>
+done</p>
+<p>lemma cont2cont_disj [simp, cont2cont]:<br>
+  assumes f: "cont (\&lt;lambda&gt;x. f x)" and g: "cont (\&lt;lambda&gt;x. g x)"<br>
+  shows "cont (\&lt;lambda&gt;x. f x \&lt;or&gt; g x)"<br>
+apply (rule cont_apply [OF f])<br>
+apply (rule chfindom_monofun2cont)<br>
+apply (rule monofunI, simp add: below_bool_def)<br>
+apply (rule cont_compose [OF _ g])<br>
+apply (rule chfindom_monofun2cont)<br>
+apply (rule monofunI, simp add: below_bool_def)<br>
+done</p>
+<p>lemma cont2cont_Collect [simp, cont2cont]:<br>
+  assumes "\&lt;And&gt;y. cont (\&lt;lambda&gt;x. f x y)"<br>
+  shows "cont (\&lt;lambda&gt;x. {y. f x y})"<br>
+unfolding Collect_def using assms<br>
+by (rule cont2cont_lambda)</p>
+<p>lemma cont2cont_mem [simp, cont2cont]:<br>
+  assumes "cont (\&lt;lambda&gt;x. f x)"<br>
+  shows "cont (\&lt;lambda&gt;x. y \&lt;in&gt; f x)"<br>
+unfolding mem_def using assms<br>
+by (rule cont2cont_fun)</p>
+<p>lemma cont2cont_union [simp, cont2cont]:<br>
+  "cont (\&lt;lambda&gt;x. f x) \&lt;Longrightarrow&gt; cont (\&lt;lambda&gt;x. g x)<br>
+\&lt;Longrightarrow&gt; cont (\&lt;lambda&gt;x. f x \&lt;union&gt; g x)"<br>
+unfolding Un_def by simp</p>
+<p>lemma cont2cont_insert [simp, cont2cont]:<br>
+  assumes "cont (\&lt;lambda&gt;x. f x)"<br>
+  shows "cont (\&lt;lambda&gt;x. insert y (f x))"<br>
+unfolding insert_def using assms<br>
+by (intro cont2cont)</p>
+<p>instantiation nat :: discrete_cpo<br>
+begin</p>
+<p>definition<br>
+  [simp]: "(x::nat) \&lt;sqsubseteq&gt; y \&lt;longleftrightarrow&gt; x = y"</p>
+<p>instance<br>
+by default simp</p>
+<p>end</p>
+<p>fixrec<br>
+  f :: "nat \&lt;rightarrow&gt; nat set"<br>
+where<br>
+  [simp del]: "f\&lt;cdot&gt;b = {b} \&lt;union&gt; f\&lt;cdot&gt;b"</p>
+<p>lemma "f\&lt;cdot&gt;b = {b}"<br>
+apply (subst f.simps)<br>
+apply (rule f.induct)<br>
+apply (rule adm_eq, simp, simp)<br>
+apply (simp add: subset_eq Ball_def mem_def bottom_eq_False)<br>
+apply simp<br>
+done</p>
+
+
+
+<a name="294116401"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20sets%20in%20HOL/CF/near/294116401" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20sets.20in.20HOL.2FCF.html#294116401">(Aug 18 2022 at 16:00)</a>:</h4>
+<p>From: Alexander Krauss &lt;<a href="mailto:krauss@in.tum.de">krauss@in.tum.de</a>&gt;<br>
+Brian Huffman wrote:<br>
+A related remark: A recursive function that returns a set can also be <br>
+defined using the inductive(_set) package. You have to rephrase the <br>
+definition using introduction rules, and manually derive the recursive <br>
+equations afterwards, but that is usually straightforward.</p>
+<p>Alex</p>
+
+
+
+<a name="294116498"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20sets%20in%20HOL/CF/near/294116498" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20sets.20in.20HOL.2FCF.html#294116498">(Aug 18 2022 at 16:01)</a>:</h4>
+<p>From: Jasmin Blanchette &lt;<a href="mailto:jasmin.blanchette@gmail.com">jasmin.blanchette@gmail.com</a>&gt;<br>
+Actually, Lukas's newly introduced "inductive_simps" command makes it easier than ever to derive recursive equations from inductive definitions. I think it's in Isabelle2009-2. I'm not aware of any documentation (beyond a few uses in Isabelle theories, which you can grep for) but it works pretty much like "inductive_cases".</p>
+<p>Jasmin</p>
+
+
+
+<a name="294116973"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20sets%20in%20HOL/CF/near/294116973" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20sets.20in.20HOL.2FCF.html#294116973">(Aug 18 2022 at 16:03)</a>:</h4>
+<p>From: Joachim Breitner &lt;<a href="mailto:mail@joachim-breitner.de">mail@joachim-breitner.de</a>&gt;<br>
+Dear Isabelle community,</p>
+<p>I am exploring HOLCF at the moment. As a starting point, I tried to<br>
+define this function with fixrec:<br>
+    f :: nat → nat set<br>
+        f b = {b} ∪ f b<br>
+I’d expect to find that "f b = {b}".</p>
+<p>This approach worked:</p>
+<hr>
+<p>fixrec f :: "int lift → (int ⇒ one)" where<br>
+  "f⋅b = (case b of ⊥ ⇒ ⊥ | Def a ⇒ (f⋅b) (a := ONE))"<br>
+declare f.simps[simp del]</p>
+<p>lemma "f⋅(Def b) = (λ c. if b = c then ONE else ⊥)"<br>
+apply (rule ext)<br>
+apply auto<br>
+apply (subst f.unfold)<br>
+apply simp<br>
+apply(induct rule:f.induct)<br>
+apply auto<br>
+done</p>
+<hr>
+<p>But I’m wondering: Why can I not write:</p>
+<hr>
+<p>fixrec f :: "int lift → int set" where<br>
+  "f⋅b = (case b of ⊥ ⇒ ⊥ | Def a ⇒ {a} ∪ (f⋅b)"<br>
+declare f.simps[simp del]</p>
+<hr>
+<p>The error message<br>
+*** Type unification failed: No type arity bool :: cpo<br>
+seems to indicate that fixrec has a problem with me using "int set" as a<br>
+pcpo. I assume the reason is that "int set" is just an abbreviation for<br>
+"int ⇒ bool", therefore my above work-around. But I’m missing the<br>
+convenient syntax of sets in Isabelle.</p>
+<p>Is this really the correct way to work with sets in HOL/CF or am I just<br>
+overlooking something?</p>
+<p>Thank you,<br>
+Joachim<br>
+<a href="/user_uploads/14278/5BGJIQTdZAN-WhGslo4TjpzN/signature.asc">signature.asc</a></p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

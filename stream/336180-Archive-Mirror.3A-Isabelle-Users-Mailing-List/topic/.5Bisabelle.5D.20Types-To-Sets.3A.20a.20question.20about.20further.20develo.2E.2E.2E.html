@@ -1,0 +1,352 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Types-To-Sets: a question about further develo... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Types-To-Sets.3A.20a.20question.20about.20further.20develo.2E.2E.2E.html">[isabelle] Types-To-Sets: a question about further develo...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294753434"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Types-To-Sets%3A%20a%20question%20about%20further%20develo.../near/294753434" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Types-To-Sets.3A.20a.20question.20about.20further.20develo.2E.2E.2E.html#294753434">(Aug 22 2022 at 19:25)</a>:</h4>
+<p>From: mailing-list anonymous &lt;<a href="mailto:mailing.list.anonymous@gmail.com">mailing.list.anonymous@gmail.com</a>&gt;<br>
+Dear All,</p>
+<p>I would like to ask a question in relation to the further development of<br>
+the functionality of the framework "Types-To-Sets".</p>
+<p>I am working on several personal projects that rely on "Types-To-Sets".<br>
+However, as was previously noted on the mailing list, the framework does<br>
+have its limitations. I would be interested in improving the functionality<br>
+of the framework. However, before I do any work in this direction I would<br>
+like to understand if anyone else is already working towards this goal and<br>
+whether or not there exists a development plan for this framework.<br>
+Naturally, if anyone has any particular ideas about how the framework can<br>
+be improved, I would be interested in learning about them.</p>
+<p><em>Background information</em></p>
+<p>In the last two months I relativised a substantial number of results about<br>
+algebraic structures and abstract spaces from the main HOL library using<br>
+the methodology suggested in [1] and collected the results in an<br>
+independent library (of course, please keep in mind that the library is a<br>
+work in progress):</p>
+<p><a href="https://github.com/xanonec/HOL-Types_To_Sets_Ext">https://github.com/xanonec/HOL-Types_To_Sets_Ext</a></p>
+<p>The initial goal was to obtain a locale-based topology library similar to<br>
+HOL-Algebra. As it stands now, the library can be seen as a complement to<br>
+the HOL main library. For each axiomatic type class/locale whose carrier<br>
+set is a universe (of course, not every class/locale was relativised yet),<br>
+the library provides a relativised locale with an explicitly defined<br>
+carrier set.</p>
+<p>For example, for the class topological_space from the main library</p>
+<p>class topological_space = "open" +<br>
+  assumes open_UNIV [simp, intro]: "open UNIV"<br>
+  assumes open_Int [intro]: "open S ⟹ open T ⟹ open (S ∩ T)"<br>
+  assumes open_Union [intro]: "∀S∈K. open S ⟹ open (⋃K)"</p>
+<p>the library of relativised results provides a locale</p>
+<p>locale topological_space_ow =<br>
+  fixes 𝔘 :: "'at set" and τ :: "'at set ⇒ bool"<br>
+  assumes open_UNIV[simp, intro]: "τ 𝔘"<br>
+  assumes open_Int[intro]: "⟦ S ⊆ 𝔘; T ⊆ 𝔘; τ S; τ T ⟧ ⟹ τ (S ∩ T)"<br>
+  assumes open_Union[intro]: "⟦ K ⊆ Pow 𝔘; ∀S∈K. τ S ⟧ ⟹ τ (⋃K)"</p>
+<p>Of course, the definitions associated with a given type class or even a<br>
+combination of type classes were relativised as well. For example, the nhds<br>
+filter for the type class topological_space</p>
+<p>definition (in topological_space) nhds :: "'a ⇒ 'a filter"<br>
+  where "nhds a = (INF S∈{S. open S ∧ a ∈ S}. principal S)"</p>
+<p>is relativised as</p>
+<p>definition nhds :: "'at ⇒ 'at filter" where<br>
+  "nhds a = (Inf_on 𝔘 (principal ` {S. S ⊆ 𝔘 ∧ τ S ∧ a ∈ S}))"</p>
+<p>In certain cases, more creative approaches were employed. For example, for<br>
+reasons of compatibility with the main class-based library, the type filter<br>
+was reused by providing new constants filter_on, inf_on and Inf_on to make<br>
+the type suitable for interpretation as complete/distributive lattices on<br>
+an explicit carrier sets, e.g.</p>
+<p>interpretation filter_clow:<br>
+  complete_lattice_ow "{F. filter_on 𝔘 F}"  "(≤)" "(&lt;)" "inf_on 𝔘" sup<br>
+bot "principal 𝔘"  "Inf_on 𝔘" Sup</p>
+<p>Once all definitions were provided, the theorems were relativised in a<br>
+semi-automatic manner. For example,</p>
+<p>lemma tendsto_compose: "g ─l→ g l ⟹ (f ⤏ l) F ⟹ ((λx. g (f x)) ⤏ g l) F"</p>
+<p>is relativised as</p>
+<p>lemma tendsto_compose:<br>
+  assumes "g <code> 𝔘A ⊆ 𝔘B"
+    and "l ∈ 𝔘A"
+    and "f </code> 𝔘C ⊆ 𝔘A"<br>
+    and "filter_on 𝔘C F"<br>
+    and "(on 𝔘B with τb: g ⤏⇩o⇩w g l) (on 𝔘A with τa at l)"<br>
+    and "(on 𝔘A with τa: f ⤏⇩o⇩w l) F"<br>
+  shows "(on 𝔘B with τb: (λx. g (f x)) ⤏⇩o⇩w g l) F"</p>
+<p>Nevertheless, as noted previously, "Types-To-Sets" does have limitations<br>
+and, at the moment, it is not very user-friendly. The library certainly<br>
+contains a substantial amount of boilerplate code, which I would like to<br>
+reduce. However, it seems that this cannot be done without providing<br>
+extensions/amendments to "Types-To-Sets" at the ML level.</p>
+<p>Thank you</p>
+<p>[1] F. Immler and B. Zhan, “Smooth Manifolds and Types to Sets for Linear<br>
+Algebra in Isabelle/HOL,” in Proceedings of the 8th ACM SIGPLAN<br>
+International Conference on Certified Programs and Proofs, ser. CPP 2019.<br>
+New York, NY, USA: ACM, 2019, pp. 65–77, event-place: Cascais, Portugal.</p>
+
+
+
+<a name="294753617"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Types-To-Sets%3A%20a%20question%20about%20further%20develo.../near/294753617" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Types-To-Sets.3A.20a.20question.20about.20further.20develo.2E.2E.2E.html#294753617">(Aug 22 2022 at 19:27)</a>:</h4>
+<p>From: Lawrence Paulson &lt;<a href="mailto:lp15@cam.ac.uk">lp15@cam.ac.uk</a>&gt;<br>
+Let me just offer my enthusiastic encouragement for you to continue!</p>
+<p>I have never managed to figure out how Types-To-Sets can be used, despite scrutinising example developments, so you deserve full credit simply for that. It definitely needs to be made more usable.</p>
+<p>Meanwhile the next release will contain tens of thousands of lines of new material about relativised concepts, not using Types-To-Sets but simply with new proofs ported from HOL Light. This is independent from your work, of course, but maybe the efforts can eventually be combined.</p>
+<p>Larry</p>
+
+
+
+<a name="294753628"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Types-To-Sets%3A%20a%20question%20about%20further%20develo.../near/294753628" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Types-To-Sets.3A.20a.20question.20about.20further.20develo.2E.2E.2E.html#294753628">(Aug 22 2022 at 19:27)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Recall that it is just an experiment to support a research paper in 2016<br>
+by Ondřej Kunčar and Andrei Popescu<br>
+<a href="https://link.springer.com/chapter/10.1007%2F978-3-319-43144-4_13">https://link.springer.com/chapter/10.1007%2F978-3-319-43144-4_13</a></p>
+<p>In 2016 and 2017 I have provided a lot of concrete feedback on the<br>
+implementation to turn it into more usable state (e.g. proper use of<br>
+Isar context commands), but somehow the project seems to have become<br>
+inactive.</p>
+<p>In the meantime Fabian Immler has made some improvements, but it is<br>
+still only experimental.</p>
+<p>Overall, there is also a high-level question about the use (or better<br>
+non-use of Types-To-Set). It is based on a genuine extension of the HOL<br>
+logic, and I am unsure what other HOL users say about it. For me this<br>
+discussion is still pending.</p>
+<p>Meta note: I am not communicating with people that don't expose there<br>
+real name. I have just seen a bit too many recent reports about<br>
+anonymous authors doing mischief on Wikipedia.</p>
+<p>A proper open-source project works like scientific research, by people<br>
+who stand with their own name and reputation for what they do and describe.</p>
+<p>Makarius</p>
+
+
+
+<a name="294753639"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Types-To-Sets%3A%20a%20question%20about%20further%20develo.../near/294753639" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Types-To-Sets.3A.20a.20question.20about.20further.20develo.2E.2E.2E.html#294753639">(Aug 22 2022 at 19:27)</a>:</h4>
+<p>From: mailing-list anonymous &lt;<a href="mailto:mailing.list.anonymous@gmail.com">mailing.list.anonymous@gmail.com</a>&gt;<br>
+Dear Lawrence Paulson/All,</p>
+<p>Thank you for your reply.</p>
+<p>I have followed the development of HOL-Analysis in the last several months.<br>
+Indeed, the work that is being done in the context of this development is<br>
+very impressive.<br>
+Thank you for your kind words about my work. However, of course, the credit<br>
+for the development of Types-To-Sets belongs to the authors of the original<br>
+article and the credit for the development of the methodology that I am<br>
+using belongs to Fabian Immler and Bohua Zhan.</p>
+<p>With my application of Types-To-Sets, I wanted to obtain a mathematics<br>
+library that is based entirely on classes and locales and uses a uniform<br>
+('software') structure both for algebraic structures and abstract spaces.<br>
+The main library of Isabelle/HOL, effectively, already achieves this goal.<br>
+However, the carrier sets for all structures are UNIVs. Types-To-Sets<br>
+allows for a nearly seamless conversion of each class/locale that treats<br>
+the carrier sets as UNIV to an equivalent locale with an explicitly defined<br>
+carrier set in a semi-automated manner. The main selling points of this<br>
+approach are</p>
+<p>1. Both explicit carrier sets and UNIV are treated in a uniform manner<br>
+   (also, my intention, is to introduce a database that relates the<br>
+   relativised and non-relativised theorems somehow).</p>
+<p>2. The results about explicit carrier sets are obtained from the results<br>
+   about UNIV in a semi-automatic manner, which implies less typing and<br>
+   fewer loc.</p>
+<p>3. Uniform 'software' structure for all algebraic structures and<br>
+   abstract spaces.</p>
+<p>4. It promotes the development of the main Isabelle/HOL library.</p>
+<p>To elaborate on clause 3, please see the comparison of the locale<br>
+topological_space_ow (relativisation of the class topological_space from<br>
+the theory Topological_Spaces) and the locale group_add_ow (relativisation<br>
+of the class group_add from the theory Groups):</p>
+<p>locale topological_space_ow =<br>
+  fixes 𝔘 :: "'at set" and τ :: "'at set ⇒ bool"<br>
+  assumes open_UNIV[simp, intro]: "τ 𝔘"<br>
+  assumes open_Int[intro]: "⟦ S ⊆ 𝔘; T ⊆ 𝔘; τ S; τ T ⟧ ⟹ τ (S ∩ T)"<br>
+  assumes open_Union[intro]: "⟦ K ⊆ Pow 𝔘; ∀S∈K. τ S ⟧ ⟹ τ (⋃K)"</p>
+<p>locale group_add_ow =<br>
+  minus_ow 𝔘 minus + uminus_ow 𝔘 uminus + monoid_add_ow 𝔘 plus zero<br>
+  for 𝔘 :: "'ag set"<br>
+    and plus (infixl "⇧+⇩o⇩w" 65)<br>
+    and minus (infixl "-⇩o⇩w" 65)<br>
+    and uminus :: "'ag ⇒ 'ag" ("-⇩o⇩w _" [81] 80)<br>
+    and zero ("0⇩o⇩w") +<br>
+  assumes left_inverse: "a ∈ 𝔘 ⟹ (-⇩o⇩w a) ⇧+⇩o⇩w a = 0⇩o⇩w"<br>
+    and add_inv_conv_diff: "⟦ a ∈ 𝔘; b ∈ 𝔘 ⟧ ⟹ a ⇧+⇩o⇩w (-⇩o⇩w b) = a<br>
+-⇩o⇩w b"</p>
+<p>As you can guess, it is now a very small step to provide the relativisation<br>
+of the class topological_group_add on an explicit carrier set.</p>
+<p>Please accept my apologies for another sales pitch. The main reason why I<br>
+am drawing so much attention to the development is that there is no other<br>
+way for me to find out whether or not someone else is doing something<br>
+similar, which is, of course, a grave concern to me.</p>
+<p>As a side note, I noticed that my previous email contains a great number of<br>
+typographical errors (normally, I do not confuse types and type<br>
+constructors).</p>
+<p>Thank you</p>
+
+
+
+<a name="294753648"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Types-To-Sets%3A%20a%20question%20about%20further%20develo.../near/294753648" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Types-To-Sets.3A.20a.20question.20about.20further.20develo.2E.2E.2E.html#294753648">(Aug 22 2022 at 19:27)</a>:</h4>
+<p>From: mailing-list anonymous &lt;<a href="mailto:mailing.list.anonymous@gmail.com">mailing.list.anonymous@gmail.com</a>&gt;<br>
+Dear Makarius Wenzel/All,</p>
+<p>Thank you for you reply. I would be very interested in learning more about<br>
+the concrete feedback that you provided in 2016 and 2017. Has it been<br>
+published anywhere? Would it be possible to provide any hyperlinks to this<br>
+feedback?</p>
+<p>I would also like to provide feedback with regard to your concerns about my<br>
+identity:</p>
+<p>1. I have already mentioned on this mailing list that I can provide my<br>
+   name/real contact details upon request, with the understanding that you<br>
+   agree not mention them on the mailing list. In fact, I have recently edited<br>
+   my signature for this email account to include this information. Given that<br>
+   you expressed your concerns about my identity and possibility of me being<br>
+   involved in mischief, I will send you a letter from the email that I<br>
+   normally use for professional correspondence later today. Of course, if I<br>
+   will ever make an attempt to submit any of my work to the AFP, it will be<br>
+   under my real name.</p>
+<p>2. There is a number of reasons why I do not wish to disclose my<br>
+   identity.</p>
+<p>1. In the past, I had problems with spam and online/telephone scam. I<br>
+      had to close two email accounts, one Skype account and had to change my<br>
+      mobile telephone number twice. I can only assume that I was<br>
+targeted due to<br>
+      a combination of my country of origin (Eastern Europe) and<br>
+having some kind<br>
+      of public profile at a certain point in my life. Some people will go<br>
+      through great lengths if they suspect that you have money and may be,<br>
+      somehow, susceptible to share it :).</p>
+<p>2. At the moment, Isabelle/formal proof is merely a hobby for me.<br>
+      Given that I have no publications in this area, I would prefer potential<br>
+      employers not to know too much about my involvement in this area, given<br>
+      that most of my previous experience was in an area that was not closely<br>
+      related. I believe that I will become more forthcoming about my<br>
+involvement<br>
+      if I will ever submit anything to the AFP.</p>
+<p>3. I have further, slightly more personal reasons, for not wishing to<br>
+      disclose my identity publicly.</p>
+<p>3. While I have no evidence, I can only guess that there may be poorly<br>
+   written articles on wikipedia that were written by people who disclosed<br>
+   their identities. However, I have little doubt that there are also many<br>
+   good contributions from people who did not wish to disclose their<br>
+   identities. For what it is worth, I have seen published articles in<br>
+   academic journals of good standing that were (many years after their<br>
+   publication) shown to contain substantial errors and served to cause great<br>
+   confusion. Also, there are many regular users of Stack Overflow who<br>
+   provided good answers without disclosing their identities.</p>
+<p>4. We owe Bitcoin to an anonymous contributor :).</p>
+<p>Thank you</p>
+
+
+
+<a name="294753662"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Types-To-Sets%3A%20a%20question%20about%20further%20develo.../near/294753662" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Types-To-Sets.3A.20a.20question.20about.20further.20develo.2E.2E.2E.html#294753662">(Aug 22 2022 at 19:27)</a>:</h4>
+<p>From: Andrei Popescu &lt;<a href="mailto:A.Popescu@mdx.ac.uk">A.Popescu@mdx.ac.uk</a>&gt;<br>
+Dear Makarius, Larry and Anonymous Contributor,</p>
+<p>I thank you for your support of, and contribution to the types-to-sets methodology. I believe the underlying local typedef rule is a very useful (yet gentle) upgrade of HOL, and have always advocated its candidacy for HOL citizenship. (Incidentally, one of my original motivations was to simplify our BNF/(co)datatype package constructions back in 2011, but in the end the package was developed without it.)</p>
+<p>However, I cannot help with making the types-to-sets machinery more user-friendly since I am not fluent in Isabelle/ML. It is Ondrej Kuncar who has implemented the local typedef rule and the accompanying "unoverloading" rule. And since Ondrej is also a co-developer of the lifting and transfer package, he is in an ideal position to make things happen; or to share some insights with people who might be interested in taking on such a development. Without more progress on this front, only power-users will use types-to-sets -- this is a shame, since types-to-sets could be part of the regular users' daily menu.</p>
+<p>Best wishes,</p>
+<p>Andrei</p>
+<p>Recall that it is just an experiment to support a research paper in 2016<br>
+by Ondřej Kunčar and Andrei Popescu<br>
+<a href="https://eur02.safelinks.protection.outlook.com/?url=https%3A%2F%2Flink.springer.com%2Fchapter%2F10.1007%252F978-3-319-43144-4_13&amp;data=02%7C01%7Ca.popescu%40mdx.ac.uk%7Cb30c5557591845e8acc508d6c18d0028%7C38e37b88a3a148cf9f056537427fed24%7C0%7C0%7C636909208665363247&amp;sdata=eRLNFLsiaQEq%2B%2BtqlqThR%2B3q9BUGUg1YCEijWZWDYeE%3D&amp;reserved=0">https://eur02.safelinks.protection.outlook.com/?url=https%3A%2F%2Flink.springer.com%2Fchapter%2F10.1007%252F978-3-319-43144-4_13&amp;data=02%7C01%7Ca.popescu%40mdx.ac.uk%7Cb30c5557591845e8acc508d6c18d0028%7C38e37b88a3a148cf9f056537427fed24%7C0%7C0%7C636909208665363247&amp;sdata=eRLNFLsiaQEq%2B%2BtqlqThR%2B3q9BUGUg1YCEijWZWDYeE%3D&amp;reserved=0</a></p>
+<p>In 2016 and 2017 I have provided a lot of concrete feedback on the<br>
+implementation to turn it into more usable state (e.g. proper use of<br>
+Isar context commands), but somehow the project seems to have become<br>
+inactive.</p>
+<p>In the meantime Fabian Immler has made some improvements, but it is<br>
+still only experimental.</p>
+<p>Overall, there is also a high-level question about the use (or better<br>
+non-use of Types-To-Set). It is based on a genuine extension of the HOL<br>
+logic, and I am unsure what other HOL users say about it. For me this<br>
+discussion is still pending.</p>
+<p>Meta note: I am not communicating with people that don't expose there<br>
+real name. I have just seen a bit too many recent reports about<br>
+anonymous authors doing mischief on Wikipedia.</p>
+<p>A proper open-source project works like scientific research, by people<br>
+who stand with their own name and reputation for what they do and describe.</p>
+<p>Makarius</p>
+
+
+
+<a name="294753668"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Types-To-Sets%3A%20a%20question%20about%20further%20develo.../near/294753668" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Types-To-Sets.3A.20a.20question.20about.20further.20develo.2E.2E.2E.html#294753668">(Aug 22 2022 at 19:27)</a>:</h4>
+<p>From: mailing-list anonymous &lt;<a href="mailto:mailing.list.anonymous@gmail.com">mailing.list.anonymous@gmail.com</a>&gt;<br>
+Dear Andrei Popescu/All,</p>
+<p>After using Types-To-Sets for the relativisation of the results from the<br>
+main library of Isabelle/HOL for a little while, I came to a conclusion<br>
+that the two main problems with the existing methodology are the<br>
+'boilerplate' code associated with having to restate the names of the<br>
+relativised theorems at least twice and, more importantly, forward<br>
+compatibility with the potential changes to the class/locale that is being<br>
+relativised (of course, it would also be interesting to understand if there<br>
+could be a negative impact associated with the extension of HOL logic and I<br>
+would like to know more about the arguments that were presented on this<br>
+subject in the past). I must admit that I am not certain whether further<br>
+automation, i.e. automatic generation of the relativised definitions, would<br>
+be beneficial and make the framework more user-friendly than it is at the<br>
+moment: usually there are several equivalent ways to present a given<br>
+relativised definition and I see no reason to force the users to use a<br>
+pre-defined default.</p>
+<p>In the short-/mid-term, I would like to provide the following functionality<br>
+that will not require any modifications to the critical code:</p>
+<ol>
+<li>
+<p>For the relativisation of definitions, I would like to discharge the<br>
+necessary proof obligations automatically and store a 'connection' between<br>
+the original and the relativised definitions as (retrievable) data.</p>
+</li>
+<li>
+<p>For the relativisation of theorems, I would like to combine the<br>
+application of a chain of attributes in a single parameterisable<br>
+command/attribute and (provide an option to) discharge the proof<br>
+obligations for further user amendments of the relativised results (e.g.<br>
+consider the case of an empty carrier set for topological spaces)<br>
+automatically. Naturally, this would also include the automation of the<br>
+naming conventions and, therefore, result in a significant reduction of the<br>
+boilerplate code. Also, the 'connection' between the relativised and<br>
+non-relativised theorems would be made available as retrievable data.</p>
+</li>
+</ol>
+<p>I believe that having an ability to see whether a given const/theorem was<br>
+relativised or not and where should be sufficient to make the framework<br>
+forward compatible with changes to the original class/locale, which, for<br>
+me, is the main problem with the large scale application of the framework.<br>
+The relativised definitions would still need to be provided by the user and<br>
+the transfer rules would still need to be proven manually. However, at<br>
+least, the user will not need to provide the statements of the theorems for<br>
+the transfer rules explicitly.</p>
+<p>In summary, my plan is to introduce several changes to the interface<br>
+associated with the methodology and not the critical code.</p>
+<p>I am not, specifically, asking for any help with the technical matters, but<br>
+I would appreciate any insight. I am merely trying to do understand whether<br>
+or not there are any active R&amp;D projects related to "Types-To-Sets". Given<br>
+that this project does not have the highest priority for me and I have much<br>
+to learn about Isabelle at the ML level, it is likely that I will be<br>
+working on this project for several months to come in small intervals. I am<br>
+merely trying to reassure myself that this will not be a wasted effort<br>
+because someone else is already working on something better. As a side<br>
+note, of course, as I mentioned previously, if anyone has any particular<br>
+ideas about what can be done beyond what is suggested in [1] and in this<br>
+email, I would be interested in learning about them. Also, if you suspect<br>
+that I might be trying to take this work in the wrong direction, I would be<br>
+thankful to hear from you.</p>
+<p>Thank you</p>
+<p>[1] F. Immler and B. Zhan, “Smooth Manifolds and Types to Sets for Linear<br>
+Algebra in Isabelle/HOL,” in Proceedings of the 8th ACM SIGPLAN<br>
+International Conference on Certified Programs and Proofs, ser. CPP 2019.<br>
+New York, NY, USA: ACM, 2019, pp. 65–77, event-place: Cascais, Portugal.</p>
+
+
+
+<a name="294753704"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Types-To-Sets%3A%20a%20question%20about%20further%20develo.../near/294753704" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Types-To-Sets.3A.20a.20question.20about.20further.20develo.2E.2E.2E.html#294753704">(Aug 22 2022 at 19:27)</a>:</h4>
+<p>From: Andrei Popescu &lt;<a href="mailto:A.Popescu@mdx.ac.uk">A.Popescu@mdx.ac.uk</a>&gt;<br>
+Dear Anonymous, </p>
+<p>Personally, I think that your goals 1 and 2 are wisely chosen, and could bring a very nice contribution. As for the question of other projects related to the topic, I don't know of other work (besides that of Fabian Immler and Bohua Zhan which you cite and the ones mentioned by Rene Thiemann in a previous thread). </p>
+<p>Best wishes, </p>
+<p>Andrei</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

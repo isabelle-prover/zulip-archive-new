@@ -1,0 +1,348 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] parse_translation does not detect changes in t... · Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/index.html">Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20parse_translation.20does.20not.20detect.20changes.20in.20t.2E.2E.2E.html">[isabelle] parse_translation does not detect changes in t...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="236772958"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20parse_translation%20does%20not%20detect%20changes%20in%20t.../near/236772958" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20parse_translation.20does.20not.20detect.20changes.20in.20t.2E.2E.2E.html#236772958">(Apr 30 2021 at 01:35)</a>:</h4>
+<p>From: Matthys Grobbelaar &lt;<a href="mailto:m.grobbelaar@uq.net.au">m.grobbelaar@uq.net.au</a>&gt;<br>
+I'm currently attempting to do syntax translations which require data (a queue) from the current theory context.<br>
+I've been able to add the queue into the theory context using the Theory_Data functor, however I can't seem to access that data in my translation function (called via parse_translation). For reference, I've been using the "Isabelle/Isar Implementation" (implementation.pdf (tum.de)&lt;<a href="https://isabelle.in.tum.de/dist/Isabelle2021/doc/implementation.pdf">https://isabelle.in.tum.de/dist/Isabelle2021/doc/implementation.pdf</a>&gt; Chapter 1.1 as a basis for adding data into the context.</p>
+<p>Am I adding the data into the wrong place? What's the correct way of doing this?</p>
+<p>Kind regards and thank you in advance,<br>
+Matthys Grobbelaar</p>
+
+
+
+<a name="236813754"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20parse_translation%20does%20not%20detect%20changes%20in%20t.../near/236813754" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20parse_translation.20does.20not.20detect.20changes.20in.20t.2E.2E.2E.html#236813754">(Apr 30 2021 at 10:22)</a>:</h4>
+<p>From: Dominique Unruh &lt;<a href="mailto:unruh@ut.ee">unruh@ut.ee</a>&gt;<br>
+Hi,</p>
+<p>how are you accessing the theory inside your parse translation? If you <br>
+use the ML antiquotation \&lt;^theory&gt; (rendered /<em>theory</em>/), then you get <br>
+the theory that you had at compile time of the parse translation. (And <br>
+theories are immutable, so changing the theory data will not affect that <br>
+theory.) The correct way is to use the context that is given to the <br>
+parse translation as an argument, and then get the theory via <br>
+"Proof_Context.theory_of ctxt". (If this is already what you are doing, <br>
+sorry for pointing out the obvious.)</p>
+<p>Best wishes,<br>
+Dominique.</p>
+
+
+
+<a name="236918467"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20parse_translation%20does%20not%20detect%20changes%20in%20t.../near/236918467" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20parse_translation.20does.20not.20detect.20changes.20in.20t.2E.2E.2E.html#236918467">(Apr 30 2021 at 23:52)</a>:</h4>
+<p>From: Matthys Grobbelaar &lt;<a href="mailto:m.grobbelaar@uq.net.au">m.grobbelaar@uq.net.au</a>&gt;<br>
+Hi Dominique,</p>
+<p>Thank you for your quick response.<br>
+At the moment, I've been accessing the theory with the following: Context.theory_of (Context.proof ctxt) where ctxt is the context given to the parse translation.<br>
+I've since changed it to be Proof_Context.theory_of ctxt which looks cleaner and appears to yield identical results.</p>
+<p>At the moment, I've been testing this as follows:</p>
+<p>*   Making a duplicate translation function in the file where I'm modifying the theory context (via setup and using the functor) and called it directly: val _ = parse_val (Context.the_local_context ()) [@{term "..."}]<br>
+  *   Making a direct call to my original translation function (which lives in another theory) with the same parameters: val _ = parse_val_orig (Context.the_local_context ()) [@{term "..."}]<br>
+  *   Using the syntax directly in the file where I'm modifying the theory context: &lt;\lrel&gt;...&lt;/rrel&gt; where &lt;\lrel&gt; and &lt;\rrel&gt; is the new syntax (just a pair of parentheses essentially)</p>
+<p>The dummy translation function is as follows (essentially just printing out the content of the queue):<br>
+    fun parse_val ctxt [trm] =<br>
+        let<br>
+            val data = VarList.get (Proof_Context.theory_of ctxt)    (* VarList is the structure using the functor which stores the data *)<br>
+            val _ = VarList.print_vars data ctxt<br>
+        in undefined end;</p>
+<p>The duplicate function in the file where the I'm modifying the context prints out the values in the queue correctly. The direct call to the translation function in the other theory and the use of syntax (which also uses this other function) prints nothing (an empty queue). Note that the printing function does not modify the queue passed in for printing.</p>
+<p>Why would the same argument, given to identical methods in different files, have different results? It seems a bit strange to me.</p>
+<p>Kind regards and thank you in advance,<br>
+Matthys Grobbelaar</p>
+
+
+
+<a name="236952264"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20parse_translation%20does%20not%20detect%20changes%20in%20t.../near/236952264" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20parse_translation.20does.20not.20detect.20changes.20in.20t.2E.2E.2E.html#236952264">(May 01 2021 at 09:15)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+I find it hard to follow what you are actually doing. Can you show the formal<br>
+explanation written in Isabelle/ML?</p>
+<p>A lot of details are non-standard in the small snipptes (e.g. use of<br>
+Context.the_local_context, undefined, trm as name for a term), so it is likely<br>
+that the overall approach is somehow wrong.</p>
+<p>Further note that in functional programming, functions are called "functions",<br>
+not methods.</p>
+<p>Makarius</p>
+
+
+
+<a name="236953596"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20parse_translation%20does%20not%20detect%20changes%20in%20t.../near/236953596" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20parse_translation.20does.20not.20detect.20changes.20in.20t.2E.2E.2E.html#236953596">(May 01 2021 at 09:41)</a>:</h4>
+<p>From: Dominique Unruh &lt;<a href="mailto:unruh@ut.ee">unruh@ut.ee</a>&gt;</p>
+<blockquote>
+<p>Why would the same argument, given to identical methods in different <br>
+files, have different results? It seems a bit strange to me.</p>
+</blockquote>
+<p>That does seem very strange to me, too. My best hypothesis is that they <br>
+are not, actually, identical methods. (They might have the exact same <br>
+code but, due to different namespaces, call different functions in their <br>
+code.)</p>
+<p>What I would try:</p>
+<p>* Write \&lt;^context&gt; instead of "Context.the_local_context ()" in your<br>
+    experiments (shouldn't change much, but if you want to refer to the<br>
+    current context at compile time of a given code snippet, that's the<br>
+    right thing to use).</p>
+<p>* Ctrl-click on both of VarList.get and VarList.print_vars to see<br>
+    where jEdit jumps. If it jumps to different places, then you have<br>
+    accidentally defined VarList twice. (Also check whether you might<br>
+    include the same ML-file twice.)</p>
+<p>* Try and print theory you got, to see if it's the right one (val _ =<br>
+    Proof_Context.theory_of ctxt |&gt; \&lt;^print&gt; or something like that).<br>
+    \&lt;^print&gt; is useful generally for debugging because it can be<br>
+    applied to anything, not just strings.</p>
+<p>* Instead of "undefined", you can also as a hack return debug output<br>
+    from a parse translation via: HOLogic.mk_literal string_to_return<br>
+    (this will then give you a string literal inside your parsed<br>
+    output). Not sure it helps specifically with your current problem,<br>
+    but it might be useful in general.</p>
+<p>Best wishes,<br>
+Dominique.</p>
+
+
+
+<a name="237023894"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20parse_translation%20does%20not%20detect%20changes%20in%20t.../near/237023894" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20parse_translation.20does.20not.20detect.20changes.20in.20t.2E.2E.2E.html#237023894">(May 02 2021 at 04:01)</a>:</h4>
+<p>From: Matthys Grobbelaar &lt;<a href="mailto:m.grobbelaar@uq.net.au">m.grobbelaar@uq.net.au</a>&gt;<br>
+Hi Makarius,</p>
+<p>My overall approach is as follows:<br>
+In order to add my queue of data into the theory context I have the following structure defined in a file structures.ML:</p>
+<p>--- BEGIN structures.ML ---<br>
+signature VAR_LIST =<br>
+sig<br>
+    val get: theory -&gt; term Queue.T<br>
+    val add: term -&gt; theory -&gt; theory<br>
+    val reset: theory -&gt; theory<br>
+end;</p>
+<p>structure VarList: VAR_LIST =<br>
+struct</p>
+<p>structure Terms = Theory_Data (<br>
+    type T = term Queue.T;<br>
+    val empty = Queue.empty;<br>
+    val extend = I;<br>
+    fun merge (ts1, ts2) = fold Queue.enqueue (Library.merge (op =) (Queue.content ts1, Queue.content ts2)) Queue.empty;<br>
+);</p>
+<p>val get = Terms.get;</p>
+<p>fun add raw_t thy = <br>
+    let<br>
+        val t = Sign.cert_term thy raw_t;<br>
+    in <a href="http://Terms.map">Terms.map</a> (Queue.enqueue t) thy end;</p>
+<p>fun reset thy = Terms.put (Queue.empty) thy;</p>
+<p>end;</p>
+<p>--- END structures.ML ---</p>
+<p>Then, in a separate theory file, I have my syntax definition and translation function:</p>
+<p>--- BEGIN MyRelations.thy ---<br>
+theory MyRelations<br>
+  imports Main  (* I'm not sure if there's a more appropriate theory to import *)<br>
+begin</p>
+<p>ML_file \&lt;open&gt; structures.ML \&lt;close&gt;</p>
+<p>syntax<br>
+    "_myrelation" :: "args =&gt; 'a set" ("\&lt;lrel&gt;_\&lt;rrel&gt;")  (* lrel and rrel are new symbols I've defined *)</p>
+<p>ML \&lt;open&gt;<br>
+fun translate_relation ctxt [trm] =<br>
+    let<br>
+        val data = VarList.get (Proof_Context.theory_of ctxt)  (* Retrieve the data in the theory context *)<br>
+        val _ = print_var_list data ctxt  (* Just prints out the terms in the list with the given context *) <br>
+        (* My actual translation uses the data stored to build a set of tuples satisfying a predicate *)<br>
+        val translation = @{term "{((x, y),(x', y')). x &gt; x'}"}   (* Just a dummy value for demo purposes *)<br>
+    in<br>
+        translation<br>
+    end<br>
+\&lt;close&gt;</p>
+<p>parse_translation \&lt;open&gt;[(@{syntax_const "_myrelation"}, translate_relation)] \&lt;close&gt;<br>
+end<br>
+--- END MyRelations.thy ---</p>
+<p>Finally, I have a theory file used for testing the translation:</p>
+<p>--- BEGIN TestRelation.thy ---<br>
+theory TestRelation<br>
+  imports "MyRelations"<br>
+begin</p>
+<p>(* Update the theory context with the necessary data for translation *)<br>
+setup \&lt;open&gt;<br>
+  VarList.add (@{term "x"}) #&gt;<br>
+  VarList.add (@{term "y"}) #&gt;<br>
+  VarList.add (@{term "z"})<br>
+\&lt;close&gt;</p>
+<p>(* See if the syntax creates the correct result *)<br>
+(* Note that the variables added create the tuples in the set comprehension *)<br>
+(* Here, the queue data is not printed out *)<br>
+lemma test_relation: "\&lt;lrel&gt; x &gt; x' \&lt;rrel&gt;" = "{((x,y,z), (x',y',z')). x &gt; x'}"</p>
+<p>(* We also create a duplicate of the translation function to see if it works differently *)<br>
+ML \&lt;open&gt;<br>
+fun translate_relation_dup ctxt [trm] =<br>
+    let<br>
+        val data = VarList.get (Proof_Context.theory_of ctxt) <br>
+        val _ = print_var_list data ctxt  <br>
+        val translation = @{term "{((x, y),(x', y')). x &gt; x'}"}   <br>
+    in<br>
+        translation<br>
+    end</p>
+<p>(* We call the duplicate translation function directly - the data is printed *)<br>
+val res = translate_relation_dup (Context.the_local_context ()) [@{term "x &gt; x'"}]<br>
+\&lt;close&gt;<br>
+end<br>
+--- END TestRelation.thy ---</p>
+<p>So essentially, when the translation function is called via the syntax, the data stored<br>
+in the theory context is not passed into the function. However, when I call a duplicate<br>
+translation function with what I would think are identical arguments, the stored data<br>
+is present. </p>
+<p>I'm not sure where I'm going wrong.  Any help is much appreciated. I'm quite new<br>
+to Isabelle so I'm certain that there are better ways to go about this.</p>
+<p>Kind regards and thank you in advance,<br>
+Matthys Grobbelaar</p>
+<p>I find it hard to follow what you are actually doing. Can you show the formal explanation written in Isabelle/ML?</p>
+<p>A lot of details are non-standard in the small snipptes (e.g. use of Context.the_local_context, undefined, trm as name for a term), so it is likely that the overall approach is somehow wrong.</p>
+<p>Further note that in functional programming, functions are called "functions", not methods.</p>
+<p>Makarius</p>
+
+
+
+<a name="237024341"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20parse_translation%20does%20not%20detect%20changes%20in%20t.../near/237024341" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20parse_translation.20does.20not.20detect.20changes.20in.20t.2E.2E.2E.html#237024341">(May 02 2021 at 04:09)</a>:</h4>
+<p>From: Matthys Grobbelaar &lt;<a href="mailto:m.grobbelaar@uq.net.au">m.grobbelaar@uq.net.au</a>&gt;<br>
+Hi Dominique,</p>
+<p>Thank you for your advice.<br>
+Learning about \&lt;^context&gt;, &lt;\^print&gt; and mk_literal has been very useful and has made debugging a lot easier.</p>
+<p>With regards to looking where JEdit jumps to, both jump to the same structure so the code is the same there. Also printing the theory appears to give the same output as well. It may well be that there is something happening with the namespaces.</p>
+<p>Kind regards,<br>
+Matthys Grobbelaar</p>
+<p>From: Dominique Unruh &lt;<a href="mailto:d.unruh@gmail.com">d.unruh@gmail.com</a>&gt; On Behalf Of Dominique Unruh<br>
+Sent: Saturday, 1 May 2021 7:41 PM<br>
+To: Matthys Grobbelaar &lt;<a href="mailto:m.grobbelaar@uq.net.au">m.grobbelaar@uq.net.au</a>&gt;<br>
+Cc: <a href="mailto:cl-isabelle-users@lists.cam.ac.uk">cl-isabelle-users@lists.cam.ac.uk</a><br>
+Subject: Re: [isabelle] parse_translation does not detect changes in theory data</p>
+<blockquote>
+<p>Why would the same argument, given to identical methods in different files, have different results? It seems a bit strange to me.</p>
+</blockquote>
+<p>That does seem very strange to me, too. My best hypothesis is that they are not, actually, identical methods. (They might have the exact same code but, due to different namespaces, call different functions in their code.)</p>
+<p>What I would try:</p>
+<p>*   Write \&lt;^context&gt; instead of "Context.the_local_context ()" in your experiments (shouldn't change much, but if you want to refer to the current context at compile time of a given code snippet, that's the right thing to use).<br>
+  *   Ctrl-click on both of VarList.get and VarList.print_vars to see where jEdit jumps. If it jumps to different places, then you have accidentally defined VarList twice. (Also check whether you might include the same ML-file twice.)<br>
+  *   Try and print theory you got, to see if it's the right one (val _ = Proof_Context.theory_of ctxt |&gt; \&lt;^print&gt; or something like that). \&lt;^print&gt; is useful generally for debugging because it can be applied to anything, not just strings.<br>
+  *   Instead of "undefined", you can also as a hack return debug output from a parse translation via: HOLogic.mk_literal string_to_return (this will then give you a string literal inside your parsed output). Not sure it helps specifically with your current problem, but it might be useful in general.</p>
+<p>Best wishes,<br>
+Dominique.</p>
+
+
+
+<a name="237042281"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20parse_translation%20does%20not%20detect%20changes%20in%20t.../near/237042281" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20parse_translation.20does.20not.20detect.20changes.20in.20t.2E.2E.2E.html#237042281">(May 02 2021 at 10:03)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+These theory and ML sources are the main means of communication, both with the<br>
+system and between humans.</p>
+<p>I've put everything into "canonical form", such it tells the story on its own<br>
+account, using standard "style and orthography": see the attached<br>
+My_Relation.thy. Doing this, it magically worked in the end, while your<br>
+original sources did not even type-check (maybe something was missing here and<br>
+there).</p>
+<p>Of course, it requires some practice to do things in the proper way. It helps<br>
+to look around in documentation and existing implementations, and eventually<br>
+develop a taste for good and bad approaches.</p>
+<p>Here are also some concrete hints for your attempt so far:</p>
+<p>* There is no point to have many small files to obscure the structure of the<br>
+project. Instead, I've written just one "theory document" with various<br>
+sections. (As the project grows and matures, it will of course have more files<br>
+at some later stage, e.g. at a healthy size of 5-25 KByte each.)</p>
+<p>* A theory name should consist of several words separated by underscore,<br>
+describing the main concept of your theory in singular. Plural is only used if<br>
+you have multiple concepts, or multiple examples. E.g. theory<br>
+"My_Great_Concept" vs. theory "My_Great_Concept_Examples". Moreover,<br>
+WeDontUseCamelCaseAnymore, because Underscore_has_been_discovered_decades_ago.</p>
+<p>* For Isabelle/HOL the canonical import is indeed theory "Main"; you should<br>
+not import anything more primitive inside HOL, because that would mean to<br>
+depend on its rather complex bootstrap. Sometimes you need more base material,<br>
+e.g. types rat, real, complex: then you import "Complex_Main" or a different<br>
+library entry point (beyond Main).</p>
+<p>* Theory data: Instead of the slightly odd Queue.T you can use a plain list<br>
+in "canonical reverse order" as shown in my version. To add means to "cons",<br>
+and to merge means to use the standard operation "Library.merge": with proper<br>
+equality on type term (aconv).</p>
+<p>* Symbols \&lt;lrel&gt; and \&lt;rrel&gt;: it is OK to experiment with newly allocated<br>
+symbols in the infinite space of possibilities, but to get anything into the<br>
+official Isabelle release (e.g. for Isabelle/AFP entries with more than one<br>
+user), it needs to be really convincing. (I've done that with some Z guys<br>
+recently, and it required 2 weeks to get everything right: fonts, latex<br>
+macros, symbol names and groups.)</p>
+<p>It is often better to use variants of pre-allocated symbols, e.g. together<br>
+with \&lt;^bold&gt; or other decoration to avoid conflicts. It is easy to define<br>
+specific input methods for Isabelle/jEdit in the theory header using<br>
+"abbrevs", e.g. see theory HOL-Library.Finite_Map.</p>
+<p>Side-remark: the Isabelle Prover IDE is called Isabelle/jEdit, while "jEdit"<br>
+is a plain text editor used as a basis for that. Nobody would call an Emacs<br>
+mode for Isabelle just "Emacs", or a VSCode extension for Isabelle just "VSCode".</p>
+<p>It is important to treat the jEdit project honestly as something separate (and<br>
+quite different). It deserves its original name for itself, and not confuse it<br>
+with our Prover IDE add-ons.</p>
+<p>(An alternative is to call Isabelle/jEdit abstractly "PIDE".)</p>
+<p>Makarius<br>
+<a href="/user_uploads/14278/C35RAh5d7JUt0-WaVYZA9lFl/My_Relation.thy">My_Relation.thy</a></p>
+
+
+
+<a name="237051299"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20parse_translation%20does%20not%20detect%20changes%20in%20t.../near/237051299" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20parse_translation.20does.20not.20detect.20changes.20in.20t.2E.2E.2E.html#237051299">(May 02 2021 at 12:58)</a>:</h4>
+<p>From: Matthys Grobbelaar &lt;<a href="mailto:m.grobbelaar@uq.net.au">m.grobbelaar@uq.net.au</a>&gt;<br>
+Hi Makarius,</p>
+<p>Thank you for the great advice, I appreciate it! It will really help improve my programming in Isabelle.<br>
+With regards to structuring theories, I am constructing a framework of syntax translations (as part of a larger project) and would like to have a single top-level entry point which the other theories in the project can include if they would like to use the framework. </p>
+<p>At the moment I have the following entry point:</p>
+<p>--- BEGIN Translations_Main.thy ---<br>
+theory Translations_Main<br>
+    imports<br>
+        "core/My_Relation"<br>
+        "core/My_Predicate"<br>
+        (* More imports are added here as the framework evolves *)<br>
+begin</p>
+<p>end<br>
+--- END Translations_Main ---</p>
+<p>Then any other theory can simply use the framework by importing Translations_Main.<br>
+Is this the correct way to go about structuring such a framework? Are there things I should watch out for?</p>
+<p>Kind regards and thank you in advance,<br>
+Matthys Grobbelaar</p>
+<p>These theory and ML sources are the main means of communication, both with the system and between humans.</p>
+<p>I've put everything into "canonical form", such it tells the story on its own account, using standard "style and orthography": see the attached My_Relation.thy. Doing this, it magically worked in the end, while your original sources did not even type-check (maybe something was missing here and there).</p>
+<p>Of course, it requires some practice to do things in the proper way. It helps to look around in documentation and existing implementations, and eventually develop a taste for good and bad approaches.</p>
+<p>Here are also some concrete hints for your attempt so far:</p>
+<p>* There is no point to have many small files to obscure the structure of the project. Instead, I've written just one "theory document" with various sections. (As the project grows and matures, it will of course have more files at some later stage, e.g. at a healthy size of 5-25 KByte each.)</p>
+<p>* A theory name should consist of several words separated by underscore, describing the main concept of your theory in singular. Plural is only used if you have multiple concepts, or multiple examples. E.g. theory "My_Great_Concept" vs. theory "My_Great_Concept_Examples". Moreover, WeDontUseCamelCaseAnymore, because Underscore_has_been_discovered_decades_ago.</p>
+<p>* For Isabelle/HOL the canonical import is indeed theory "Main"; you should not import anything more primitive inside HOL, because that would mean to depend on its rather complex bootstrap. Sometimes you need more base material, e.g. types rat, real, complex: then you import "Complex_Main" or a different library entry point (beyond Main).</p>
+<p>* Theory data: Instead of the slightly odd Queue.T you can use a plain list in "canonical reverse order" as shown in my version. To add means to "cons", and to merge means to use the standard operation "Library.merge": with proper equality on type term (aconv).</p>
+<p>* Symbols \&lt;lrel&gt; and \&lt;rrel&gt;: it is OK to experiment with newly allocated symbols in the infinite space of possibilities, but to get anything into the official Isabelle release (e.g. for Isabelle/AFP entries with more than one user), it needs to be really convincing. (I've done that with some Z guys recently, and it required 2 weeks to get everything right: fonts, latex macros, symbol names and groups.)</p>
+<p>It is often better to use variants of pre-allocated symbols, e.g. together with \&lt;^bold&gt; or other decoration to avoid conflicts. It is easy to define specific input methods for Isabelle/jEdit in the theory header using "abbrevs", e.g. see theory HOL-Library.Finite_Map.</p>
+<p>Side-remark: the Isabelle Prover IDE is called Isabelle/jEdit, while "jEdit"<br>
+is a plain text editor used as a basis for that. Nobody would call an Emacs mode for Isabelle just "Emacs", or a VSCode extension for Isabelle just "VSCode".</p>
+<p>It is important to treat the jEdit project honestly as something separate (and quite different). It deserves its original name for itself, and not confuse it with our Prover IDE add-ons.</p>
+<p>(An alternative is to call Isabelle/jEdit abstractly "PIDE".)</p>
+<p>Makarius</p>
+
+
+
+<a name="237052918"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/247541-Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20parse_translation%20does%20not%20detect%20changes%20in%20t.../near/237052918" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/247541-Mirror:-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20parse_translation.20does.20not.20detect.20changes.20in.20t.2E.2E.2E.html#237052918">(May 02 2021 at 13:29)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+It is correct, merely some possibilities for fine-tuning:</p>
+<p>* No need for "_Main" in the name, just use a theory name that describes<br>
+your framework, and potentially let it coincide with the session name. For<br>
+example: session "My_Great_Framework" with main theory "My_Great_Framework"<br>
+(and "_Framework" does not have to be literally in the name).</p>
+<p>* Sub-directories for sessions are possible, but somehow confusing: it<br>
+complicates the mapping of the per-session theory name space to files, both<br>
+for the system and the user.</p>
+<p>* Did you actually have a proper ROOT file with session definition already?<br>
+If not, you can start with "isabelle mkroot" and then remove the generated<br>
+document setup; or you just look at example ROOT files (and strip the "HOL-"<br>
+name prefix).</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Jul 15 2022 at 23:21 UTC</p>
+</html>

@@ -1,0 +1,82 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Interrupt Isabelle with signal · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Interrupt.20Isabelle.20with.20signal.html">[isabelle] Interrupt Isabelle with signal</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294050237"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Interrupt%20Isabelle%20with%20signal/near/294050237" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Interrupt.20Isabelle.20with.20signal.html#294050237">(Aug 18 2022 at 10:38)</a>:</h4>
+<p>From: Florian Funke &lt;<a href="mailto:funke@informatik.uni-tuebingen.de">funke@informatik.uni-tuebingen.de</a>&gt;<br>
+Hi all,</p>
+<p>I'm working on a program that starts Isabelle and communicates with the<br>
+Isabelle process (in Isar interaction mode) using its standard output and<br>
+input stream. Now I'd like to be able to cancel commands I've sent to<br>
+Isabelle (e.g. because their execution doesn't terminate). The<br>
+ProofGeneral seems to have this capability and uses<br>
+comint-interrupt-subjob in the proof-interrupt-process function. But when<br>
+I try to send a SIGINT signal to the isabelle-process, it doesn't have any<br>
+impact, however sending SIGINT to the poly process that isabelle starts<br>
+("poly-driver") manually, causes Isabelle to cancel the execution of the<br>
+current command (which is what I'm trying to do from within my program).<br>
+This is a problem, since I do not have a chance to get the process ID of<br>
+this poly-driver process that Isabelle spawns and therefore cannot send<br>
+signals to it (I do have Isabelle's PID, of cause). In the Isabelle System<br>
+Manual, I couldn't find out if there is a way to send signals to the<br>
+Isabelle process directly, neither how the ProofGeneral deals with this<br>
+problem.</p>
+<p>-- Florian</p>
+
+
+
+<a name="294050262"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Interrupt%20Isabelle%20with%20signal/near/294050262" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Interrupt.20Isabelle.20with.20signal.html#294050262">(Aug 18 2022 at 10:38)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+Peeking at comint.el reveals that emacs signals the whole process group of <br>
+the controlling pty here.  I've managed to imitate this behaviour in the <br>
+shell using kill with negated PID like this:</p>
+<p>kill -INT -- -4711</p>
+<p>Also note that the Isabelle/Isar toplevel ignores any INT signals unless <br>
+it actually runs a command.  To test kills more easily you may use the raw <br>
+ML toplevel, which reports something like ``Compilation interrupted''.</p>
+<p>Makarius</p>
+
+
+
+<a name="294050274"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Interrupt%20Isabelle%20with%20signal/near/294050274" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Interrupt.20Isabelle.20with.20signal.html#294050274">(Aug 18 2022 at 10:39)</a>:</h4>
+<p>From: "Mark A. Hillebrand" &lt;<a href="mailto:mah@dfki.de">mah@dfki.de</a>&gt;<br>
+Hi Florian,</p>
+<p>I have made the same observation when writing a similar program; I use<br>
+Perl with the <a href="http://Expect.pm">Expect.pm</a> library to remote-control Isabelle. While<br>
+sending SIGINT does not come through to Isabelle (maybe it gets stuck in<br>
+lib/scripts/feeder.pl, but I haven't investigated closely), sending a<br>
+control-C character seems to interrupt the Isabelle process. Here is a<br>
+short example:</p>
+<p>#!/usr/bin/perl<br>
+    use Expect;</p>
+<p>my $isabelle = Expect-&gt;new();</p>
+<p>$isabelle-&gt;spawn('/usr/local/Isabelle/bin/isabelle', 'HOL' );<br>
+    #$isabelle-&gt;raw_pty(1);</p>
+<p>$isabelle-&gt;log_file("log.txt");<br>
+    #$isabelle-&gt;log_stdout(1);<br>
+    #$isabelle-&gt;exp_internal(1);</p>
+<p>$isabelle-&gt;send(qq(use_thy "~~/HOL/Library/Word";\n));</p>
+<p>sleep 1; # keep loading for a bit<br>
+    $isabelle-&gt;send("\cC"); # interrupt<br>
+    sleep 1; # wait another bit</p>
+<p>$isabelle-&gt;send("quit();\n");<br>
+    $isabelle-&gt;soft_close;</p>
+<p>(Be aware that this program doesn't really synchronize with Isabelle<br>
+prompts etc. but it should).</p>
+<p>Hope this helps</p>
+<p>Mark</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

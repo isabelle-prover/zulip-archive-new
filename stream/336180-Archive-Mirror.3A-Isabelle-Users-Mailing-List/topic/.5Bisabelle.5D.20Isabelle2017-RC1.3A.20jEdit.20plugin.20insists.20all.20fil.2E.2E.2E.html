@@ -1,0 +1,171 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Isabelle2017-RC1: jEdit plugin insists all fil... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2017-RC1.3A.20jEdit.20plugin.20insists.20all.20fil.2E.2E.2E.html">[isabelle] Isabelle2017-RC1: jEdit plugin insists all fil...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294718915"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2017-RC1%3A%20jEdit%20plugin%20insists%20all%20fil.../near/294718915" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2017-RC1.3A.20jEdit.20plugin.20insists.20all.20fil.2E.2E.2E.html#294718915">(Aug 22 2022 at 16:01)</a>:</h4>
+<p>From: <a href="mailto:Matthew.Brecknell@data61.csiro.au">Matthew.Brecknell@data61.csiro.au</a><br>
+On Tue, 2017-08-22 at 11:15 +0200, Makarius wrote:</p>
+<blockquote>
+<p>On 22/08/17 09:01, <a href="mailto:Matthew.Brecknell@data61.csiro.au">Matthew.Brecknell@data61.csiro.au</a> wrote:</p>
+<blockquote>
+<p>We have many theories and other source files which are generated at<br>
+various times during our lengthy build process. It seems that before I can<br>
+use <code>isabelle jedit -d</code> to load even our very first session, I must first<br>
+generate all files mentioned in all sessions accessible from the ROOTS<br>
+file, and all their theories.</p>
+</blockquote>
+<p>This sounds like a conflict of a legacy build process based on "make"<br>
+versus Isabelle session structure with "isabelle build" and now<br>
+increasingly inside Isabelle/jEdit.</p>
+<p>At some point you should try to overcome this tension, and do it all<br>
+within static theory sources (by loading other files into a theory from<br>
+within).</p>
+<blockquote>
+<p>Can this requirement be relaxed again, so that I only need the files for<br>
+the session I want to load?</p>
+</blockquote>
+<p>See the following NEWS entry:</p>
+<ul>
+<li>Command-line invocation "isabelle jedit -R -l SESSION" uses the parent<br>
+image of the SESSION, with qualified theory imports restricted to that<br>
+portion of the session graph. Moreover, the ROOT entry of the SESSION is<br>
+opened in the editor.</li>
+</ul>
+</blockquote>
+<p>Last week, I finished updating all our proofs to Isabelle2017-RC0,<br>
+without significant issues. I am still checking against RC1, but so far<br>
+so good.</p>
+<p>However, I have noticed that in RC1, "isabelle jedit -R -l SESSION" no<br>
+longer ignores sessions that are not ancestors of SESSION. So now, we<br>
+really do need to generate all files mentioned in all sessions<br>
+accessible from the ROOTS file, and all their theories, before we can<br>
+open Isabelle/jEdit on any of our sessions.</p>
+<p>This will make life very difficult for us.</p>
+<p>I have thought about this since my previous email, and I doubt we can<br>
+ever escape what you describe as a "legacy build process" based on<br>
+"make".</p>
+<p>One of the reasons for this: For our proofs about the seL4 C kernel, we<br>
+rely on the build process for the C kernel to generate preprocessed<br>
+sources. Our C parser, implemented in Isabelle/ML, then generates a C<br>
+specification from these preprocessed kernel sources. We need to mention<br>
+the preprocessed sources in a ROOT file, to ensure that Isabelle<br>
+rebuilds the session at the right times.</p>
+<p>Without the leniency of the RC0 behaviour of "isabelle jedit -R", our<br>
+options appear to be:</p>
+<ul>
+<li>Before attempting to open Isabelle/jEdit, run a "make" step which<br>
+  generates all the files for all our sessions. While not too<br>
+  inconvenient, it's distasteful that we would need to generate<br>
+  preprocessed kernel sources for a session near the top of our hierarchy,<br>
+  just to work on our library sessions at the leaves.</li>
+</ul>
+<p>There is also the chance that we find ourselves in a chicken-and-egg<br>
+  situation, where we can't generate files because some theory is broken,<br>
+  but we can't edit the theory because we haven't generated files! We<br>
+  would need to temporarily patch our build system to bootstrap ourselves<br>
+  out of such a situation.</p>
+<ul>
+<li>Refactor our ROOT and ROOTS files, so that we can select whichever<br>
+  subset of sessions we want, and exclude sessions which require files<br>
+  we don't yet want to generate. There may be many such subsets, requiring<br>
+  many ROOT and ROOTS files, each with its own directory.</li>
+</ul>
+<p>Obviously, such a structure just re-encodes dependencies that are<br>
+  already present in the ROOT files. So limiting the scope could be (and<br>
+  indeed, was previously) automated by Isabelle/jEdit.</p>
+<p>Neither of these options is attractive. We would really like <em>some</em><br>
+mechanism to limit which sessions Isabelle/jEdit looks at, whether or not<br>
+that's "-R". There may be other options I have not considered, in which<br>
+case, I would welcome any reasonable suggestions!</p>
+<blockquote>
+<p>Note that after Isabelle2017-RC0 (e.g. in current snapshots from<br>
+<a href="http://isabelle.in.tum.de/devel/release_snapshot">http://isabelle.in.tum.de/devel/release_snapshot</a>) the session-qualified<br>
+imports are even more rigorous. It might cause additional problems for<br>
+your setup.</p>
+</blockquote>
+<p>On the whole, session-qualified imports seem to be a very positive<br>
+change.<br>
+However, at least from the perspective of a user, they seem<br>
+unrelated to the<br>
+problem we're facing here.</p>
+
+
+
+<a name="294719075"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2017-RC1%3A%20jEdit%20plugin%20insists%20all%20fil.../near/294719075" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2017-RC1.3A.20jEdit.20plugin.20insists.20all.20fil.2E.2E.2E.html#294719075">(Aug 22 2022 at 16:02)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On 05/09/17 08:02, <a href="mailto:Matthew.Brecknell@data61.csiro.au">Matthew.Brecknell@data61.csiro.au</a> wrote:</p>
+<blockquote>
+<p>I have noticed that in RC1, "isabelle jedit -R -l SESSION" no<br>
+longer ignores sessions that are not ancestors of SESSION. So now, we<br>
+really do need to generate all files mentioned in all sessions<br>
+accessible from the ROOTS file, and all their theories, before we can<br>
+open Isabelle/jEdit on any of our sessions.</p>
+</blockquote>
+<p>The idea in Isabelle2017-RC1 actually is to tolerate session import<br>
+errors during startup of the application, and merely present a big<br>
+warning dialog. It came out a bit more strict than planned, but you can<br>
+try <a href="http://isabelle.in.tum.de/repos/isabelle/rev/1af360d1cad2">http://isabelle.in.tum.de/repos/isabelle/rev/1af360d1cad2</a> or wait a<br>
+couple of days for Isabelle2017-RC2.</p>
+<blockquote>
+<ul>
+<li>Before attempting to open Isabelle/jEdit, run a "make" step which<br>
+  generates all the files for all our sessions. While not too<br>
+  inconvenient, it's distasteful that we would need to generate<br>
+  preprocessed kernel sources for a session near the top of our hierarchy,<br>
+  just to work on our library sessions at the leaves.</li>
+</ul>
+</blockquote>
+<p>You could also try to generate empty templates first.</p>
+<blockquote>
+<p>On the whole, session-qualified imports seem to be a very positive<br>
+change.<br>
+However, at least from the perspective of a user, they seem<br>
+unrelated to the<br>
+problem we're facing here.</p>
+</blockquote>
+<p>The full exploration of the session name space by Isabelle/jEdit is<br>
+required to map file names to logical theory names. Without that you<br>
+cannot refer to session-qualified theories.</p>
+<p>Makarius</p>
+
+
+
+<a name="294719133"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Isabelle2017-RC1%3A%20jEdit%20plugin%20insists%20all%20fil.../near/294719133" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle2017-RC1.3A.20jEdit.20plugin.20insists.20all.20fil.2E.2E.2E.html#294719133">(Aug 22 2022 at 16:02)</a>:</h4>
+<p>From: <a href="mailto:Matthew.Brecknell@data61.csiro.au">Matthew.Brecknell@data61.csiro.au</a><br>
+On Tue, 2017-09-05 at 14:41 +0200, Makarius wrote:</p>
+<blockquote>
+<p>The idea in Isabelle2017-RC1 actually is to tolerate session import<br>
+errors during startup of the application, and merely present a big<br>
+warning dialog. It came out a bit more strict than planned, but you can<br>
+try <a href="http://isabelle.in.tum.de/repos/isabelle/rev/1af360d1cad2">http://isabelle.in.tum.de/repos/isabelle/rev/1af360d1cad2</a> or wait a<br>
+couple of days for Isabelle2017-RC2.</p>
+</blockquote>
+<p>I've tried 1af360d1cad2, and confirm that it resolves our problem.</p>
+<p>Your reply to Florian Haftmann in the thread "Qualified theory imports and<br>
+isabelle jedit -l … -R …" now also makes sense to me.</p>
+<blockquote>
+<p>The full exploration of the session name space by Isabelle/jEdit is<br>
+required to map file names to logical theory names. Without that you<br>
+cannot refer to session-qualified theories.</p>
+</blockquote>
+<p>Fair enough, although it's still not clear to me why it's necessary, or even<br>
+desirable, to do this full exploration eagerly at Isabelle/jEdit startup.<br>
+Although it would be more fiddly to arrange for the exploration to be done<br>
+on demand, surely it is at least possible?</p>
+<p>Anyway, thanks for helping us out of this problem!</p>
+<p>Matthew</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

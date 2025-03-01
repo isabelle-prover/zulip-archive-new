@@ -1,0 +1,77 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Non-exhaustive pattern-matching in generated c... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Non-exhaustive.20pattern-matching.20in.20generated.20c.2E.2E.2E.html">[isabelle] Non-exhaustive pattern-matching in generated c...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294721970"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Non-exhaustive%20pattern-matching%20in%20generated%20c.../near/294721970" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Non-exhaustive.20pattern-matching.20in.20generated.20c.2E.2E.2E.html#294721970">(Aug 22 2022 at 16:18)</a>:</h4>
+<p>From: Brandon Bohrer &lt;<a href="mailto:bbohrer@cs.cmu.edu">bbohrer@cs.cmu.edu</a>&gt;<br>
+Hi All,</p>
+<p>I'm currently generating code from Isabelle definitions that use " 'a set"<br>
+(where 'a::{finite,enum}).<br>
+When I run it I get exceptions because the generated code for Set.image<br>
+(i.e. f ` set) has a non-exhaustive pattern-match, which is difficult to<br>
+avoid for infinite types but in principle should be avoidable for<br>
+enumeration types (since the coset constructor is redundant with the set<br>
+constructor).</p>
+<p>Does anyone know of a way to code-generate an exhaustive implementation for<br>
+Set.image for finite/enumeration types, without implementing my own<br>
+finite/cofinite-set data structure from scratch?</p>
+<p>If I code-generate to Scala, I can hack the resulting code to be exhaustive<br>
+by matching on types at runtime, but (a) I'd rather avoid hacks and (b) I<br>
+may want to generate SML instead, where such hacks do not work as well.</p>
+<p>I've attached a trivial example that reproduces the exception. The SML file<br>
+generated from the Isabelle theory raises Match on start. For good measure,<br>
+I've also included an SML file demonstrating the hacky solution.</p>
+<p>Thanks!<br>
+-Brandon<br>
+<a href="/user_uploads/14278/_6h02CWzF4XY2atOi2C8raAc/Codegen_Exploder.thy">Codegen_Exploder.thy</a><br>
+<a href="/user_uploads/14278/wkYhyXhdSF9byk5bkM9IAU7_/Exploder.sml">Exploder.sml</a><br>
+<a href="/user_uploads/14278/0uZNfC5gpGHEr7CBOVfrY11f/Exploder_Hack.sml">Exploder_Hack.sml</a></p>
+
+
+
+<a name="294722001"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Non-exhaustive%20pattern-matching%20in%20generated%20c.../near/294722001" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Non-exhaustive.20pattern-matching.20in.20generated.20c.2E.2E.2E.html#294722001">(Aug 22 2022 at 16:19)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Hi Brandon,</p>
+<p>To implement set image for an arbitrary function, I don't see any way other than first <br>
+converting the complement representation into an explicit list of the elements. You can <br>
+use the type class enum for that. For example:</p>
+<p>lemma set_fold_remove1:<br>
+   "distinct ys ⟹ set (fold remove1 xs ys) = set ys - set xs"<br>
+   by(induction xs arbitrary: ys) auto</p>
+<p>lemma coset_enum:<br>
+   "List.coset xs = set (fold remove1 xs Enum.enum)"<br>
+   by(auto simp add: set_fold_remove1 enum_distinct UNIV_enum[symmetric])</p>
+<p>lemma image_coset [code]:<br>
+   "f ` List.coset xs = set (map f (fold remove1 xs Enum.enum))"<br>
+   by(simp only: coset_enum set_map)</p>
+<p>Now image has two code equations, one for set and one for coset. However, you can no <br>
+longer use image on sets whose element types are not enumerable, i.e., an instance of the <br>
+enum type class.</p>
+<p>If you want to have both, then you have to do a bit more work. Basically you must <br>
+implement in HOL the type tests that you do manually in Scala. The theory Collection_Enum <br>
+in my AFP entry Containers does this and uses it for set comprehensions. There's currently <br>
+no setup for set complement, but it would not be hard to do so.</p>
+<p>Hope this helps,<br>
+Andreas</p>
+
+
+
+<a name="294722022"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Non-exhaustive%20pattern-matching%20in%20generated%20c.../near/294722022" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Non-exhaustive.20pattern-matching.20in.20generated.20c.2E.2E.2E.html#294722022">(Aug 22 2022 at 16:19)</a>:</h4>
+<p>From: Brandon Bohrer &lt;<a href="mailto:bbohrer@cs.cmu.edu">bbohrer@cs.cmu.edu</a>&gt;<br>
+I'm currently using sets only for enumeration types, so your code worked<br>
+perfectly. Many thanks!</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

@@ -1,0 +1,218 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Handling of invalid type variable names on ML ... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Handling.20of.20invalid.20type.20variable.20names.20on.20ML.20.2E.2E.2E.html">[isabelle] Handling of invalid type variable names on ML ...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294731730"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Handling%20of%20invalid%20type%20variable%20names%20on%20ML%20.../near/294731730" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Handling.20of.20invalid.20type.20variable.20names.20on.20ML.20.2E.2E.2E.html#294731730">(Aug 22 2022 at 17:11)</a>:</h4>
+<p>From: Dominique Unruh &lt;<a href="mailto:unruh@ut.ee">unruh@ut.ee</a>&gt;<br>
+Dear Makarius,</p>
+<p>thank you for the explanation. I was not aware the Variable.variant_fixes<br>
+and friends are also for type variables, this is useful to know. (Perhaps<br>
+the implementation manual should mention this more explicitly.)</p>
+<p>Concerning my original confusion: I was wondering how it can be that fixing<br>
+the variable "a" influences the behavior of the (invalid) type variable<br>
+"a". I think the answer is that, while type and regular variables are<br>
+separate, the table that remembers what variables are fixed is shared by<br>
+type and regular variables. Thus fixing the regular variable <em>a</em> also fixes<br>
+the (invalid) type variable <em>a</em>. Is that correct?</p>
+<p>I will try to follow your programming guidelines. But one thing is unclear<br>
+to me in that context: Goal.prove has an argument xs (instantiated with<br>
+["l"] in my example). I thought I can use xs with a hardcoded name because<br>
+Goal.prove will locally fix that variable. Is that incorrect? If it's<br>
+incorrect, I don't understand how the argument xs can be used, because if I<br>
+get a fresh name via Variable.variant_fixes and supply this name in the<br>
+argument xs, then I get an error that the variable is already fixed. So, I<br>
+see no way how to use the xs argument. (Of course, I can always avoid using<br>
+that argument by using Variable.export after creating a theorem using<br>
+Goal.prove, but then what is xs for?)</p>
+<p>Best wishes,<br>
+Dominique.</p>
+
+
+
+<a name="294731811"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Handling%20of%20invalid%20type%20variable%20names%20on%20ML%20.../near/294731811" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Handling.20of.20invalid.20type.20variable.20names.20on.20ML.20.2E.2E.2E.html#294731811">(Aug 22 2022 at 17:12)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On 25/05/18 21:03, Dominique Unruh wrote:</p>
+<blockquote>
+<p>Concerning my original confusion: I was wondering how it can be that<br>
+fixing the variable "a" influences the behavior of the (invalid) type<br>
+variable "a". I think the answer is that, while type and regular<br>
+variables are separate, the table that remembers what variables are<br>
+fixed is shared by type and regular variables. Thus fixing the regular<br>
+variable /a/ also fixes the (invalid) type variable /a/. Is that correct?</p>
+</blockquote>
+<p>The aspect of the context that is relevant here is Name.context /<br>
+Variable.names_of. That sub-context throws type and term variables into<br>
+one pot, and implicitly relies on other policies that ensure that they<br>
+are normally not in conflict.</p>
+<p>As you can see in the Variable module, there are further intermediate<br>
+states of variables, corresponding to declare_names,<br>
+declare_constraints, declare_term etc. -- the "implementation" manual<br>
+explains some of this.</p>
+<p>It is particularly important to develop an intuition how implicitly<br>
+declared type variables vs. explicitly fixed term variables give you<br>
+Hindley-Milner polymorphism in the end. That is the main purpose of the<br>
+whole affair of managing names formally.</p>
+<blockquote>
+<p>I will try to follow your programming guidelines. But one thing is<br>
+unclear to me in that context: Goal.prove has an argument xs<br>
+(instantiated with ["l"] in my example). I thought I can use xs with a<br>
+hardcoded name because Goal.prove will locally fix that variable. Is<br>
+that incorrect? If it's incorrect, I don't understand how the argument<br>
+xs can be used, because if I get a fresh name via Variable.variant_fixes<br>
+and supply this name in the argument xs, then I get an error that the<br>
+variable is already fixed. So, I see no way how to use the xs argument.</p>
+</blockquote>
+<p>Goal.prove provides a programming interface that corresponds to Isar<br>
+"have props if asms for xs", but Goal.prove uses<br>
+Variable.add_fixes_direct without any implicit name invention. The names<br>
+that you provide need to be "free" in the sense that they can be fixed<br>
+in the current context, e.g. because they were invented properly beforehand.</p>
+<p>Apart from these explicit term variables, you need to take care about<br>
+type variables occurring in the propositions: Variable.declare_term does<br>
+that, it ensures that the term is syntactically known to the context.</p>
+<p>Makarius</p>
+
+
+
+<a name="294733474"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Handling%20of%20invalid%20type%20variable%20names%20on%20ML%20.../near/294733474" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Handling.20of.20invalid.20type.20variable.20names.20on.20ML.20.2E.2E.2E.html#294733474">(Aug 22 2022 at 17:22)</a>:</h4>
+<p>From: Dominique Unruh &lt;<a href="mailto:unruh@ut.ee">unruh@ut.ee</a>&gt;<br>
+Hi,</p>
+<p>I am not sure the following situation should be considered a bug or not,<br>
+since it occurs only when using Isabelle incorrectly. But I feel that it<br>
+probably indicates that invalid input is not detected in time, and it may<br>
+lead to very hard to understand problems (starting from a typo). So I just<br>
+explain the problem and leave it to the Isabelle-experts to decide whether<br>
+it indicates a real problem or not.</p>
+<p>The problem is exhibited by the theory below. But in a nutshell, we have<br>
+the following situation:</p>
+<p>- It is possible to prove a theorem with a type variable called <em>a</em> (not<br>
+<em>'a</em>). I understand that I should not do that, of course. But there is<br>
+   no error when proving the theorem.</p>
+<p>- Then, if we try to use OF with that theorem, we get unexpected<br>
+   failures. But only if <em>a</em> is the name of a fixed variable (not type<br>
+   variable).</p>
+<p>I guess that type variable <em>a</em> should probably just be rejected when trying<br>
+to prove the theorem. But even if not, it is surprising that the existence<br>
+of a fixed variable <em>a</em> makes a difference since I would have assumed that<br>
+free variables and free type variables have completely independent name<br>
+spaces.</p>
+<p>theory Test<br>
+  imports Main<br>
+begin</p>
+<p>lemma x: fixes c :: int assumes "c = d" shows "True" ..</p>
+<p>context fixes a :: int begin</p>
+<p>ML {*<br>
+val ctx = @{context}<br>
+val T = TFree(("a"),@{sort type}) (* Note the incorrect "a" instead of "'a"<br>
+*)<br>
+val l = Free(("l"),T)<br>
+val prop = HOLogic.mk_Trueprop (HOLogic.mk_eq (l,l)) (* prop = "l=l" *)<br>
+fun tac {context=ctx, ...} = ALLGOALS (simp_tac ctx)<br>
+val thm = Goal.prove ctx ["l"] [] prop tac (* proving prop *)<br>
+val _ = @{thm x} OF [thm] (* Fails with "no unifiers". But succeeds if<br>
+"fixes a" above is "fixes b" *)<br>
+*}</p>
+<p>Best wishes,<br>
+Dominique.</p>
+
+
+
+<a name="294733520"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Handling%20of%20invalid%20type%20variable%20names%20on%20ML%20.../near/294733520" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Handling.20of.20invalid.20type.20variable.20names.20on.20ML.20.2E.2E.2E.html#294733520">(Aug 22 2022 at 17:22)</a>:</h4>
+<p>From: Makarius &lt;<a href="mailto:makarius@sketis.net">makarius@sketis.net</a>&gt;<br>
+On 25/05/18 16:51, Dominique Unruh wrote:</p>
+<blockquote>
+<p>I am not sure the following situation should be considered a bug or not,<br>
+since it occurs only when using Isabelle incorrectly. But I feel that it<br>
+probably indicates that invalid input is not detected in time, and it may<br>
+lead to very hard to understand problems (starting from a typo). So I just<br>
+explain the problem and leave it to the Isabelle-experts to decide whether<br>
+it indicates a real problem or not.</p>
+</blockquote>
+<p>This preface already points in the direction of a "general user error",<br>
+or rather a mismatch of expectations vs. the reality of how the system<br>
+works.</p>
+<blockquote>
+<p>The problem is exhibited by the theory below. But in a nutshell, we have<br>
+the following situation:</p>
+<p>- It is possible to prove a theorem with a type variable called <em>a</em> (not<br>
+<em>'a</em>). I understand that I should not do that, of course. But there is<br>
+   no error when proving the theorem.<br>
+   - Then, if we try to use OF with that theorem, we get unexpected<br>
+   failures. But only if <em>a</em> is the name of a fixed variable (not type<br>
+   variable).</p>
+<p>I guess that type variable <em>a</em> should probably just be rejected when trying<br>
+to prove the theorem. But even if not, it is surprising that the existence<br>
+of a fixed variable <em>a</em> makes a difference since I would have assumed that<br>
+free variables and free type variables have completely independent name<br>
+spaces.</p>
+</blockquote>
+<p>There are many different notions of names, variables, contexts etc. and<br>
+a lot of system infrastructure to help getting Isabelle/ML tool<br>
+implementations right. The "implementation" manual explains some of this<br>
+-- beyond that it is important to find good examples and study them<br>
+carefully.</p>
+<p>In general, the programming interfaces are much less typed than one<br>
+might expect. As a start you should think of Isabelle/ML is a variant of<br>
+LISP with a few static types to avoid utter nonsense. It is important to<br>
+observe certain disciplines and high-level ideas -- the system often<br>
+does not check or cannot check for that.</p>
+<p>For type and term variables, it is usually already an error if literal<br>
+names appear in the ML text. There are operations to invent fresh<br>
+variables relative to a certain context -- and using them is mandatory<br>
+to make things work in arbitrary contexts. So it is unlikely to make a<br>
+typo of "a" vs. "'a" in ML, because both are already wrong as literal<br>
+variable names in the source.</p>
+<blockquote>
+<p>val ctx = @{context}</p>
+</blockquote>
+<p>First note that there are hard and fast naming conventions for certain<br>
+basic Isabelle/ML types (see chapter 0 in the "implementation" manual),<br>
+in particular the value above needs to be called "ctxt". Otherwise there<br>
+is no chance to understand the source in more complex situations, when<br>
+there is a serious problem with contexts (the present example is not<br>
+serious yet). The Highlighter of Isabelle/jEdit can be helpful here,<br>
+when sources are written in a standard form.</p>
+<blockquote>
+<p>fun tac {context=ctx, ...} = ALLGOALS (simp_tac ctx)</p>
+</blockquote>
+<p>At this spot you are binding the same name "ctx" again: this shadowing<br>
+makes it difficult to understand and change the sources later. Anyway,<br>
+the forward definition of "tac" is better inlined into the Goal.prove<br>
+invocation, it makes the source more readable and robust.</p>
+<p>Here is that snippet in standard form, optimized for readability:</p>
+<p>ML ‹<br>
+val ctxt = @{context}<br>
+val T = TFree ("a", @{sort type})<br>
+val l = Free ("l", T)<br>
+val thm =<br>
+  Goal.prove ctxt ["l"] [] (HOLogic.mk_Trueprop (HOLogic.mk_eq (l, l)))<br>
+    (fn {context = ctxt', ...} =&gt; ALLGOALS (simp_tac ctxt'))<br>
+›</p>
+<p>Now the development of the local ctxt into ctxt' becomes clear: the<br>
+latter is the "eigen-context" of the goal statement.</p>
+<p>After inspecting contexts, I routinely look at variables and terms vs.<br>
+these contexts. Above Goal.prove is applied to some proposition that is<br>
+not declared in the context (e.g. with Variable.declare_term). Omitting<br>
+that in real applications can lead to really confusing situations with<br>
+the implicit Hindley-Milner polymorphism and other corner cases.</p>
+<p>See also section "6.1 Variables" in the "implementation" manual,<br>
+including its minimal examples. With that you might produce fresh<br>
+type/term variables robustly, such that the whole question from the<br>
+start disappears.</p>
+<p>Makarius</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

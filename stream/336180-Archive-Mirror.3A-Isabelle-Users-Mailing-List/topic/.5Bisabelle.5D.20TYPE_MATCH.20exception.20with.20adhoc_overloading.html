@@ -1,0 +1,126 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] TYPE_MATCH exception with adhoc_overloading · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20TYPE_MATCH.20exception.20with.20adhoc_overloading.html">[isabelle] TYPE_MATCH exception with adhoc_overloading</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294319234"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20TYPE_MATCH%20exception%20with%20adhoc_overloading/near/294319234" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20TYPE_MATCH.20exception.20with.20adhoc_overloading.html#294319234">(Aug 19 2022 at 16:26)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@inf.ethz.ch">andreas.lochbihler@inf.ethz.ch</a>&gt;<br>
+Dear experts on adhoc overloading,</p>
+<p>When I want to instantiate variables in a theorem using the attribute "of", sometimes the <br>
+exception TYPE_MATCH gets raised. This seems strange to me because I would expect that <br>
+adhoc_overloading either complains about not being able to uniquely resolve an overloaded <br>
+constant or exchanges the constant in the AST.</p>
+<p>By adding more type annotations, I have so far been able to circumvent the exception, but <br>
+there seems to be a check missing. Attached you find a small example.</p>
+<p>Best,<br>
+Andreas<br>
+<a href="/user_uploads/14278/bWrnwsovAmRoWO4FTbeOXr7d/Scratch.thy">Scratch.thy</a></p>
+
+
+
+<a name="294319412"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20TYPE_MATCH%20exception%20with%20adhoc_overloading/near/294319412" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20TYPE_MATCH.20exception.20with.20adhoc_overloading.html#294319412">(Aug 19 2022 at 16:27)</a>:</h4>
+<p>From: Christian Sternagel &lt;<a href="mailto:c.sternagel@gmail.com">c.sternagel@gmail.com</a>&gt;<br>
+Dear Andreas,</p>
+<p>Thanks for the report, I'll have a look. First an immediate observation:</p>
+<p>When adding the following to Scratch.thy</p>
+<p>declare [[show_variants]]</p>
+<p>notepad<br>
+begin<br>
+   fix f :: "('b ⇒ 'b ⇒ 'a) stream"<br>
+   and x :: "'b stream"<br>
+   term "pure id :: ('b =&gt; 'b) stream"</p>
+<p>the first "term" results in</p>
+<p>"pure_stream id"<br>
+   :: "('c ⇒ 'c) stream"</p>
+<p>while the second results in</p>
+<p>"pure_stream id"<br>
+   :: "('b ⇒ 'b) stream"</p>
+<p>So it is not surprising that the first causes problems while matching. <br>
+Why, however "'c" is produced instead of "'b" is not immediately clear <br>
+to me. I'll investigate.</p>
+<p>cheers</p>
+<p>chris</p>
+
+
+
+<a name="294319794"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20TYPE_MATCH%20exception%20with%20adhoc_overloading/near/294319794" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20TYPE_MATCH.20exception.20with.20adhoc_overloading.html#294319794">(Aug 19 2022 at 16:28)</a>:</h4>
+<p>From: Christian Sternagel &lt;<a href="mailto:c.sternagel@gmail.com">c.sternagel@gmail.com</a>&gt;<br>
+I'm currently a bit confused by the result of "Sign.typ_unify" (or <br>
+rather the result of applying the corresponding "unifier"). So maybe the <br>
+problem stems from my ignorance w.r.t. to its intended result.</p>
+<p>After applying the attached "debug" patch for the following</p>
+<p>consts pure :: "'a ⇒ 'b"</p>
+<p>definition pure_stream :: "'a ⇒ 'a stream"<br>
+   where "pure_stream = sconst"</p>
+<p>adhoc_overloading pure pure_stream</p>
+<p>consts ap_stream :: "('a ⇒ 'b) stream ⇒ 'a stream ⇒ 'b stream" <br>
+(infixl "◇" 70)<br>
+   consts S_stream :: "(('a ⇒ 'b ⇒ 'c) ⇒ ('a ⇒ 'b) ⇒ 'a ⇒ 'c) stream"</p>
+<p>declare [[show_variants]]</p>
+<p>term "pure id :: ('b ⇒ 'b) stream"</p>
+<p>we obtain the output</p>
+<p>oconst type: (??'a ⇒ ??'a) ⇒ ('b ⇒ 'b) stream<br>
+variant type: ?'a ⇒ ?'a stream<br>
+("unifier:",<br>
+  {(("'a", 0), (["HOL.type"], "??'a ⇒ ??'a")),<br>
+    (("?'a", 0),<br>
+      (["HOL.type"],<br>
+       "'b"))}) (line 165 of <br>
+"/home/griff/Repos/isabelle/src/Tools/adhoc_overloading.ML")<br>
+("candidate term:",<br>
+  Const ("Scratch.pure_stream",<br>
+         "?'a<br>
+          ⇒ ?'a <a href="http://Stream.stream">Stream.stream</a>")) (line 167 of <br>
+"/home/griff/Repos/isabelle/src/Tools/adhoc_overloading.ML")<br>
+("after unification:",<br>
+  Const ("Scratch.pure_stream",<br>
+         "(??'a ⇒ ??'a)<br>
+          ⇒ (??'a<br>
+              ⇒ ??'a) <a href="http://Stream.stream">Stream.stream</a>")) (line 168 of <br>
+"/home/griff/Repos/isabelle/src/Tools/adhoc_overloading.ML")<br>
+"pure_stream id"<br>
+   :: "('a ⇒ 'a) stream"</p>
+<p>The result of unification is a bit surprising to me, since the obtained <br>
+"unifier" seems to claim that</p>
+<p>('b =&gt; 'b) =&gt; ('b =&gt; 'b) stream</p>
+<p>and</p>
+<p>(??'a =&gt; ??'a) =&gt; (??'a =&gt; ??'a) stream</p>
+<p>are equal. What am I missing here? Maybe Envir.subst_term_types is not <br>
+the way to apply the typenv obtained by typ_unify? (In this special <br>
+case, if I would call subst_term_types twice with the same typenv, the <br>
+result would be as I expected.)</p>
+<p>cheers</p>
+<p>chris</p>
+<p>Btw: the "delete" patch (which is to be applied before "debug") fixes a <br>
+typo in the description of "no_adhoc_overloading". It is entirely <br>
+unrelated to the issue at hand, but maybe somebody could apply it anyway.<br>
+<a href="/user_uploads/14278/CfRPZwIdEYzbMvXiH8s__RCW/delete">delete</a><br>
+<a href="/user_uploads/14278/7nJyc8e-KUWuvLpx04p8_z5G/debug">debug</a></p>
+
+
+
+<a name="294319812"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20TYPE_MATCH%20exception%20with%20adhoc_overloading/near/294319812" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20TYPE_MATCH.20exception.20with.20adhoc_overloading.html#294319812">(Aug 19 2022 at 16:28)</a>:</h4>
+<p>From: Dmitriy Traytel &lt;<a href="mailto:traytel@in.tum.de">traytel@in.tum.de</a>&gt;<br>
+Hi Christian,</p>
+<p>just a few weeks ago, I learned that Envir.subst_term_types is indeed <br>
+the wrong function when substituting with a unifier (instead it is <br>
+intended for matchers).</p>
+<p>The right functions for unifiers in envir.ML are the ones prefixed with <br>
+"norm".</p>
+<p>Hope that helps,<br>
+Dmitriy</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

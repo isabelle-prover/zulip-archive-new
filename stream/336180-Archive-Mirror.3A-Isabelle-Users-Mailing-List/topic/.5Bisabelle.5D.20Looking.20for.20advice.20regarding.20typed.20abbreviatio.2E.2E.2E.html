@@ -1,0 +1,199 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Looking for advice regarding typed abbreviatio... · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Looking.20for.20advice.20regarding.20typed.20abbreviatio.2E.2E.2E.html">[isabelle] Looking for advice regarding typed abbreviatio...</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294119353"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Looking%20for%20advice%20regarding%20typed%20abbreviatio.../near/294119353" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Looking.20for.20advice.20regarding.20typed.20abbreviatio.2E.2E.2E.html#294119353">(Aug 18 2022 at 16:15)</a>:</h4>
+<p>From: Rafal Kolanski &lt;<a href="mailto:rafalk@cse.unsw.edu.au">rafalk@cse.unsw.edu.au</a>&gt;<br>
+Dear Isabelle Gurus,</p>
+<p>I'm trying to put together a representation of C structures using <br>
+records, coupled with a memory model that involves pointers. There is an <br>
+operation I'm trying to express elegantly, however, that is giving me <br>
+quite a bit of trouble: dereference-and-get-address-of-field.</p>
+<p>For example take these two C structures:<br>
+struct A {<br>
+   char z;<br>
+};<br>
+struct B {<br>
+   int x;<br>
+   struct A y;<br>
+};<br>
+These have correspondingly obvious isabelle record representations (with <br>
+names prefixed to prevent collisions).</p>
+<p>If we have some variable "sa" holding a pointer to a struct A in memory, <br>
+then the dereference-and-get-address-of-field operator (denoted &amp;-&gt;) <br>
+should look something like this: sa&amp;-&gt;''x''<br>
+representing the C code: &amp;(sa-&gt;x)<br>
+This will add the structure offset of field "x" to the address contained <br>
+in the pointer "sa" and retype it as a pointer to an int.</p>
+<p>Doing the one-step case, as with "x" is possible using overloaded <br>
+functions with a manual constraint on the return type, but what I really <br>
+want is chaining, for example:<br>
+   sa&amp;-&gt;y&amp;-&gt;z should give a char pointer of z within struct A within <br>
+struct B.</p>
+<p>This is where I'm completely stuck. In my case, a "pointer" is just an <br>
+address with a phantom type variable representing the type of value it <br>
+points to. I have a function per record that given a string name of the <br>
+field, gives its offset within the corresponding structure. I have a <br>
+function that given a variable pointing to a structure of some type, <br>
+returns the relevant lookup function. The problem is the return value, <br>
+since it's type varies based on which field name one requests.</p>
+<p>I am aware that this is probably not the neatest way to go about it. <br>
+However, I really want to have a nice-looking textual representation for <br>
+the user, and ugly details under the carpet if necessary to make that <br>
+possible.</p>
+<p>The generic problem boils down to (simplified pseudo-Isabelle):</p>
+<p>consts (overloaded)<br>
+   get_lookup_table_for :: "'a itself =&gt; string =&gt; 'b"<br>
+consts (overloaded)<br>
+   -- "lookup table for structure A"<br>
+   lookup_A :: "'a ptr =&gt; string =&gt; 'b ptr"<br>
+   -- "lookup table for structure B"<br>
+   lookup_B :: "'a ptr =&gt; string =&gt; 'b ptr"<br>
+then define:<br>
+   "get_lookup_table_for TYPE(A) = lookup_A"<br>
+   "get_lookup_table_for TYPE(B) = lookup_B"<br>
+   "lookup_A p ''y'' = (ptr_add p 4)::(B ptr)"<br>
+   "lookup_B p ''z'' = (ptr_add p 0)::(char ptr)"</p>
+<p>to finally get a function:<br>
+   "lookup p name = get_lookup_table_for (TYPE(p)) p name"<br>
+which can be chained like so:<br>
+   lookup (lookup sa ''y'') ''z''<br>
+and that should give something, which will either have the type "char <br>
+ptr" inferred, or, if constrained to type "char ptr" can still be <br>
+reasoned about.</p>
+<p>I wish to avoid having to constrain the type returned by almost every <br>
+single structure field lookup when annotating code.</p>
+<p>As such, I welcome <em>any</em> method which will work, no matter how clunky. <br>
+If it involves ML hackery, no problem.</p>
+<p>Would any of you have some kind of recommendation for me? I saw some <br>
+posts a while back about doing syntax translations pre and post type <br>
+checking, but I'm unsure how to apply them to this situation seeing as I <br>
+need the type of "sa" to be able to infer the type of the lookup result.</p>
+<p>Sincerely hopeful,</p>
+<p>Rafal Kolanski.</p>
+
+
+
+<a name="294119374"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Looking%20for%20advice%20regarding%20typed%20abbreviatio.../near/294119374" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Looking.20for.20advice.20regarding.20typed.20abbreviatio.2E.2E.2E.html#294119374">(Aug 18 2022 at 16:15)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@kit.edu">andreas.lochbihler@kit.edu</a>&gt;<br>
+Dear Rafael,</p>
+<blockquote>
+<p>struct A {<br>
+  char z;<br>
+};<br>
+struct B {<br>
+  int x;<br>
+  struct A y;<br>
+};</p>
+<p>[...]</p>
+<p>The generic problem boils down to (simplified pseudo-Isabelle):</p>
+<p>consts (overloaded)<br>
+  get_lookup_table_for :: "'a itself =&gt; string =&gt; 'b"<br>
+consts (overloaded)<br>
+  -- "lookup table for structure A"<br>
+  lookup_A :: "'a ptr =&gt; string =&gt; 'b ptr"<br>
+  -- "lookup table for structure B"<br>
+  lookup_B :: "'a ptr =&gt; string =&gt; 'b ptr"<br>
+then define:<br>
+  "get_lookup_table_for TYPE(A) = lookup_A"<br>
+  "get_lookup_table_for TYPE(B) = lookup_B"<br>
+  "lookup_A p ''y'' = (ptr_add p 4)::(B ptr)"<br>
+  "lookup_B p ''z'' = (ptr_add p 0)::(char ptr)"</p>
+<p>to finally get a function:<br>
+  "lookup p name = get_lookup_table_for (TYPE(p)) p name"<br>
+which can be chained like so:<br>
+  lookup (lookup sa ''y'') ''z''<br>
+and that should give something, which will either have the type "char <br>
+ptr" inferred, or, if constrained to type "char ptr" can still be <br>
+reasoned about.</p>
+<p>Would any of you have some kind of recommendation for me? I saw some <br>
+posts a while back about doing syntax translations pre and post type <br>
+checking, but I'm unsure how to apply them to this situation seeing as I <br>
+need the type of "sa" to be able to infer the type of the lookup result.<br>
+I think syntax translations during type checking might solve your problem. <br>
+However, I feel that you need a more general framework than the one by Christian <br>
+Sternagel. In his approach, the overloaded constant is replaced during type <br>
+checking with another constant whose type is more specific. AFAIK this approach <br>
+works as follows when it encounters an overloaded constant c during parsing:</p>
+</blockquote>
+<p>1st) Determine the type constraints on c (from surrounding applications/type <br>
+annotations etc.)<br>
+2nd) Check whether these constraints unify with one of the registered <br>
+translations. If so, replace c appropriately.<br>
+3rd) After type checking, raise an error if c still occurs literally in the term.</p>
+<p>Your problem looks a bit more difficult because the return type of the <br>
+overloaded lookup constant not only depends on the arguments' types, but also on <br>
+the value. For exmple, suppose that the type of sa is known as<br>
+"B ptr". What should be the type of "lookup sa x" in<br>
+"x = ''y'' | x = ''z'' --&gt; lookup sa x = ..."?</p>
+<p>However, if you only need to succeed in type checking lookup terms when the <br>
+second argument is given as a literal string, a similar approach might work.<br>
+Instead of looking at the type constraints, you would have to match for term <br>
+pattern</p>
+<p>Const ("lookup", _) $<br>
+(_, &lt;ML representation of "B ptr"&gt;) $<br>
+(Const ("Cons", _) $<br>
+   (Const ("String.char.Char", _) $ ... ))</p>
+<p>and replace this with a specialized constant<br>
+lookup_B_y defined as</p>
+<p>lookup_B_y p = (ptr_add p 4)::(A ptr)"</p>
+<p>If this solves your problem, there might be an even simpler solution: Make the <br>
+field name parameter part of the lookup function name. Every struct declaration <br>
+gets translated to a list of dereference functions. In your example:</p>
+<p>definition lookup_A_z :: "A ptr =&gt; char ptr" ("_&amp;-&gt;''''z''''")<br>
+where "lookup_A_z p == ptr_add p 0"</p>
+<p>definition lookup_B_x :: "B ptr =&gt; int ptr" ("_&amp;-&gt;''''x''''")<br>
+where "lookup_B_x p == ptr_add p 0"</p>
+<p>definition lookup_B_y :: "B ptr =&gt; A ptr" ("_&amp;-&gt;''''y''''")<br>
+where "lookup_B_y p == ptr_add p 4"</p>
+<p>Then, "(p&amp;-&gt;''y'')&amp;-&gt;''z''" should type check and have type "char ptr", although <br>
+I have not tested this yet.<br>
+Note that if you have multiple structs with the same field name, say</p>
+<p>struct C { char x; }</p>
+<p>you will get another definition</p>
+<p>definition lookup_C_x :: "C ptr =&gt; char ptr" ("_&amp;-&gt;''''x''''")<br>
+where "lookup_C_x == ptr_add p 0"</p>
+<p>Now, "p&amp;-&gt;''x''" will produce two parse trees, but in most cases, only one will <br>
+be type correct.  If this happens multiple times, parsing becomes increadibly <br>
+slow because the number of parse trees grows exponentially. In that case, you <br>
+can have an overloaded constant for every field name and use Christian <br>
+Sternagel's solution. You only need to register translations for "_&amp;-&gt;''x''" and <br>
+"_&amp;-&gt;''y''" etc.</p>
+<p>Hope this helps,<br>
+Andreas</p>
+
+
+
+<a name="294119384"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Looking%20for%20advice%20regarding%20typed%20abbreviatio.../near/294119384" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Looking.20for.20advice.20regarding.20typed.20abbreviatio.2E.2E.2E.html#294119384">(Aug 18 2022 at 16:15)</a>:</h4>
+<p>From: Andreas Lochbihler &lt;<a href="mailto:andreas.lochbihler@kit.edu">andreas.lochbihler@kit.edu</a>&gt;<br>
+Dear Rafal,</p>
+<p>The approach is the same as the adhoc overloading facility by Christian <br>
+Sternagel (in the current development version in <br>
+~~/src/Tools/Adhoc_Overloading). This mechanism adds the translation via <br>
+Syntax.add_term_check to the type checking phase of terms (and similarly the <br>
+inverse translation to the printing phase). For more information on this, see <br>
+the thread on the mailing list starting with this post:<br>
+<a href="https://lists.cam.ac.uk/mailman/htdig/cl-isabelle-users/2010-May/msg00055.html">https://lists.cam.ac.uk/mailman/htdig/cl-isabelle-users/2010-May/msg00055.html</a></p>
+<p>At this very point in the type checking phase, you'd have to replace the generic <br>
+constant "lookup" with specialized versions like "lookup_B_y". To determine the <br>
+right specialized version, you will need the type of the first parameter and the <br>
+value of the second parameter of lookup. Determining the value of the second <br>
+parameter could be done with pattern matching. I don't know exactly what the <br>
+syntax tree looks like at this stage, but you should be able to find that out.</p>
+<p>Sincerely,<br>
+Andreas</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>

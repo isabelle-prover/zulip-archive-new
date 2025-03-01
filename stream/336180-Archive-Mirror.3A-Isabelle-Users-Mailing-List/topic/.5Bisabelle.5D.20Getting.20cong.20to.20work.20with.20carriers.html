@@ -1,0 +1,79 @@
+<html>
+<head><meta charset="utf-8"><title>[isabelle] Getting cong to work with carriers · Archive Mirror: Isabelle Users Mailing List · Zulip Chat Archive</title></head>
+<h2>Stream: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/index.html">Archive Mirror: Isabelle Users Mailing List</a></h2>
+<h3>Topic: <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Getting.20cong.20to.20work.20with.20carriers.html">[isabelle] Getting cong to work with carriers</a></h3>
+
+<hr>
+
+<base href="https://isabelle.zulipchat.com/">
+
+<head><link href="http://isabelle.systems/zulip-archive/style.css" rel="stylesheet"></head>
+
+<a name="294294536"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Getting%20cong%20to%20work%20with%20carriers/near/294294536" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Getting.20cong.20to.20work.20with.20carriers.html#294294536">(Aug 19 2022 at 15:49)</a>:</h4>
+<p>From: Holden Lee &lt;<a href="mailto:hl422@cam.ac.uk">hl422@cam.ac.uk</a>&gt;<br>
+Working with abstract algebra (with locales) requires always showing<br>
+elements are in the carrier before concluding anything with them. Using<br>
+type classes, this would be automatic from type-checking. I feel like there<br>
+should be a way to make it as automatic with carriers by declaring the<br>
+right simp rules, but so far I've had no success, and have to continually<br>
+pipe in facts about elements being in the carrier every time I want to<br>
+prove something. Does anyone know a way to get around this?</p>
+<p>I can get it to do basic things like: if a, b are in the carrier then a*b+c<br>
+is in the carrier. But I am working with finite sums, where congruence<br>
+rules and not just simp rules are required.</p>
+<p>I've set up a baby example to see where the problem is.</p>
+<p>Suppose I have a simp rule and congruence rules (think of F being like sum<br>
+or finsum, for instance)</p>
+<p>lemma <em>simp_rule</em>:<br>
+  fixes x<br>
+  assumes "x∈S"<br>
+  shows "a x = b x"<br>
+sorry</p>
+<p>lemma <em>rule_cong'</em>:<br>
+  "[|A=B; !! x. x∈A ==&gt; f x = g x|] ==&gt; F A f = F B g"<br>
+sorry</p>
+<p>(<em>cong</em>)<br>
+lemma <em>rule_cong</em>:<br>
+  "[|A=B; !!x. x∈A =simp=&gt; f x = g x|] ==&gt; F A f = F B g"<br>
+sorry</p>
+<p>Then Isabelle successfully solves the following, as expected (by<br>
+simplifying the LHS to F S b, then the RHS also to F S b).</p>
+<p>lemma <em>test_cong'</em>:<br>
+  "F S (λx. if (x∈S) then b x else 0) = F S a"<br>
+<em>by (auto cong: rule_cong simp add: simp_rule)</em></p>
+<p>But Isabelle stumbles on the following:</p>
+<p>lemma* test_congT'*:<br>
+  "F T (λx. if (x∈S) then b x else 0) = F T a"<br>
+proof -<br>
+  have 1:"T⊆S" by (unfold T_def S_def, auto)<br>
+  from 1 show ?thesis<br>
+    apply <em>(auto cong: rule_cong simp add: simp_rule elim!: subsetD)</em><br>
+<em>(</em>fails* - also with cong/cong' elim!/intro*<em>)</em></p>
+<p><em>(</em>subsetD: ?A ⊆ ?B ==&gt; ?c ∈ ?A ==&gt; ?c ∈ ?B<em>)</em></p>
+<p>The problem is that applying the congruence rule it fails to show x\in S.<br>
+With the assumption T⊆S and x∈T and subsetD declared as an elim rule<br>
+explicitly, it should conclude x∈S. Why doesn't it, and how can I get it to<br>
+do this?</p>
+<p>The application is that F is finsum/finprod and the expression inside<br>
+simplifies <em>on the condition that x</em><em>∈carrier G</em>, while the set T is a<br>
+<em>subset</em> of carrier G</p>
+<p>For easy experimentation, here is the file:<br>
+<a href="https://dl.dropboxusercontent.com/u/27883775/work/Isabelle/TestTactics.thy">https://dl.dropboxusercontent.com/u/27883775/work/Isabelle/TestTactics.thy</a></p>
+<p>-Holden</p>
+
+
+
+<a name="294294544"></a>
+<h4><a href="https://isabelle.zulipchat.com/#narrow/stream/336180-Archive%20Mirror%3A%20Isabelle%20Users%20Mailing%20List/topic/%5Bisabelle%5D%20Getting%20cong%20to%20work%20with%20carriers/near/294294544" class="zl"><img src="http://isabelle.systems/zulip-archive/assets/img/zulip.svg" alt="view this post on Zulip" style="width:20px;height:20px;"></a> Email Gateway <a href="http://isabelle.systems/zulip-archive/stream/336180-Archive-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Getting.20cong.20to.20work.20with.20carriers.html#294294544">(Aug 19 2022 at 15:49)</a>:</h4>
+<p>From: Lawrence Paulson &lt;<a href="mailto:lp15@cam.ac.uk">lp15@cam.ac.uk</a>&gt;<br>
+You may have luck with </p>
+<p>apply (auto cong: rule_cong simp add: simp_rule subsetD [OF 1])</p>
+<p>Auto doesn’t use “elim!” inside the simplifier, but outside it, so it cannot help.</p>
+<p>The point of my suggestion is to instantiate the variables in subsetD.</p>
+<p>Larry</p>
+
+
+
+<hr><p>Last updated: Mar 01 2025 at 16:21 UTC</p>
+</html>
